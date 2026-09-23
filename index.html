@@ -1,0 +1,1457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Journal Color Studio — Dove Expressions</title>
+<meta name="description" content="Swap the colors and design elements of complete Dove Expressions journals and export print-ready PDFs.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Lato:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+:root {
+  --bg: #f7f3ef;
+  --panel: #ffffff;
+  --ink: #2a1a18;
+  --muted: #7b6a66;
+  --line: #e7ddd6;
+  --brand: #630000;
+  --gold: #c9a05a;
+  --shadow: 0 10px 30px rgba(60, 20, 10, .10);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #171211; --panel: #221a19; --ink: #f3e9e4; --muted: #b3a29d; --line: #3a2e2c;
+    --brand: #e6a3a3; --shadow: 0 10px 30px rgba(0,0,0,.4);
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 Lato, system-ui, sans-serif; }
+header { display: flex; align-items: center; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--line); background: var(--panel); position: sticky; top: 0; z-index: 5; }
+.brand-mark { width: 34px; height: 34px; border-radius: 8px; background: var(--brand); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 13px; }
+header strong { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 20px; }
+header small { display: block; color: var(--muted); font-size: 10px; letter-spacing: .14em; }
+header .spacer { flex: 1; }
+.saved { color: var(--muted); font-size: 12px; }
+.layout { display: grid; grid-template-columns: 380px minmax(0, 1fr); gap: 20px; padding: 20px; max-width: 1400px; margin: 0 auto; }
+aside { display: flex; flex-direction: column; gap: 14px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; box-shadow: var(--shadow); }
+.card h2 { margin: 0 0 10px; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); display: flex; justify-content: space-between; }
+.card h2 span { text-transform: none; letter-spacing: 0; font-weight: 400; }
+h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-height: 1.1; margin: 0 0 6px; }
+.lead { color: var(--muted); margin: 0; }
+.seg { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 6px; }
+.seg button, .btn { border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 10px; padding: 9px 10px; cursor: pointer; font: inherit; text-align: left; }
+.seg button strong { display: block; font-size: 13px; }
+.seg button small { color: var(--muted); font-size: 11px; }
+.seg button.active { border-color: var(--brand); box-shadow: inset 0 0 0 1px var(--brand); }
+.btn.primary { background: var(--brand); color: #fff; border-color: var(--brand); text-align: center; font-weight: 700; }
+.btn:disabled { opacity: .5; cursor: wait; }
+.palettes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.palettes button { border: 1px solid var(--line); border-radius: 10px; padding: 6px; background: var(--panel); cursor: pointer; color: var(--ink); font: inherit; }
+.palettes button.selected { border-color: var(--brand); box-shadow: inset 0 0 0 1px var(--brand); }
+.swatch-row { display: flex; height: 22px; border-radius: 6px; overflow: hidden; margin-bottom: 4px; }
+.swatch-row i { flex: 1; }
+.thumb { display: block; width: 100%; height: auto; border-radius: 6px; margin-bottom: 4px; background: var(--line); }
+.seg button .thumb { aspect-ratio: 1.3; object-fit: cover; }
+.accent-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 4px; }
+.accent-tiles button { border: 1px solid var(--line); border-radius: 8px; padding: 4px; background: var(--panel); color: var(--ink); cursor: pointer; font: inherit; font-size: 10px; }
+.accent-tiles button.active { border-color: var(--brand); box-shadow: inset 0 0 0 1px var(--brand); }
+.accent-tiles canvas { display: block; width: 100%; aspect-ratio: 1; border-radius: 5px; margin-bottom: 2px; }
+.page-strip { display: flex; gap: 10px; overflow-x: auto; padding: 10px 16px 14px; border-top: 1px solid var(--line); scrollbar-width: thin; }
+.page-strip button { flex: 0 0 auto; border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 4px; cursor: pointer; color: var(--ink); font: inherit; font-size: 10px; line-height: 1.2; width: 82px; }
+.pager { display: grid; grid-template-columns: 44px 1fr 44px; gap: 8px; align-items: center; margin-top: 10px; }
+.pager .btn { text-align: center; font-size: 20px; padding: 4px 0; }
+.pager div { text-align: center; font-size: 12px; color: var(--muted); }
+.pager strong { display: block; color: var(--ink); font-size: 14px; }
+.page-strip button.active { border-color: var(--brand); box-shadow: inset 0 0 0 1px var(--brand); }
+.page-strip canvas { display: block; width: 100%; height: auto; border-radius: 3px; margin-bottom: 3px; box-shadow: 0 2px 8px rgba(0,0,0,.18); }
+.palettes span { font-size: 11px; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.group-label { font-size: 11px; color: var(--muted); margin: 12px 0 6px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.group-label:first-child { margin-top: 0; }
+.role { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px dashed var(--line); }
+.role:last-child { border-bottom: 0; }
+.role label { display: flex; align-items: center; gap: 8px; flex: 1; }
+.role input[type=checkbox] { accent-color: var(--brand); }
+.role input[type=color] { width: 40px; height: 28px; border: 1px solid var(--line); border-radius: 6px; padding: 0; background: none; cursor: pointer; }
+.role small { color: var(--muted); display: block; font-size: 11px; }
+.slider { display: grid; gap: 4px; margin-top: 10px; }
+.slider span { display: flex; justify-content: space-between; font-size: 12px; }
+.slider input { width: 100%; accent-color: var(--brand); }
+.field { display: grid; gap: 4px; margin-top: 10px; font-size: 12px; }
+.field input, .field select { font: inherit; padding: 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.actions { display: grid; gap: 8px; }
+.workspace { min-width: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); display: flex; flex-direction: column; min-height: 80vh; position: sticky; top: 84px; max-height: calc(100vh - 104px); }
+.workbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.workbar strong { font-size: 15px; }
+.preview { flex: 1; display: grid; place-items: center; padding: 20px; background: repeating-conic-gradient(var(--bg) 0 25%, transparent 0 50%) 0 0 / 24px 24px; min-height: 0; }
+.preview canvas { max-width: 100%; max-height: calc(100vh - 360px); width: auto; height: auto; box-shadow: 0 16px 40px rgba(0,0,0,.25); background: #fff; }
+.hidden { display: none !important; }
+.preview { position: relative; }
+.loading { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; gap: 4px; background: var(--bg); background: color-mix(in srgb, var(--bg) 88%, transparent); color: var(--ink); padding: 16px; }
+.loading strong { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 22px; }
+.loading small { color: var(--muted); }
+.toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-size: 13px; z-index: 10; }
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; padding: 16px; }
+  /* Keep the preview pinned while scrolling the controls on a phone. */
+  .workspace { position: sticky; top: 0; z-index: 4; max-height: none; min-height: 0; order: -1; }
+  header { position: static; }
+  .saved { display: none; }
+  .workbar { padding: 8px 12px; }
+  .preview { padding: 10px; }
+  .preview canvas { max-height: 30vh; }
+  .page-strip { padding: 6px 10px 8px; gap: 8px; }
+  .page-strip button { width: 64px; font-size: 10px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand-mark">DE</div>
+  <div><strong>Journal Color Studio</strong><small>DOVE EXPRESSIONS</small></div>
+  <div class="spacer"></div>
+  <span class="saved">Changes save automatically</span>
+</header>
+
+<div class="layout">
+  <aside>
+    <div class="card">
+      <h1>Your journal, your colors.</h1>
+      <p class="lead">Choose a journal, then swap the marble, colors and elements. Every page of the book changes together, so you never rebuild a layout.</p>
+    </div>
+
+    <div class="card">
+      <h2>Journal <span>layout</span></h2>
+      <div class="field"><span>Which journal</span>
+        <select id="journal">
+          <option value="dream">Dream Journal</option>
+          <option value="prayer">Prayer Journal (Pink)</option>
+        </select>
+      </div>
+      <div class="pager">
+        <button class="btn" id="prevPage" aria-label="Previous page">‹</button>
+        <div><strong id="pageName"></strong><span id="pageNum"></span></div>
+        <button class="btn" id="nextPage" aria-label="Next page">›</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Design pieces <span>from your Canva elements</span></h2>
+      <div class="field"><span>Marble</span>
+        <div class="seg" id="marbleSeg">
+          <button data-marble="classic"><strong>Veined</strong><small>Textured stone + cream</small></button>
+          <button data-marble="canva"><strong>Bold gold</strong><small>Flat stone, metallic veins</small></button>
+          <button data-marble="blush"><strong>Watercolor</strong><small>Soft wash, smoky wisps</small></button>
+          <button data-marble="goldleaf"><strong>Gold leaf</strong><small>Sweeping leaf veins</small></button>
+          <button data-marble="white"><strong>White</strong><small>Soft grey veining</small></button>
+          <button data-marble="floral"><strong>Floral</strong><small>Watercolor bouquet</small></button>
+        </div>
+      </div>
+      <div class="field"><span>Title plate</span>
+        <div class="seg" id="plateSeg">
+          <button data-plate="classic"><strong>Flat frame</strong><small>Frame + thin trim</small></button>
+          <button data-plate="bevel"><strong>Gold bevel</strong><small>Metallic gradient frame</small></button>
+        </div>
+      </div>
+      <div class="field"><span>Cover lettering</span>
+        <div class="seg" id="titleSeg">
+          <button data-title="script"><strong>Script</strong><small>Brush-lettered Dream</small></button>
+          <button data-title="serif"><strong>Serif</strong><small>Classic + soft shadow</small></button>
+        </div>
+      </div>
+      <div class="field"><span>Accent art</span><div class="accent-tiles" id="accentTiles"></div></div>
+      <div class="row2">
+        <div class="field hidden"><span>Accent art</span>
+          <select id="accent">
+            <option value="none">None</option>
+            <option value="topo">Topographic lines</option>
+            <option value="waves">Flowing lines</option>
+            <option value="arcs">Nested arcs</option>
+            <option value="ribbon">Line ribbon</option>
+            <option value="dots">Halftone dots</option>
+            <option value="stripes">Bold stripes</option>
+          </select>
+        </div>
+        <div class="field"><span>Accent placement</span>
+          <select id="accentPlace">
+            <option value="corners">Opposite corners</option>
+            <option value="center">Behind the title</option>
+            <option value="full">Full page</option>
+          </select>
+        </div>
+      </div>
+      <label class="slider" id="accentOpacityRow"><span>Accent opacity <b id="accentVal"></b></span><input type="range" id="accentOpacity" min="5" max="100"></label>
+      <div class="role" id="accentLinedRow"><label><input type="checkbox" id="accentLined"> Also show accent faintly on lined pages</label></div>
+      <label class="slider" id="shadowRow"><span>Lettering shadow <b id="shadowVal"></b></span><input type="range" id="titleShadow" min="0" max="100"></label>
+    </div>
+
+    <div class="card">
+      <h2>Palette <span id="paletteName"></span></h2>
+      <div class="palettes" id="palettes"></div>
+    </div>
+
+    <div class="card">
+      <h2>Layers <span>toggle + recolor</span></h2>
+      <div id="roles"></div>
+      <label class="slider"><span>Stone texture <b id="textureVal"></b></span><input type="range" id="texture" min="0" max="100"></label>
+      <label class="slider"><span>Vein strength <b id="veinVal"></b></span><input type="range" id="veinStrength" min="0" max="100"></label>
+      <label class="slider"><span>Title plate opacity <b id="plateVal"></b></span><input type="range" id="plateOpacity" min="0" max="100"></label>
+    </div>
+
+    <div class="card" id="linedCard">
+      <h2>Interior pages</h2>
+      <div class="field"><span>Header style</span>
+        <select id="headerStyle">
+          <option value="mixed">As designed (your Canva layout)</option>
+          <option value="block">Dark block + gold rule</option>
+          <option value="rule">Classic title + gold rule</option>
+          <option value="bar">Title + dark bar</option>
+          <option value="band">Marble band + title plate</option>
+          <option value="soft">Soft marble wash</option>
+          <option value="plain">Title only</option>
+        </select>
+      </div>
+      <div class="row2">
+        <div class="field"><span>Dark bars + blocks</span>
+          <select id="headerFill"><option value="marble">Marble</option><option value="solid">Solid stone color</option></select>
+        </div>
+        <div class="field"><span>Page footer</span>
+          <select id="footer"><option value="on">Gold rule + bar</option><option value="off">None</option></select>
+        </div>
+      </div>
+      <div class="row2">
+        <div class="field"><span>Header rule</span>
+          <select id="headerRule"><option value="line">Gold line</option><option value="ornament">Gold ornament divider</option></select>
+        </div>
+        <div class="field"><span>Writing lines</span>
+          <select id="lineStyle"><option value="printed">Printed</option><option value="hand">Hand-drawn</option></select>
+        </div>
+      </div>
+      <div class="field"><span>Line spacing</span>
+        <select id="lineSpacing">
+          <option value="25">Master (25 pt)</option>
+          <option value="22">College (22 pt)</option>
+          <option value="30">Wide (30 pt)</option>
+        </select>
+      </div>
+      <div class="role" style="margin-top:10px"><label><input type="checkbox" id="marginLine"> Left margin rule</label></div>
+    </div>
+
+    <div class="card">
+      <h2>Export <span>8.885 × 11.385 in</span></h2>
+      <div class="seg" id="qualitySeg">
+        <button data-q="proof" class="active"><strong>Quick proof</strong><small>150 DPI</small></button>
+        <button data-q="print"><strong>Print quality</strong><small>300 DPI</small></button>
+      </div>
+      <div class="row2">
+        <div class="field"><span>Interior pages</span><input type="number" id="pageCount" min="10" max="300" value="102"></div>
+        <div class="field"><span>Front cover</span><select id="includeCover"><option value="yes">Include</option><option value="no">Leave out</option></select></div>
+      </div>
+      <div class="field"><span>Back cover</span><select id="includeBack"><option value="yes">Include (marble)</option><option value="no">Leave out</option></select></div>
+      <div class="actions" style="margin-top:12px">
+        <button class="btn primary" id="exportPdf">Export full journal PDF</button>
+        <div class="row2">
+          <button class="btn" id="exportCover">Cover PNG</button>
+          <button class="btn" id="exportLined">This page PNG</button>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <article class="workspace">
+    <div class="workbar">
+      <div><strong id="viewLabel">Front cover</strong></div>
+      <button class="btn" id="compare">Hold to compare original</button>
+    </div>
+    <div class="preview"><canvas id="canvas" width="760" height="974"></canvas>
+      <div class="loading" id="loading"><strong>Loading your journal…</strong><small>Preparing the design pieces</small></div>
+    </div>
+    <div class="page-strip" id="pageStrip"></div>
+  </article>
+</div>
+<div class="toast hidden" id="toast"></div>
+
+<script>
+(() => {
+  // Page size matches the Alibaba production master (639.75 × 819.75 pt).
+  const PAGE_W = 639.75, PAGE_H = 819.75;
+  // Marble layer maps: R = stone detail (or vein shading), G = gold veins, B = cream highlights.
+  // The "canva" marble comes from Sydni's Canva cover: flat stone, so the gold carries its own light-to-dark shading.
+  const TEXTURES = {
+    classic: { src: 'marble-layers.png', shadeBase: .82, shadeAmt: .3 },
+    canva: { src: 'marble-layers-canva.png', shadeBase: .5, shadeAmt: .75 },
+    blush: { src: 'marble-layers-blush.png', shadeBase: .62, shadeAmt: .55 },       // watercolor marble: B holds the dark smoky wisps
+    goldleaf: { src: 'marble-layers-goldleaf.png', shadeBase: .62, shadeAmt: .5 },  // gold-leaf veins over a plain stone
+    white: { src: 'marble-layers-white.png', shadeBase: .7, shadeAmt: .4 },         // white marble: grey veins take the Veins color
+  };
+  const IMAGES = {
+    title: 'title-lettering.png',        // script "Dream Journal" (alpha mask, full page)
+    serif: 'title-serif.png',            // serif "Dream Journal" from the Canva cover (alpha mask, cropped)
+    serifShadow: 'title-serif-shadow.png',
+    bevel: 'bevel-frame.png',            // Canva gold bevel frame: R = lightness, G = gold vs dark ring, A = coverage
+    'accent:topo': 'accent-topo.png',       // single-color line art from the Canva elements (alpha masks)
+    'accent:waves': 'accent-waves.png',
+    'accent:arcs': 'accent-arcs.png',
+    'accent:ribbon': 'accent-ribbon.png',
+    'accent:dots': 'accent-dots.png',
+    'accent:stripes': 'accent-stripes.png',
+    floralCover: 'floral-cover.jpg',       // full bouquet artwork, recolored per-palette (not an alpha mask)
+    floralHeader: 'floral-header.png',     // small rose cluster: flanks header rules, corners of How to Use
+    floralCorner: 'floral-corner.png',     // large corner bouquet: frames the Belongs-to page
+    divider: 'ornament-divider.png',       // gold ornament divider (alpha mask)
+    handLines: 'lines-hand.png',
+    logo: 'dove-logo.png',                 // Dove Expressions wordmark, kept in its brand colors           // 11 hand-drawn ruled lines stacked as equal-height strips (alpha mask)
+  };
+  // Script lettering bounds inside its full-page mask, and the bevel plate geometry from the Canva cover (page fractions).
+  const SCRIPT_BOX = { x: .2483, y: .3912, w: .5217, h: .2085 };
+  const BEVEL_BOX = { x: .2489, y: .3746, w: .5016, h: .2513 };
+  const HAND_LINE_COUNT = 11;
+  const BEVEL_SRC_BORDER = 43;             // px in bevel-frame.png between the frame edge and the plate
+
+  const ROLES = [
+    { group: 'Marble', key: 'stone', label: 'Stone', hint: 'Base of the marble' },
+    { group: 'Marble', key: 'vein', label: 'Veins', hint: 'Fine vein network', toggle: 'showVeins' },
+    { group: 'Marble', key: 'highlight', label: 'Highlights', hint: 'Cream patches (smoky wisps on Watercolor)', toggle: 'showHighlights' },
+    { group: 'Title plate', key: 'plate', label: 'Plate fill', hint: 'Box behind the title', toggle: 'showPlate' },
+    { group: 'Title plate', key: 'frame', label: 'Outer frame', hint: 'Thick border', toggle: 'showFrame' },
+    { group: 'Title plate', key: 'trim', label: 'Inner trim', hint: 'Thin border + header rule', toggle: 'showTrim' },
+    { group: 'Title plate', key: 'title', label: 'Lettering', hint: 'Cover title + page titles' },
+    { group: 'Accent', key: 'accent', label: 'Accent art', hint: 'Line art from your elements' },
+    { group: 'Page', key: 'paper', label: 'Paper', hint: 'Lined page background' },
+    { group: 'Page', key: 'line', label: 'Ruled lines', hint: 'Writing lines + margin rule' },
+  ];
+
+  const PALETTES = [
+    { name: 'Your Canva Cover', look: { marble: 'canva', plateStyle: 'bevel', titleStyle: 'serif', headerFill: 'solid', headerStyle: 'mixed' }, stone: '#050505', vein: '#C8A769', highlight: '#FFFFFF', plate: '#131313', frame: '#111111', trim: '#D4B06A', title: '#FFFFFF', paper: '#FFFFFF', line: '#B8A58A' },
+    { name: 'Blush Watercolor', look: { marble: 'blush' }, stone: '#F7CACC', vein: '#C8AE70', highlight: '#3A1519', plate: '#FFF7F6', frame: '#8E4B57', trim: '#C8AE70', title: '#8E2F3F', paper: '#FFFBFA', line: '#E3B7BC' },
+    { name: 'Gold Leaf', look: { marble: 'goldleaf' }, stone: '#FBF8F3', vein: '#C9A55E', highlight: '#FFFFFF', plate: '#FFFFFF', frame: '#1E1B18', trim: '#C9A55E', title: '#1E1B18', paper: '#FFFFFF', line: '#D8CBB4' },
+    { name: 'White Marble', look: { marble: 'white' }, stone: '#F8F8F7', vein: '#8C8C90', highlight: '#FFFFFF', plate: '#FFFFFF', frame: '#222222', trim: '#BFA06A', title: '#222222', paper: '#FFFFFF', line: '#CFCFCF' },
+    { name: 'Floral Garden', look: { marble: 'floral', plateStyle: 'classic', titleStyle: 'serif' }, stone: '#718365', vein: '#CBA15F', highlight: '#F0B5AA', plate: '#8C1830', frame: '#63202E', trim: '#CBA15F', title: '#FFFFFF', paper: '#FFFFFF', line: '#E3C4C9' },
+    { name: 'Original Black + Gold', stone: '#141212', vein: '#C9A05A', highlight: '#F1E6CC', plate: '#2A070E', frame: '#151313', trim: '#CBA15F', title: '#FFFFFF', paper: '#FFFFFF', line: '#B8948C' },
+    { name: 'Dove Signature', stone: '#1A0B0B', vein: '#E6A742', highlight: '#F2DFD8', plate: '#630000', frame: '#1A0B0B', trim: '#E6A742', title: '#FFFDFC', paper: '#FFFDFC', line: '#C9A49B' },
+    { name: 'White Carrara', stone: '#EDEAE4', vein: '#8F8B86', highlight: '#CFCAC3', plate: '#FFFFFF', frame: '#2B2B2B', trim: '#B8955A', title: '#630000', paper: '#FFFFFF', line: '#C9C1B6' },
+    { name: 'Emerald + Gold', stone: '#0F2A22', vein: '#C89543', highlight: '#E7D8BD', plate: '#175B49', frame: '#0B1F19', trim: '#C89543', title: '#FFFDF8', paper: '#FFFDF8', line: '#B3C4B5' },
+    { name: 'Midnight Blue', stone: '#0E1626', vein: '#C3A15E', highlight: '#B9CBD8', plate: '#263D6A', frame: '#0A0F1A', trim: '#C3A15E', title: '#FDFDFC', paper: '#FDFDFC', line: '#AEBCCC' },
+    { name: 'Plum', stone: '#1E1224', vein: '#C5A45E', highlight: '#D9C2DE', plate: '#5C3568', frame: '#140B18', trim: '#C5A45E', title: '#FFFEFC', paper: '#FFFEFC', line: '#C6B2CB' },
+    { name: 'Blush Rose', stone: '#E9CFCB', vein: '#BB9167', highlight: '#FFF6F2', plate: '#82445E', frame: '#5A2B3F', trim: '#BB9167', title: '#FFFCFC', paper: '#FFFCFC', line: '#D5A9B4' },
+    { name: 'Teal + Coral', stone: '#0D2F33', vein: '#D19A4A', highlight: '#E7A18E', plate: '#155D66', frame: '#09201F', trim: '#D19A4A', title: '#FFFDFC', paper: '#FFFDFC', line: '#AFC7C4' },
+    { name: 'Terracotta', stone: '#2A140E', vein: '#BD8B43', highlight: '#DDAA86', plate: '#914631', frame: '#1C0D09', trim: '#BD8B43', title: '#FFFCF8', paper: '#FFFCF8', line: '#D2B39C' },
+  ];
+
+  PALETTES.forEach((pl) => { pl.accent ??= pl.trim; });
+
+  const DEFAULTS = {
+    view: 'cover', quality: 'proof',
+    palette: { ...PALETTES[1] },
+    marble: 'classic', plateStyle: 'classic', titleStyle: 'script', titleShadow: 30,
+    accent: 'none', accentPlace: 'corners', accentOpacity: 70, accentLined: false,
+    showVeins: true, showHighlights: true, showPlate: true, showFrame: true, showTrim: true,
+    texture: 60, veinStrength: 100, plateOpacity: 88,
+    headerStyle: 'mixed', lineSpacing: '25', footer: 'on', marginLine: false,
+    headerRule: 'line', lineStyle: 'printed', headerFill: 'marble',
+    journal: 'dream', page: 0, pageCount: 102, includeCover: 'yes', includeBack: 'yes',
+  };
+  const STORE_KEY = 'dove-marble-studio';
+  let state = structuredClone(DEFAULTS);
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
+    if (saved) state = { ...state, ...saved, palette: { ...state.palette, ...(saved.palette || {}) } };
+    delete state.palette.look;
+    state.palette.accent ??= state.palette.trim;
+    if (!['mixed', 'block', 'rule', 'bar', 'band', 'soft', 'plain'].includes(state.headerStyle)) state.headerStyle = 'mixed';
+    if (state.pageCount < 10) state.pageCount = DEFAULTS.pageCount;
+  } catch {}
+  const save = () => { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch {} };
+
+  const $ = (id) => document.getElementById(id);
+  const hexRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const mix = (a, b, t) => a + (b - a) * t;
+  const loadOnce = (src) => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
+  // Weak cell signals drop downloads; retry with a growing pause before giving up on a file.
+  async function loadImage(src) {
+    for (let attempt = 0; ; attempt++) {
+      try { return await loadOnce(attempt ? `${src}?retry=${attempt}` : src); }
+      catch (e) { if (attempt >= 4) throw e; await new Promise((r) => setTimeout(r, 800 * 2 ** attempt)); }
+    }
+  }
+  // Assets load progressively: the small pieces and the marble in use come first so the preview appears quickly
+  // (phones on cellular), and the other marbles load only when something needs them.
+  const ASSET_SRC = { ...Object.fromEntries(Object.entries(TEXTURES).map(([k, t]) => [`marble:${k}`, t.src])), ...IMAGES };
+  const pending = new Map();
+  function ensureAsset(key) {
+    if (ASSETS[key]) return Promise.resolve(ASSETS[key]);
+    if (!pending.has(key)) {
+      pending.set(key, loadImage(ASSET_SRC[key]).then((img) => { ASSETS[key] = img; scheduleRedraw(); return img; })
+        .catch(() => { pending.delete(key); throw new Error(ASSET_SRC[key]); }));
+    }
+    return pending.get(key);
+  }
+  let redrawTimer = 0;
+  function scheduleRedraw() { clearTimeout(redrawTimer); redrawTimer = setTimeout(() => { if (ready) { draw(); refreshThumbs(); } }, 60); }
+  const withTimeout = (pr, ms) => Promise.race([pr, new Promise((r) => setTimeout(r, ms))]);
+  const fontsReady = document.fonts ? withTimeout(document.fonts.load('600 40px "Cormorant Garamond"').then(() => document.fonts.load('italic 500 20px "Cormorant Garamond"')).catch(() => {}), 2500) : Promise.resolve();
+
+  // Phones cap total canvas memory, and short-lived canvases are freed lazily, so scratch canvases are reused.
+  const scratchPool = {};
+  function scratch(name, w, h) {
+    const c = scratchPool[name] || (scratchPool[name] = document.createElement('canvas'));
+    c.width = Math.max(1, Math.round(w)); c.height = Math.max(1, Math.round(h));
+    return c;
+  }
+
+  // Cache the cropped layer map per output size so recoloring only re-runs the pixel math.
+  const layerCache = new Map();
+  function layerData(img, w, h) {
+    const key = `${img.src}|${w}x${h}`;
+    if (layerCache.has(key)) return layerCache.get(key);
+    const c = scratch('layer', w, h);
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    const ir = img.naturalWidth / img.naturalHeight, r = w / h;
+    let sx = 0, sy = 0, sw = img.naturalWidth, sh = img.naturalHeight;
+    if (ir > r) { sw = sh * r; sx = (img.naturalWidth - sw) / 2; } else { sh = sw / r; sy = (img.naturalHeight - sh) / 2; }
+    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
+    const data = ctx.getImageData(0, 0, w, h).data;
+    if (layerCache.size > 12) layerCache.delete(layerCache.keys().next().value);
+    layerCache.set(key, data);
+    return data;
+  }
+
+  // Rebuild the marble from its separated layers with the chosen colors.
+  // soft = true washes the marble toward the paper color (used for the soft header).
+  function paintMarble(ctx, x, y, w, h, s, soft = false) {
+    w = Math.max(1, Math.round(w)); h = Math.max(1, Math.round(h));
+    if (s.marble === 'floral') {
+      // The bouquet art only reads well full-bleed (covers, back cover); thin bars stay a flat deep-flower color.
+      if (h > w * .9) {
+        const src = ASSETS.floralCover;
+        if (!src) { ensureAsset('floralCover').catch(() => {}); ctx.fillStyle = s.palette.paper; ctx.fillRect(x, y, w, h); return; }
+        ctx.drawImage(hueRecolor(src, w, h, s.palette), x, y, w, h);
+      } else { ctx.fillStyle = s.palette.plate; ctx.fillRect(x, y, w, h); }
+      return;
+    }
+    const key = s.marble in TEXTURES ? s.marble : 'classic', tx = TEXTURES[key], img = ASSETS[`marble:${key}`];
+    if (!img) {                      // not loaded yet: show the stone color now, redraw when it arrives
+      ensureAsset(`marble:${key}`).catch(() => {});
+      ctx.fillStyle = s.palette.stone; ctx.fillRect(x, y, w, h); return;
+    }
+    const src = layerData(img, w, h);
+    const out = ctx.createImageData(w, h), d = out.data;
+    const p = s.palette;
+    const stone = hexRgb(p.stone), vein = hexRgb(p.vein), hi = hexRgb(p.highlight), paper = hexRgb(p.paper);
+    const stoneLum = (stone[0] * .2126 + stone[1] * .7152 + stone[2] * .0722) / 255;
+    // Dark stone lightens where the texture rises; light stone does the reverse so it stays bright.
+    const tex = s.texture / 100;
+    const isLight = stoneLum > .5;
+    const shadow = stone.map((c) => isLight ? mix(c, 255, .25 * tex) : c * (1 - .45 * tex));
+    const light = stone.map((c) => isLight ? c * (1 - .2 * tex) : mix(c, 255, .38 * tex));
+    const vs = s.veinStrength / 100;
+    const gOn = s.showVeins ? vs : 0, cOn = s.showHighlights ? vs : 0;
+    for (let i = 0; i < d.length; i += 4) {
+      const det = src[i] / 255, g = (src[i + 1] / 255) * gOn, cr = (src[i + 2] / 255) * cOn;
+      const shade = tx.shadeBase + tx.shadeAmt * det;
+      for (let k = 0; k < 3; k++) {
+        let v = mix(shadow[k], light[k], det);
+        v = mix(v, Math.min(255, vein[k] * shade), g);
+        v = mix(v, hi[k], cr);
+        if (soft) v = mix(paper[k], v, .16);
+        d[i + k] = v;
+      }
+      d[i + 3] = 255;
+    }
+    const tmp = scratch('marble', w, h);
+    tmp.getContext('2d').putImageData(out, 0, 0);
+    ctx.drawImage(tmp, x, y, w, h);
+  }
+
+  // Recolors a full-color photo (not an alpha mask) onto the palette's flower roles: plate = deep
+  // flowers, highlight = soft flowers, stone = leaves, trim = gold, paper = page white. Mirrors the
+  // hue-bucket approach the original floral studio used, so the actual bouquet artwork stays intact.
+  const hueCache = new Map();
+  function hueRecolor(img, w, h, palette) {
+    w = Math.max(1, Math.round(w)); h = Math.max(1, Math.round(h));
+    const key = `${img.src}|${w}x${h}|${palette.plate}|${palette.highlight}|${palette.trim}|${palette.stone}|${palette.paper}`;
+    if (hueCache.has(key)) return hueCache.get(key);
+    const src = scratch('hueSrc', w, h);
+    const sctx = src.getContext('2d', { willReadFrequently: true });
+    const ir = img.naturalWidth / img.naturalHeight, r = w / h;
+    let sx = 0, sy = 0, sw = img.naturalWidth, sh = img.naturalHeight;
+    if (ir > r) { sw = sh * r; sx = (img.naturalWidth - sw) / 2; } else { sh = sw / r; sy = (img.naturalHeight - sh) / 2; }
+    sctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
+    const id = sctx.getImageData(0, 0, w, h), d = id.data;
+    const deep = hexRgb(palette.plate), blush = hexRgb(palette.highlight), gold = hexRgb(palette.trim), leaf = hexRgb(palette.stone), paperC = hexRgb(palette.paper);
+    for (let i = 0; i < d.length; i += 4) {
+      const r0 = d[i] / 255, g0 = d[i + 1] / 255, b0 = d[i + 2] / 255;
+      const mx = Math.max(r0, g0, b0), mn = Math.min(r0, g0, b0), l = (mx + mn) / 2;
+      let hue = 0, sat = 0;
+      if (mx !== mn) {
+        const dl = mx - mn;
+        sat = l > .5 ? dl / (2 - mx - mn) : dl / (mx + mn);
+        hue = (mx === r0 ? (g0 - b0) / dl + (g0 < b0 ? 6 : 0) : mx === g0 ? (b0 - r0) / dl + 2 : (r0 - g0) / dl + 4) * 60;
+      }
+      let target = null;
+      if (l > .93 && sat < .15) target = paperC;
+      else if (sat < .08 || l < .06) target = null;
+      else if (hue >= 60 && hue < 170) target = leaf;
+      else if (hue >= 30 && hue < 60) target = gold;
+      else if (hue < 30 || hue >= 300) target = l > .55 ? blush : deep;
+      else target = blush;
+      if (target) {
+        const f = Math.min(1, Math.max(.05, sat * 1.3));
+        d[i] = mix(d[i], target[0], f); d[i + 1] = mix(d[i + 1], target[1], f); d[i + 2] = mix(d[i + 2], target[2], f);
+      }
+    }
+    sctx.putImageData(id, 0, 0);
+    const out = document.createElement('canvas'); out.width = w; out.height = h;
+    out.getContext('2d').drawImage(src, 0, 0);
+    if (hueCache.size > 3) hueCache.delete(hueCache.keys().next().value);
+    hueCache.set(key, out);
+    return out;
+  }
+
+  function tintedMask(img, w, h, color) {
+    const c = scratch('tint', w, h);
+    const x = c.getContext('2d');
+    x.drawImage(img, 0, 0, c.width, c.height);
+    x.globalCompositeOperation = 'source-in';
+    x.fillStyle = color; x.fillRect(0, 0, c.width, c.height);
+    return c;
+  }
+
+  function rgba(hex, a) { const [r, g, b] = hexRgb(hex); return `rgba(${r},${g},${b},${a})`; }
+
+  // Gold bevel plate from the Canva cover. The frame is drawn 9-slice so it never stretches, then recolored:
+  // the metallic band follows the trim color (keeping its light-to-dark sweep), the thin outer ring follows the frame color.
+  function drawBevelPlate(ctx, x, y, w, h, border, s) {
+    const p = s.palette, img = ASSETS.bevel;
+    if (!img) { if (s.showPlate) { ctx.fillStyle = rgba(p.plate, s.plateOpacity / 100); ctx.fillRect(x, y, w, h); } return { x: x + border, y: y + border, w: w - 2 * border, h: h - 2 * border }; }
+    const W = Math.max(1, Math.round(w)), H = Math.max(1, Math.round(h)), b = Math.max(2, Math.round(border));
+    const sb = BEVEL_SRC_BORDER + 4, db = Math.round(b * sb / BEVEL_SRC_BORDER);
+    const iw = img.naturalWidth, ih = img.naturalHeight;
+    const c = scratch('bevel', W, H);
+    const cx = c.getContext('2d', { willReadFrequently: true });
+    const sx = [0, sb, iw - sb, iw], sy = [0, sb, ih - sb, ih], dx = [0, db, W - db, W], dy = [0, db, H - db, H];
+    for (let r = 0; r < 3; r++) for (let q = 0; q < 3; q++) {
+      if (r === 1 && q === 1) continue;
+      cx.drawImage(img, sx[q], sy[r], sx[q + 1] - sx[q], sy[r + 1] - sy[r], dx[q], dy[r], dx[q + 1] - dx[q], dy[r + 1] - dy[r]);
+    }
+    const data = cx.getImageData(0, 0, W, H), d = data.data;
+    const trim = hexRgb(p.trim), frame = hexRgb(p.frame);
+    const tOn = s.showTrim ? 1 : 0, fOn = s.showFrame ? 1 : 0;
+    for (let i = 0; i < d.length; i += 4) {
+      const l = d[i] / 255, g = d[i + 1] / 255, a = d[i + 3];
+      if (!a) continue;
+      for (let k = 0; k < 3; k++) {
+        const gold = l < .55 ? mix(trim[k] * .3, trim[k], l / .55) : mix(trim[k], mix(trim[k], 255, .7), (l - .55) / .45);
+        const ring = Math.min(255, frame[k] * (.6 + 1.2 * l) + 40 * l);
+        d[i + k] = mix(ring, gold, g);
+      }
+      d[i + 3] = a * (g * tOn + (1 - g) * fOn);
+    }
+    cx.putImageData(data, 0, 0);
+    ctx.drawImage(c, x, y, w, h);
+    if (s.showPlate) { ctx.fillStyle = rgba(p.plate, s.plateOpacity / 100); ctx.fillRect(x + b, y + b, w - 2 * b, h - 2 * b); }
+    return { x: x + b, y: y + b, w: w - 2 * b, h: h - 2 * b };
+  }
+
+  // Accent line art, tinted with the accent color. On lined pages it sits faintly in the bottom corner, under the lines.
+  function drawAccent(ctx, W, H, s, lined = false) {
+    const img = ASSETS[`accent:${s.accent}`];
+    if (!img) return;
+    const ar = img.naturalWidth / img.naturalHeight, color = s.palette.accent || s.palette.trim;
+    const put = (x, y, w, rot = 0) => {
+      const h = w / ar, m = tintedMask(img, w, h, color);
+      ctx.save(); ctx.translate(x + w / 2, y + h / 2); ctx.rotate(rot); ctx.drawImage(m, -w / 2, -h / 2, w, h); ctx.restore();
+    };
+    ctx.globalAlpha = s.accentOpacity / 100 * (lined ? .35 : 1);
+    if (lined) {
+      const w = W * .38; put(W - w * .82, H - (w / ar) * .82, w);
+    } else if (s.accentPlace === 'center') {
+      const w = W * .82; put((W - w) / 2, (H - w / ar) / 2, w);
+    } else if (s.accentPlace === 'full') {
+      const w = Math.max(W * 1.05, H * 1.05 * ar); put((W - w) / 2, (H - w / ar) / 2, w);
+    } else {
+      const w = W * .5, h = w / ar;
+      put(W - w * .8, -h * .2, w);
+      put(-w * .2, H - h * .8, w, Math.PI);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // Fit an image (or a sub-box of it) inside a box, preserving its shape.
+  function fitInto(box, aspect, pad) {
+    let w = box.w * (1 - pad * 2), h = w / aspect;
+    if (h > box.h * (1 - pad * 2)) { h = box.h * (1 - pad * 2); w = h * aspect; }
+    return { x: box.x + (box.w - w) / 2, y: box.y + (box.h - h) / 2, w, h };
+  }
+
+  function drawCoverTitle(ctx, W, H, inner, s) {
+    const p = s.palette;
+    if (s.titleStyle === 'serif' && ASSETS.serif) {
+      const t = ASSETS.serif, sh = ASSETS.serifShadow;
+      const r = fitInto(inner, t.naturalWidth / t.naturalHeight, .14);
+      if (s.titleShadow > 0 && sh) {
+        // The shadow art is larger than the lettering; keep the same offset it had in Canva.
+        const k = r.w / t.naturalWidth;
+        ctx.globalAlpha = s.titleShadow / 100 * .6;
+        ctx.drawImage(tintedMask(sh, sh.naturalWidth * k, sh.naturalHeight * k, '#000'), r.x - 22 * k, r.y - 19 * k, sh.naturalWidth * k, sh.naturalHeight * k);
+        ctx.globalAlpha = 1;
+      }
+      ctx.drawImage(tintedMask(t, r.w, r.h, p.title), r.x, r.y, r.w, r.h);
+      return;
+    }
+    // Script lettering lives inside a full-page mask; crop to its bounds and fit it to the plate.
+    const img = ASSETS.title, iw = img.naturalWidth, ih = img.naturalHeight;
+    const src = { x: SCRIPT_BOX.x * iw, y: SCRIPT_BOX.y * ih, w: SCRIPT_BOX.w * iw, h: SCRIPT_BOX.h * ih };
+    const r = fitInto(inner, src.w / src.h, .08);
+    const c = scratch('script', r.w, r.h);
+    c.getContext('2d').drawImage(img, src.x, src.y, src.w, src.h, 0, 0, c.width, c.height);
+    ctx.drawImage(tintedMask(c, r.w, r.h, p.title), r.x, r.y, r.w, r.h);
+  }
+
+  function renderCover(canvas, width, s) {
+    canvas.width = width; canvas.height = Math.round(width * PAGE_H / PAGE_W);
+    const ctx = canvas.getContext('2d'), W = canvas.width, H = canvas.height, p = s.palette;
+    paintMarble(ctx, 0, 0, W, H, s);
+    if (s.accent !== 'none') drawAccent(ctx, W, H, s);
+    let inner;
+    if (s.plateStyle === 'bevel') {
+      const fw = BEVEL_BOX.w * W;
+      inner = drawBevelPlate(ctx, BEVEL_BOX.x * W, BEVEL_BOX.y * H, fw, BEVEL_BOX.h * H, BEVEL_SRC_BORDER * fw / (ASSETS.bevel ? ASSETS.bevel.naturalWidth : 921), s);
+    } else {
+      const x = W * .13, y = H * .335, w = W * .74, h = H * .33;
+      if (s.showPlate) { ctx.fillStyle = rgba(p.plate, s.plateOpacity / 100); ctx.fillRect(x, y, w, h); }
+      if (s.showFrame) { ctx.strokeStyle = p.frame; ctx.lineWidth = W * .018; ctx.strokeRect(x, y, w, h); }
+      if (s.showTrim) { ctx.strokeStyle = p.trim; ctx.lineWidth = W * .009; const o = W * .018; ctx.strokeRect(x + o, y + o, w - 2 * o, h - 2 * o); }
+      const o = W * .027;
+      inner = { x: x + o, y: y + o, w: w - 2 * o, h: h - 2 * o };
+    }
+    drawCoverTitle(ctx, W, H, inner, s);
+  }
+
+  // Darkest of the palette's ink colors, for text sitting on light paper.
+  function inkColor(p) {
+    const lum = (h) => { const [r, g, b] = hexRgb(h); return r * .2126 + g * .7152 + b * .0722; };
+    return [p.plate, p.frame, p.title, p.stone].reduce((a, b) => (lum(b) < lum(a) ? b : a));
+  }
+
+  // A thin metallic rule: the trim color swept light to dark, like the gold lines in the Canva pages.
+  function goldRule(ctx, x, y, w, h, trim) {
+    const [r, g, b] = hexRgb(trim), lite = `rgb(${mix(r, 255, .6)},${mix(g, 255, .6)},${mix(b, 255, .6)})`, deep = `rgb(${r * .55},${g * .55},${b * .55})`;
+    const gr = ctx.createLinearGradient(x, 0, x + w, 0);
+    gr.addColorStop(0, deep); gr.addColorStop(.3, trim); gr.addColorStop(.5, lite); gr.addColorStop(.7, trim); gr.addColorStop(1, deep);
+    ctx.fillStyle = gr; ctx.fillRect(x, y, w, h);
+  }
+
+  // ---------- Journal page templates ----------
+  // Each page type is built from the same themeable pieces (marble or solid bars, title plate, gold rules,
+  // boxes, writing lines, lettering), so one palette or element change flows through the whole journal.
+  // Positions follow Sydni's Canva master ("Dream Journal – Final 28 Pages"), in page fractions.
+
+  const font = (px, { weight = 500, italic = false } = {}) => `${italic ? 'italic ' : ''}${weight} ${Math.round(px)}px "Cormorant Garamond", Georgia, serif`;
+
+  // Draws text wrapped to maxW. Returns the y just below the last line.
+  function wrapText(ctx, text, x, y, maxW, lineH, align = 'left', draw = true) {
+    const out = [];
+    text.split('\n').forEach((para) => {
+      let line = '';
+      para.split(' ').forEach((word) => {
+        const test = line ? `${line} ${word}` : word;
+        if (ctx.measureText(test).width > maxW && line) { out.push(line); line = word; } else line = test;
+      });
+      out.push(line);
+    });
+    if (draw) {
+      ctx.textAlign = align; ctx.textBaseline = 'alphabetic';
+      const ax = align === 'center' ? x + maxW / 2 : x;
+      out.forEach((l, i) => ctx.fillText(l, ax, y + lineH * (i + 1)));
+    }
+    return y + lineH * out.length;
+  }
+
+  // A dark bar or block: real marble, or the flat stone color (the Canva master uses flat black).
+  function stoneBar(ctx, x, y, w, h, s) {
+    if (s.headerFill === 'solid') { ctx.fillStyle = s.palette.stone; ctx.fillRect(x, y, w, h); }
+    else paintMarble(ctx, x, y, w, h, s);
+  }
+
+  function headerRule(ctx, x, y, w, h, s) {
+    if (!s.showTrim) return;
+    if (s.headerRule === 'ornament' && ASSETS.divider) {
+      const d = ASSETS.divider, dw = Math.min(w * .78, s._W * .7), dh = dw * d.naturalHeight / d.naturalWidth;
+      ctx.drawImage(tintedMask(d, dw, dh, s.palette.trim), x + (w - dw) / 2, y + h / 2 - dh / 2, dw, dh);
+    } else goldRule(ctx, x, y, w, h, s.palette.trim);
+  }
+
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+  }
+
+  // Page background, faint accent, and the gold-over-bar footer used on most Canva pages.
+  function pageBase(ctx, W, H, s, { footer = true } = {}) {
+    ctx.fillStyle = s.palette.paper; ctx.fillRect(0, 0, W, H);
+    if (s.accent !== 'none' && s.accentLined) drawAccent(ctx, W, H, s, true);
+    if (footer && s.footer === 'on') {
+      const bar = H * .035;
+      stoneBar(ctx, 0, H - bar, W, bar, s);
+      if (s.showTrim) goldRule(ctx, 0, H - bar - H * .01, W, H * .01, s.palette.trim);
+      return H - bar - H * .03;
+    }
+    return H - H * .03;
+  }
+
+  // Page header. "As designed" gives each page the style it has in the Canva master; any other choice applies everywhere.
+  // Returns the y where writing space begins.
+  function drawHeader(ctx, W, H, s, title, { sub = '', pref = 'rule', x0 = 0, x1 = W } = {}) {
+    const p = s.palette, w = x1 - x0, cx = x0 + w / 2;
+    const style = s.headerStyle === 'mixed' ? pref : s.headerStyle;
+    const ink = inkColor(p);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    let bottom;
+    if (style === 'block') {                       // dark block, light lettering, gold rule (Interpretation, Application, Summary)
+      const hb = H * .1;
+      stoneBar(ctx, x0, 0, w, hb, s);
+      ctx.fillStyle = p.title; ctx.font = font(H * .045); ctx.fillText(title, cx, hb * .56);
+      headerRule(ctx, x0, hb, w, H * .011, s);
+      bottom = hb + H * .011;
+    } else if (style === 'bar') {                  // title on paper, thick dark bar beneath (Dream)
+      ctx.fillStyle = ink; ctx.font = font(H * .05); ctx.fillText(title, cx, H * .07);
+      stoneBar(ctx, x0, H * .115, w, H * .028, s);
+      bottom = H * .143;
+    } else if (style === 'band') {                 // marble band with the cover's title plate
+      const band = H * .125;
+      paintMarble(ctx, x0, 0, w, band, s);
+      headerRule(ctx, x0 + w * .045, band - H * .009, w * .91, H * .004, s);
+      ctx.font = font(H * .036, { weight: 600 });
+      const pw = Math.max(ctx.measureText(title).width + W * .12, w * .34), ph = band * (sub ? .7 : .56);
+      const px = cx - pw / 2, py = band * .47 - ph / 2 + (sub ? band * .06 : 0);
+      if (s.plateStyle === 'bevel') drawBevelPlate(ctx, px, py, pw, ph, W * .011, s);
+      else {
+        if (s.showPlate) { ctx.fillStyle = rgba(p.plate, s.plateOpacity / 100); ctx.fillRect(px, py, pw, ph); }
+        if (s.showFrame) { ctx.strokeStyle = p.frame; ctx.lineWidth = W * .007; ctx.strokeRect(px, py, pw, ph); }
+        if (s.showTrim) { ctx.strokeStyle = p.trim; ctx.lineWidth = W * .0035; const o = W * .008; ctx.strokeRect(px + o, py + o, pw - 2 * o, ph - 2 * o); }
+      }
+      ctx.fillStyle = p.title; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(title, cx, band * .47);
+      if (sub) { ctx.font = font(H * .016, { italic: true }); ctx.fillText(sub, cx, band * .47 + H * .03); sub = ''; }
+      bottom = band;
+    } else if (style === 'soft') {                 // pale marble wash
+      const band = H * .11;
+      paintMarble(ctx, x0, 0, w, band, s, true);
+      ctx.fillStyle = ink; ctx.font = font(H * .045); ctx.fillText(title, cx, band * .52);
+      headerRule(ctx, x0, band, w, H * .006, s);
+      bottom = band + H * .006;
+    } else if (style === 'plain') {                // title only
+      ctx.fillStyle = ink; ctx.font = font(H * .045); ctx.fillText(title, cx, H * .06);
+      bottom = H * .09;
+    } else {                                       // 'rule': thin top bar, dark title, gold rule (Draw, Brainstorm, Keys, Notes)
+      const isFloral = s.marble === 'floral';
+      if (s.footer === 'on' && !isFloral) stoneBar(ctx, x0, 0, w, H * .022, s);
+      ctx.fillStyle = ink; ctx.font = font(H * .045); ctx.fillText(title, cx, H * .068);
+      headerRule(ctx, x0, H * .105, w, H * .012, s);
+      if (isFloral) floralFlank(ctx, cx, H * .108 - H * .05, w * .07, H * .1, s);
+      bottom = H * .117;
+    }
+    if (sub) {
+      ctx.fillStyle = ink; ctx.font = font(H * .026, { italic: true }); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(sub, cx, bottom + H * .028);
+      bottom += H * .05;
+    }
+    return bottom;
+  }
+
+  // A pair of hue-recolored floral clusters flanking a header rule, mirrored left/right of center.
+  function floralFlank(ctx, cx, y, halfGap, h, s) {
+    const img = ASSETS.floralHeader;
+    if (!img) { ensureAsset('floralHeader').catch(() => {}); return; }
+    const w = h * (img.naturalWidth / img.naturalHeight), rec = hueRecolor(img, w, h, s.palette);
+    ctx.save(); ctx.translate(cx - halfGap, y); ctx.scale(-1, 1); ctx.drawImage(rec, -w, 0, w, h); ctx.restore();
+    ctx.drawImage(rec, cx + halfGap, y, w, h);
+  }
+
+  function writingLines(ctx, W, H, s, x0, x1, top, bottom) {
+    const p = s.palette, pt = H / PAGE_H, spacing = Number(s.lineSpacing) * pt;
+    const first = top + spacing * .9;
+    if (s.lineStyle === 'hand' && ASSETS.handLines) {
+      // Cycle through the 11 hand-drawn strokes so neighbouring lines never repeat.
+      const img = ASSETS.handLines, sh = img.naturalHeight / HAND_LINE_COUNT, lw = x1 - x0, dh = sh * lw / img.naturalWidth;
+      const tinted = tintedMask(img, img.naturalWidth, img.naturalHeight, p.line);
+      let i = 0;
+      for (let y = first; y <= bottom; y += spacing, i++) ctx.drawImage(tinted, 0, (i % HAND_LINE_COUNT) * sh, img.naturalWidth, sh, x0, y - dh / 2, lw, dh);
+    } else {
+      ctx.strokeStyle = p.line; ctx.lineWidth = Math.max(1, .75 * pt);
+      ctx.beginPath();
+      for (let y = first; y <= bottom; y += spacing) { const yy = Math.round(y) + .5; ctx.moveTo(x0, yy); ctx.lineTo(x1, yy); }
+      ctx.stroke();
+    }
+    if (s.marginLine) {
+      ctx.strokeStyle = p.line; ctx.lineWidth = Math.max(1, pt);
+      ctx.beginPath(); ctx.moveTo(x0 + (x1 - x0) * .1, top); ctx.lineTo(x0 + (x1 - x0) * .1, bottom); ctx.stroke();
+    }
+  }
+
+  // A plain lined page with a header: the workhorse of the cycle.
+  const linedPage = (title, pref, sub = '') => (ctx, W, H, s) => {
+    const bottom = pageBase(ctx, W, H, s);
+    const top = drawHeader(ctx, W, H, s, title, { pref, sub });
+    writingLines(ctx, W, H, s, W * .045, W * .955, top, bottom);
+  };
+
+  // Dark sidebar used on the first Dream and first Brainstorm page of each cycle.
+  function sidebarPage(ctx, W, H, s, title, fillSidebar) {
+    ctx.fillStyle = s.palette.paper; ctx.fillRect(0, 0, W, H);
+    if (s.accent !== 'none' && s.accentLined) drawAccent(ctx, W, H, s, true);
+    const sx = W * .6;
+    const top = drawHeader(ctx, W, H, s, title, { pref: 'bar', x1: sx });
+    writingLines(ctx, W, H, s, W * .045, sx - W * .03, top, H * .965);
+    stoneBar(ctx, sx, 0, W - sx, H, s);
+    fillSidebar(sx + W * .03, W - sx - W * .06);
+  }
+
+  const DREAM_TYPES = [['Destiny', 'Revelatory', 'Encouragement'], ['Direction', 'Warning', 'Self Condition'], ['Transformation', 'Intercession', 'Demonic']];
+  const HOW_TO_STEPS = [
+    ['01', 'Write your dream on the page titled “Dream.” Be sure to include all the key details. Write the dream in narrative form. If you are visual, you may draw the dream on the “Draw Your Dream” page. It is suggested that you still write out your dream.'],
+    ['02', 'Although you may not know what your dream means, it is important to name them for memorization and documentation purposes. It will narrow down the search process if you have multiple dreams documented. I suggest that you title the dream like the name of a movie with two to five words. Instead of naming it a symbol that stands out to you, try thinking of a short sentence with an action verb. Doing this may help stimulate your ability to interpret the dream.'],
+    ['03', 'Ask God, in faith, to provide you with the interpretation of the dream.'],
+    ['04', 'Document your thought process of decoding the dream on the “Brainstorm” page. You may add as many pages as you need. Read through the dream and search for patterns, themes, emotions, and/or key actions. For example, someone may be running throughout the entire dream. Another example is that someone in the dream may perform similar activities, such as writing, typing, and recording throughout the entire dream. The next step is to begin with the first scene and decode the symbols. During this process, asking the Holy Spirit to confirm each symbol is important. If you allow, he will guide you through the process of interpretation by asking you questions or giving you hints and confirmations along the way. One must understand that interpretation may require the Holy Spirit and skill. God works through us.'],
+    ['05', 'Once you have decoded the main symbols and have an idea of what the dream is about, write down the message the dream is depicting on the “Interpretation” page. The interpretation should encompass the entire dream and be about a paragraph or less. However, you may take up the whole page if needed. During this step, one should ask oneself, “What is the moral of the story?”'],
+    ['06', 'On the “Application” page, document how the Interpretation/message of the dream applies to your life in the past, present, or future.'],
+  ];
+  const QUESTIONS = [
+    'Is there a lesson or message in the dream that resonates with you? Reflect on whether the dream offers any guidance, warning, or encouragement.',
+    'What emotions do you feel upon waking, and how might they relate to areas of your life? Consider if any particular life situation evokes similar emotions.',
+    'What objects or thoughts stand out? List anything that caught your attention, including items, places, or feelings that were particularly vivid.',
+    'Who else appears in the dream? Describe these people by their relationship to you, and consider any qualities or characteristics they represent.',
+  ];
+
+  function howToSteps(ctx, W, H, s, steps) {
+    const p = s.palette, ink = inkColor(p);
+    const bottom = pageBase(ctx, W, H, s);
+    if (s.footer === 'on') stoneBar(ctx, 0, 0, W, H * .022, s);
+    ctx.fillStyle = ink; ctx.font = font(H * .042, { weight: 700 }); ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    ctx.fillText('How to Use this Journal', W * .09, H * .125);
+    const tx = W * .235, tw = W * .69, lh = H * .0215, r = H * .032, cx = W * .165;
+    ctx.font = font(H * .0175);
+    let y = H * .165;
+    const centers = [];
+    steps.forEach(([num, text]) => {
+      const end = wrapText(ctx, text, tx, y, tw, lh, 'left', false);
+      centers.push([num, text, y, Math.max(y + (end - y) / 2 + lh * .3, y + r + lh * .2)]);
+      y = Math.max(end, y + r * 2 + lh * .4) + H * .02;
+    });
+    // Vertical rule threading the numbered badges, like the Canva page.
+    ctx.strokeStyle = ink; ctx.lineWidth = Math.max(1.5, W * .003);
+    ctx.beginPath(); ctx.moveTo(cx, centers[0][3]); ctx.lineTo(cx, centers[centers.length - 1][3]); ctx.stroke();
+    centers.forEach(([num, text, top, cy]) => {
+      ctx.fillStyle = p.stone; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+      if (s.showTrim) { ctx.strokeStyle = p.trim; ctx.lineWidth = Math.max(1, W * .002); ctx.stroke(); }
+      ctx.fillStyle = p.title; ctx.font = font(r * 1.15); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(num, cx, cy + r * .05);
+      ctx.fillStyle = ink; ctx.font = font(H * .0175); wrapText(ctx, text, tx, top, tw, lh);
+    });
+    return bottom;
+  }
+
+  const TEMPLATES = {
+    logo(ctx, W, H, s) {
+      ctx.fillStyle = s.palette.paper; ctx.fillRect(0, 0, W, H);
+      const img = ASSETS.logo;
+      if (!img) return;
+      const lw = W * .38, lh = lw * img.naturalHeight / img.naturalWidth;
+      ctx.drawImage(img, (W - lw) / 2, H * .47 - lh / 2, lw, lh);
+    },
+    belongs(ctx, W, H, s) {
+      const p = s.palette;
+      ctx.fillStyle = p.paper; ctx.fillRect(0, 0, W, H);
+      if (s.accent !== 'none' && s.accentLined) drawAccent(ctx, W, H, s, true);
+      if (s.marble === 'floral') {
+        const img = ASSETS.floralCorner;
+        if (!img) ensureAsset('floralCorner').catch(() => {});
+        else {
+          const w = H * .3, h = w * (img.naturalHeight / img.naturalWidth), rec = hueRecolor(img, w, h, p);
+          ctx.drawImage(rec, 0, 0, w, h);
+          ctx.save(); ctx.translate(W, H); ctx.rotate(Math.PI); ctx.drawImage(rec, 0, 0, w, h); ctx.restore();
+        }
+      } else {
+        const bar = H * .038;
+        stoneBar(ctx, 0, 0, W, bar, s);
+        stoneBar(ctx, 0, H - bar, W, bar, s);
+        if (s.showTrim) goldRule(ctx, 0, H - bar - H * .012, W, H * .012, p.trim);
+      }
+      if (s.marble === 'floral') {
+        const bx = W * .13, by = H * .24, bw = W * .74, bh = H * .42;
+        ctx.fillStyle = rgba(p.highlight, .82); roundRect(ctx, bx, by, bw, bh, W * .012); ctx.fill();
+        ctx.fillStyle = p.title; ctx.font = font(H * .026, { italic: true }); ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+        ctx.fillText('This Journal Belongs To:', bx + W * .06, by + bh * .38);
+        ctx.fillText('Date:', bx + W * .06, by + bh * .72);
+      } else {
+        ctx.font = font(H * .034, { italic: true });
+        [['This Journal Belongs To', .395], ['Date', .655]].forEach(([label, y]) => {
+          ctx.fillStyle = inkColor(p); ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+          ctx.fillText(label, W / 2, H * y - H * .012);
+          if (s.showTrim) goldRule(ctx, W * .05, H * y, W * .9, Math.max(1.5, H * .0028), p.trim);
+        });
+      }
+    },
+    scripture(ctx, W, H, s) {
+      ctx.fillStyle = s.palette.paper; ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = inkColor(s.palette); ctx.font = font(H * .025, { italic: true });
+      const end = wrapText(ctx, '“In the Last Days,” God says, “I will pour out my Spirit on every kind of people: Your sons will prophesy, also your daughters; Your young men will see visions, your old men dream dreams.”', W * .2, H * .4, W * .6, H * .033, 'center');
+      ctx.fillText('Acts 2:17', W / 2, end + H * .033);
+    },
+    howto1: (ctx, W, H, s) => howToSteps(ctx, W, H, s, HOW_TO_STEPS.slice(0, 4)),
+    howto2: (ctx, W, H, s) => howToSteps(ctx, W, H, s, HOW_TO_STEPS.slice(4)),
+    howto3(ctx, W, H, s) {
+      const p = s.palette, ink = inkColor(p);
+      pageBase(ctx, W, H, s);
+      if (s.footer === 'on') stoneBar(ctx, 0, 0, W, H * .022, s);
+      ctx.fillStyle = ink; ctx.font = font(H * .036, { weight: 700 }); ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+      ctx.fillText('How to Use this Journal', W * .07, H * .09);
+      const cols = [W * .07, W * .545], bw = W * .385, rows = [[H * .205, H * .25], [H * .6, H * .245]];
+      const boxes = [
+        ['Key Actions', 'Document each action the main character makes throughout the dream (i.e., running, preparing, sleeping etc.). The actions will provide a clue to the message of the dream.'],
+        ['Interpretation', 'Interpretation is the meaning of the dream. It should relay a clear message. Hence, the dream should move from symbology to a decoded message that can be literally applied.'],
+        ['Steps', null],
+        ['Application', 'Application is how the dream applies to one’s life. It is the action of implementation.'],
+      ];
+      boxes.forEach(([label, text], i) => {
+        const x = cols[i % 2], [y, h] = rows[Math.floor(i / 2)];
+        ctx.fillStyle = ink; ctx.font = font(H * .036); ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+        ctx.fillText(label, x + bw / 2, y - H * .018);
+        ctx.fillStyle = p.stone; roundRect(ctx, x, y, bw, h, W * .035); ctx.fill();
+        if (s.showTrim) { ctx.strokeStyle = p.trim; ctx.lineWidth = Math.max(1, W * .0025); ctx.stroke(); }
+        ctx.fillStyle = p.title; ctx.font = font(H * .0175);
+        if (text) {
+          const lines = wrapText(ctx, text, 0, 0, bw * .8, H * .024, 'center', false) / (H * .024);
+          wrapText(ctx, text, x + bw * .1, y + h / 2 - lines * H * .012 - H * .006, bw * .8, H * .024, 'center');
+        } else {
+          // Steps: numbers, a gold bar, and the four words.
+          const bx = x + bw * .22;
+          ctx.save(); roundRect(ctx, x, y, bw, h, W * .035); ctx.clip();
+          const gr = ctx.createLinearGradient(0, y, 0, y + h), [r, g, b] = hexRgb(p.trim);
+          gr.addColorStop(0, `rgb(${r * .6},${g * .6},${b * .6})`); gr.addColorStop(.5, `rgb(${mix(r, 255, .5)},${mix(g, 255, .5)},${mix(b, 255, .5)})`); gr.addColorStop(1, p.trim);
+          ctx.fillStyle = gr; ctx.fillRect(bx, y, bw * .11, h); ctx.restore();
+          ctx.fillStyle = p.title; ctx.font = font(H * .023);
+          ['Pray', 'Brainstorm', 'Interpret', 'Apply'].forEach((word, k) => {
+            const yy = y + h * (k + .6) / 4.2;
+            ctx.textAlign = 'center'; ctx.fillText(String(k + 1), x + bw * .11, yy + H * .008);
+            ctx.fillText(word, x + bw * .66, yy + H * .008);
+          });
+        }
+      });
+    },
+    summaryTable(ctx, W, H, s) {
+      const p = s.palette, ink = inkColor(p);
+      ctx.fillStyle = p.paper; ctx.fillRect(0, 0, W, H);
+      if (s.footer === 'on') stoneBar(ctx, 0, 0, W, H * .022, s);
+      ctx.fillStyle = ink; ctx.font = font(H * .05); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('Interpretation Summary', W / 2, H * .08);
+      const x0 = W * .055, x1 = W * .945, y0 = H * .13, hh = H * .075;
+      ctx.fillStyle = p.stone; ctx.fillRect(x0, y0, x1 - x0, hh);
+      const cols = [['Count', .09], ['Date', .13], ['Name', .26], ['Type', .14], ['Interpretation', .38]];
+      let x = x0;
+      ctx.font = font(H * .017);
+      cols.forEach(([label, f], i) => {
+        const cw = (x1 - x0) * f;
+        ctx.fillStyle = p.title; ctx.fillText(label, x + cw / 2, y0 + hh / 2);
+        if (i && s.showTrim) goldRule(ctx, x - W * .002, y0, W * .004, hh, p.trim);
+        x += cw;
+      });
+      ctx.strokeStyle = p.line; ctx.lineWidth = Math.max(1, W * .0015);
+      ctx.strokeRect(x0, y0 + hh + H * .004, x1 - x0, H * .945 - (y0 + hh + H * .004));
+    },
+    contents(ctx, W, H, s) {
+      const p = s.palette, ink = inkColor(p);
+      pageBase(ctx, W, H, s);
+      const ly = H * .055, lh = H * .04;
+      stoneBar(ctx, 0, ly, W, lh, s);
+      ctx.fillStyle = p.title; ctx.font = font(H * .015, { italic: true }); ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+      [['Status', .1], ['N = Not Interpreted', .3], ['I = Interpreted', .6], ['A = Application', .8]].forEach(([t, f]) => ctx.fillText(t, W * f, ly + lh / 2));
+      ctx.fillRect(W * .175, ly + lh * .2, Math.max(1, W * .002), lh * .6);
+      ctx.fillStyle = ink; ctx.font = font(H * .045); ctx.fillText('Table of Contents', W / 2, H * .135);
+      headerRule(ctx, 0, H * .17, W, H * .011, s);
+      ctx.fillStyle = ink; ctx.font = font(H * .028, { italic: true });
+      [['#', .07], ['Date', .23], ['Title', .44], ['Type', .66], ['Status', .87]].forEach(([t, f]) => ctx.fillText(t, W * f, H * .207));
+      ctx.fillRect(0, H * .232, W, Math.max(2, H * .004));
+    },
+    title(ctx, W, H, s) {
+      const p = s.palette, ink = inkColor(p);
+      pageBase(ctx, W, H, s);
+      const isFloral = s.marble === 'floral';
+      if (!isFloral && s.footer === 'on') stoneBar(ctx, 0, 0, W, H * .038, s);
+      ctx.fillStyle = ink; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = font(H * .06); ctx.fillText('Title', W / 2, H * .135);
+      headerRule(ctx, W * .1, H * .17, W * .8, H * .007, s);
+      if (isFloral) floralFlank(ctx, W / 2, H * .17 - H * .045, W * .14, H * .09, s);
+      ctx.fillStyle = ink; ctx.font = font(H * .038); ctx.fillText('Date', W * .24, H * .295); ctx.fillText('Time', W * .74, H * .295);
+      headerRule(ctx, W * .1, H * .385, W * .8, H * .011, s);
+      ctx.fillStyle = ink; ctx.font = font(H * .04); ctx.fillText('Dream Type', W / 2, H * .445);
+      ctx.font = font(H * .024);
+      DREAM_TYPES.forEach((row, r) => row.forEach((t, c) => ctx.fillText(t, W * (.27 + c * .23), H * (.513 + r * .053))));
+      ctx.font = font(H * .026); ctx.fillText('Other:', W * .38, H * .675);
+      ctx.strokeStyle = s.palette.trim; ctx.lineWidth = Math.max(1, W * .0015);
+      ctx.beginPath(); ctx.moveTo(W * .42, H * .685); ctx.lineTo(W * .72, H * .685); ctx.stroke();
+      headerRule(ctx, W * .1, H * .717, W * .8, H * .011, s);
+      ctx.fillStyle = ink; ctx.font = font(H * .042); ctx.fillText('Dreamer’s Involvement', W / 2, H * .775);
+      ctx.font = font(H * .026);
+      [['Participant', .245], ['Partial Participant', .5], ['Observer', .745]].forEach(([t, f]) => ctx.fillText(t, W * f, H * .845));
+    },
+    draw(ctx, W, H, s) { pageBase(ctx, W, H, s); drawHeader(ctx, W, H, s, 'Draw Your Dream', { pref: 'rule' }); },
+    dreamLegend(ctx, W, H, s) {
+      const p = s.palette;
+      sidebarPage(ctx, W, H, s, 'Dream', (x, w) => {
+        // Legend card
+        const y = H * .045, h = H * .165;
+        ctx.fillStyle = p.paper; ctx.fillRect(x, y, w, h);
+        if (s.showTrim) goldRule(ctx, x, y, w, H * .006, p.trim);
+        const ink = inkColor(p);
+        ctx.fillStyle = ink; ctx.font = font(H * .03); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('Legend', x + w * .6, y + H * .03);
+        ctx.font = font(H * .0135); ctx.textAlign = 'left';
+        const rows = [['Repeat', 'bold'], ['Key Words', '#8BC34A'], ['Play on Words', '#F2D14B'], ['Key Emotions', 'line']];
+        rows.forEach(([label, mark], i) => {
+          const yy = y + H * (.06 + i * .024);
+          ctx.fillStyle = ink; ctx.font = font(H * .0135); ctx.fillText(label, x + w * .06, yy);
+          if (mark === 'bold') { ctx.fillStyle = p.trim; ctx.font = font(H * .0145, { weight: 700 }); ctx.textAlign = 'right'; ctx.fillText('Bold', x + w * .94, yy); ctx.textAlign = 'left'; }
+          else if (mark === 'line') { ctx.fillStyle = ink; ctx.fillRect(x + w * .66, yy, w * .28, Math.max(1.5, H * .003)); }
+          else { ctx.fillStyle = mark; roundRect(ctx, x + w * .74, yy - H * .006, w * .2, H * .012, H * .006); ctx.fill(); }
+        });
+        // Brainstorm bar and writing panel
+        const by = y + h + H * .012, bh = H * .045;
+        goldRule(ctx, x, by, w, bh, p.trim);
+        ctx.fillStyle = inkColor(p); ctx.font = font(H * .028); ctx.textAlign = 'center'; ctx.fillText('Brainstorm', x + w / 2, by + bh / 2);
+        ctx.fillStyle = p.paper; ctx.fillRect(x, by + bh, w, H * .955 - by - bh);
+      });
+    },
+    dream: linedPage('Dream', 'bar'),
+    brainstormQ(ctx, W, H, s) {
+      const p = s.palette;
+      sidebarPage(ctx, W, H, s, 'Brainstorm', (x, w) => {
+        ctx.fillStyle = p.title; ctx.font = font(H * .03);
+        let y = wrapText(ctx, 'Questions to Consider', x, H * .03, w, H * .038, 'center');
+        ctx.font = font(H * .0175);
+        QUESTIONS.forEach((q) => { y = wrapText(ctx, q, x, y + H * .02, w, H * .0235, 'center'); });
+      });
+    },
+    brainstorm: linedPage('Brainstorm', 'rule'),
+    keys(ctx, W, H, s) {
+      const p = s.palette, isFloral = s.marble === 'floral';
+      pageBase(ctx, W, H, s);
+      drawHeader(ctx, W, H, s, 'Keys', { pref: 'rule' });
+      const [r, g, b] = hexRgb(p.trim), soft = `rgb(${mix(r, 255, .72)},${mix(g, 255, .72)},${mix(b, 255, .72)})`, label = `rgb(${r * .7},${g * .7},${b * .7})`;
+      [['Actions', .14, .148], ['Key Symbols', .525, .148], ['Emotions', .14, .55], ['Scriptures', .525, .55]].forEach(([t, fx, fy]) => {
+        const x = W * fx, y = H * fy, w = W * .335, h = H * .37;
+        if (isFloral) { ctx.fillStyle = rgba(p.highlight, .6); roundRect(ctx, x, y, w, h, W * .012); ctx.fill(); }
+        else { ctx.strokeStyle = soft; ctx.lineWidth = Math.max(1.5, W * .003); ctx.strokeRect(x, y, w, h); }
+        ctx.fillStyle = isFloral ? p.plate : label; ctx.font = font(H * .024); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(t, x + w / 2, y + H * .042);
+        // A single small sprig peeking from each box's right edge, sized to stay clear of the neighbouring box.
+        if (isFloral && ASSETS.floralHeader) {
+          const sw = w * .22, sh = sw * .9, sx = x + w - sw * .45, sy = y + h * .58 - sh / 2;
+          ctx.drawImage(hueRecolor(ASSETS.floralHeader, sw, sh, p), sx, sy, sw, sh);
+        } else if (isFloral) ensureAsset('floralHeader').catch(() => {});
+      });
+    },
+    interp: linedPage('Interpretation', 'block'),
+    app: linedPage('Application', 'block'),
+    summaryDream: linedPage('Summary', 'block', 'Dream'),
+    summaryIA: linedPage('Summary', 'block', 'Interpretation and Application'),
+    notes: linedPage('Notes', 'rule'),
+    back(ctx, W, H, s) { paintMarble(ctx, 0, 0, W, H, s); },
+
+    // ---------- Prayer Journal (Pink) ----------
+    prayerSug1: (ctx, W, H, s) => prayerSuggestions(ctx, W, H, s, PRAYER_TIPS.slice(0, 3)),
+    prayerSug2: (ctx, W, H, s) => prayerSuggestions(ctx, W, H, s, PRAYER_TIPS.slice(3)),
+    prayerLetter(ctx, W, H, s) {
+      const p = s.palette, ink = inkColor(p);
+      ctx.fillStyle = p.paper; ctx.fillRect(0, 0, W, H);
+      paintWash(ctx, W, H, s, 'corners');
+      ctx.fillStyle = ink; ctx.font = font(H * .03); ctx.textBaseline = 'alphabetic';
+      ctx.textAlign = 'left'; ctx.fillText('Dear', W * .07, H * .075);
+      ctx.textAlign = 'right'; ctx.fillText('Date', W * .93, H * .075);
+      ctx.strokeStyle = p.line; ctx.lineWidth = Math.max(1, W * .0015);
+      ctx.beginPath();
+      ctx.moveTo(W * .15, H * .08); ctx.lineTo(W * .46, H * .08);
+      ctx.moveTo(W * .65, H * .08); ctx.lineTo(W * .89, H * .08);
+      ctx.stroke();
+      writingLines(ctx, W, H, s, W * .07, W * .93, H * .12, H * .9);
+      ctx.fillStyle = p.plate; ctx.font = font(H * .0155, { italic: true }); ctx.textAlign = 'center';
+      wrapText(ctx, '“One thing have I asked of the Lord, that will I seek after: that I may dwell in the house of the Lord all the days of my life.” Psalm 27:4 ESV', W * .13, H * .935, W * .74, H * .02, 'center');
+    },
+    prayerNotes(ctx, W, H, s) {
+      const p = s.palette;
+      ctx.fillStyle = p.paper; ctx.fillRect(0, 0, W, H);
+      paintWash(ctx, W, H, s, 'corners');
+      ctx.fillStyle = inkColor(p); ctx.font = font(H * .028, { weight: 600 }); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('My Notes', W / 2, H * .05);
+      ctx.strokeStyle = p.trim; ctx.lineWidth = Math.max(1, H * .003);
+      ctx.beginPath(); ctx.moveTo(W * .07, H * .075); ctx.lineTo(W * .93, H * .075); ctx.stroke();
+      writingLines(ctx, W, H, s, W * .07, W * .93, H * .1, H * .95);
+    },
+  };
+
+  const PRAYER_TIPS = [
+    'Begin your letters to God by addressing him in reverence. When Jesus taught his disciples The Lord’s Prayer, he began by addressing the Father with reverence. He said, “Our Father, hallowed be your name...” As such, start by saying something likened to “Dear Father” or “Dear Lord.” It may help you to remember that this is not a diary to yourself, but a letter of prayer to God.',
+    'The next step is to give thanks. The apostle Paul explains how prayer and petition to God should be accompanied by thanksgiving. As a result, the peace of God would come (Phil 4:6-7).',
+    'After you talk to God about what is on your heart, take 30 seconds to a minute to be silent. Listen for his response. Prayer is a two-way communication. If you hear a reply, write it down and respond back to him. Once you’ve written your response, listen again. Continue this until it seems the conversation has ended. Remember, You can hear him! His sheep hear his voice (Jn 10:27).',
+    'Sign your name like any other letter when you close out the letter (i.e., with Love, Ashely). Closing out the prayer with your name will remind you that this is a personal conversation with God.',
+    'After signing your name, write, “In Jesus’ Name I pray, Amen.” Jesus told his disciples that if they asked anything in his name, he would do it (Jn 14:14). All believers are his disciples. Ask in his name.',
+    'The journal can be used to reflect on Scripture. If Scriptures come to mind while journaling or in your personal Bible Study time, discuss them with God in your letters.',
+  ];
+  const PRAYER_LABELS = ['One', 'Two', 'Three', 'Four', 'Five', 'Six'];
+
+  // Soft, palette-driven watercolor blob washes: 'full' fills the whole page (covers), 'corners'
+  // puts a light bloom in each corner behind the writing lines.
+  function paintWash(ctx, W, H, s, mode) {
+    const p = s.palette;
+    const blob = (cx, cy, r, color, alpha) => {
+      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+      g.addColorStop(0, rgba(color, alpha)); g.addColorStop(1, rgba(color, 0));
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+    };
+    if (mode === 'full') {
+      ctx.fillStyle = p.paper; ctx.fillRect(0, 0, W, H);
+      blob(W * .1, H * .04, W * .55, p.highlight, .6); blob(W * .92, H * .08, W * .4, p.plate, .35);
+      blob(W * .06, H * .94, W * .48, p.plate, .35); blob(W * .95, H * .96, W * .55, p.highlight, .65);
+      blob(W * .5, H * .5, W * .5, p.highlight, .1);
+    } else {
+      blob(0, 0, W * .4, p.highlight, .55); blob(W, 0, W * .26, p.plate, .3);
+      blob(0, H, W * .28, p.plate, .3); blob(W, H, W * .4, p.highlight, .55);
+    }
+  }
+
+  function prayerSuggestions(ctx, W, H, s, tips) {
+    const p = s.palette, ink = inkColor(p);
+    ctx.fillStyle = p.paper; ctx.fillRect(0, 0, W, H);
+    paintWash(ctx, W, H, s, 'corners');
+    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = p.plate; ctx.font = font(H * .045, { weight: 600 });
+    ctx.fillText('Journaling', W / 2, H * .075);
+    ctx.font = font(H * .045, { italic: true });
+    ctx.fillText('Suggestions', W / 2, H * .11);
+    const bx = W * .12, bw = W * .76;
+    let y = H * .16;
+    tips.forEach((text, i) => {
+      ctx.font = font(H * .018);
+      const lines = Math.ceil(wrapText(ctx, text, 0, 0, bw * .88, H * .0225, 'center', false) / (H * .0225));
+      const h = H * .05 + lines * H * .0225;
+      ctx.fillStyle = p.highlight; roundRect(ctx, bx, y, bw, h, H * .025); ctx.fill();
+      ctx.fillStyle = p.plate; ctx.font = font(H * .024, { italic: true }); ctx.textAlign = 'center';
+      ctx.fillText(PRAYER_LABELS[PRAYER_TIPS.indexOf(text)], bx + bw / 2, y + H * .028);
+      ctx.fillStyle = ink; ctx.font = font(H * .018);
+      wrapText(ctx, text, bx + bw * .06, y + H * .048, bw * .88, H * .0225, 'center');
+      y += h + H * .022;
+    });
+  }
+
+  // Journal-specific cover and back-cover renderers.
+  function renderCoverPrayer(canvas, width, s) {
+    canvas.width = width; canvas.height = Math.round(width * PAGE_H / PAGE_W);
+    const ctx = canvas.getContext('2d'), W = canvas.width, H = canvas.height, p = s.palette;
+    paintWash(ctx, W, H, s, 'full');
+    if (s.accent !== 'none') drawAccent(ctx, W, H, s);
+    const bx = W * .14, by = H * .32, bw = W * .72, bh = H * .27;
+    if (s.showTrim) { ctx.strokeStyle = p.trim; ctx.lineWidth = Math.max(1.5, W * .003); ctx.strokeRect(bx, by, bw, bh); }
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const ink = inkColor(p);   // the wash itself uses plate/highlight, so text needs a color guaranteed to contrast
+    ctx.fillStyle = ink; ctx.font = font(H * .075, { weight: 600 });
+    ctx.fillText('Prayer', W / 2, H * .415);
+    ctx.font = font(H * .045, { italic: true });
+    ctx.fillText('journal', W / 2, H * .49);
+    if (s.showTrim) { ctx.strokeStyle = p.trim; ctx.lineWidth = Math.max(2, W * .01); ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(bx + bw * .1, by + bh * .92); ctx.lineTo(bx + bw * .55, by + bh * 1.12); ctx.stroke(); ctx.lineCap = 'butt'; }
+  }
+  const COVERS = { dream: renderCover, prayer: renderCoverPrayer };
+  const BACKS = { prayer: (ctx, W, H, s) => paintWash(ctx, W, H, s, 'full') };
+
+  const PAGE_LABELS = {
+    cover: 'Front cover', logo: 'Dove Expressions', belongs: 'Belongs to', scripture: 'Scripture', howto1: 'How to use 1', howto2: 'How to use 2',
+    howto3: 'How to use 3', summaryTable: 'Interpretation summary', contents: 'Table of contents', title: 'Title', draw: 'Draw your dream',
+    dreamLegend: 'Dream + legend', dream: 'Dream', brainstormQ: 'Brainstorm + questions', brainstorm: 'Brainstorm', keys: 'Keys',
+    interp: 'Interpretation', app: 'Application', summaryDream: 'Summary: dream', summaryIA: 'Summary: interp. + app.', notes: 'Notes', back: 'Back cover',
+    prayerSug1: 'Journaling tips 1', prayerSug2: 'Journaling tips 2', prayerLetter: 'Dear God letter', prayerNotes: 'My notes',
+  };
+
+  // A journal is its front pages plus a cycle that repeats to fill the interior.
+  const JOURNALS = {
+    dream: {
+      name: 'Dream Journal',
+      front: ['logo', 'belongs', 'scripture', 'howto1', 'howto2', 'howto3', 'summaryTable', 'summaryTable', 'contents', 'contents'],
+      cycle: ['title', 'draw', 'dreamLegend', 'dream', 'dream', 'brainstormQ', 'brainstorm', 'keys', 'interp', 'interp', 'app', 'app', 'summaryDream', 'summaryIA', 'notes', 'notes'],
+    },
+    prayer: {
+      name: 'Prayer Journal',
+      front: ['prayerSug1', 'prayerSug2'],
+      cycle: ['prayerLetter', 'prayerLetter', 'prayerLetter', 'prayerLetter', 'prayerNotes'],
+    },
+  };
+
+  function pageList(s) {
+    const j = JOURNALS[s.journal] || JOURNALS.dream, list = [];
+    if (s.includeCover === 'yes') list.push('cover');
+    const interior = [...j.front];
+    for (let i = 0; interior.length < s.pageCount; i++) interior.push(j.cycle[i % j.cycle.length]);
+    list.push(...interior.slice(0, s.pageCount));
+    if (s.includeBack === 'yes') list.push('back');
+    return list;
+  }
+
+  // Every distinct page type in reading order, for the page strip.
+  function pageTypes(s) {
+    const j = JOURNALS[s.journal] || JOURNALS.dream;
+    return [...new Set(['cover', ...j.front, ...j.cycle, 'back'])];
+  }
+
+  function renderPage(canvas, width, s, type) {
+    if (type === 'cover') return (COVERS[s.journal] || renderCover)(canvas, width, s);
+    canvas.width = width; canvas.height = Math.round(width * PAGE_H / PAGE_W);
+    const ctx = canvas.getContext('2d');
+    if (type === 'back' && BACKS[s.journal]) return BACKS[s.journal](ctx, canvas.width, canvas.height, { ...s, _W: canvas.width });
+    (TEMPLATES[type] || TEMPLATES.dream)(ctx, canvas.width, canvas.height, { ...s, _W: canvas.width });
+  }
+
+  // ---------- UI ----------
+  const ASSETS = {};
+  let ready = false, comparing = false, busy = false;
+  const canvas = $('canvas');
+
+  function paletteMatch() {
+    return PALETTES.find((pl) => ROLES.every((r) => pl[r.key].toLowerCase() === state.palette[r.key].toLowerCase()));
+  }
+
+  function buildPalettes() {
+    const box = $('palettes'); box.innerHTML = '';
+    const match = paletteMatch();
+    PALETTES.forEach((pl) => {
+      const b = document.createElement('button');
+      if (match && match.name === pl.name) b.className = 'selected';
+      b.title = pl.name;
+      b.innerHTML = `<canvas class="thumb" data-palette="${pl.name}"></canvas><div class="swatch-row">${['stone', 'vein', 'highlight', 'plate', 'trim'].map((k) => `<i style="background:${pl[k]}"></i>`).join('')}</div><span>${pl.name}</span>`;
+      b.onclick = () => { const { look, ...colors } = pl; state.palette = colors; if (look) Object.assign(state, look); commit(); };
+      box.appendChild(b);
+    });
+    $('paletteName').textContent = match ? match.name : 'Custom version';
+  }
+
+  function buildRoles() {
+    const box = $('roles'); box.innerHTML = '';
+    let group = '';
+    ROLES.forEach((r) => {
+      if (r.group !== group) {
+        group = r.group;
+        const g = document.createElement('div'); g.className = 'group-label'; g.textContent = group; box.appendChild(g);
+      }
+      const row = document.createElement('div'); row.className = 'role';
+      const lab = document.createElement('label');
+      if (r.toggle) {
+        const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !!state[r.toggle];
+        cb.setAttribute('aria-label', `Show ${r.label}`);
+        cb.onchange = () => { state[r.toggle] = cb.checked; commit(false); };
+        lab.appendChild(cb);
+      }
+      const txt = document.createElement('span'); txt.innerHTML = `${r.label}<small>${r.hint}</small>`; lab.appendChild(txt);
+      const col = document.createElement('input'); col.type = 'color'; col.value = state.palette[r.key]; col.setAttribute('aria-label', r.label);
+      col.oninput = () => { state.palette[r.key] = col.value; commit(false); buildPalettes(); };
+      row.append(lab, col); box.appendChild(row);
+    });
+  }
+
+  const currentType = () => { const list = pageList(state); state.page = Math.min(Math.max(0, state.page || 0), list.length - 1); return list[state.page]; };
+  function goTo(type) { const i = pageList(state).indexOf(type); if (i >= 0) state.page = i; }
+  // Interior settings should show an interior page, not the cover.
+  function toInterior() { if (['cover', 'back', 'logo', 'scripture', 'belongs'].includes(currentType())) goTo('dream'); }
+
+  function syncControls() {
+    document.querySelectorAll('#qualitySeg button').forEach((b) => b.classList.toggle('active', b.dataset.q === state.quality));
+    document.querySelectorAll('#marbleSeg button').forEach((b) => b.classList.toggle('active', b.dataset.marble === state.marble));
+    document.querySelectorAll('#plateSeg button').forEach((b) => b.classList.toggle('active', b.dataset.plate === state.plateStyle));
+    document.querySelectorAll('#titleSeg button').forEach((b) => b.classList.toggle('active', b.dataset.title === state.titleStyle));
+    $('shadowRow').classList.toggle('hidden', state.titleStyle !== 'serif');
+    $('shadowVal').textContent = state.titleShadow + '%';
+    $('accentVal').textContent = state.accentOpacity + '%';
+    for (const id of ['accentPlace', 'accentOpacityRow', 'accentLinedRow']) ($(id).closest('.field') || $(id)).classList.toggle('hidden', state.accent === 'none');
+    $('accent').value = state.accent; $('accentPlace').value = state.accentPlace; $('accentLined').checked = state.accentLined;
+    for (const id of ['texture', 'veinStrength', 'plateOpacity', 'titleShadow', 'accentOpacity']) $(id).value = state[id];
+    $('textureVal').textContent = state.texture + '%';
+    $('veinVal').textContent = state.veinStrength + '%';
+    $('plateVal').textContent = state.plateOpacity + '%';
+    for (const id of ['journal', 'headerStyle', 'headerFill', 'lineSpacing', 'footer', 'pageCount', 'includeCover', 'includeBack', 'headerRule', 'lineStyle']) $(id).value = state[id];
+    $('marginLine').checked = state.marginLine;
+    const type = currentType(), total = pageList(state).length;
+    $('viewLabel').textContent = PAGE_LABELS[type];
+    $('pageName').textContent = PAGE_LABELS[type];
+    $('pageNum').textContent = `Page ${state.page + 1} of ${total}`;
+  }
+
+  let raf = 0;
+  function draw() {
+    if (!ready) return;
+    cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(() => {
+      const s = comparing ? { ...state, palette: { ...DEFAULTS.palette } } : state;
+      renderPage(canvas, 760, s, currentType());
+    });
+  }
+
+  // ---------- Previews of every choice ----------
+  const ACCENTS = [['none', 'None'], ['topo', 'Topo'], ['waves', 'Flowing'], ['arcs', 'Arcs'], ['ribbon', 'Ribbon'], ['dots', 'Dots'], ['stripes', 'Stripes']];
+  function buildAccentTiles() {
+    const box = $('accentTiles'); box.innerHTML = '';
+    ACCENTS.forEach(([key, label]) => {
+      const b = document.createElement('button'); b.dataset.accent = key;
+      b.innerHTML = `<canvas width="72" height="72"></canvas>${label}`;
+      b.onclick = () => { state.accent = key; goTo('cover'); commit(false); };
+      box.appendChild(b);
+    });
+  }
+
+  let thumbTimer = 0;
+  function refreshThumbs() {
+    if (!ready) return;
+    clearTimeout(thumbTimer);
+    thumbTimer = setTimeout(() => {
+      const base = { ...state, accentOpacity: Math.max(state.accentOpacity, 60) };
+      // Each palette previewed as a mini cover with the current marble, plate, lettering and accent.
+      document.querySelectorAll('#palettes canvas[data-palette]').forEach((c) => {
+        const { look, ...colors } = PALETTES.find((pl) => pl.name === c.dataset.palette);
+        renderCover(c, 96, { ...base, ...(look || {}), palette: colors });
+      });
+      // Each marble previewed in the current colors.
+      document.querySelectorAll('#marbleSeg button').forEach((b) => {
+        let c = b.querySelector('canvas');
+        if (!c) { c = document.createElement('canvas'); c.className = 'thumb'; b.prepend(c); }
+        c.width = 104; c.height = 80;
+        paintMarble(c.getContext('2d'), 0, 0, 104, 80, { ...state, marble: b.dataset.marble });
+      });
+      // Each accent previewed in the accent color over the stone color.
+      document.querySelectorAll('#accentTiles button').forEach((b) => {
+        const c = b.querySelector('canvas'), x = c.getContext('2d');
+        x.fillStyle = state.palette.stone; x.fillRect(0, 0, 72, 72);
+        b.classList.toggle('active', b.dataset.accent === state.accent);
+        const img = ASSETS[`accent:${b.dataset.accent}`];
+        if (!img) { x.fillStyle = state.palette.vein; x.font = '600 12px Lato, sans-serif'; x.textAlign = 'center'; x.fillText('—', 36, 40); return; }
+        const r = fitInto({ x: 0, y: 0, w: 72, h: 72 }, img.naturalWidth / img.naturalHeight, .08);
+        x.drawImage(tintedMask(img, r.w, r.h, state.palette.accent || state.palette.trim), r.x, r.y, r.w, r.h);
+      });
+      // Every page type of the journal, in reading order.
+      const strip = $('pageStrip'), types = [...new Set(pageList(state))];
+      if (strip.dataset.sig !== types.join()) {
+        strip.dataset.sig = types.join(); strip.innerHTML = '';
+        types.forEach((t) => {
+          const b = document.createElement('button'); b.dataset.type = t;
+          b.innerHTML = `<canvas></canvas>${PAGE_LABELS[t]}`;
+          b.onclick = () => { goTo(t); commit(false); };
+          strip.appendChild(b);
+        });
+      }
+      const cur = currentType();
+      strip.querySelectorAll('button').forEach((b) => {
+        b.classList.toggle('active', b.dataset.type === cur);
+        renderPage(b.querySelector('canvas'), 150, state, b.dataset.type);
+      });
+      // Keep the current page's thumbnail in view without scrolling the whole window.
+      const act = strip.querySelector('button.active');
+      if (act) {
+        const l = act.offsetLeft - strip.offsetLeft, r = l + act.offsetWidth;
+        if (l < strip.scrollLeft) strip.scrollLeft = l - 8;
+        else if (r > strip.scrollLeft + strip.clientWidth) strip.scrollLeft = r - strip.clientWidth + 8;
+      }
+    }, 120);
+  }
+
+  function commit(rebuild = true) {
+    save();
+    if (rebuild) { buildPalettes(); buildRoles(); }
+    syncControls();
+    draw();
+    refreshThumbs();
+  }
+
+  $('prevPage').onclick = () => { state.page = Math.max(0, state.page - 1); commit(false); };
+  $('nextPage').onclick = () => { state.page = Math.min(pageList(state).length - 1, state.page + 1); commit(false); };
+  document.addEventListener('keydown', (e) => {
+    if (['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return;
+    if (e.key === 'ArrowRight') $('nextPage').click();
+    if (e.key === 'ArrowLeft') $('prevPage').click();
+  });
+  $('journal').onchange = (e) => { state.journal = e.target.value; state.page = 0; commit(false); };
+  document.querySelectorAll('#qualitySeg button').forEach((b) => b.onclick = () => { state.quality = b.dataset.q; commit(false); });
+  document.querySelectorAll('#marbleSeg button').forEach((b) => b.onclick = () => { state.marble = b.dataset.marble; commit(false); });
+  document.querySelectorAll('#plateSeg button').forEach((b) => b.onclick = () => { state.plateStyle = b.dataset.plate; commit(false); });
+  document.querySelectorAll('#titleSeg button').forEach((b) => b.onclick = () => { state.titleStyle = b.dataset.title; goTo('cover'); commit(false); });
+  $('accent').onchange = (e) => { state.accent = e.target.value; commit(false); };
+  $('accentPlace').onchange = (e) => { state.accentPlace = e.target.value; goTo('cover'); commit(false); };
+  $('accentLined').onchange = (e) => { state.accentLined = e.target.checked; toInterior(); commit(false); };
+  for (const id of ['texture', 'veinStrength', 'plateOpacity', 'titleShadow', 'accentOpacity']) $(id).oninput = (e) => { state[id] = Number(e.target.value); commit(false); };
+  for (const id of ['headerStyle', 'headerFill', 'lineSpacing', 'footer', 'headerRule', 'lineStyle']) $(id).onchange = (e) => { state[id] = e.target.value; toInterior(); commit(false); };
+  for (const id of ['includeCover', 'includeBack']) $(id).onchange = (e) => { const t = currentType(); state[id] = e.target.value; goTo(t); commit(false); };
+  $('pageCount').onchange = (e) => { state.pageCount = Math.min(300, Math.max(10, Number(e.target.value) || 102)); commit(false); };
+  $('marginLine').onchange = (e) => { state.marginLine = e.target.checked; toInterior(); commit(false); };
+  const cmp = $('compare');
+  cmp.onpointerdown = () => { comparing = true; draw(); };
+  for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) cmp.addEventListener(ev, () => { if (comparing) { comparing = false; draw(); } });
+
+  const toast = (msg) => { const t = $('toast'); t.textContent = msg; t.classList.remove('hidden'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.add('hidden'), 3500); };
+  const slug = () => (paletteMatch()?.name || 'custom').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  const toBlob = (c, type, q) => new Promise((res, rej) => c.toBlob((b) => b ? res(b) : rej(new Error('Could not prepare the page image.')), type, q));
+  const download = (blob, name) => { const u = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = u; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(u), 1000); };
+  const dpi = () => state.quality === 'print' ? 300 : 150;
+  const pxWidth = () => Math.round(PAGE_W / 72 * dpi());
+
+  function setBusy(on, label) {
+    busy = on;
+    for (const id of ['exportPdf', 'exportCover', 'exportLined']) $(id).disabled = on;
+    $('exportPdf').textContent = on ? label : 'Export full journal PDF';
+  }
+
+  $('exportCover').onclick = async () => {
+    if (busy) return; setBusy(true, 'Preparing cover…');
+    try { const c = document.createElement('canvas'); renderCover(c, 2666, state); download(await toBlob(c, 'image/png'), `marble-journal-cover-${slug()}.png`); toast('Production-size cover downloaded'); }
+    catch { toast('Cover export stopped. Please try again.'); } finally { setBusy(false); }
+  };
+  $('exportLined').onclick = async () => {
+    if (busy) return; setBusy(true, 'Preparing page…');
+    try {
+      const c = document.createElement('canvas'), type = currentType();
+      renderPage(c, pxWidth(), state, type);
+      download(await toBlob(c, 'image/png'), `journal-page-${state.page + 1}-${type}-${slug()}.png`); toast('Page downloaded');
+    }
+    catch { toast('Page export stopped. Please try again.'); } finally { setBusy(false); }
+  };
+  $('exportPdf').onclick = async () => {
+    if (busy) return;
+    if (!window.jspdf) { toast('PDF library did not load. Check your connection and refresh.'); return; }
+    const list = pageList(state);
+    setBusy(true, 'Building…');
+    try {
+      const pdf = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'pt', format: [PAGE_W, PAGE_H], compress: true });
+      const q = state.quality === 'print' ? .94 : .88;
+      const c = document.createElement('canvas'), cache = new Map();
+      // Repeated page types (every Dream, Notes…) render once; the PDF reuses the same image by name.
+      for (let i = 0; i < list.length; i++) {
+        const type = list[i];
+        if (!cache.has(type)) {
+          renderPage(c, pxWidth(), state, type);
+          cache.set(type, new Uint8Array(await (await toBlob(c, 'image/jpeg', q)).arrayBuffer()));
+        }
+        if (i) pdf.addPage([PAGE_W, PAGE_H], 'portrait');
+        pdf.addImage(cache.get(type), 'JPEG', 0, 0, PAGE_W, PAGE_H, `page-${type}`, 'FAST');
+        if (i % 6 === 0) { setBusy(true, `Building ${Math.round(i / list.length * 100)}%`); await new Promise(requestAnimationFrame); }
+      }
+      pdf.save(`${(JOURNALS[state.journal] || JOURNALS.dream).name.toLowerCase().replace(/\s+/g, '-')}-${slug()}.pdf`);
+      toast(`Complete journal downloaded (${list.length} pages)`);
+    } catch (e) { console.error(e); toast('Export stopped. Please try again.'); }
+    finally { setBusy(false); }
+  };
+
+  buildAccentTiles(); buildPalettes(); buildRoles(); syncControls();
+  // Load the small pieces plus the marble in use, then draw; everything else streams in afterwards.
+  const core = ['title', `marble:${state.marble in TEXTURES ? state.marble : 'classic'}`];
+  let loaded = 0;
+  const status = $('loading');
+  // Everything else is optional: pages draw without a piece until it arrives, then redraw.
+  Object.keys(IMAGES).filter((k) => !core.includes(k)).forEach((k) => ensureAsset(k).catch(() => {}));
+  Promise.all([...core.map((k) => ensureAsset(k).then((img) => { loaded++; status.querySelector('small').textContent = `${loaded} of ${core.length} pieces`; return img; })), fontsReady])
+    .then(() => { ready = true; status.classList.add('hidden'); draw(); refreshThumbs(); })
+    .catch((e) => { status.querySelector('strong').textContent = 'A design file could not be loaded'; status.querySelector('small').textContent = `${e.message} — check your connection and refresh.`; });
+})();
+</script>
+</body>
+</html>
