@@ -140,21 +140,11 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
 
     <div class="card">
       <h2>Design pieces <span>from your Canva elements</span></h2>
-      <div class="field"><span>Marble</span>
-        <div class="seg" id="marbleSeg">
-          <button data-marble="classic"><strong>Veined</strong><small>Textured stone + cream</small></button>
-          <button data-marble="canva"><strong>Bold gold</strong><small>Flat stone, metallic veins</small></button>
-          <button data-marble="blush"><strong>Watercolor</strong><small>Soft wash, smoky wisps</small></button>
-          <button data-marble="goldleaf"><strong>Gold leaf</strong><small>Sweeping leaf veins</small></button>
-          <button data-marble="white"><strong>White</strong><small>Soft grey veining</small></button>
-          <button data-marble="floral"><strong>Floral</strong><small>Watercolor bouquet</small></button>
-        </div>
+      <div class="field"><span>Background</span>
+        <div class="seg" id="marbleSeg"></div>
       </div>
       <div class="field"><span>Title plate</span>
-        <div class="seg" id="plateSeg">
-          <button data-plate="classic"><strong>Flat frame</strong><small>Frame + thin trim</small></button>
-          <button data-plate="bevel"><strong>Gold bevel</strong><small>Metallic gradient frame</small></button>
-        </div>
+        <div class="seg" id="plateSeg"></div>
       </div>
       <div class="field"><span>Cover lettering</span>
         <div class="seg" id="titleSeg">
@@ -202,24 +192,24 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
         <select id="fontFamily">
           <option value="Cormorant Garamond">Cormorant Garamond (default)</option>
           <option value="Playfair Display">Playfair Display</option>
-          <option value="EB Garamond">EB Garamond</option>
+          <option value="Lora">Lora</option>
           <option value="Libre Baskerville">Libre Baskerville</option>
-          <option value="Dancing Script">Dancing Script (handwritten)</option>
-          <option value="Alex Brush">Alex Brush (script)</option>
-          <option value="Montserrat">Montserrat (modern sans)</option>
-          <option value="Lato">Lato (clean sans)</option>
+          <option value="Cinzel">Cinzel</option>
+          <option value="Montserrat">Montserrat</option>
+          <option value="Lato">Lato</option>
+          <option value="Raleway">Raleway</option>
         </select>
       </div>
       <div class="field"><span>Section headings</span>
         <select id="headingFont">
           <option value="Cormorant Garamond">Cormorant Garamond (default)</option>
           <option value="Playfair Display">Playfair Display</option>
-          <option value="EB Garamond">EB Garamond</option>
+          <option value="Lora">Lora</option>
           <option value="Libre Baskerville">Libre Baskerville</option>
-          <option value="Dancing Script">Dancing Script (handwritten)</option>
-          <option value="Alex Brush">Alex Brush (script)</option>
-          <option value="Montserrat">Montserrat (modern sans)</option>
-          <option value="Lato">Lato (clean sans)</option>
+          <option value="Cinzel">Cinzel</option>
+          <option value="Montserrat">Montserrat</option>
+          <option value="Lato">Lato</option>
+          <option value="Raleway">Raleway</option>
         </select>
       </div>
       <label class="slider"><span>Text size <b id="fontScaleVal"></b></span><input type="range" id="fontScale" min="70" max="140"></label>
@@ -358,6 +348,34 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
     { group: 'Page', key: 'line', label: 'Ruled lines', hint: 'Writing lines + margin rule' },
   ];
 
+  // ---------- Slot-based asset + template registry (Dream Journal cover, phase 1) ----------
+  // Each cover is built from fixed slots (background, title plate, title text). A slot only ever shows
+  // the assets its template lists as approved; swapping the asset in a slot changes nothing else on the
+  // page. Backgrounds stay tied to the existing marble/floral/watercolor render engines (no invented
+  // artwork); title plates beyond "classic"/"bevel" are simple procedural shapes (no image asset needed).
+  const ASSET_REGISTRY = {
+    'bg-marble-veined':     { type: 'background', renderer: 'marble', textureKey: 'classic',  colorRoles: ['stone', 'vein', 'highlight'], label: 'Veined', hint: 'Textured stone + cream' },
+    'bg-marble-boldgold':   { type: 'background', renderer: 'marble', textureKey: 'canva',     colorRoles: ['stone', 'vein', 'highlight'], label: 'Bold gold', hint: 'Flat stone, metallic veins' },
+    'bg-watercolor':        { type: 'background', renderer: 'marble', textureKey: 'blush',     colorRoles: ['stone', 'vein', 'highlight'], label: 'Watercolor', hint: 'Soft wash, layered blooms' },
+    'bg-marble-goldleaf':   { type: 'background', renderer: 'marble', textureKey: 'goldleaf',  colorRoles: ['stone', 'vein', 'highlight'], label: 'Gold leaf', hint: 'Sweeping leaf veins' },
+    'bg-marble-white':      { type: 'background', renderer: 'marble', textureKey: 'white',     colorRoles: ['stone', 'vein', 'highlight'], label: 'White', hint: 'Soft grey veining' },
+    'bg-floral':            { type: 'background', renderer: 'floral',                          colorRoles: ['plate', 'highlight', 'trim', 'stone', 'paper'], label: 'Floral', hint: 'Watercolor bouquet' },
+    'plate-rectangle':      { type: 'titlePlate', renderer: 'shape', shape: 'classic', colorRoles: ['plate', 'frame', 'trim'], label: 'Rectangle', hint: 'Frame + thin trim' },
+    'plate-rounded':        { type: 'titlePlate', renderer: 'shape', shape: 'rounded', colorRoles: ['plate', 'frame', 'trim'], label: 'Rounded', hint: 'Soft rounded corners' },
+    'plate-oval':           { type: 'titlePlate', renderer: 'shape', shape: 'oval',    colorRoles: ['plate', 'frame', 'trim'], label: 'Oval', hint: 'Elliptical plate' },
+    'plate-circle':         { type: 'titlePlate', renderer: 'shape', shape: 'circle',  colorRoles: ['plate', 'frame', 'trim'], label: 'Circle', hint: 'Round medallion' },
+    'plate-bevel':          { type: 'titlePlate', renderer: 'bevel', shape: 'bevel',   colorRoles: ['plate', 'frame', 'trim'], label: 'Gold bevel', hint: 'Metallic gradient frame' },
+    'plate-none':           { type: 'titlePlate', renderer: 'none', shape: 'none',     colorRoles: [], label: 'None', hint: 'Title floats on the background' },
+  };
+  const TEMPLATE_REGISTRY = {
+    dream: {
+      cover: {
+        backgroundSlot: ['bg-marble-veined', 'bg-marble-boldgold', 'bg-watercolor', 'bg-marble-goldleaf', 'bg-marble-white', 'bg-floral'],
+        titlePlateSlot: ['plate-rectangle', 'plate-rounded', 'plate-oval', 'plate-circle', 'plate-bevel', 'plate-none'],
+      },
+    },
+  };
+
   const PALETTES = [
     { name: 'Your Canva Cover', look: { marble: 'canva', plateStyle: 'bevel', titleStyle: 'serif', headerFill: 'solid', headerStyle: 'mixed' }, stone: '#050505', vein: '#C8A769', highlight: '#FFFFFF', plate: '#131313', frame: '#111111', trim: '#D4B06A', title: '#FFFFFF', paper: '#FFFFFF', line: '#B8A58A' },
     { name: 'Blush Watercolor', look: { marble: 'blush' }, stone: '#F7CACC', vein: '#C8AE70', highlight: '#3A1519', plate: '#FFF7F6', frame: '#8E4B57', trim: '#C8AE70', title: '#8E2F3F', paper: '#FFFBFA', line: '#E3B7BC' },
@@ -433,12 +451,12 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
   const FONT_STYLESHEETS = {
     'Cormorant Garamond': 'family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600',
     'Playfair Display': 'family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500',
-    'EB Garamond': 'family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500',
+    'Lora': 'family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500',
     'Libre Baskerville': 'family=Libre+Baskerville:ital,wght@0,400;0,700;1,400',
-    'Dancing Script': 'family=Dancing+Script:wght@400;500;600;700',
-    'Alex Brush': 'family=Alex+Brush',
+    'Cinzel': 'family=Cinzel:wght@400;500;600;700',
     'Montserrat': 'family=Montserrat:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500',
     'Lato': 'family=Lato:ital,wght@0,400;0,700;1,400',
+    'Raleway': 'family=Raleway:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500',
   };
   const loadedFonts = new Set(['Cormorant Garamond']);
   // Loads a picked family's stylesheet (once) and waits for the browser to actually have it ready to draw with.
@@ -709,22 +727,48 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
     ctx.drawImage(tintedMask(c, r.w, r.h, p.title), r.x, r.y, r.w, r.h);
   }
 
+  // Procedural title-plate shapes (titlePlateSlot assets that aren't the gold-bevel image asset).
+  // Same box, same fill/frame/trim roles as the classic rectangle — only the outline geometry changes,
+  // so swapping shapes never moves the title or anything else on the cover.
+  function drawTitlePlateShape(ctx, x, y, w, h, W, s, shape) {
+    const p = s.palette;
+    if (shape === 'circle') { const d = Math.min(w, h); x += (w - d) / 2; y += (h - d) / 2; w = h = d; }
+    const outline = (bx, by, bw, bh) => {
+      ctx.beginPath();
+      if (shape === 'oval' || shape === 'circle') ctx.ellipse(bx + bw / 2, by + bh / 2, bw / 2, bh / 2, 0, 0, Math.PI * 2);
+      else if (shape === 'rounded') { roundRect(ctx, bx, by, bw, bh, bh * .16); return; }
+      else ctx.rect(bx, by, bw, bh);
+    };
+    if (s.showPlate) { outline(x, y, w, h); ctx.fillStyle = rgba(p.plate, s.plateOpacity / 100); ctx.fill(); }
+    if (s.showFrame) { outline(x, y, w, h); ctx.strokeStyle = p.frame; ctx.lineWidth = W * .018; ctx.stroke(); }
+    if (s.showTrim) {
+      const o = W * .018;
+      outline(x + o, y + o, w - 2 * o, h - 2 * o);
+      ctx.strokeStyle = p.trim; ctx.lineWidth = W * .009; ctx.stroke();
+    }
+    if (shape === 'oval' || shape === 'circle') {
+      // Inscribe a rectangle clear of the curve for the title lettering.
+      const iw = w * .62, ih = h * .62;
+      return { x: x + (w - iw) / 2, y: y + (h - ih) / 2, w: iw, h: ih };
+    }
+    const o = W * .027;
+    return { x: x + o, y: y + o, w: w - 2 * o, h: h - 2 * o };
+  }
+
   function renderCover(canvas, width, s) {
     canvas.width = width; canvas.height = Math.round(width * PAGE_H / PAGE_W);
-    const ctx = canvas.getContext('2d'), W = canvas.width, H = canvas.height, p = s.palette;
+    const ctx = canvas.getContext('2d'), W = canvas.width, H = canvas.height;
     paintMarble(ctx, 0, 0, W, H, s);
     if (s.accent !== 'none') drawAccent(ctx, W, H, s);
     let inner;
+    const x = W * .13, y = H * .335, w = W * .74, h = H * .33;
     if (s.plateStyle === 'bevel') {
       const fw = BEVEL_BOX.w * W;
       inner = drawBevelPlate(ctx, BEVEL_BOX.x * W, BEVEL_BOX.y * H, fw, BEVEL_BOX.h * H, BEVEL_SRC_BORDER * fw / (ASSETS.bevel ? ASSETS.bevel.naturalWidth : 921), s);
+    } else if (s.plateStyle === 'none') {
+      const o = W * .05; inner = { x: x + o, y: y + o, w: w - 2 * o, h: h - 2 * o };
     } else {
-      const x = W * .13, y = H * .335, w = W * .74, h = H * .33;
-      if (s.showPlate) { ctx.fillStyle = rgba(p.plate, s.plateOpacity / 100); ctx.fillRect(x, y, w, h); }
-      if (s.showFrame) { ctx.strokeStyle = p.frame; ctx.lineWidth = W * .018; ctx.strokeRect(x, y, w, h); }
-      if (s.showTrim) { ctx.strokeStyle = p.trim; ctx.lineWidth = W * .009; const o = W * .018; ctx.strokeRect(x + o, y + o, w - 2 * o, h - 2 * o); }
-      const o = W * .027;
-      inner = { x: x + o, y: y + o, w: w - 2 * o, h: h - 2 * o };
+      inner = drawTitlePlateShape(ctx, x, y, w, h, W, s, s.plateStyle);
     }
     drawCoverTitle(ctx, W, H, inner, s);
   }
@@ -1345,6 +1389,35 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
     $('paletteName').textContent = match ? match.name : 'Custom version';
   }
 
+  // Background/title-plate buttons are generated from the registry's approved slot list for this
+  // journal's cover, so a new asset only has to be added to TEMPLATE_REGISTRY to appear here.
+  function buildSlotSeg(boxId, slotAssets, activeId, onPick) {
+    const box = $(boxId); box.innerHTML = '';
+    slotAssets.forEach((id) => {
+      const asset = ASSET_REGISTRY[id];
+      const b = document.createElement('button');
+      b.dataset.asset = id;
+      b.className = id === activeId ? 'active' : '';
+      b.innerHTML = `<strong>${asset.label}</strong><small>${asset.hint || ''}</small>`;
+      b.onclick = () => onPick(id, asset);
+      box.appendChild(b);
+    });
+  }
+  function currentBackgroundAsset() { return Object.entries(ASSET_REGISTRY).find(([, a]) => a.type === 'background' && (a.textureKey === state.marble || (a.renderer === 'floral' && state.marble === 'floral')))?.[0]; }
+  function currentPlateAsset() { return Object.entries(ASSET_REGISTRY).find(([, a]) => a.type === 'titlePlate' && a.shape === state.plateStyle)?.[0]; }
+  function buildCoverSlots() {
+    const slots = (TEMPLATE_REGISTRY[state.journal] || TEMPLATE_REGISTRY.dream).cover;
+    buildSlotSeg('marbleSeg', slots.backgroundSlot, currentBackgroundAsset(), (id, asset) => {
+      state.marble = asset.textureKey || asset.renderer;
+      // Each background has a designed look (see PALETTES' `look.marble`); adopt just its stone/vein/highlight
+      // so, e.g., "White" actually renders white instead of keeping whatever colors were active before.
+      const match = PALETTES.find((pl) => pl.look?.marble === state.marble);
+      if (match) Object.assign(state.palette, { stone: match.stone, vein: match.vein, highlight: match.highlight });
+      commit(true);
+    });
+    buildSlotSeg('plateSeg', slots.titlePlateSlot, currentPlateAsset(), (id, asset) => { state.plateStyle = asset.shape; commit(true); });
+  }
+
   function buildRoles() {
     const box = $('roles'); box.innerHTML = '';
     let group = '';
@@ -1375,8 +1448,8 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
 
   function syncControls() {
     document.querySelectorAll('#qualitySeg button').forEach((b) => b.classList.toggle('active', b.dataset.q === state.quality));
-    document.querySelectorAll('#marbleSeg button').forEach((b) => b.classList.toggle('active', b.dataset.marble === state.marble));
-    document.querySelectorAll('#plateSeg button').forEach((b) => b.classList.toggle('active', b.dataset.plate === state.plateStyle));
+    document.querySelectorAll('#marbleSeg button').forEach((b) => b.classList.toggle('active', b.dataset.asset === currentBackgroundAsset()));
+    document.querySelectorAll('#plateSeg button').forEach((b) => b.classList.toggle('active', b.dataset.asset === currentPlateAsset()));
     document.querySelectorAll('#titleSeg button').forEach((b) => b.classList.toggle('active', b.dataset.title === state.titleStyle));
     $('shadowRow').classList.toggle('hidden', state.titleStyle !== 'serif');
     $('shadowVal').textContent = state.titleShadow + '%';
@@ -1440,12 +1513,13 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
         const { look, ...colors } = PALETTES.find((pl) => pl.name === c.dataset.palette);
         renderCover(c, 96, { ...base, ...(look || {}), palette: colors });
       });
-      // Each marble previewed in the current colors.
+      // Each background previewed in the current colors.
       document.querySelectorAll('#marbleSeg button').forEach((b) => {
         let c = b.querySelector('canvas');
         if (!c) { c = document.createElement('canvas'); c.className = 'thumb'; b.prepend(c); }
         c.width = 104; c.height = 80;
-        paintMarble(c.getContext('2d'), 0, 0, 104, 80, { ...state, marble: b.dataset.marble });
+        const asset = ASSET_REGISTRY[b.dataset.asset];
+        paintMarble(c.getContext('2d'), 0, 0, 104, 80, { ...state, marble: asset.textureKey || asset.renderer });
       });
       // Each accent previewed in the accent color over the stone color.
       document.querySelectorAll('#accentTiles button').forEach((b) => {
@@ -1485,7 +1559,7 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
 
   function commit(rebuild = true) {
     save();
-    if (rebuild) { buildPalettes(); buildRoles(); }
+    if (rebuild) { buildPalettes(); buildRoles(); buildCoverSlots(); }
     syncControls();
     draw();
     refreshThumbs();
@@ -1498,22 +1572,13 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
     if (e.key === 'ArrowRight') $('nextPage').click();
     if (e.key === 'ArrowLeft') $('prevPage').click();
   });
-  $('journal').onchange = (e) => { state.journal = e.target.value; state.page = 0; commit(false); };
+  $('journal').onchange = (e) => { state.journal = e.target.value; state.page = 0; commit(true); };
   document.querySelectorAll('#qualitySeg button').forEach((b) => b.onclick = () => { state.quality = b.dataset.q; commit(false); });
-  document.querySelectorAll('#marbleSeg button').forEach((b) => b.onclick = () => {
-    state.marble = b.dataset.marble;
-    // Each texture has a designed look (see PALETTES' `look.marble`); adopt just its stone/vein/highlight
-    // so, e.g., "White" actually renders white instead of keeping whatever colors were active before.
-    const match = PALETTES.find((pl) => pl.look?.marble === state.marble);
-    if (match) Object.assign(state.palette, { stone: match.stone, vein: match.vein, highlight: match.highlight });
-    commit(true);
-  });
   $('fontFamily').onchange = (e) => { state.fontFamily = e.target.value; ensureFont(state.fontFamily).then(() => commit(false)); commit(false); };
   $('headingFont').onchange = (e) => { state.headingFont = e.target.value; ensureFont(state.headingFont).then(() => commit(false)); commit(false); };
   $('fontScale').oninput = (e) => { state.fontScale = Number(e.target.value); commit(false); };
   $('textColorAuto').onchange = (e) => { state.textColorAuto = e.target.checked; commit(false); };
   $('textColor').oninput = (e) => { state.textColor = e.target.value; commit(false); };
-  document.querySelectorAll('#plateSeg button').forEach((b) => b.onclick = () => { state.plateStyle = b.dataset.plate; commit(false); });
   document.querySelectorAll('#titleSeg button').forEach((b) => b.onclick = () => { state.titleStyle = b.dataset.title; goTo('cover'); commit(false); });
   $('accent').onchange = (e) => { state.accent = e.target.value; commit(false); };
   $('accentPlace').onchange = (e) => { state.accentPlace = e.target.value; goTo('cover'); commit(true); };
@@ -1604,7 +1669,7 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
     finally { setBusy(false); }
   };
 
-  buildAccentTiles(); buildPalettes(); buildRoles(); syncControls();
+  buildAccentTiles(); buildPalettes(); buildRoles(); buildCoverSlots(); syncControls();
   // Load the small pieces plus the marble in use, then draw; everything else streams in afterwards.
   const core = ['title', `marble:${state.marble in TEXTURES ? state.marble : 'classic'}`];
   let loaded = 0;
