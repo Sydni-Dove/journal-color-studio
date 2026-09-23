@@ -1216,14 +1216,27 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
     paintWash(ctx, W, H, s, 'full');
     if (s.accent !== 'none') drawAccent(ctx, W, H, s);
     const bx = W * .14, by = H * .32, bw = W * .72, bh = H * .27;
-    if (s.showTrim) { ctx.strokeStyle = p.trim; ctx.lineWidth = Math.max(1.5, W * .003); ctx.strokeRect(bx, by, bw, bh); }
+    // A real plate (fill + frame + trim, same toggles/styles as the Dream cover) sits behind the title
+    // so it stays legible over a busy accent pattern instead of just a thin outline over open art.
+    let inner;
+    if (s.plateStyle === 'bevel') {
+      const border = BEVEL_SRC_BORDER * bw / (ASSETS.bevel ? ASSETS.bevel.naturalWidth : 921);
+      inner = drawBevelPlate(ctx, bx, by, bw, bh, border, s);
+    } else {
+      if (s.showPlate) { ctx.fillStyle = rgba(p.plate, s.plateOpacity / 100); ctx.fillRect(bx, by, bw, bh); }
+      if (s.showFrame) { ctx.strokeStyle = p.frame; ctx.lineWidth = W * .012; ctx.strokeRect(bx, by, bw, bh); }
+      if (s.showTrim) { ctx.strokeStyle = p.trim; ctx.lineWidth = W * .006; const o = W * .014; ctx.strokeRect(bx + o, by + o, bw - 2 * o, bh - 2 * o); }
+      inner = { x: bx, y: by, w: bw, h: bh };
+    }
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    const ink = inkColor(p);   // the wash itself uses plate/highlight, so text needs a color guaranteed to contrast
-    ctx.fillStyle = ink; ctx.font = font(H * .075, { weight: 600 });
-    ctx.fillText('Prayer', W / 2, H * .415);
-    ctx.font = font(H * .045, { italic: true });
-    ctx.fillText('journal', W / 2, H * .49);
-    if (s.showTrim) { ctx.strokeStyle = p.trim; ctx.lineWidth = Math.max(2, W * .01); ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(bx + bw * .1, by + bh * .92); ctx.lineTo(bx + bw * .55, by + bh * 1.12); ctx.stroke(); ctx.lineCap = 'butt'; }
+    // On a filled plate the title color follows the palette; with no plate it needs guaranteed contrast against the wash.
+    const onPlate = s.plateStyle === 'bevel' || s.showPlate;
+    const ink = onPlate ? p.title : inkColor(p);
+    const cy = inner.y + inner.h / 2;
+    ctx.fillStyle = ink; ctx.font = headFont(H * .075, { weight: 600 });
+    ctx.fillText('Prayer', W / 2, cy - H * .038);
+    ctx.font = headFont(H * .045, { italic: true });
+    ctx.fillText('journal', W / 2, cy + H * .035);
   }
   const COVERS = { dream: renderCover, prayer: renderCoverPrayer };
   const BACKS = { prayer: (ctx, W, H, s) => paintWash(ctx, W, H, s, 'full') };
