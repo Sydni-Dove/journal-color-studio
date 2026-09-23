@@ -193,6 +193,25 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
     </div>
 
     <div class="card">
+      <h2>Typography <span>font, size, color</span></h2>
+      <div class="field"><span>Font</span>
+        <select id="fontFamily">
+          <option value="Cormorant Garamond">Cormorant Garamond (default)</option>
+          <option value="Playfair Display">Playfair Display</option>
+          <option value="EB Garamond">EB Garamond</option>
+          <option value="Libre Baskerville">Libre Baskerville</option>
+          <option value="Dancing Script">Dancing Script (handwritten)</option>
+          <option value="Alex Brush">Alex Brush (script)</option>
+          <option value="Montserrat">Montserrat (modern sans)</option>
+          <option value="Lato">Lato (clean sans)</option>
+        </select>
+      </div>
+      <label class="slider"><span>Text size <b id="fontScaleVal"></b></span><input type="range" id="fontScale" min="70" max="140"></label>
+      <div class="role"><label><input type="checkbox" id="textColorAuto"> Text color follows palette</label>
+        <input type="color" id="textColor" aria-label="Text color"></div>
+    </div>
+
+    <div class="card">
       <h2>Layers <span>toggle + recolor</span></h2>
       <div id="roles"></div>
       <label class="slider"><span>Stone texture <b id="textureVal"></b></span><input type="range" id="texture" min="0" max="100"></label>
@@ -352,6 +371,7 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
     headerStyle: 'mixed', lineSpacing: '25', footer: 'on', marginLine: false,
     headerRule: 'line', lineStyle: 'printed', headerFill: 'marble',
     journal: 'dream', page: 0, pageCount: 102, includeCover: 'yes', includeBack: 'yes',
+    fontFamily: 'Cormorant Garamond', fontScale: 100, textColorAuto: true, textColor: '#2A1A18',
   };
   const STORE_KEY = 'dove-marble-studio';
   let state = structuredClone(DEFAULTS);
@@ -392,6 +412,33 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
   function scheduleRedraw() { clearTimeout(redrawTimer); redrawTimer = setTimeout(() => { if (ready) { draw(); refreshThumbs(); } }, 60); }
   const withTimeout = (pr, ms) => Promise.race([pr, new Promise((r) => setTimeout(r, ms))]);
   const fontsReady = document.fonts ? withTimeout(document.fonts.load('600 40px "Cormorant Garamond"').then(() => document.fonts.load('italic 500 20px "Cormorant Garamond"')).catch(() => {}), 2500) : Promise.resolve();
+
+  // Every font offered in the Typography picker, and the Google Fonts weight/style axis to request for it.
+  const FONT_STYLESHEETS = {
+    'Cormorant Garamond': 'family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600',
+    'Playfair Display': 'family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500',
+    'EB Garamond': 'family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500',
+    'Libre Baskerville': 'family=Libre+Baskerville:ital,wght@0,400;0,700;1,400',
+    'Dancing Script': 'family=Dancing+Script:wght@400;500;600;700',
+    'Alex Brush': 'family=Alex+Brush',
+    'Montserrat': 'family=Montserrat:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500',
+    'Lato': 'family=Lato:ital,wght@0,400;0,700;1,400',
+  };
+  const loadedFonts = new Set(['Cormorant Garamond']);
+  // Loads a picked family's stylesheet (once) and waits for the browser to actually have it ready to draw with.
+  function ensureFont(family) {
+    if (loadedFonts.has(family)) return Promise.resolve();
+    loadedFonts.add(family);
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = `https://fonts.googleapis.com/css2?${FONT_STYLESHEETS[family] || `family=${encodeURIComponent(family)}`}&display=swap`;
+    document.head.appendChild(link);
+    if (!document.fonts) return Promise.resolve();
+    return withTimeout(Promise.all([
+      document.fonts.load(`600 40px "${family}"`),
+      document.fonts.load(`italic 500 20px "${family}"`),
+    ]).catch(() => {}), 4000);
+  }
 
   // Phones cap total canvas memory, and short-lived canvases are freed lazily, so scratch canvases are reused.
   const scratchPool = {};
@@ -632,6 +679,7 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
 
   // Darkest of the palette's ink colors, for text sitting on light paper.
   function inkColor(p) {
+    if (!state.textColorAuto) return state.textColor;
     const lum = (h) => { const [r, g, b] = hexRgb(h); return r * .2126 + g * .7152 + b * .0722; };
     return [p.plate, p.frame, p.title, p.stone].reduce((a, b) => (lum(b) < lum(a) ? b : a));
   }
@@ -649,7 +697,7 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
   // boxes, writing lines, lettering), so one palette or element change flows through the whole journal.
   // Positions follow Sydni's Canva master ("Dream Journal – Final 28 Pages"), in page fractions.
 
-  const font = (px, { weight = 500, italic = false } = {}) => `${italic ? 'italic ' : ''}${weight} ${Math.round(px)}px "Cormorant Garamond", Georgia, serif`;
+  const font = (px, { weight = 500, italic = false } = {}) => `${italic ? 'italic ' : ''}${weight} ${Math.round(px * (state.fontScale / 100))}px "${state.fontFamily}", Georgia, serif`;
 
   // Draws text wrapped to maxW. Returns the y just below the last line.
   function wrapText(ctx, text, x, y, maxW, lineH, align = 'left', draw = true) {
@@ -1274,6 +1322,8 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
     $('plateVal').textContent = state.plateOpacity + '%';
     for (const id of ['journal', 'headerStyle', 'headerFill', 'lineSpacing', 'footer', 'pageCount', 'includeCover', 'includeBack', 'headerRule', 'lineStyle']) $(id).value = state[id];
     $('marginLine').checked = state.marginLine;
+    $('fontFamily').value = state.fontFamily; $('fontScale').value = state.fontScale; $('fontScaleVal').textContent = state.fontScale + '%';
+    $('textColorAuto').checked = state.textColorAuto; $('textColor').value = state.textColor; $('textColor').disabled = state.textColorAuto;
     const type = currentType(), total = pageList(state).length;
     $('viewLabel').textContent = PAGE_LABELS[type];
     $('pageName').textContent = PAGE_LABELS[type];
@@ -1374,6 +1424,10 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
   $('journal').onchange = (e) => { state.journal = e.target.value; state.page = 0; commit(false); };
   document.querySelectorAll('#qualitySeg button').forEach((b) => b.onclick = () => { state.quality = b.dataset.q; commit(false); });
   document.querySelectorAll('#marbleSeg button').forEach((b) => b.onclick = () => { state.marble = b.dataset.marble; commit(false); });
+  $('fontFamily').onchange = (e) => { state.fontFamily = e.target.value; ensureFont(state.fontFamily).then(() => commit(false)); commit(false); };
+  $('fontScale').oninput = (e) => { state.fontScale = Number(e.target.value); commit(false); };
+  $('textColorAuto').onchange = (e) => { state.textColorAuto = e.target.checked; commit(false); };
+  $('textColor').oninput = (e) => { state.textColor = e.target.value; commit(false); };
   document.querySelectorAll('#plateSeg button').forEach((b) => b.onclick = () => { state.plateStyle = b.dataset.plate; commit(false); });
   document.querySelectorAll('#titleSeg button').forEach((b) => b.onclick = () => { state.titleStyle = b.dataset.title; goTo('cover'); commit(false); });
   $('accent').onchange = (e) => { state.accent = e.target.value; commit(false); };
@@ -1448,7 +1502,7 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
   const status = $('loading');
   // Everything else is optional: pages draw without a piece until it arrives, then redraw.
   Object.keys(IMAGES).filter((k) => !core.includes(k)).forEach((k) => ensureAsset(k).catch(() => {}));
-  Promise.all([...core.map((k) => ensureAsset(k).then((img) => { loaded++; status.querySelector('small').textContent = `${loaded} of ${core.length} pieces`; return img; })), fontsReady])
+  Promise.all([...core.map((k) => ensureAsset(k).then((img) => { loaded++; status.querySelector('small').textContent = `${loaded} of ${core.length} pieces`; return img; })), fontsReady, ensureFont(state.fontFamily)])
     .then(() => { ready = true; status.classList.add('hidden'); draw(); refreshThumbs(); })
     .catch((e) => { status.querySelector('strong').textContent = 'A design file could not be loaded'; status.querySelector('small').textContent = `${e.message} — check your connection and refresh.`; });
 })();
