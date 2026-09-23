@@ -194,8 +194,20 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
 
     <div class="card">
       <h2>Typography <span>font, size, color</span></h2>
-      <div class="field"><span>Font</span>
+      <div class="field"><span>Body text</span>
         <select id="fontFamily">
+          <option value="Cormorant Garamond">Cormorant Garamond (default)</option>
+          <option value="Playfair Display">Playfair Display</option>
+          <option value="EB Garamond">EB Garamond</option>
+          <option value="Libre Baskerville">Libre Baskerville</option>
+          <option value="Dancing Script">Dancing Script (handwritten)</option>
+          <option value="Alex Brush">Alex Brush (script)</option>
+          <option value="Montserrat">Montserrat (modern sans)</option>
+          <option value="Lato">Lato (clean sans)</option>
+        </select>
+      </div>
+      <div class="field"><span>Section headings</span>
+        <select id="headingFont">
           <option value="Cormorant Garamond">Cormorant Garamond (default)</option>
           <option value="Playfair Display">Playfair Display</option>
           <option value="EB Garamond">EB Garamond</option>
@@ -301,7 +313,7 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
   const TEXTURES = {
     classic: { src: 'marble-layers.png', shadeBase: .82, shadeAmt: .3 },
     canva: { src: 'marble-layers-canva.png', shadeBase: .5, shadeAmt: .75 },
-    blush: { src: 'marble-layers-blush.png', shadeBase: .62, shadeAmt: .55 },       // watercolor marble: B holds the dark smoky wisps
+    blush: { src: 'marble-layers-blush.png', shadeBase: .68, shadeAmt: .32, blur: .022 },  // watercolor: blurred mask reads as a soft diffuse wash, not sharp veining
     goldleaf: { src: 'marble-layers-goldleaf.png', shadeBase: .62, shadeAmt: .5 },  // gold-leaf veins over a plain stone
     white: { src: 'marble-layers-white.png', shadeBase: .7, shadeAmt: .4 },         // white marble: grey veins take the Veins color
   };
@@ -371,7 +383,7 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
     headerStyle: 'mixed', lineSpacing: '25', footer: 'on', marginLine: false,
     headerRule: 'line', lineStyle: 'printed', headerFill: 'marble',
     journal: 'dream', page: 0, pageCount: 102, includeCover: 'yes', includeBack: 'yes',
-    fontFamily: 'Cormorant Garamond', fontScale: 100, textColorAuto: true, textColor: '#2A1A18',
+    fontFamily: 'Cormorant Garamond', headingFont: 'Cormorant Garamond', fontScale: 100, textColorAuto: true, textColor: '#2A1A18',
   };
   const STORE_KEY = 'dove-marble-studio';
   let state = structuredClone(DEFAULTS);
@@ -449,16 +461,20 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
   }
 
   // Cache the cropped layer map per output size so recoloring only re-runs the pixel math.
+  // blurPx softens the mask itself (used by Watercolor) so the recolor reads as a diffuse wash, not sharp mineral veining.
   const layerCache = new Map();
-  function layerData(img, w, h) {
-    const key = `${img.src}|${w}x${h}`;
+  function layerData(img, w, h, blurPx = 0) {
+    const key = `${img.src}|${w}x${h}|${blurPx}`;
     if (layerCache.has(key)) return layerCache.get(key);
     const c = scratch('layer', w, h);
     const ctx = c.getContext('2d', { willReadFrequently: true });
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
     const ir = img.naturalWidth / img.naturalHeight, r = w / h;
     let sx = 0, sy = 0, sw = img.naturalWidth, sh = img.naturalHeight;
     if (ir > r) { sw = sh * r; sx = (img.naturalWidth - sw) / 2; } else { sh = sw / r; sy = (img.naturalHeight - sh) / 2; }
+    if (blurPx > 0) ctx.filter = `blur(${blurPx}px)`;
     ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
+    ctx.filter = 'none';
     const data = ctx.getImageData(0, 0, w, h).data;
     if (layerCache.size > 12) layerCache.delete(layerCache.keys().next().value);
     layerCache.set(key, data);
@@ -483,7 +499,7 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
       ensureAsset(`marble:${key}`).catch(() => {});
       ctx.fillStyle = s.palette.stone; ctx.fillRect(x, y, w, h); return;
     }
-    const src = layerData(img, w, h);
+    const src = layerData(img, w, h, tx.blur ? tx.blur * w : 0);
     const out = ctx.createImageData(w, h), d = out.data;
     const p = s.palette;
     const stone = hexRgb(p.stone), vein = hexRgb(p.vein), hi = hexRgb(p.highlight), paper = hexRgb(p.paper);
@@ -522,6 +538,7 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
     if (hueCache.has(key)) return hueCache.get(key);
     const src = scratch('hueSrc', w, h);
     const sctx = src.getContext('2d', { willReadFrequently: true });
+    sctx.imageSmoothingEnabled = true; sctx.imageSmoothingQuality = 'high';
     const ir = img.naturalWidth / img.naturalHeight, r = w / h;
     let sx = 0, sy = 0, sw = img.naturalWidth, sh = img.naturalHeight;
     if (ir > r) { sw = sh * r; sx = (img.naturalWidth - sw) / 2; } else { sh = sw / r; sy = (img.naturalHeight - sh) / 2; }
@@ -698,6 +715,8 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
   // Positions follow Sydni's Canva master ("Dream Journal – Final 28 Pages"), in page fractions.
 
   const font = (px, { weight = 500, italic = false } = {}) => `${italic ? 'italic ' : ''}${weight} ${Math.round(px * (state.fontScale / 100))}px "${state.fontFamily}", Georgia, serif`;
+  // Section-heading text (page titles drawn by drawHeader) can use its own typeface, independent of body text.
+  const headFont = (px, { weight = 500, italic = false } = {}) => `${italic ? 'italic ' : ''}${weight} ${Math.round(px * (state.fontScale / 100))}px "${state.headingFont || state.fontFamily}", Georgia, serif`;
 
   // Draws text wrapped to maxW. Returns the y just below the last line.
   function wrapText(ctx, text, x, y, maxW, lineH, align = 'left', draw = true) {
@@ -761,18 +780,18 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
     if (style === 'block') {                       // dark block, light lettering, gold rule (Interpretation, Application, Summary)
       const hb = H * .1;
       stoneBar(ctx, x0, 0, w, hb, s);
-      ctx.fillStyle = p.title; ctx.font = font(H * .045); ctx.fillText(title, cx, hb * .56);
+      ctx.fillStyle = p.title; ctx.font = headFont(H * .045); ctx.fillText(title, cx, hb * .56);
       headerRule(ctx, x0, hb, w, H * .011, s);
       bottom = hb + H * .011;
     } else if (style === 'bar') {                  // title on paper, thick dark bar beneath (Dream)
-      ctx.fillStyle = ink; ctx.font = font(H * .05); ctx.fillText(title, cx, H * .07);
+      ctx.fillStyle = ink; ctx.font = headFont(H * .05); ctx.fillText(title, cx, H * .07);
       stoneBar(ctx, x0, H * .115, w, H * .028, s);
       bottom = H * .143;
     } else if (style === 'band') {                 // marble band with the cover's title plate
       const band = H * .125;
       paintMarble(ctx, x0, 0, w, band, s);
       headerRule(ctx, x0 + w * .045, band - H * .009, w * .91, H * .004, s);
-      ctx.font = font(H * .036, { weight: 600 });
+      ctx.font = headFont(H * .036, { weight: 600 });
       const pw = Math.max(ctx.measureText(title).width + W * .12, w * .34), ph = band * (sub ? .7 : .56);
       const px = cx - pw / 2, py = band * .47 - ph / 2 + (sub ? band * .06 : 0);
       if (s.plateStyle === 'bevel') drawBevelPlate(ctx, px, py, pw, ph, W * .011, s);
@@ -782,21 +801,21 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
         if (s.showTrim) { ctx.strokeStyle = p.trim; ctx.lineWidth = W * .0035; const o = W * .008; ctx.strokeRect(px + o, py + o, pw - 2 * o, ph - 2 * o); }
       }
       ctx.fillStyle = p.title; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(title, cx, band * .47);
-      if (sub) { ctx.font = font(H * .016, { italic: true }); ctx.fillText(sub, cx, band * .47 + H * .03); sub = ''; }
+      if (sub) { ctx.font = headFont(H * .016, { italic: true }); ctx.fillText(sub, cx, band * .47 + H * .03); sub = ''; }
       bottom = band;
     } else if (style === 'soft') {                 // pale marble wash
       const band = H * .11;
       paintMarble(ctx, x0, 0, w, band, s, true);
-      ctx.fillStyle = ink; ctx.font = font(H * .045); ctx.fillText(title, cx, band * .52);
+      ctx.fillStyle = ink; ctx.font = headFont(H * .045); ctx.fillText(title, cx, band * .52);
       headerRule(ctx, x0, band, w, H * .006, s);
       bottom = band + H * .006;
     } else if (style === 'plain') {                // title only
-      ctx.fillStyle = ink; ctx.font = font(H * .045); ctx.fillText(title, cx, H * .06);
+      ctx.fillStyle = ink; ctx.font = headFont(H * .045); ctx.fillText(title, cx, H * .06);
       bottom = H * .09;
     } else {                                       // 'rule': thin top bar, dark title, gold rule (Draw, Brainstorm, Keys, Notes)
       const isFloral = s.marble === 'floral';
       if (s.footer === 'on' && !isFloral) stoneBar(ctx, x0, 0, w, H * .022, s);
-      ctx.fillStyle = ink; ctx.font = font(H * .045); ctx.fillText(title, cx, H * .068);
+      ctx.fillStyle = ink; ctx.font = headFont(H * .045); ctx.fillText(title, cx, H * .068);
       headerRule(ctx, x0, H * .105, w, H * .012, s);
       if (isFloral) floralFlank(ctx, cx, H * .108 - H * .05, w * .07, H * .1, s);
       bottom = H * .117;
@@ -1322,7 +1341,7 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
     $('plateVal').textContent = state.plateOpacity + '%';
     for (const id of ['journal', 'headerStyle', 'headerFill', 'lineSpacing', 'footer', 'pageCount', 'includeCover', 'includeBack', 'headerRule', 'lineStyle']) $(id).value = state[id];
     $('marginLine').checked = state.marginLine;
-    $('fontFamily').value = state.fontFamily; $('fontScale').value = state.fontScale; $('fontScaleVal').textContent = state.fontScale + '%';
+    $('fontFamily').value = state.fontFamily; $('headingFont').value = state.headingFont; $('fontScale').value = state.fontScale; $('fontScaleVal').textContent = state.fontScale + '%';
     $('textColorAuto').checked = state.textColorAuto; $('textColor').value = state.textColor; $('textColor').disabled = state.textColorAuto;
     const type = currentType(), total = pageList(state).length;
     $('viewLabel').textContent = PAGE_LABELS[type];
@@ -1336,7 +1355,11 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
     cancelAnimationFrame(raf);
     raf = requestAnimationFrame(() => {
       const s = comparing ? { ...state, palette: { ...DEFAULTS.palette } } : state;
-      renderPage(canvas, 760, s, currentType());
+      // Render at the screen's actual pixel density (capped at 2x) so photographic art like the
+      // Floral cover stays crisp instead of being upscaled/blurred by the browser on retina displays.
+      const cssW = 760, dpr = Math.min(2, window.devicePixelRatio || 1);
+      canvas.style.width = cssW + 'px';
+      renderPage(canvas, Math.round(cssW * dpr), s, currentType());
     });
   }
 
@@ -1423,8 +1446,16 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
   });
   $('journal').onchange = (e) => { state.journal = e.target.value; state.page = 0; commit(false); };
   document.querySelectorAll('#qualitySeg button').forEach((b) => b.onclick = () => { state.quality = b.dataset.q; commit(false); });
-  document.querySelectorAll('#marbleSeg button').forEach((b) => b.onclick = () => { state.marble = b.dataset.marble; commit(false); });
+  document.querySelectorAll('#marbleSeg button').forEach((b) => b.onclick = () => {
+    state.marble = b.dataset.marble;
+    // Each texture has a designed look (see PALETTES' `look.marble`); adopt just its stone/vein/highlight
+    // so, e.g., "White" actually renders white instead of keeping whatever colors were active before.
+    const match = PALETTES.find((pl) => pl.look?.marble === state.marble);
+    if (match) Object.assign(state.palette, { stone: match.stone, vein: match.vein, highlight: match.highlight });
+    commit(true);
+  });
   $('fontFamily').onchange = (e) => { state.fontFamily = e.target.value; ensureFont(state.fontFamily).then(() => commit(false)); commit(false); };
+  $('headingFont').onchange = (e) => { state.headingFont = e.target.value; ensureFont(state.headingFont).then(() => commit(false)); commit(false); };
   $('fontScale').oninput = (e) => { state.fontScale = Number(e.target.value); commit(false); };
   $('textColorAuto').onchange = (e) => { state.textColorAuto = e.target.checked; commit(false); };
   $('textColor').oninput = (e) => { state.textColor = e.target.value; commit(false); };
@@ -1502,7 +1533,7 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
   const status = $('loading');
   // Everything else is optional: pages draw without a piece until it arrives, then redraw.
   Object.keys(IMAGES).filter((k) => !core.includes(k)).forEach((k) => ensureAsset(k).catch(() => {}));
-  Promise.all([...core.map((k) => ensureAsset(k).then((img) => { loaded++; status.querySelector('small').textContent = `${loaded} of ${core.length} pieces`; return img; })), fontsReady, ensureFont(state.fontFamily)])
+  Promise.all([...core.map((k) => ensureAsset(k).then((img) => { loaded++; status.querySelector('small').textContent = `${loaded} of ${core.length} pieces`; return img; })), fontsReady, ensureFont(state.fontFamily), ensureFont(state.headingFont)])
     .then(() => { ready = true; status.classList.add('hidden'); draw(); refreshThumbs(); })
     .catch((e) => { status.querySelector('strong').textContent = 'A design file could not be loaded'; status.querySelector('small').textContent = `${e.message} — check your connection and refresh.`; });
 })();
