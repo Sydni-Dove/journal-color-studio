@@ -1484,9 +1484,11 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
       const s = comparing ? { ...state, palette: { ...DEFAULTS.palette } } : state;
       // Render at the screen's actual pixel density (capped at 2x) so photographic art like the
       // Floral cover stays crisp instead of being upscaled/blurred by the browser on retina displays.
-      const cssW = 760, dpr = Math.min(2, window.devicePixelRatio || 1);
-      canvas.style.width = cssW + 'px';
-      renderPage(canvas, Math.round(cssW * dpr), s, currentType());
+      // The CSS box is governed purely by this width:height ratio plus max-width/max-height (both still
+      // "auto" in CSS) — never set canvas.style.width/height here, or the browser can't shrink both
+      // dimensions together under max-height and the page distorts.
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      renderPage(canvas, Math.round(760 * dpr), s, currentType());
     });
   }
 
