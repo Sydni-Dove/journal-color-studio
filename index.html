@@ -392,6 +392,21 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     blush: { src: 'marble-layers-blush.png', shadeBase: .68, shadeAmt: .32 },  // asset id only: watercolor is rendered by paintWatercolor(), not this layer map
     goldleaf: { src: 'marble-layers-goldleaf.png', shadeBase: .62, shadeAmt: .5, veins: 'marble-goldleaf-gold.png', veinsAlpha: true, rec: 'Gold Leaf' },  // gold-leaf veins over a plain stone
     white: { src: 'marble-layers-white.png', shadeBase: .7, shadeAmt: .4 },         // white marble: grey veins take the Veins color
+    // Kintsugi marbles (Design Elements p.68-71, Canva AI-upscaled, maps built by tools/build_marble_maps.py). Stone +
+    // second stone are rebuilt from the map; the gold seams are the original pixels (exact in the marble's own colors,
+    // tone-transferred otherwise). roles = what each layer is in this artwork, shown in Layers.
+    rose: { src: 'marble-layers-rose.png', shadeBase: .6, shadeAmt: .5, veins: 'marble-rose-gold.png', veinsAlpha: true, rec: 'Rose Marble',
+      roles: { stone: ['Rose stone', 'Deeper pink slabs'], highlight: ['Blush stone', 'Pale pink + white slabs'], vein: ['Gold seams', 'Kintsugi gold'] } },
+    // Three stone tones (wine, rose, cream) - more than two tone curves can carry - so like the Canva cover it keeps
+    // the whole original as its source: exact pixels in its own colors, per-pixel tone transfer for any other palette
+    // (every wine/rose pixel keeps its offset from the stone color, so rose stays a lighter, softer shade of it).
+    burgundy: { src: 'marble-layers-burgundy.png', shadeBase: .6, shadeAmt: .5, veins: 'marble-burgundy-source.jpg', rec: 'Burgundy Blush Marble',
+      texScale: 2,     // its wine stone spans a wider light/dark range than the other marbles
+      roles: { stone: ['Wine + rose stone', 'Burgundy and rose-pink slabs'], highlight: ['Cream stone', 'Pale cream + blush slabs'], vein: ['Gold seams', 'Kintsugi gold'] } },
+    ember: { src: 'marble-layers-ember.png', shadeBase: .6, shadeAmt: .5, veins: 'marble-ember-gold.png', veinsAlpha: true, rec: 'Black Ember Marble',
+      roles: { stone: ['Black stone', 'Deep charcoal'], highlight: ['Smoke', 'Grey smoky wisps'], vein: ['Ember seams', 'Glowing gold veins'] } },
+    peach: { src: 'marble-layers-peach.png', shadeBase: .6, shadeAmt: .5, veins: 'marble-peach-gold.png', veinsAlpha: true, rec: 'Peach Marble',
+      roles: { stone: ['Coral stone', 'Deeper peach slabs'], highlight: ['Champagne stone', 'Pale cream slabs'], vein: ['Gold seams', 'Kintsugi gold'] } },
   };
   const IMAGES = {
     title: 'title-lettering.png',        // script "Dream Journal" (alpha mask, full page)
@@ -479,6 +494,10 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     'bg-marble-boldgold':   { type: 'background', renderer: 'marble', textureKey: 'canva',     colorRoles: ['stone', 'vein', 'highlight'], recommendedPalette: 'Your Canva Cover', label: 'Bold gold', hint: 'Flat stone, metallic veins' },
     'bg-watercolor':        { type: 'background', renderer: 'marble', textureKey: 'blush',     colorRoles: ['stone', 'vein', 'highlight'], recommendedPalette: 'Blush Watercolor', label: 'Watercolor', hint: 'Soft wash, layered blooms' },
     'bg-marble-goldleaf':   { type: 'background', renderer: 'marble', textureKey: 'goldleaf',  colorRoles: ['stone', 'vein', 'highlight'], recommendedPalette: 'Gold Leaf', label: 'Gold leaf', hint: 'Sweeping leaf veins' },
+    'bg-marble-rose':       { type: 'background', renderer: 'marble', textureKey: 'rose',      colorRoles: ['stone', 'highlight', 'vein'], recommendedPalette: 'Rose Marble', label: 'Rose marble', hint: 'Pink stone, gold seams' },
+    'bg-marble-burgundy':   { type: 'background', renderer: 'marble', textureKey: 'burgundy',  colorRoles: ['stone', 'highlight', 'vein'], recommendedPalette: 'Burgundy Blush Marble', label: 'Burgundy + blush', hint: 'Wine + cream, gold seams' },
+    'bg-marble-ember':      { type: 'background', renderer: 'marble', textureKey: 'ember',     colorRoles: ['stone', 'highlight', 'vein'], recommendedPalette: 'Black Ember Marble', label: 'Black ember', hint: 'Black stone, glowing veins' },
+    'bg-marble-peach':      { type: 'background', renderer: 'marble', textureKey: 'peach',     colorRoles: ['stone', 'highlight', 'vein'], recommendedPalette: 'Peach Marble', label: 'Peach marble', hint: 'Coral + champagne, gold seams' },
     'bg-marble-white':      { type: 'background', renderer: 'marble', textureKey: 'white',     colorRoles: ['stone', 'vein', 'highlight'], recommendedPalette: 'White Marble', label: 'White', hint: 'Soft grey veining' },
     // Page 64 abstract watercolor from Sydni's Canva library, rebuilt from its layers so each color group is editable.
     // One flat color (the Background color role) — build the cover up from decorations and uploads on top of it.
@@ -560,7 +579,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     dream: {
       cover: {
         // 'bg-watercolor' (procedural blobs) is retired from the picker: it was never Sydni's artwork.
-        backgroundSlot: ['bg-solid', 'bg-marble-veined', 'bg-marble-boldgold', 'bg-abstract', 'bg-marble-goldleaf', 'bg-marble-white', 'bg-floral', 'bg-cabana', 'bg-pinstripe', 'bg-bias', 'bg-candy', 'bg-scribble', 'bg-arches', 'bg-img-marble-white', 'bg-img-gold-leaf-veins', 'bg-img-marble-black-gold', 'bg-img-marble-blue-gold', 'bg-img-marble-pink-gold', 'bg-img-stripes-blue-cream', 'bg-img-stripes-navy-thin', 'bg-img-stripes-diagonal', 'bg-img-notebook-paper', 'bg-img-leather-tan', 'bg-img-leather-black', 'bg-img-leather-brown', 'bg-img-leather-croc-brown', 'bg-img-leather-orange', 'bg-img-leather-croc-white', 'bg-img-leather-suede-beige', 'bg-img-abstract-white-ribbons', 'bg-img-abstract-white-chevron'],
+        backgroundSlot: ['bg-solid', 'bg-marble-veined', 'bg-marble-boldgold', 'bg-abstract', 'bg-marble-goldleaf', 'bg-marble-white', 'bg-marble-rose', 'bg-marble-burgundy', 'bg-marble-ember', 'bg-marble-peach', 'bg-floral', 'bg-cabana', 'bg-pinstripe', 'bg-bias', 'bg-candy', 'bg-scribble', 'bg-arches', 'bg-img-marble-white', 'bg-img-gold-leaf-veins', 'bg-img-marble-black-gold', 'bg-img-marble-blue-gold', 'bg-img-marble-pink-gold', 'bg-img-stripes-blue-cream', 'bg-img-stripes-navy-thin', 'bg-img-stripes-diagonal', 'bg-img-notebook-paper', 'bg-img-leather-tan', 'bg-img-leather-black', 'bg-img-leather-brown', 'bg-img-leather-croc-brown', 'bg-img-leather-orange', 'bg-img-leather-croc-white', 'bg-img-leather-suede-beige', 'bg-img-abstract-white-ribbons', 'bg-img-abstract-white-chevron'],
         titlePlateSlot: ['plate-rectangle', 'plate-rounded', 'plate-oval', 'plate-circle', 'plate-bevel', 'plate-ring', 'plate-none'],
         // Uploaded elements are appended to every decor slot (and the background slot) at runtime.
         decorTopSlot: ['decor-none', 'decor-floral', 'decor-wash-pink', 'decor-wash-beige', 'decor-wash-orange', 'decor-wash-cream', 'decor-blob-purple', 'decor-scribble', 'decor-stripes-yellow', 'decor-boho', 'decor-bouquet', 'decor-corner', 'decor-topo', 'decor-waves', 'decor-arcs', 'decor-ribbon', 'decor-dots', 'decor-stripes'],
@@ -615,6 +634,12 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     { name: 'Plum', stone: '#1E1224', vein: '#C5A45E', highlight: '#D9C2DE', plate: '#5C3568', frame: '#140B18', trim: '#C5A45E', title: '#FFFEFC', paper: '#FFFEFC', line: '#C6B2CB' },
     { name: 'Blush Rose', stone: '#E9CFCB', vein: '#BB9167', highlight: '#FFF6F2', plate: '#82445E', frame: '#5A2B3F', trim: '#BB9167', title: '#FFFCFC', paper: '#FFFCFC', line: '#D5A9B4' },
     { name: 'Teal + Coral', stone: '#0D2F33', vein: '#D19A4A', highlight: '#E7A18E', plate: '#155D66', frame: '#09201F', trim: '#D19A4A', title: '#FFFDFC', paper: '#FFFDFC', line: '#AFC7C4' },
+    // Kintsugi marbles' own colors (medians of each layer in the Canva artwork) + plate/lettering chosen to read on them.
+    { name: 'Rose Marble', stone: '#FAB3B5', vein: '#F68F22', highlight: '#FCDFE0', plate: '#FFF7F6', frame: '#B5485E', trim: '#D98A2B', title: '#8E2F3F', paper: '#FFFBFA', line: '#EDC3C6' },
+    // Burgundy: Canva's own photo colors for this marble (burgundy, light orange, gray orange, dark red, pastel red).
+    { name: 'Burgundy Blush Marble', stone: '#9C2933', vein: '#D9834F', highlight: '#F9DCCF', plate: '#4E0812', frame: '#4E0812', trim: '#D9834F', title: '#F9DCCF', paper: '#FFFBF8', line: '#EF9C93', accent: '#EF9C93' },
+    { name: 'Black Ember Marble', stone: '#0B0A09', vein: '#E97318', highlight: '#413B37', plate: '#141210', frame: '#0B0A09', trim: '#E97318', title: '#FFF4E6', paper: '#FFFFFF', line: '#C9B8A6' },
+    { name: 'Peach Marble', stone: '#FEB89F', vein: '#F28F30', highlight: '#FBE1D3', plate: '#FFF8F3', frame: '#C0664A', trim: '#D98A2B', title: '#8A3D24', paper: '#FFFCF9', line: '#F1CDBE' },
     { name: 'Terracotta', stone: '#2A140E', vein: '#BD8B43', highlight: '#DDAA86', plate: '#914631', frame: '#1C0D09', trim: '#BD8B43', title: '#FFFCF8', paper: '#FFFCF8', line: '#D2B39C' },
     // Orange pack (palettes/orange-palettes-for-journal-color-studio.json, one-way snapshot). `swatches` keeps the
     // source colors; roles use them directly except the deep ink shades (title/frame), which are the palette's
@@ -1233,7 +1258,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     if (lutCache.has(ck)) return lutCache.get(ck);
     const S = hexLab(p.stone), G = hexLab(p.vein), Hc = hexLab(p.highlight);
     // Stone texture strength follows the Stone texture slider (L* per unit of source luminance).
-    const A = 50 * tex;                  // calibrated so the original colorway matches the source marble's contrast
+    const A = 50 * tex * (TEXTURES[key]?.texScale || 1);   // calibrated so the original colorway matches the source marble's contrast
     // A very pale (or very dark) stone settles slightly (max 16 L*) so the texture still has room instead of clipping flat.
     let Ls = S[0];
     const up = (st.p95 - st.stone) * A, down = (st.stone - st.p5) * A;
@@ -1305,7 +1330,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     if (tx.veins && !veinImg) ensureAsset(`marbleVeins:${key}`).catch(() => {});
     const own = veinImg ? 0 : 1;                        // real veins arrive as an overlay below
     for (let i = 0; i < d.length; i += 4) {
-      const r = src[i] * 3, g = (src[i + 1] / 255) * gOn * own, cr = (src[i + 2] / 255) * cOn * own;
+      const r = src[i] * 3, g = (src[i + 1] / 255) * gOn * own, cr = (src[i + 2] / 255) * cOn * (tx.veinsAlpha ? 1 : own);
       for (let k = 0; k < 3; k++) {
         let v = stoneLUT[r + k] * (1 - g) + goldLUT[r + k] * g;
         v = v * (1 - cr) + hiLUT[r + k] * cr;
@@ -3548,7 +3573,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
         if (m in PATTERNS) patternRoles(m).forEach((r) => out.push({ ...r }));
         else if (m === 'solid') out.push({ ...byKey.stone, group: 'Background', label: 'Background color', hint: 'Solid background', toggle: null });
         else if (m === 'abstract') [['stone', 'Burgundy shapes'], ['highlight', 'Pink washes'], ['accent', 'Orange + peach shapes'], ['vein', 'Gold lines + splatter']].forEach(([key, label]) => out.push({ ...byKey[key], group: 'Background', label, hint: 'Abstract watercolor', toggle: null }));
-        else if (!(m in PATTERNS) && !m.startsWith('img:') && !m.startsWith('upload:') && m !== 'floral' && m !== 'solid') ['stone', 'vein', 'highlight'].forEach((key) => out.push({ ...byKey[key], group: 'Background' }));
+        else if (!(m in PATTERNS) && !m.startsWith('img:') && !m.startsWith('upload:') && m !== 'floral' && m !== 'solid') ['stone', 'vein', 'highlight'].forEach((key) => { const [label, hint] = TEXTURES[m]?.roles?.[key] || []; out.push({ ...byKey[key], group: 'Background', ...(label ? { label, hint } : {}) }); });
       }
       const seen = new Set(out.map((r) => r.key));
       PRAYER_ROLES[state.journal].forEach(([key, label, hint]) => { if (!replaced.includes(key) && !seen.has(key)) { seen.add(key); out.push({ ...byKey[key], group: 'Design', label, hint, toggle: null }); } });
@@ -3579,7 +3604,8 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     } else if (m.startsWith('img:')) {
       // photo / pattern backgrounds keep their own colors
     } else {
-      add('stone', 'Marble'); add('vein', 'Marble'); add('highlight', 'Marble');
+      const own = TEXTURES[m]?.roles || {};
+      add('stone', 'Marble', ...(own.stone || [])); add('vein', 'Marble', ...(own.vein || [])); add('highlight', 'Marble', ...(own.highlight || []));
     }
     const plated = !['none', 'ring'].includes(state.plateStyle);
     if (plated) { add('plate', 'Title plate'); add('frame', 'Title plate'); }
