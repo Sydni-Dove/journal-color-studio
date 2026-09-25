@@ -201,18 +201,18 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
             <option value="stripes">Bold stripes</option>
           </select>
         </div>
-        <div class="field"><span>Accent placement</span>
-          <select id="accentPlace">
-            <option value="corners">Opposite corners</option>
-            <option value="cornerTopRight">Top-right corner</option>
-            <option value="cornerBottomLeft">Bottom-left corner</option>
-            <option value="borderEdge">Top + bottom edges</option>
-            <option value="behindTitleSubtle">Behind the title (subtle)</option>
-          </select>
+        <div class="field"><span>Accent layout</span>
+          <select id="accentPlace"></select>
         </div>
       </div>
       <label class="slider" id="accentOpacityRow"><span>Accent opacity <b id="accentVal"></b></span><input type="range" id="accentOpacity" min="5" max="100"></label>
-      <label class="slider" id="accentScaleRow"><span>Accent size <b id="accentScaleVal"></b></span><input type="range" id="accentScale" min="40" max="200"></label>
+      <label class="slider" id="accentScaleRow"><span>Accent size <b id="accentScaleVal"></b></span><input type="range" id="accentScale" min="30" max="200"></label>
+      <label class="slider hidden" id="accentTileRow"><span>Pattern size <b id="accentTileVal"></b></span><input type="range" id="accentTile" min="40" max="200"></label>
+      <label class="slider hidden" id="accentSpacingRow"><span>Repeat spacing <b id="accentSpacingVal"></b></span><input type="range" id="accentSpacing" min="0" max="100"></label>
+      <label class="slider hidden" id="accentXRow"><span>X position <b id="accentXVal"></b></span><input type="range" id="accentXIn" min="0" max="100"></label>
+      <label class="slider hidden" id="accentYRow"><span>Y position <b id="accentYVal"></b></span><input type="range" id="accentYIn" min="0" max="100"></label>
+      <label class="slider hidden" id="accentRotRow"><span>Rotation <b id="accentRotVal"></b></span><input type="range" id="accentRot" min="-180" max="180"></label>
+      <div class="role hidden" id="accentDragRow"><span class="hint">Drag the element on the cover preview to reposition it.</span></div>
       <div class="role" id="accentLinedRow"><label><input type="checkbox" id="accentLined"> Also show accent faintly on lined pages</label></div>
       <label class="slider" id="shadowRow"><span>Lettering shadow <b id="shadowVal"></b></span><input type="range" id="titleShadow" min="0" max="100"></label>
     </div>
@@ -415,6 +415,18 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     floralCorner: 'floral-corner.png',     // large corner bouquet: frames the Belongs-to page
     divider: 'ornament-divider.png',       // gold ornament divider (alpha mask)
     handLines: 'lines-hand.png',
+    // Pattern maps are built with tools/build_pattern_maps.py (same crops, same masks, same roles at any resolution).
+    // cabana / pinstripe / bias: from 2125 px transparent Canva exports (216 DPI page).
+    // candy / scribble / abstract: from ~1545 px page images (lower resolution); rebuild with the script when
+    // full-size Canva exports are available.
+    'pattern:cabana': 'pattern-cabana.png',       // ink maps of the Canva stripe/pattern designs (0 = light ground, 255 = full ink)
+    'pattern:pinstripe': 'pattern-pinstripe.png',
+    'pattern:bias': 'pattern-bias.png',
+    'pattern:candy': 'pattern-candy.png',
+    'pattern:scribble': 'pattern-scribble.png',
+    'pattern:arches0': 'pattern-abstract-0.png',  // abstract arches: RGB = coverage of ground, lines, leaf
+    'pattern:arches1': 'pattern-abstract-1.png',  //   arc, striped circle, sun
+    'pattern:arches2': 'pattern-abstract-2.png',  //   sun-over-leaf overlap, loop
     logo: 'brand/wordmark.png',            // Dove Expressions wordmark from the final logo files (09-19-2024)                 // Dove Expressions wordmark, kept in its brand colors           // 11 hand-drawn ruled lines stacked as equal-height strips (alpha mask)
   };
   // Script lettering bounds inside its full-page mask, and the bevel plate geometry from the Canva cover (page fractions).
@@ -441,7 +453,19 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     { group: 'Accent', key: 'accent', label: 'Accent art', hint: 'Line art from your elements' },
     { group: 'Page', key: 'paper', label: 'Paper', hint: 'Lined page background' },
     { group: 'Page', key: 'line', label: 'Ruled lines', hint: 'Writing lines + margin rule' },
+    // Pattern roles only show (and only matter) when a striped background is chosen. `variant` roles are
+    // the ones a repeat click on the selected palette reassigns (see paletteVariants).
+    { group: 'Stripes + patterns', key: 'stripeBackground', label: 'Pattern background', hint: 'Light ground between stripes', pattern: true, variant: true },
+    { group: 'Stripes + patterns', key: 'stripePrimary', label: 'Stripes / stroke', hint: 'The printed stripes or brush stroke', pattern: true, variant: true },
+    { group: 'Stripes + patterns', key: 'stripeAccent', label: 'Border line', hint: 'Thin pinline around the page', toggle: 'showStripeBorder', pattern: true, variant: true },
+    // Abstract arches (Design Elements p.38): ground = Pattern background, arch lines = Stripes / stroke, plus its own shapes.
+    { group: 'Abstract shapes', key: 'shapeLeaf', label: 'Leaf', hint: 'Large half-leaf shape', pattern: 'arches', variant: true },
+    { group: 'Abstract shapes', key: 'shapeArc', label: 'Arc', hint: 'Wide lower-left arc', pattern: 'arches', variant: true },
+    { group: 'Abstract shapes', key: 'shapeStripes', label: 'Striped circle', hint: 'Banded center circle', pattern: 'arches', variant: true },
+    { group: 'Abstract shapes', key: 'shapeSun', label: 'Sun', hint: 'Circle (its overlap with the leaf deepens it)', pattern: 'arches', variant: true },
+    { group: 'Abstract shapes', key: 'shapeLoop', label: 'Loop', hint: 'Soft outline loop', pattern: 'arches', variant: true },
   ];
+  ROLES.find((r) => r.key === 'accent').variant = true;
 
   // ---------- Slot-based asset + template registry (Dream Journal cover, phase 1) ----------
   // Palettes hold COLORS ONLY. Backgrounds may name a recommended palette, offered as an explicit
@@ -483,6 +507,16 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     'bg-img-abstract-white-chevron': { type: 'background', renderer: 'image', textureKey: 'img:abstract-white-chevron', image: 'canva:abstract-white-chevron', colorRoles: ['paper'], label: 'White chevron', hint: 'Layered white' },
     // Floral design: the cover background is plain paper (recolor via Paper); the bouquets and ring are separate slots.
     'bg-floral':            { type: 'background', renderer: 'floral', colorRoles: ['paper'], recommendedPalette: 'Floral Garden', label: 'Floral paper', hint: 'Plain paper + floral interior' },
+    // Stripe + pattern designs from the Canva "Design Elements" file (pages 30, 33, 34, 36, 37). They are graphic
+    // designs, not photos, so they are recolorable: each is stored as an ink map (how much of the dark source
+    // tone every pixel holds) and rebuilt in the palette's pattern roles. Stripe geometry, the fabric weave and
+    // the chalk grain all live in that map, so only the colors change — never a flat tint over the image.
+    'bg-cabana':            { type: 'background', renderer: 'pattern', textureKey: 'cabana',    colorRoles: ['stripeBackground', 'stripePrimary', 'stripeAccent'], label: 'Cabana', hint: 'Wide two-tone stripes' },
+    'bg-pinstripe':         { type: 'background', renderer: 'pattern', textureKey: 'pinstripe', colorRoles: ['stripeBackground', 'stripePrimary', 'stripeAccent'], label: 'Pinstripe', hint: 'Woven fabric stripes' },
+    'bg-bias':              { type: 'background', renderer: 'pattern', textureKey: 'bias',      colorRoles: ['stripeBackground', 'stripePrimary', 'stripeAccent'], label: 'Bias stripe', hint: 'Diagonal fabric stripes' },
+    'bg-candy':             { type: 'background', renderer: 'pattern', textureKey: 'candy',     colorRoles: ['stripeBackground', 'stripePrimary', 'stripeAccent'], label: 'Bold stripes', hint: 'Even bright stripes' },
+    'bg-scribble':          { type: 'background', renderer: 'pattern', textureKey: 'scribble',  colorRoles: ['stripeBackground', 'stripePrimary', 'stripeAccent'], label: 'Scribble', hint: 'Chalk brush stroke' },
+    'bg-arches':            { type: 'background', renderer: 'pattern', textureKey: 'arches',    colorRoles: ['stripeBackground', 'stripePrimary', 'shapeLeaf', 'shapeArc', 'shapeStripes', 'shapeSun', 'shapeLoop', 'stripeAccent'], label: 'Abstract arches', hint: 'Boho shapes + arch lines' },
     'plate-rectangle':      { type: 'titlePlate', renderer: 'shape', shape: 'classic', colorRoles: ['plate', 'frame', 'trim'], label: 'Rectangle', hint: 'Frame + thin trim' },
     'plate-rounded':        { type: 'titlePlate', renderer: 'shape', shape: 'rounded', colorRoles: ['plate', 'frame', 'trim'], label: 'Rounded', hint: 'Soft rounded corners' },
     'plate-oval':           { type: 'titlePlate', renderer: 'shape', shape: 'oval',    colorRoles: ['plate', 'frame', 'trim'], label: 'Oval', hint: 'Elliptical plate' },
@@ -526,7 +560,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     dream: {
       cover: {
         // 'bg-watercolor' (procedural blobs) is retired from the picker: it was never Sydni's artwork.
-        backgroundSlot: ['bg-solid', 'bg-marble-veined', 'bg-marble-boldgold', 'bg-abstract', 'bg-marble-goldleaf', 'bg-marble-white', 'bg-floral', 'bg-img-marble-white', 'bg-img-gold-leaf-veins', 'bg-img-marble-black-gold', 'bg-img-marble-blue-gold', 'bg-img-marble-pink-gold', 'bg-img-stripes-blue-cream', 'bg-img-stripes-navy-thin', 'bg-img-stripes-diagonal', 'bg-img-notebook-paper', 'bg-img-leather-tan', 'bg-img-leather-black', 'bg-img-leather-brown', 'bg-img-leather-croc-brown', 'bg-img-leather-orange', 'bg-img-leather-croc-white', 'bg-img-leather-suede-beige', 'bg-img-abstract-white-ribbons', 'bg-img-abstract-white-chevron'],
+        backgroundSlot: ['bg-solid', 'bg-marble-veined', 'bg-marble-boldgold', 'bg-abstract', 'bg-marble-goldleaf', 'bg-marble-white', 'bg-floral', 'bg-cabana', 'bg-pinstripe', 'bg-bias', 'bg-candy', 'bg-scribble', 'bg-arches', 'bg-img-marble-white', 'bg-img-gold-leaf-veins', 'bg-img-marble-black-gold', 'bg-img-marble-blue-gold', 'bg-img-marble-pink-gold', 'bg-img-stripes-blue-cream', 'bg-img-stripes-navy-thin', 'bg-img-stripes-diagonal', 'bg-img-notebook-paper', 'bg-img-leather-tan', 'bg-img-leather-black', 'bg-img-leather-brown', 'bg-img-leather-croc-brown', 'bg-img-leather-orange', 'bg-img-leather-croc-white', 'bg-img-leather-suede-beige', 'bg-img-abstract-white-ribbons', 'bg-img-abstract-white-chevron'],
         titlePlateSlot: ['plate-rectangle', 'plate-rounded', 'plate-oval', 'plate-circle', 'plate-bevel', 'plate-ring', 'plate-none'],
         // Uploaded elements are appended to every decor slot (and the background slot) at runtime.
         decorTopSlot: ['decor-none', 'decor-floral', 'decor-wash-pink', 'decor-wash-beige', 'decor-wash-orange', 'decor-wash-cream', 'decor-blob-purple', 'decor-scribble', 'decor-stripes-yellow', 'decor-boho', 'decor-bouquet', 'decor-corner', 'decor-topo', 'decor-waves', 'decor-arcs', 'decor-ribbon', 'decor-dots', 'decor-stripes'],
@@ -536,12 +570,34 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     },
   };
 
-  const ACCENT_PLACEMENTS = {
-    corners:           { label: 'Opposite corners',        maxOpacity: .85, maxScale: .5 },
-    cornerTopRight:    { label: 'Top-right corner',        maxOpacity: .85, maxScale: .55 },
-    cornerBottomLeft:  { label: 'Bottom-left corner',      maxOpacity: .85, maxScale: .55 },
-    borderEdge:        { label: 'Top + bottom edges',      maxOpacity: .6,  maxScale: 1 },
-    behindTitleSubtle: { label: 'Behind the title',        maxOpacity: .16, maxScale: 1 },
+  // Accent layouts. The Sept 24 safe placements (corners, edges, behind the title) keep their caps: the Opacity and
+  // Size sliders work inside them (100% = the cap; maxScale is a fraction of page width). The other layouts use the
+  // sliders as-is; on the cover every layout except "Behind the title (subtle)" is clipped away from the title plate.
+  const ACCENT_LAYOUTS = [
+    ['corners', 'Opposite corners'], ['tl', 'Top left'], ['tr', 'Top right'], ['bl', 'Bottom left'], ['br', 'Bottom right'],
+    ['borderEdge', 'Top + bottom edges'], ['behindTitleSubtle', 'Behind the title (subtle)'],
+    ['left', 'Left side'], ['right', 'Right side'], ['top', 'Top band'], ['bottom', 'Bottom band'], ['diagonal', 'Diagonal sweep'],
+    ['center', 'Center field'], ['full', 'Full page'], ['repeat', 'Full page repeat'], ['scatter', 'Full-page scatter'],
+    ['bleed', 'Full bleed'], ['custom', 'Custom'],
+  ];
+  const ACCENT_CAPS = {
+    corners:           { maxOpacity: .85, maxScale: .5 },
+    tl:                { maxOpacity: .85, maxScale: .55 },
+    tr:                { maxOpacity: .85, maxScale: .55 },
+    bl:                { maxOpacity: .85, maxScale: .55 },
+    br:                { maxOpacity: .85, maxScale: .55 },
+    borderEdge:        { maxOpacity: .6,  maxScale: 1 },
+    behindTitleSubtle: { maxOpacity: .16, maxScale: 1 },
+  };
+  const CORNERS = ['corners', 'tl', 'tr', 'bl', 'br'], SAFE = ['borderEdge', 'behindTitleSubtle'];
+  // Layouts each element supports; anything else is hidden for that element (no broken combinations).
+  const ACCENT_SUPPORT = {
+    stripes: [...CORNERS, ...SAFE, 'left', 'right', 'top', 'bottom', 'center', 'full', 'repeat', 'bleed', 'custom'],
+    dots: [...CORNERS, ...SAFE, 'left', 'right', 'top', 'bottom', 'center', 'full', 'repeat', 'scatter', 'bleed', 'custom'],
+    arcs: [...CORNERS, ...SAFE, 'left', 'right', 'center', 'full', 'repeat', 'bleed', 'custom'],
+    topo: [...CORNERS, ...SAFE, 'left', 'right', 'top', 'bottom', 'center', 'full', 'repeat', 'bleed', 'custom'],
+    waves: [...CORNERS, ...SAFE, 'left', 'right', 'top', 'bottom', 'center', 'full', 'repeat', 'bleed', 'custom'],
+    ribbon: [...CORNERS, ...SAFE, 'left', 'right', 'diagonal', 'center', 'full', 'bleed', 'custom'],
   };
 
   const PALETTES = [
@@ -560,6 +616,18 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     { name: 'Blush Rose', stone: '#E9CFCB', vein: '#BB9167', highlight: '#FFF6F2', plate: '#82445E', frame: '#5A2B3F', trim: '#BB9167', title: '#FFFCFC', paper: '#FFFCFC', line: '#D5A9B4' },
     { name: 'Teal + Coral', stone: '#0D2F33', vein: '#D19A4A', highlight: '#E7A18E', plate: '#155D66', frame: '#09201F', trim: '#D19A4A', title: '#FFFDFC', paper: '#FFFDFC', line: '#AFC7C4' },
     { name: 'Terracotta', stone: '#2A140E', vein: '#BD8B43', highlight: '#DDAA86', plate: '#914631', frame: '#1C0D09', trim: '#BD8B43', title: '#FFFCF8', paper: '#FFFCF8', line: '#D2B39C' },
+    // Orange pack (palettes/orange-palettes-for-journal-color-studio.json, one-way snapshot). `swatches` keeps the
+    // source colors; roles use them directly except the deep ink shades (title/frame), which are the palette's
+    // strongest color taken darker (same hue) so page text and plate lettering stay legible on light paper.
+    { name: 'Orange Light', id: 'orange-light', swatches: ['#FFFFFF', '#FFD7B5', '#FFB38A', '#FF9248', '#FF6700'], stone: '#FFD7B5', vein: '#FF6700', highlight: '#FFFFFF', plate: '#FFFFFF', frame: '#FF6700', trim: '#FF9248', title: '#993E00', paper: '#FFFFFF', line: '#FFB38A', accent: '#FF9248' },
+    { name: 'Halloween Orange', id: 'halloween-orange', swatches: ['#FFEDE4', '#FFD3BE', '#FBB38F', '#F18B57', '#EB6521'], stone: '#EB6521', vein: '#FFD3BE', highlight: '#FFEDE4', plate: '#FFEDE4', frame: '#8C380D', trim: '#F18B57', title: '#8C380D', paper: '#FFFAF7', line: '#FBB38F', accent: '#FFD3BE' },
+    { name: 'Ultra Orange', id: 'ultra-orange', swatches: ['#FFE0D7', '#FFC2AF', '#FF9C7E', '#FF7B53', '#FF3B00'], stone: '#FF3B00', vein: '#FFE0D7', highlight: '#FFC2AF', plate: '#FFE0D7', frame: '#992300', trim: '#FF7B53', title: '#992300', paper: '#FFFAF8', line: '#FF9C7E', accent: '#FFC2AF' },
+    { name: 'Pure Orange', id: 'pure-orange', swatches: ['#F6BC76', '#FBB766', '#FDAB49', '#FD9B26', '#FF8C00'], stone: '#FF8C00', vein: '#F6BC76', highlight: '#FFF3E4', plate: '#FFF3E4', frame: '#995400', trim: '#FDAB49', title: '#995400', paper: '#FFFBF5', line: '#FBB766', accent: '#FD9B26' },
+    { name: 'Amber Orange', id: 'amber-orange', swatches: ['#F9A709', '#EDA211', '#E19D1A', '#D79920', '#CE972B'], stone: '#CE972B', vein: '#F9A709', highlight: '#FDF2DC', plate: '#FDF2DC', frame: '#7F5D1A', trim: '#E19D1A', title: '#7F5D1A', paper: '#FFFCF5', line: '#EDA211', accent: '#F9A709' },
+    { name: 'Orange Spectrum', id: 'orange-spectrum', swatches: ['#FFD106', '#FFA500', '#F9A12D', '#FF5600', '#FF3400'], stone: '#FF5600', vein: '#FFD106', highlight: '#FFA500', plate: '#FFFFFF', frame: '#991F00', trim: '#FFD106', title: '#991F00', paper: '#FFFFFF', line: '#F9A12D', accent: '#FFD106' },
+    { name: 'Tropical Sunrise', id: 'tropical-sunrise', swatches: ['#FF9F1C', '#FFBF69', '#FFFFFF', '#CBF3F0', '#2EC4B6'], stone: '#2EC4B6', vein: '#FF9F1C', highlight: '#CBF3F0', plate: '#FFFFFF', frame: '#1D7C73', trim: '#FF9F1C', title: '#1D7C73', paper: '#FFFFFF', line: '#FFBF69', accent: '#FFBF69' },
+    { name: 'Peach Cloud', id: 'peach-cloud', swatches: ['#FFDCDC', '#FFF2EB', '#FFE8CD', '#FFD6BA'], stone: '#FFD6BA', vein: '#FFDCDC', highlight: '#FFF2EB', plate: '#FFF2EB', frame: '#DE9D78', trim: '#FFDCDC', title: '#6F4A33', paper: '#FFF2EB', line: '#FFD6BA', accent: '#FFE8CD' },
+    { name: 'Tiger Amber & Blues', id: 'tiger-amber-blues', swatches: ['#8ECAE6', '#219EBC', '#021433', '#FFB703', '#FB8500'], stone: '#021433', vein: '#FFB703', highlight: '#8ECAE6', plate: '#219EBC', frame: '#021433', trim: '#FB8500', title: '#FFFFFF', paper: '#FFFFFF', line: '#8ECAE6', accent: '#FFB703' },
   ];
 
   // Palettes made for each prayer journal. Roles there mean: stone = main watercolor (and the figure), vein = second color
@@ -633,12 +701,86 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   const palettesFor = (j) => [...(j === 'dream' ? PALETTES : JOURNAL_PALETTES[j]), ...FAMILY_PALETTES, ...customPals().filter((pl) => (pl.journal || 'dream') === j || !pl.journal)];
   const paletteByName = (name) => allPalettes().find((pl) => pl.name === name);
 
+  // ---------- Palette variations (repeat-click) ----------
+  // Clicking the already-selected palette cycles through alternate, still-valid assignments of the
+  // variant roles (stripe roles + accent art) drawn from that palette's own colors. Base roles never change,
+  // so marble, plate, lettering and page text stay exactly as designed. Hoisted helpers: runs before `hexRgb`.
+  function relLum(hex) {
+    const c = [1, 3, 5].map((i) => { const v = parseInt(hex.slice(i, i + 2), 16) / 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; });
+    return .2126 * c[0] + .7152 * c[1] + .0722 * c[2];
+  }
+  function contrast(a, b) { const x = relLum(a), y = relLum(b); return (Math.max(x, y) + .05) / (Math.min(x, y) + .05); }
+  function rgbDist(a, b) { let d = 0; for (const i of [1, 3, 5]) d += (parseInt(a.slice(i, i + 2), 16) - parseInt(b.slice(i, i + 2), 16)) ** 2; return Math.sqrt(d); }
+  function deepen(hex, k) { return '#' + [1, 3, 5].map((i) => Math.round(parseInt(hex.slice(i, i + 2), 16) * k).toString(16).padStart(2, '0')).join('').toUpperCase(); }
+  const STRIPE_MIN_CONTRAST = 1.5;   // stripe vs the background it sits on: always reads as a separate stripe
+  const variantCache = new Map();
+  function paletteVariants(pl) {
+    const key = ['paper', 'stone', 'plate', 'frame', 'highlight', 'vein', 'trim', 'title', 'line', 'accent'].map((k) => pl[k]).join() + (pl.swatches || []).join();
+    if (variantCache.has(key)) return variantCache.get(key);
+    // Candidate colors in design-priority order (background candidates favour paper/stone; stripes favour the strong roles).
+    const uniq = (arr) => arr.filter(Boolean).map((c) => c.toUpperCase()).filter((c, i, a) => a.indexOf(c) === i);
+    const bgs = uniq([pl.paper, pl.stone, pl.highlight, pl.plate, ...(pl.swatches || [])]);
+    const inks = uniq([pl.stone, pl.plate, pl.frame, pl.vein, pl.trim, pl.accent, pl.title, pl.highlight, ...(pl.swatches || []), pl.line]);
+    const groups = bgs.map((bg) => {
+      const ok = inks.filter((c) => c !== bg && contrast(bg, c) >= STRIPE_MIN_CONTRAST);
+      const out = [];
+      for (const a of ok) for (const b of ok) if (a !== b && rgbDist(a, b) >= 40) out.push([bg, a, b]);
+      return out;
+    }).filter((g) => g.length);
+    // Round-robin across backgrounds so consecutive clicks look genuinely different (new ground, not just swapped stripes).
+    const picks = [];
+    for (let round = 0; picks.length < 5 && groups.some((g) => g[round]); round++) {
+      for (const g of groups) {
+        // Skip repeats and plain swaps (ground <-> stripe): on 50/50 stripes a swap looks like the same design.
+        const t = g.find((c, i) => i >= round && !picks.some((p) => (p[0] === c[0] && p[1] === c[1]) || (p[0] === c[1] && p[1] === c[0])));
+        if (t && picks.length < 5) picks.push(t);
+      }
+    }
+    if (!picks.length) {
+      // Soft all-pastel palettes (e.g. Peach Cloud): keep the lightest as ground and deepen the stripe colors,
+      // same hue, until they clear the minimum contrast so stripes never melt into the background.
+      const byLum = [...uniq([pl.paper, pl.stone, pl.highlight, pl.plate, pl.trim, pl.vein, pl.accent, ...(pl.swatches || [])])].sort((a, b) => relLum(b) - relLum(a));
+      const bg = byLum[0];
+      const lift = (c) => { let k = 1, out = c; while (contrast(bg, out) < STRIPE_MIN_CONTRAST && k > .3) { k -= .04; out = deepen(c, k); } return out; };
+      for (let i = byLum.length - 1; i > 0 && picks.length < 3; i--) {
+        const a = lift(byLum[i]), b = lift(byLum[i === 1 ? byLum.length - 1 : i - 1]);
+        picks.push([bg, a, rgbDist(a, b) >= 20 ? b : deepen(b, .8)]);
+      }
+    }
+    const accents = [pl.accent.toUpperCase(), ...inks.filter((c) => c !== pl.accent.toUpperCase() && contrast(c, pl.stone) >= 1.3)];
+    const variants = picks.map(([bg, a, b], i) => {
+      const edge = inks.filter((c) => c !== bg && c !== a && c !== b).sort((x, y) => contrast(bg, y) - contrast(bg, x))[0] || a;
+      // Abstract shapes: the palette's other colors, rotated per variation; the loop stays a soft tone near the ground.
+      const others = inks.filter((c) => c !== bg && c !== a && contrast(bg, c) >= 1.25);
+      const pool = others.length >= 4 ? others : [...others, ...[a, ...others].map((c) => deepen(c, .75))];
+      const pick = (n) => pool[(i + n) % pool.length];
+      const loop = uniq([pl.highlight, pl.paper, pl.line, ...(pl.swatches || [])]).filter((c) => c !== bg).sort((x, y) => contrast(bg, x) - contrast(bg, y))[0] || deepen(bg, .93);
+      return { stripeBackground: bg, stripePrimary: a, stripeAccent: edge, accent: accents[i % accents.length],
+        shapeLeaf: pick(0), shapeArc: pick(1), shapeStripes: pick(2), shapeSun: pick(3), shapeLoop: loop };
+    });
+    variantCache.set(key, variants);
+    return variants;
+  }
+  // Variation 0 is each palette's designed default.
+  // Every built-in palette (Dream, each prayer journal's own set and the color families) carries pattern roles.
+  [...PALETTES, ...Object.values(JOURNAL_PALETTES).flat(), ...FAMILY_PALETTES].forEach((pl) => { pl.accent ??= pl.trim; Object.assign(pl, paletteVariants(pl)[0]); });
+  // Pattern roles for any color set that lacks them (saved custom palettes, recipe variations); never changes set roles.
+  const PATTERN_KEYS = ['stripeBackground', 'stripePrimary', 'stripeAccent', 'shapeLeaf', 'shapeArc', 'shapeStripes', 'shapeSun', 'shapeLoop'];
+  function patternRolesFor(pal, i = 0) {
+    const vs = paletteVariants({ ...pal, accent: pal.accent || pal.trim });
+    const { accent, ...roles } = vs[i % vs.length] || {};
+    return roles;
+  }
+  const withPatternRoles = (pal) => (PATTERN_KEYS.every((k) => pal[k]) ? pal : { ...patternRolesFor(pal), ...Object.fromEntries(Object.entries(pal).filter(([, v]) => v)) });
+  const paletteColors = (pl) => Object.fromEntries(ROLES.map((r) => [r.key, pl[r.key]]));
+
   const DEFAULTS = {
     view: 'cover', quality: 'proof',
     // Fresh start = the original Canva cover: bold-gold marble, gold bevel plate, serif lettering, black + gold.
     palette: { ...PALETTES[0] },
     marble: 'canva', plateStyle: 'bevel', titleStyle: 'serif', titleShadow: 30,
     accent: 'none', accentPlace: 'corners', accentOpacity: 70, accentLined: false, accentScale: 80,
+    accentX: .5, accentY: .5, accentRot: 0, accentTile: 100, accentSpacing: 0, showStripeBorder: false,
     showVeins: true, showHighlights: true, showPlate: true, showFrame: true, showTrim: true,
     texture: 60, veinStrength: 100, plateOpacity: 88,
     headerStyle: 'mixed', lineSpacing: '25', footer: 'on', marginLine: false,
@@ -671,15 +813,22 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       if (saved.fontFamily && !saved.bodyFont) state.bodyFont = saved.fontFamily;
       if (saved.fontScale && !saved.bodyFontScale) { state.bodyFontScale = saved.fontScale; state.headingFontScale = saved.fontScale; }
     }
-    delete state.fontFamily; delete state.fontScale; delete state.accentX; delete state.accentY;
+    delete state.fontFamily; delete state.fontScale;
     delete state.palette.look;
     state.palette.accent ??= state.palette.trim;
+    // Saves from before the stripe roles existed: derive them from the saved colors' own first variation
+    // (not the defaults' merged-in values), so a saved palette still matches its palette button.
+    state.marble = { stripes: 'candy', stripesDiag: 'bias' }[state.marble] || state.marble;
+    if (saved && !saved.palette?.shapeLeaf) {
+      const { accent, ...stripes } = paletteVariants(state.palette)[0] || {};
+      Object.assign(state.palette, stripes);
+    }
     if (!['mixed', 'block', 'rule', 'bar', 'band', 'soft', 'plain'].includes(state.headerStyle)) state.headerStyle = 'mixed';
     if (state.pageCount < 10) state.pageCount = DEFAULTS.pageCount;
-    // Full-page and free-drag accents were retired: map them onto the nearest safe placement.
-    state.accentPlace = { full: 'corners', custom: 'corners', center: 'behindTitleSubtle' }[state.accentPlace] || state.accentPlace;
-    if (!ACCENT_PLACEMENTS[state.accentPlace]) state.accentPlace = 'corners';
-    state.accentScale = Math.min(200, Math.max(40, state.accentScale ?? 80));
+    // Sept 24 single-corner names → the shared layout names.
+    state.accentPlace = { cornerTopRight: 'tr', cornerBottomLeft: 'bl' }[state.accentPlace] || state.accentPlace;
+    if (!ACCENT_LAYOUTS.some(([v]) => v === state.accentPlace)) state.accentPlace = 'corners';
+    state.accentScale = Math.min(200, Math.max(30, state.accentScale ?? 80));
     if (!['custom', 'script', 'serif'].includes(state.titleStyle)) state.titleStyle = 'serif';
     if (state.marble === 'blush') state.marble = 'abstract';
     if (!['cover', 'original', 'palette'].includes(state.floralArt)) state.floralArt = 'cover';
@@ -1111,6 +1260,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     w = Math.max(1, Math.round(w)); h = Math.max(1, Math.round(h));
     if (s.marble === 'journal') s = { ...s, marble: 'classic' };
     if (s.marble === 'solid') { ctx.fillStyle = s.palette.stone; ctx.fillRect(x, y, w, h); return; }        // only prayer journals use their own art; never reaches here in practice
+    if (s.marble in PATTERNS) { paintPattern(ctx, x, y, w, h, s, soft); return; }
     if (s.marble === 'blush') { paintWatercolor(ctx, x, y, w, h, s, soft); return; }
     if (s.marble === 'abstract' || s.marble.startsWith('img:')) {
       // Full-bleed areas (covers) show the artwork; thin header/footer bars use the stone color.
@@ -1183,6 +1333,146 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     ctx.drawImage(tmp, x, y, w, h);
   }
 
+  // ---------- Stripe patterns (recolorable design assets) ----------
+  // Geometry comes from the Canva stripe element itself (accent-stripes.png): columns 53..1045 are exactly
+  // 18 stripe periods, stripe edge to stripe edge, so the tile repeats with no seam and the alternating
+  // primary/secondary colors line up across tiles. Only colors are swapped; widths, spacing and the
+  // original anti-aliased edges are kept, so the pattern never flattens into one tint.
+  const STRIPE_TILE = { x: 53, w: 992, row: 350 };
+  // How each pattern background fills a page. 'width': vertical stripes are fitted to the page width and run the
+  // full height (stretching along a stripe changes nothing). 'cover': scaled evenly and cropped. 'contain': the
+  // whole element shown on the pattern background.
+  // `original` = the design's own Canva colors (for "As designed").
+  const PATTERNS = {
+    cabana: { fit: 'width', original: { stripeBackground: '#FCF7F1', stripePrimary: '#8D9DB6' } },
+    pinstripe: { fit: 'cover', original: { stripeBackground: '#EDF1FA', stripePrimary: '#07080D' } },
+    bias: { fit: 'cover', original: { stripeBackground: '#F1F2F6', stripePrimary: '#040306' } },
+    candy: { fit: 'width', original: { stripeBackground: '#FFFFFF', stripePrimary: '#FBDC60' } },
+    scribble: { fit: 'contain', pad: .05, original: { stripeBackground: '#FFFFFF', stripePrimary: '#2B2B2B' } },
+    arches: { fit: 'cover', layers: 3, original: { stripeBackground: '#F5D9D5', stripePrimary: '#010101', shapeLeaf: '#304C35', shapeArc: '#C16A4E', shapeStripes: '#A7642F', shapeSun: '#D8805C', shapeLoop: '#E9D5CF' } },
+  };
+  let stripeRow = null;
+  function stripeGeometry() {
+    if (stripeRow) return stripeRow;
+    const img = ASSETS['accent:stripes'];
+    if (!img) { ensureAsset('accent:stripes').catch(() => {}); return null; }
+    const n = STRIPE_TILE.w, c = scratch('stripeRow', n, 1), x = c.getContext('2d', { willReadFrequently: true });
+    x.clearRect(0, 0, n, 1);
+    x.drawImage(img, STRIPE_TILE.x, STRIPE_TILE.row, n, 1, 0, 0, n, 1);
+    const d = x.getImageData(0, 0, n, 1).data, a = new Uint8Array(n), idx = new Uint8Array(n), ON = 120;
+    for (let i = 0; i < n; i++) a[i] = d[i * 4 + 3];
+    for (let i = 0, k = 0; i < n; i++) { if (i && a[i] >= ON && a[i - 1] < ON) k++; idx[i] = k; }
+    // A soft leading edge belongs to the stripe that starts next (the last column leads into the next tile's stripe 0).
+    for (let i = 0; i < n; i++) if (a[i] && a[i] < ON && (i === n - 1 || a[i + 1] >= ON)) idx[i] = i === n - 1 ? idx[i] + 1 : idx[i + 1];
+    stripeRow = { a, idx, max: Math.max(...a) || 255 };
+    return stripeRow;
+  }
+  // One opaque (bg set) or transparent (bg null, used by the accent art) stripe tile at an integer pixel width.
+  const stripeTileCache = new Map();
+  function stripeTile(px, bg, c1, c2) {
+    const g = stripeGeometry();
+    if (!g) return null;
+    const w = Math.max(4, Math.round(px)), key = `${w}|${bg}|${c1}|${c2}`;
+    if (stripeTileCache.has(key)) return stripeTileCache.get(key);
+    const n = STRIPE_TILE.w, src = document.createElement('canvas'); src.width = n; src.height = 1;
+    const sx = src.getContext('2d'), id = sx.createImageData(n, 1), d = id.data;
+    const B = bg && hexRgb(bg), P = hexRgb(c1), S = hexRgb(c2 || c1);
+    for (let i = 0; i < n; i++) {
+      const col = g.idx[i] % 2 ? S : P, t = g.a[i] / g.max;
+      for (let k = 0; k < 3; k++) d[i * 4 + k] = B ? mix(B[k], col[k], t) : col[k];
+      d[i * 4 + 3] = B ? 255 : g.a[i];
+    }
+    sx.putImageData(id, 0, 0);
+    const out = document.createElement('canvas'); out.width = w; out.height = 8;
+    const ox = out.getContext('2d'); ox.imageSmoothingEnabled = true; ox.imageSmoothingQuality = 'high';
+    ox.drawImage(src, 0, 0, w, 8);
+    if (stripeTileCache.size > 24) stripeTileCache.delete(stripeTileCache.keys().next().value);
+    stripeTileCache.set(key, out);
+    return out;
+  }
+  // Fill a rectangle with the stripe repeat at a given tile width, optionally on a bias. The repeat is
+  // anchored at the rectangle's center so crops are even on both sides.
+  function fillStripes(ctx, x, y, w, h, tileW, [bg, c1, c2], angle = 0) {
+    const tile = stripeTile(tileW, bg, c1, c2);
+    if (!tile) return false;
+    ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+    ctx.translate(Math.round(x + w / 2), Math.round(y + h / 2)); ctx.rotate(angle);
+    const R = Math.ceil(Math.hypot(w, h) / 2) + tile.width;
+    ctx.fillStyle = ctx.createPattern(tile, 'repeat'); ctx.fillRect(-R, -R, 2 * R, 2 * R);
+    ctx.restore();
+    return true;
+  }
+  const inkCache = new Map();
+  function inkMap(key, w, h, asset = key, rgba = false) {
+    const img = ASSETS[`pattern:${asset}`];
+    if (!img) { ensureAsset(`pattern:${asset}`).catch(() => {}); return null; }
+    const ck = `${asset}|${w}x${h}`;
+    if (inkCache.has(ck)) return inkCache.get(ck);
+    const pat = PATTERNS[key], iw = img.naturalWidth, ih = img.naturalHeight;
+    const c = scratch('ink', w, h), x = c.getContext('2d', { willReadFrequently: true });
+    x.fillStyle = '#000'; x.fillRect(0, 0, w, h);
+    x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high';
+    if (pat.fit === 'width') x.drawImage(img, 0, 0, w, h);
+    else if (pat.fit === 'contain') {
+      const k = Math.min(w * (1 - 2 * pat.pad) / iw, h * (1 - 2 * pat.pad) / ih);
+      x.drawImage(img, (w - iw * k) / 2, (h - ih * k) / 2, iw * k, ih * k);
+    } else {
+      const ir = iw / ih, r = w / h;
+      let sx = 0, sy = 0, sw = iw, sh = ih;
+      if (ir > r) { sw = ih * r; sx = (iw - sw) / 2; } else { sh = iw / r; sy = (ih - sh) / 2; }
+      x.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
+    }
+    const d = x.getImageData(0, 0, w, h).data;
+    let t = d;
+    if (!rgba) { t = new Uint8Array(w * h); for (let i = 0; i < t.length; i++) t[i] = d[i * 4]; }
+    if (inkCache.size > 18) inkCache.delete(inkCache.keys().next().value);
+    inkCache.set(ck, t);
+    return t;
+  }
+  // Pattern background: the ink map rebuilt between the pattern background and stripe colors (palette roles).
+  function paintPattern(ctx, x, y, w, h, s, soft = false) {
+    const p = withPatternRoles(s.palette);
+    // Thin header bars stay a flat stone color (like Floral) so bar titles keep their designed contrast.
+    if (h < w * .5 && !soft) { ctx.fillStyle = p.stone; ctx.fillRect(x, y, w, h); return; }
+    const pat = PATTERNS[s.marble], paper = hexRgb(p.paper);
+    const out = ctx.createImageData(w, h), d = out.data;
+    if (pat.layers) {
+      // Multi-shape design: each shape's coverage (anti-aliased edges included) takes its role's color.
+      const maps = [0, 1, 2].map((i) => inkMap(s.marble, w, h, `${s.marble}${i}`, true));
+      if (maps.some((m) => !m)) { ctx.fillStyle = p.stripeBackground; ctx.fillRect(x, y, w, h); return; }
+      const cols = [p.stripeBackground, p.stripePrimary, p.shapeLeaf, p.shapeArc, p.shapeStripes, p.shapeSun, deepen(p.shapeSun, .69), p.shapeLoop].map(hexRgb);
+      for (let j = 0; j < d.length; j += 4) {
+        let r = 0, g = 0, b = 0, sum = 0;
+        for (let m = 0; m < 3; m++) for (let c = 0; c < 3; c++) {
+          const v = maps[m][j + c], ci = m * 3 + c;
+          if (!v || ci > 7) continue;
+          r += cols[ci][0] * v; g += cols[ci][1] * v; b += cols[ci][2] * v; sum += v;
+        }
+        const px = sum ? [r / sum, g / sum, b / sum] : cols[0];
+        for (let k = 0; k < 3; k++) d[j + k] = soft ? mix(paper[k], px[k], .16) : px[k];
+        d[j + 3] = 255;
+      }
+    } else {
+      const t = inkMap(s.marble, w, h);
+      if (!t) { ctx.fillStyle = p.stripeBackground; ctx.fillRect(x, y, w, h); return; }
+      const B = hexRgb(p.stripeBackground), P = hexRgb(p.stripePrimary);
+      for (let i = 0, j = 0; i < t.length; i++, j += 4) {
+        const v = t[i] / 255;
+        for (let k = 0; k < 3; k++) { const c = B[k] + (P[k] - B[k]) * v; d[j + k] = soft ? mix(paper[k], c, .16) : c; }
+        d[j + 3] = 255;
+      }
+    }
+    const tmp = scratch('patternOut', w, h);
+    tmp.getContext('2d').putImageData(out, 0, 0);
+    ctx.drawImage(tmp, x, y, w, h);
+    if (s.showStripeBorder && !soft) {
+      const o = Math.round(w * .035);
+      ctx.strokeStyle = p.stripeAccent; ctx.lineWidth = Math.max(1, w * .006);
+      ctx.strokeRect(x + o, y + o, w - 2 * o, h - 2 * o);
+    }
+  }
+
+
   // Recolors a full-color photo (not an alpha mask) onto the palette's flower roles: plate = deep
   // flowers, highlight = soft flowers, stone = leaves, trim = gold, paper = page white. Mirrors the
   // hue-bucket approach the original floral studio used, so the actual bouquet artwork stays intact.
@@ -1237,11 +1527,17 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     return { x: x + b, y: y + b, w: w - 2 * b, h: h - 2 * b };
   }
 
-  // ---------- Accent art: safe placements only ----------
-  // Accents frame the cover; they never become a full-page overlay and never sit on the title. Each
-  // placement caps how big and how strong the art can get, and the Opacity/Size sliders work inside
-  // those caps (100% = the cap). maxScale is a fraction of page width.
-  // (ACCENT_PLACEMENTS itself is declared with the registries above so saved state can be validated.)
+  // ---------- Accent layout ----------
+  // Only placement/tiling/scale changes per layout; the artwork itself and its palette tint never do.
+  // Sept 24 safe placements keep their size/opacity caps, and on the cover every layout except
+  // "Behind the title (subtle)" is clipped away from the title plate so an accent never sits on the title.
+  // (ACCENT_LAYOUTS / ACCENT_SUPPORT / ACCENT_CAPS are declared with the registries above.)
+  // Sides: pattern-like art fills a band; a single motif (dot cluster, arcs, ribbon) sits on the edge instead.
+  const SIDE_BAND = { stripes: true, topo: true, waves: true };
+  // One repeat tile's width (page-width fraction) at Pattern size 100%.
+  const REPEAT_TILE = { dots: .34, arcs: .26, topo: .5, waves: .5 };
+  const BLEED = .125 * 72 / PAGE_W;   // 1/8 in past the trim, as a page-width fraction
+  const accentLayout = (s) => ((ACCENT_SUPPORT[s.accent] || []).includes(s.accentPlace) ? s.accentPlace : 'corners');
 
   // Accent line art, tinted with the accent color. On lined pages it sits faintly in the bottom corner, under the lines.
   // avoid = the title plate's outer bounds on the cover; corner and edge art is clipped away from it.
@@ -1249,39 +1545,116 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     const img = ASSETS[`accent:${s.accent}`];
     if (!img) return;
     const ar = img.naturalWidth / img.naturalHeight, color = s.palette.accent || s.palette.trim;
-    const put = (x, y, w, rot = 0) => {
+    const put = (x, y, w, rot = 0, fx = false, fy = false) => {
       const h = w / ar, m = tintedMask(img, w, h, color);
-      ctx.save(); ctx.translate(x + w / 2, y + h / 2); ctx.rotate(rot); ctx.drawImage(m, -w / 2, -h / 2, w, h); ctx.restore();
+      ctx.save(); ctx.translate(x + w / 2, y + h / 2); ctx.rotate(rot); ctx.scale(fx ? -1 : 1, fy ? -1 : 1);
+      ctx.drawImage(m, -w / 2, -h / 2, w, h); ctx.restore();
+    };
+    // Mirror-tiling: neighbours are flipped so line art meets itself at every edge (no hard seams), at the
+    // element's own proportions. gap adds even spacing between copies.
+    const tileArea = (rx, ry, rw, rh, tw, gap = 0) => {
+      tw = Math.max(4, Math.round(tw));
+      const th = Math.max(4, Math.round(tw / ar)), m = tintedMask(img, tw, th, color);
+      const gx = Math.round(tw * gap), gy = Math.round(th * gap), stepX = tw + gx, stepY = th + gy;
+      const cols = Math.ceil(rw / stepX) + 2, rows = Math.ceil(rh / stepY) + 2;
+      const x0 = Math.round(rx + rw / 2 - (cols * stepX - gx) / 2), y0 = Math.round(ry + rh / 2 - (rows * stepY - gy) / 2);
+      ctx.save(); ctx.beginPath(); ctx.rect(rx, ry, rw, rh); ctx.clip();
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+        ctx.save(); ctx.translate(x0 + c * stepX + tw / 2, y0 + r * stepY + th / 2); ctx.scale(c % 2 ? -1 : 1, r % 2 ? -1 : 1);
+        ctx.drawImage(m, -tw / 2, -th / 2, tw, th); ctx.restore();
+      }
+      ctx.restore();
+    };
+    const isStripes = s.accent === 'stripes', k = (s.accentTile ?? 100) / 100, gap = (s.accentSpacing ?? 0) / 100;
+    // Stripes repeat as a true pattern at the element's native scale (it spans the page width in Canva).
+    const stripeW = W * STRIPE_TILE.w / img.naturalWidth * k;
+    const band = (x, y, w, h, tileW) => {
+      if (isStripes) fillStripes(ctx, x, y, w, h, stripeW, [null, color, color]);
+      else tileArea(x, y, w, h, tileW);
     };
     ctx.save();
-    if (lined) {
+    const L = lined ? 'lined' : accentLayout(s);
+    if (L === 'lined') {
       ctx.globalAlpha = s.accentOpacity / 100 * .35;
       const w = W * .38; put(W - w * .82, H - (w / ar) * .82, w);
       ctx.restore(); return;
     }
-    const place = ACCENT_PLACEMENTS[s.accentPlace] || ACCENT_PLACEMENTS.corners;
-    ctx.globalAlpha = place.maxOpacity * Math.min(1, s.accentOpacity / 100);
-    const size = W * place.maxScale * Math.min(2, (s.accentScale ?? 80) / 100);
-    if (avoid && s.accentPlace !== 'behindTitleSubtle') {
+    const cap = ACCENT_CAPS[L] || { maxOpacity: 1, maxScale: .5 };
+    ctx.globalAlpha = cap.maxOpacity * Math.min(1, s.accentOpacity / 100);
+    const size = W * cap.maxScale * Math.min(2, (s.accentScale ?? 80) / 100);
+    if (avoid && L !== 'behindTitleSubtle') {
       // Everything except a margin around the plate: the accent can approach the title but never touch it.
       const m = W * .035;
       ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.rect(avoid.x - m, avoid.y - m, avoid.w + 2 * m, avoid.h + 2 * m);
       ctx.clip('evenodd');
     }
-    const h = size / ar;
-    if (s.accentPlace === 'behindTitleSubtle') {
+    if (L === 'behindTitleSubtle') {
       const box = avoid || { x: W * .15, y: H * .35, w: W * .7, h: H * .3 };
       const r = fitInto(box, ar, 0);
       put(r.x, r.y, r.w);
-    } else if (s.accentPlace === 'borderEdge') {
+    } else if (L === 'borderEdge') {
       // A shallow band of the art along the top and bottom edges only.
-      const band = H * .12;
-      ctx.beginPath(); ctx.rect(0, 0, W, band); ctx.rect(0, H - band, W, band); ctx.clip();
-      put((W - size) / 2, band - h * .55, size, Math.PI);
-      put((W - size) / 2, H - band - h * .45, size);
-    } else {
-      if (s.accentPlace !== 'cornerBottomLeft') put(W - size * .8, -h * .2, size);
-      if (s.accentPlace !== 'cornerTopRight') put(-size * .2, H - h * .8, size, Math.PI);
+      const edge = H * .12, h = size / ar;
+      ctx.beginPath(); ctx.rect(0, 0, W, edge); ctx.rect(0, H - edge, W, edge); ctx.clip();
+      put((W - size) / 2, edge - h * .55, size, Math.PI);
+      put((W - size) / 2, H - edge - h * .45, size);
+    } else if (L === 'custom') {
+      const w = W * ((s.accentScale ?? 90) / 100);
+      put(s.accentX * W - w / 2, s.accentY * H - (w / ar) / 2, w, (s.accentRot || 0) * Math.PI / 180);
+    } else if (L === 'center') {
+      const w = W * .82; put((W - w) / 2, (H - w / ar) / 2, w);
+    } else if (L === 'full') {
+      const w = Math.max(W * 1.05, H * 1.05 * ar); put((W - w) / 2, (H - w / ar) / 2, w);
+    } else if (L === 'corners') {
+      const w = size, h = w / ar;
+      put(W - w * .8, -h * .2, w);
+      put(-w * .2, H - h * .8, w, Math.PI);
+    } else if (['tl', 'tr', 'bl', 'br'].includes(L)) {
+      // Same size and overhang as "Opposite corners", one corner at a time, mirrored to face into the page.
+      const w = size, h = w / ar;
+      if (L === 'tr') put(W - w * .8, -h * .2, w);
+      if (L === 'bl') put(-w * .2, H - h * .8, w, Math.PI);
+      if (L === 'tl') put(-w * .2, -h * .2, w, 0, true);
+      if (L === 'br') put(W - w * .8, H - h * .8, w, 0, false, true);
+    } else if (L === 'top' || L === 'bottom') {
+      const bh = Math.round(H * .16);
+      band(0, L === 'top' ? 0 : H - bh, W, bh, bh * 1.4 * ar * k);
+    } else if (L === 'left' || L === 'right') {
+      const right = L === 'right';
+      if (SIDE_BAND[s.accent]) {
+        const bw = Math.round(W * .24);
+        band(right ? W - bw : 0, 0, bw, H, bw * 1.4 * k);
+      } else if (s.accent === 'arcs') {
+        const h = H * .75, w = h * ar;   // the arcs' center sits on the page edge
+        put(right ? W - w : 0, (H - h) / 2, w, 0, !right);
+      } else if (s.accent === 'ribbon') {
+        // The ribbon flows corner to corner; turned 45° it runs down the page edge as a side sweep.
+        const w = H * .8, h = w / ar, cx = right ? W - w * .15 : w * .15;
+        put(cx - w / 2, (H - h) / 2, w, right ? Math.PI / 4 : -Math.PI / 4, !right);
+      } else {
+        const w = W * .5, h = w / ar;
+        put(right ? W - w * .65 : -w * .35, (H - h) / 2, w, 0, !right);
+      }
+    } else if (L === 'diagonal') {
+      const w = W * 1.15; put((W - w) / 2, (H - w / ar) / 2, w, -Math.atan2(H, W));
+    } else if (L === 'repeat') {
+      if (isStripes) fillStripes(ctx, 0, 0, W, H, stripeW, [null, color, color]);
+      else tileArea(0, 0, W, H, W * (REPEAT_TILE[s.accent] || .4) * k, gap);
+    } else if (L === 'scatter') {
+      // Fixed, hand-balanced positions so the scatter never jumps between redraws or exports.
+      const SPOTS = [[.12, .1, 1, 0], [.82, .2, .8, 1.3], [.45, .45, .6, 2.2], [.1, .62, .75, 3.6], [.85, .72, .95, 4.4], [.5, .92, .7, 5.5], [.55, .08, .55, .6], [.3, .8, .5, 2.9]];
+      const base = W * .34 * k * (1 + gap);
+      for (const [fx, fy, sc, rot] of SPOTS) { const w = base * sc; put(fx * W - w / 2, fy * H - (w / ar) / 2, w, rot); }
+    } else if (L === 'bleed') {
+      // Cover the page plus 1/8 in past every trim edge, on whole pixels, so nothing leaves a white sliver at the cut.
+      const b = Math.ceil(W * BLEED), TW = W + 2 * b, TH = H + 2 * b;
+      if (isStripes) fillStripes(ctx, -b, -b, TW, TH, stripeW, [null, color, color]);
+      else {
+        // The outer 1.5% of the art (soft, partly transparent edge pixels) is pushed beyond the bleed.
+        const inset = .015, sw = img.naturalWidth * (1 - 2 * inset), sh = img.naturalHeight * (1 - 2 * inset);
+        const sc = Math.max(TW / sw, TH / sh), fw = Math.ceil(img.naturalWidth * sc);
+        put(Math.floor((W - fw) / 2), Math.floor((H - fw / ar) / 2), fw);
+      }
     }
     ctx.restore();
   }
@@ -2403,8 +2776,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     const [h, sat, l] = toHsl(...hexRgb(hex)), [r, g, b] = fromHsl(h, Math.min(sat, .75), Math.max(l, .8));
     return '#' + [r, g, b].map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
   }
-  const relLum = (hex) => { const c = hexRgb(hex).map((v) => { v /= 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; }); return .2126 * c[0] + .7152 * c[1] + .0722 * c[2]; };
-  const contrast = (a, b) => (Math.max(relLum(a), relLum(b)) + .05) / (Math.min(relLum(a), relLum(b)) + .05);
+  // relLum() / contrast() are the hoisted helpers declared with the palette variations above.
   // The first color that reads on bg (3:1), else whichever reads best.
   const readableOn = (bg, colors) => colors.find((c) => contrast(c, bg) >= 3) || colors.reduce((a, b) => (contrast(b, bg) > contrast(a, bg) ? b : a));
   // Body text / small labels: the palette's lettering color when it reads on the paper, else its most readable color.
@@ -2824,8 +3196,10 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
 
   // Which kind of design is on screen (what the layer roles MEAN there).
   function designType(s) {
-    if (s.journal && s.journal !== 'dream') return 'wash';
     const m = s.marble || '';
+    // Recolorable Canva patterns (any journal): repeat-clicks rearrange the pattern's own colors.
+    if (m in PATTERNS) return 'pattern';
+    if (s.journal && s.journal !== 'dream') return 'wash';
     if (m === 'floral') return 'floral';
     if (m === 'abstract' || m === 'blush') return 'watercolor';
     if (m === 'solid' || /stripe/.test(m)) return 'geometric';
@@ -2926,6 +3300,13 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   function paletteVariations(pl, design) {
     const key = `${pl.name}|${design}|${ROLES.map((r) => pl[r.key]).join()}|${(pl.swatch || []).join()}`;
     if (variationCache.has(key)) return variationCache.get(key);
+    if (design === 'pattern') {
+      // Canva patterns: the palette's base roles stay as designed; each click deals its colors onto the pattern
+      // roles (ground, stripes, border, abstract shapes, accent art) in the next contrast-checked arrangement.
+      const out = paletteVariants(pl).map((v, i) => ({ ...pl, ...v, _label: i ? `Arrangement ${i + 1}` : 'As designed' }));
+      variationCache.set(key, out);
+      return out;
+    }
     const K = colorKit(pl), out = [];
     // A full palette designed for this studio keeps its own arrangement as variation 1.
     if (!pl.family) out.push({ ...pl, _label: 'As designed' });
@@ -2949,12 +3330,13 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     const design = designType(state), vars = paletteVariations(pl, design), pv = state.paletteVar;
     const idx = pv && pv.name === pl.name && pv.design === design ? (pv.index + 1) % vars.length : 0;
     const { _label, ...roles } = vars[idx];
-    state.palette = { ...roles, name: pl.name, ...(pl.family || idx ? { v: idx + 1 } : {}) };
+    state.palette = withPatternRoles({ ...roles, name: pl.name, ...(pl.family || idx ? { v: idx + 1 } : {}) });
     state.paletteVar = { name: pl.name, design, index: idx, count: vars.length, label: _label };
     artFollowsPalette(); commit();
   }
   const activeVariation = (pl) => { const pv = state.paletteVar; return pv && pv.name === pl.name && pv.design === designType(state) ? pv : null; };
 
+  const same = (a, b) => (a || '').toLowerCase() === (b || '').toLowerCase();
   function paletteMatch() {
     return palettesFor(state.journal).find((pl) => ROLES.every((r) => (pl[r.key] || '').toLowerCase() === (state.palette[r.key] || '').toLowerCase()));
   }
@@ -2967,7 +3349,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       const av = activeVariation(pl);
       if (av || (!state.paletteVar && match && match.name === pl.name)) b.className = 'selected';
       b.title = pl.name;
-      b.innerHTML = `<canvas class="thumb" data-palette="${pl.name}"></canvas><div class="swatch-row">${(pl.swatch || ['stone', 'vein', 'highlight', 'plate', 'trim'].map((k) => pl[k])).map((c) => `<i style="background:${c}"></i>`).join('')}</div><span>${mine ? '★ ' : ''}${pl.name}${av && av.count > 1 ? ` <small class="pal-var" title="${av.label} — click again for the next arrangement">${av.index + 1}/${av.count}</small>` : ''}</span>`;
+      b.innerHTML = `<canvas class="thumb" data-palette="${pl.name}"></canvas><div class="swatch-row">${(pl.swatch || pl.swatches || ['stone', 'vein', 'highlight', 'plate', 'trim'].map((k) => pl[k])).map((c) => `<i style="background:${c}"></i>`).join('')}</div><span>${mine ? '★ ' : ''}${pl.name}${av && av.count > 1 ? ` <small class="pal-var" title="${av.label} — click again for the next arrangement">${av.index + 1}/${av.count}</small>` : ''}</span>`;
       // Colors only: background, plate, lettering and header design stay exactly as they are.
       b.onclick = () => applyPaletteClick(pl);
       if (mine) {
@@ -3150,6 +3532,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   };
   const PR_ART_ROLES = { prayer: ['stone', 'vein', 'plate', 'highlight', 'title'], warrior: ['stone', 'plate', 'title'], warring: ['stone', 'vein', 'plate', 'trim', 'frame', 'title'] };
   const PR_PLATE_ROLES = [['plate', 'Title plate', 'Plate fill'], ['frame', 'Title plate', 'Outer frame'], ['trim', 'Title plate', 'Inner trim'], ['title', 'Title plate', 'Lettering on the plate']];
+  const patternRoles = (m) => ROLES.filter((r) => r.pattern === true || r.pattern === m);
   function rolesFor() {
     if (state.journal !== 'dream') {
       const byKey = Object.fromEntries(ROLES.map((r) => [r.key, r]));
@@ -3158,9 +3541,10 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       const replaced = swapped ? { prayer: ['stone'], warrior: ['stone'], warring: ['stone', 'vein'] }[state.journal] : [];
       const out = [];
       if (swapped) {
-        if (m === 'solid') out.push({ ...byKey.stone, group: 'Background', label: 'Background color', hint: 'Solid background', toggle: null });
+        if (m in PATTERNS) patternRoles(m).forEach((r) => out.push({ ...r }));
+        else if (m === 'solid') out.push({ ...byKey.stone, group: 'Background', label: 'Background color', hint: 'Solid background', toggle: null });
         else if (m === 'abstract') [['stone', 'Burgundy shapes'], ['highlight', 'Pink washes'], ['accent', 'Orange + peach shapes'], ['vein', 'Gold lines + splatter']].forEach(([key, label]) => out.push({ ...byKey[key], group: 'Background', label, hint: 'Abstract watercolor', toggle: null }));
-        else if (!m.startsWith('img:') && !m.startsWith('upload:') && m !== 'floral' && m !== 'solid') ['stone', 'vein', 'highlight'].forEach((key) => out.push({ ...byKey[key], group: 'Background' }));
+        else if (!(m in PATTERNS) && !m.startsWith('img:') && !m.startsWith('upload:') && m !== 'floral' && m !== 'solid') ['stone', 'vein', 'highlight'].forEach((key) => out.push({ ...byKey[key], group: 'Background' }));
       }
       const seen = new Set(out.map((r) => r.key));
       PRAYER_ROLES[state.journal].forEach(([key, label, hint]) => { if (!replaced.includes(key) && !seen.has(key)) { seen.add(key); out.push({ ...byKey[key], group: 'Design', label, hint, toggle: null }); } });
@@ -3186,6 +3570,8 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       add('trim', 'Flowers', 'Gold accents', 'Ring, bars + gold details', 'showTrim');
     } else if (m === 'solid') {
       add('stone', 'Background', 'Background color', 'Solid background', null);
+    } else if (m in PATTERNS) {
+      patternRoles(m).forEach((r) => add(r.key, r.group));
     } else if (m.startsWith('img:')) {
       // photo / pattern backgrounds keep their own colors
     } else {
@@ -3201,6 +3587,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
 
   function buildRoles() {
     const box = $('roles'); box.innerHTML = '';
+    if (state.marble in PATTERNS) Object.assign(state.palette, withPatternRoles(state.palette));
     let group = '';
     if (state.marble.startsWith('img:')) {
       const n = document.createElement('p'); n.className = 'hint'; n.style.margin = '0 0 6px';
@@ -3239,6 +3626,12 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       col.oninput = () => { state.palette[r.key] = col.value; artFollowsColor(r.key); commit(false); buildPalettes(); };
       row.append(lab, col); box.appendChild(row);
     });
+    if (PATTERNS[state.marble]) {
+      const row = document.createElement('div'); row.className = 'role';
+      const b = document.createElement('button'); b.className = 'btn'; b.textContent = 'As designed (Canva colors)';
+      b.onclick = () => { Object.assign(state.palette, PATTERNS[state.marble].original); commit(); };
+      row.append(b); box.appendChild(row);
+    }
   }
 
   // The design's own palette: the journal's for prayer journals, the background's for the Dream Journal.
@@ -3271,11 +3664,34 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     $('coverFontNote').textContent = state.titleStyle === 'custom' ? '' : '(used when Cover lettering = Custom font)';
     $('shadowVal').textContent = state.titleShadow + '%';
     $('accentVal').textContent = state.accentOpacity + '%';
-    for (const id of ['accentPlace', 'accentOpacityRow', 'accentScaleRow', 'accentLinedRow']) ($(id).closest('.field') || $(id)).classList.toggle('hidden', state.accent === 'none');
-    $('accentScaleRow').classList.toggle('hidden', state.accent === 'none' || state.accentPlace === 'behindTitleSubtle');
-    $('accentScaleVal').textContent = state.accentScale + '%';
-    $('accent').value = state.accent; $('accentPlace').value = state.accentPlace; $('accentLined').checked = state.accentLined;
-    $('accentScale').value = state.accentScale;
+    for (const id of ['accentPlace', 'accentOpacityRow', 'accentLinedRow']) ($(id).closest('.field') || $(id)).classList.toggle('hidden', state.accent === 'none');
+    // Only the layouts this element supports are offered.
+    const supported = ACCENT_SUPPORT[state.accent] || [];
+    const sel = $('accentPlace'), sig = supported.join();
+    if (sel.dataset.sig !== sig) {
+      sel.dataset.sig = sig;
+      sel.innerHTML = ACCENT_LAYOUTS.filter(([v]) => supported.includes(v)).map(([v, label]) => `<option value="${v}">${label}</option>`).join('');
+    }
+    const layout = accentLayout(state), on = state.accent !== 'none';
+    const customAccent = on && layout === 'custom';
+    const sized = on && (['corners', 'tl', 'tr', 'bl', 'br', 'borderEdge'].includes(layout) || customAccent);
+    const banded = ['top', 'bottom'].includes(layout) || (['left', 'right'].includes(layout) && SIDE_BAND[state.accent]);
+    const tiled = on && (['repeat', 'scatter'].includes(layout) || banded || (layout === 'bleed' && state.accent === 'stripes'));
+    $('accentTileRow').classList.toggle('hidden', !tiled);
+    $('accentSpacingRow').classList.toggle('hidden', !(on && ['repeat', 'scatter'].includes(layout) && state.accent !== 'stripes'));
+    $('accentScaleRow').classList.toggle('hidden', !sized);
+    for (const id of ['accentXRow', 'accentYRow', 'accentRotRow', 'accentDragRow']) $(id).classList.toggle('hidden', !customAccent);
+    $('accentScaleVal').textContent = (state.accentScale ?? 80) + '%';
+    $('accentTileVal').textContent = (state.accentTile ?? 100) + '%';
+    $('accentSpacingVal').textContent = (state.accentSpacing ?? 0) + '%';
+    $('accentXVal').textContent = Math.round(state.accentX * 100) + '%';
+    $('accentYVal').textContent = Math.round(state.accentY * 100) + '%';
+    $('accentRotVal').textContent = (state.accentRot || 0) + '°';
+    canvas.style.cursor = customAccent && currentType() === 'cover' ? 'grab' : '';
+    $('accent').value = state.accent; $('accentPlace').value = layout; $('accentLined').checked = state.accentLined;
+    $('accentScale').value = state.accentScale ?? 80;
+    $('accentTile').value = state.accentTile ?? 100; $('accentSpacing').value = state.accentSpacing ?? 0;
+    $('accentXIn').value = Math.round(state.accentX * 100); $('accentYIn').value = Math.round(state.accentY * 100); $('accentRot').value = state.accentRot || 0;
     for (const id of ['texture', 'veinStrength', 'plateOpacity', 'titleShadow', 'accentOpacity']) $(id).value = state[id];
     const marbleBg = !['abstract', 'floral', 'blush', 'journal', 'solid'].includes(state.marble) && !state.marble.startsWith('img:');
     for (const id of ['texture', 'veinStrength']) $(id).closest('.slider').classList.toggle('hidden', !marbleBg);
@@ -3320,7 +3736,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     ACCENTS.forEach(([key, label]) => {
       const b = document.createElement('button'); b.dataset.accent = key;
       b.innerHTML = `<canvas width="72" height="72"></canvas>${label}`;
-      b.onclick = () => { state.accent = key; goTo('cover'); commit(false); };
+      b.onclick = () => { state.accent = key; if (key !== 'none') state.accentPlace = accentLayout(state); goTo('cover'); commit(false); };
       box.appendChild(b);
     });
   }
@@ -3543,11 +3959,36 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     return coverTitleColor(state);
   }
   document.querySelectorAll('#titleSeg button').forEach((b) => b.onclick = () => { state.titleStyle = b.dataset.title; goTo('cover'); if (state.titleStyle === 'custom') ensureFont(state.coverFont).then(() => commit(false)); commit(false); });
-  $('accent').onchange = (e) => { state.accent = e.target.value; commit(false); };
+  $('accent').onchange = (e) => { state.accent = e.target.value; if (state.accent !== 'none') state.accentPlace = accentLayout(state); commit(false); };
   $('accentPlace').onchange = (e) => { state.accentPlace = e.target.value; goTo('cover'); commit(false); };
   $('accentScale').oninput = (e) => { state.accentScale = Number(e.target.value); commit(false); };
+  for (const id of ['accentTile', 'accentSpacing', 'accentRot']) $(id).oninput = (e) => { state[id] = Number(e.target.value); goTo('cover'); commit(false); };
+  $('accentXIn').oninput = (e) => { state.accentX = Number(e.target.value) / 100; goTo('cover'); commit(false); };
+  $('accentYIn').oninput = (e) => { state.accentY = Number(e.target.value) / 100; goTo('cover'); commit(false); };
   $('accentLined').onchange = (e) => { state.accentLined = e.target.checked; toInterior(); commit(false); };
 
+  // Drag the accent element directly on the cover preview when "Large + drag to place" is chosen.
+  (() => {
+    let dragging = false;
+    const toCanvasXY = (e) => {
+      const r = canvas.getBoundingClientRect();
+      return { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height };
+    };
+    canvas.addEventListener('pointerdown', (e) => {
+      if (state.accent === 'none' || accentLayout(state) !== 'custom' || !['cover'].includes(currentType())) return;
+      dragging = true; canvas.setPointerCapture(e.pointerId);
+      const { x, y } = toCanvasXY(e);
+      state.accentX = x; state.accentY = y; draw();
+    });
+    canvas.addEventListener('pointermove', (e) => {
+      if (!dragging) return;
+      const { x, y } = toCanvasXY(e);
+      state.accentX = Math.min(1, Math.max(0, x)); state.accentY = Math.min(1, Math.max(0, y)); draw();
+    });
+    const end = () => { if (dragging) { dragging = false; save(); syncControls(); refreshThumbs(); } };
+    canvas.addEventListener('pointerup', end);
+    canvas.addEventListener('pointercancel', end);
+  })();
   for (const id of ['texture', 'veinStrength', 'plateOpacity', 'titleShadow', 'accentOpacity']) $(id).oninput = (e) => { state[id] = Number(e.target.value); commit(false); };
   for (const id of ['headerStyle', 'headerFill', 'lineSpacing', 'footer', 'headerRule', 'lineStyle', 'floralArt']) $(id).onchange = (e) => { state[id] = e.target.value; toInterior(); commit(false); };
   for (const id of ['includeCover', 'includeBack']) $(id).onchange = (e) => { const t = currentType(); state[id] = e.target.value; goTo(t); commit(false); };
