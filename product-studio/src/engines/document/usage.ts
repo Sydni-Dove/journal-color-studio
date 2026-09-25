@@ -8,7 +8,10 @@
 import type { FitResult, LayoutDefinition } from "../../layouts/shared/types";
 import type { FunctionalPatternKind } from "../../types/theme";
 import type { ColorToken, FontGroup, TypographyRole, WordingKey } from "../../types/tokens";
-import { recipeLayouts, solvePage, type ResolvedDocument } from "./resolve";
+import { anchorsFor } from "../../layouts/shared/components";
+import type { CompositionAnchor } from "../../types/composition";
+import type { SemanticTextKey, TextAnchor } from "../../types/layout";
+import { compositionFor, recipeLayouts, solvePage, type ResolvedDocument } from "./resolve";
 
 export type ProjectUsage = {
   layouts: { layout: LayoutDefinition; fit: FitResult }[];
@@ -28,6 +31,10 @@ export type ProjectUsage = {
   colorTokens: ColorToken[];
   spreads: boolean;
   incompatible: { layoutId: string; label: string; reason: string }[];
+  /** Positionable semantic text that renders, with the anchors each supports and an example of its text. */
+  semanticText: { key: SemanticTextKey; example: string; anchors: TextAnchor[]; layoutIds: string[]; anchor: TextAnchor; defaultAnchor: TextAnchor }[];
+  /** Composition anchors present on the product's pages (decoration placement). */
+  compositionAnchors: CompositionAnchor[];
   /** Layouts that visibly consume each page-scoped control (for "applies to … pages" hints). */
   consumers: { pattern: string[]; sidebar: string[]; datePlacement: string[]; sectionsPerDay: string[]; writingRows: string[] };
 };
@@ -51,10 +58,30 @@ export function computeUsage(doc: ResolvedDocument): ProjectUsage {
   // Solved output of the first page of each recipe step: what really renders.
   const roles = new Set<TypographyRole>();
   const tokens = new Set<ColorToken>(["background"]);
+  const semantic = new Map<SemanticTextKey, ProjectUsage["semanticText"][number]>();
+  const anchors = new Set<CompositionAnchor>();
+  const regionSets: Partial<Record<CompositionAnchor, { x: number; y: number; w: number; h: number }>>[] = [];
   doc.project.recipe.items.forEach((item) => {
     const index = doc.recipe.pages.findIndex((p) => p.recipeItemId === item.id && !p.filler);
     if (index < 0) return;
-    for (const n of solvePage(doc, index).nodes) {
+    const solved = solvePage(doc, index);
+    const hasFooter = solved.nodes.some((n) => n.type === "group" && n.component === "PageFooter");
+    for (const n of solved.nodes) {
+      if (n.type === "text" && n.semantic) {
+        const cur = semantic.get(n.semantic);
+        const layoutId = doc.recipe.pages[index].layoutId;
+        if (cur) cur.layoutIds = [...new Set([...cur.layoutIds, layoutId])];
+        else {
+          const anchors = anchorsFor(n.semantic, { footer: hasFooter ? { x: 0, y: 0, w: 0, h: 0 } : null });
+          const def = n.placement?.defaultAnchor ?? anchors[0];
+          semantic.set(n.semantic, { key: n.semantic, example: n.text, anchors, layoutIds: [layoutId], anchor: n.placement?.anchor ?? def, defaultAnchor: def });
+        }
+      }
+    }
+    const regions = compositionFor(doc, index).regions;
+    for (const a of Object.keys(regions)) anchors.add(a as CompositionAnchor);
+    regionSets.push(regions);
+    for (const n of solved.nodes) {
       switch (n.type) {
         case "text":
           roles.add(n.role);
@@ -92,6 +119,8 @@ export function computeUsage(doc: ResolvedDocument): ProjectUsage {
   };
 
   return {
+    semanticText: [...semantic.values()],
+    compositionAnchors: distinctAnchors([...anchors], regionSets),
     consumers,
     layouts,
     patterns,
@@ -111,4 +140,19 @@ export function computeUsage(doc: ResolvedDocument): ProjectUsage {
     spreads: doc.recipe.pages.some((p) => p.side !== "single"),
     incompatible: layouts.filter((l) => !l.fit.ok).map((l) => ({ layoutId: l.layout.id, label: l.layout.label, reason: l.fit.ok ? "" : l.fit.reason })),
   };
+}
+
+/** Most specific first: when two anchors are the same physical region on every page, only this one is offered. */
+const ANCHOR_SPECIFICITY: CompositionAnchor[] = ["title", "notes", "calendar", "writingArea", "sidebar", "header", "footer", "mainContent", "safeArea", "page", "topLeftAccent", "topRightAccent", "bottomLeftAccent", "bottomRightAccent"];
+
+/** Drop anchors that are the same bounds as a more specific anchor on every page (no duplicate options). */
+function distinctAnchors(anchors: CompositionAnchor[], pages: Partial<Record<CompositionAnchor, { x: number; y: number; w: number; h: number }>>[]): CompositionAnchor[] {
+  const key = (r?: { x: number; y: number; w: number; h: number }) => (r ? [r.x, r.y, r.w, r.h].map((v) => v.toFixed(4)).join(",") : "-");
+  const sorted = [...anchors].sort((a, b) => ANCHOR_SPECIFICITY.indexOf(a) - ANCHOR_SPECIFICITY.indexOf(b));
+  const kept: CompositionAnchor[] = [];
+  for (const a of sorted) {
+    const dup = kept.some((k) => pages.every((pg) => key(pg[a]) === key(pg[k])));
+    if (!dup) kept.push(a);
+  }
+  return anchors.filter((a) => kept.includes(a));
 }

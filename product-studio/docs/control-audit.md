@@ -278,3 +278,165 @@ spread pages: the only rect is the grid border (plus checkboxes), and the 3
 shared rules sit at 3 distinct positions. It adds a desk-pad suite
 covering contiguity, shared rules on boundaries, weekday alignment, and
 rendered markup with no per-cell rects.
+
+## Debugging pass — composition, spacing, text placement, numeric input, dropdowns (2026-09-25)
+
+These were observed on production at `d4c9b9d` and are treated as current defects.
+
+### 0. Design snapshot refreshed first
+
+- **Current Journal Color Studio source:** branch
+  `integration/multi-journal-plus-patterns` at `14e4e75`. It contains
+  `main`, the pattern branch and the Sept 24 four-journal baseline. The
+  previous snapshot was `main` at `8282a74`.
+- **Unchanged:** all 13 previously snapshotted files are byte-identical at
+  `14e4e75` and were left untouched.
+- **Changed and refreshed:**
+  - the **bouquet**: upstream retired `floral-cover.jpg`, which had the
+    lettering baked in, in favour of `floral-bouquet.png`;
+  - **marble vein overlays** (`marble-canva-source.png`,
+    `marble-goldleaf-gold.png`);
+  - the **marble and floral recolor math** (Lab lookup-table stone and
+    tone transfer; see `themes/recolorMath.ts`);
+  - the **palettes**: Floral Garden changed; Abstract Watercolor and 9
+    orange palettes added;
+  - **placement metadata** (`design-library/placement.ts`);
+  - the **Against** brand font.
+- The full per-file record with SHA-1s is in
+  `src/design-library/SNAPSHOT.md`. `tests/snapshot-integrity.test.ts`
+  verifies it and checks that nothing imports outside `/product-studio`.
+
+### 1. Decoration composition
+
+**Root cause.** The decoration planner read only trim, bleed and safe
+geometry, never the layout. Every piece was placed as a fraction of the
+page box:
+- corners sized from the short side and sliced by a rectangular safe-area
+  mask;
+- header art "cover"-scaled to the top margin, so a few inches of art hung
+  off the page;
+- sprigs at the page centre ±18%, unrelated to any title;
+- frames cut exactly at the safe edge, touching the content.
+
+**Architecture added:**
+PageGeometry → functional layout (nodes and declared `regions`) →
+**composition** → decoration plan → renderer.
+
+- **Composition** (`engines/composition/composition.ts`) resolves physical
+  regions: page, safeArea, header, title (ink), mainContent, calendar,
+  notes, sidebar, writingArea, footer and the four accent zones. It also
+  builds **protected content**: text ink, rules, grids, surfaces, boxes and
+  binding/glue keep-outs, inflated by `decorationToContentClearance`.
+- **The object fitter** (`engines/composition/fit.ts`):
+  - anchors each piece to a region using a `DecorationPlacement` (anchor,
+    align X/Y, fit, max width/height, offsets, allow overlap / bleed /
+    clipping);
+  - scales it about its anchor to the largest size whose real artwork
+    footprint (alpha-occupancy grids from `tools/build_occupancy.py`)
+    stays uncropped and clear of content;
+  - drops it with a reason below 0.6", rather than drawing a speck.
+- **Placements** follow the snapshotted Journal Color Studio data:
+  - corners (floral default = the opposite pair with the most room);
+  - flanking the title, resting on its rule;
+  - top + bottom edges;
+  - behind the title (≤ 16% opacity);
+  - header band ending a clearance above the content;
+  - margin frame around the content (watercolor edge feathered);
+  - full page behind content.
+- Line-art bands and frames are mirror-tiled. Corner line art overhangs the
+  edge as designed, with content masked away.
+- The editor shows per-piece status for the page being viewed ("placed at
+  N%" or "not placed — reason").
+
+### 2. Spacing
+
+The tokens `titleToRuleGap`, `headingToContentGap`, `labelToBorderInset`,
+`dateToCellInset`, `sectionHeadingInset` and
+`decorationToContentClearance` are defined in inches per density and
+applied by the shared components:
+- `positionText` / `headerTitle` (titles);
+- `section` (headings);
+- `weekdayHeader`;
+- `calendarGrid` (dates);
+- weekly day labels;
+- the grocery category headings.
+
+The measured tight spots were the desk-pad titles and the journal "Date"
+(0.10"), the grocery headings (0.00") and the compact weekday labels
+(0.092"). They now meet their tokens.
+
+### 3. Text placement
+
+Semantic text is `pageTitle`, `monthYear`, `weekOf`, `productTitle`,
+`dateLabel`, `footer` or `sectionHeading`. Each element can be placed at:
+- the header, above-content or footer anchors, left / centre / right
+  (footer only where a footer exists; section headings align within their
+  section);
+- with fine X/Y offsets clamped to the print-safe area.
+
+The Text placement panel lists only elements that render, and marks the
+layout default.
+
+### 4. Numeric input
+
+**Root cause.** The shared `NumberField` displayed the committed number and
+committed on every `onChange` only when `parseFloat` succeeded. Deleting
+the last digit therefore reverted the field. The page counter (`parseInt` +
+range), the export range (`+value`) and the margins (`parseFloat`) had
+their own variants.
+
+**Fix.** One `NumericInput` (via `LabeledNumeric` / `NumberField`) keeps a
+text draft separate from the committed value:
+- partial states are allowed while typing;
+- it commits on blur, Enter or arrow keys, with validation, clamping and
+  messages;
+- Escape reverts;
+- the message is the input's description, never part of its label.
+
+**Coverage.** Page navigation, copies, margins, sections and rows per day,
+sidebar width, line spacing, line weight, pitch, dot size, major lines,
+margin line, opacity, line strength, decoration size, zoom and opacity,
+decoration max size and offsets, text offsets, custom width and height,
+wizard year and pages, and the export page range.
+
+### 5. Dropdown audit
+
+The audit changed every select option on 5 decorated products and compared
+the rendered page.
+
+- **Printer profile and binding:** these change requirements, keep-outs,
+  bleed and validation, but the page does not move when every margin
+  already exceeds them. The summary now says which case applies. It names
+  printers with identical requirements for the product (Generic Commercial
+  = Coil / Spiral Generic for coil), and explains that 6-ring and 7-ring
+  differ in punch pattern only.
+- **Anchor list:** it offered duplicate regions (Notes = Sidebar, Main
+  content = Calendar); anchors are now de-duplicated by physical bounds.
+- **Text placement:** "Layout default" hid which anchor was in use; the
+  select now shows the real anchor and marks the default.
+- **Corners:** the select showed the wrong pair when the automatic choice
+  applied; it now has an explicit "Automatic — the pair with the most
+  room".
+- **Colour roles:** some options looked identical because the brand palette
+  shares hexes (Decoration base = Headings = Rules = #630000); options now
+  show their hex.
+- **Decoration controls:** these were silent no-ops when every piece had no
+  room (for example, bouquet on the 5×7 notepad: glue zone + footer); the
+  panel now states it and validation reports `decoration-no-room`.
+- **Legacy placement pair:** full page (without "extend under writing") vs
+  margin frame rendered identically. Full page now means behind content;
+  old projects migrate to the frame on load.
+
+### 6. Composition validation
+
+New rules:
+- `decoration-clipped`
+- `decoration-no-room` (+ info when shrunk below 50%)
+- `decoration-overlap` (incl. excessive intended overlap)
+- `decoration-dead-space`
+- `title-rule-gap`
+- `label-border-inset`
+- `text-region`
+
+Also fixed: a rule's "…and N more" summary is no longer always an
+export-blocking error; it carries that rule's worst severity.

@@ -1,35 +1,44 @@
 /**
- * RASTER RECOLOR ENGINE (browser). Turns a design-library snapshot plus role
- * colors into a recolored bitmap at a physical size, cached by content key.
+ * RASTER RECOLOR ENGINE (browser I/O). Loads a design-library snapshot,
+ * crops/scales it to a physical size, runs the pure recolor math
+ * (recolorMath.ts) and caches the result by content key.
  *
  * Formats (defined by the snapshot assets, implemented here independently):
- *   marble  R = stone detail, G = vein coverage, B = highlight coverage
- *   floral  full-color art; each pixel's hue family maps to a role
+ *   marble  layer map R = stone detail, G = vein coverage, B = highlight coverage,
+ *           optionally with real vein artwork drawn over the recolored stone
+ *   floral  full-colour art with alpha; Lab tone transfer per colour family
  *
  * Output is identical for preview and print because both read the same
  * cache entry (print waits for prepareRasters before opening the dialog).
  */
-import { findAsset, type FloralAsset, type MarbleAsset } from "../design-library/library";
+import { findAsset, type MarbleAsset } from "../design-library/library";
+import { jcsPaletteRoles } from "../design-library/palettes";
+import { floralSoftFill, marbleLUTs, marbleStats, paintMarblePixels, toneTransferPixels, veinCoverage, type MarbleStats } from "./recolorMath";
 
 export type RasterRequest = {
   assetId: string;
   pxW: number;
   pxH: number;
-  /** Zoom into the artwork (1 = cover-fit). */
+  /** cover = crop to fill (materials); stretch = the whole artwork into its own-aspect rect (objects). */
+  fit: "cover" | "stretch";
+  /** Zoom into the artwork (1 = cover-fit). Materials only. */
   zoom: number;
   /** Role colors as hex. */
   roles: { base: string; vein: string; highlight: string; deep: string; paper: string };
 };
 
-/** Marble texture strength / vein strength used by the approved designs (JCS defaults). */
+/** Marble stone texture / vein strength used by the approved designs (JCS defaults: texture 60, veins 100). */
 const MARBLE_TEXTURE = 0.6;
 const MARBLE_VEIN_STRENGTH = 1;
+/** Width of the sample JCS measures marble statistics on. */
+const MARBLE_STATS_PX = 240;
 
-export const rasterKey = (r: RasterRequest) => JSON.stringify([r.assetId, r.pxW, r.pxH, +r.zoom.toFixed(3), r.roles]);
+export const rasterKey = (r: RasterRequest) => JSON.stringify([r.assetId, r.pxW, r.pxH, r.fit, +r.zoom.toFixed(3), r.roles]);
 
 const done = new Map<string, string>();
 const pending = new Map<string, Promise<string>>();
 const images = new Map<string, Promise<HTMLImageElement>>();
+const stats = new Map<string, MarbleStats>();
 const listeners = new Set<() => void>();
 
 export function onRasterReady(fn: () => void): () => void {
@@ -40,9 +49,6 @@ export function onRasterReady(fn: () => void): () => void {
 export function rasterUrl(r: RasterRequest): string | undefined {
   return done.get(rasterKey(r));
 }
-
-const hexRgb = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
-const mix = (a: number, b: number, t: number) => a + (b - a) * t;
 
 function loadImage(url: string): Promise<HTMLImageElement> {
   let p = images.get(url);
@@ -59,79 +65,77 @@ function loadImage(url: string): Promise<HTMLImageElement> {
   return p;
 }
 
-/** Draw the artwork cover-cropped (and zoomed) into a w×h canvas; return its pixels. */
-function coverPixels(img: HTMLImageElement, w: number, h: number, zoom: number): { canvas: HTMLCanvasElement; data: ImageData } {
+function canvas(w: number, h: number) {
   const c = document.createElement("canvas");
   c.width = w;
   c.height = h;
   const ctx = c.getContext("2d", { willReadFrequently: true })!;
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
-  const ir = img.naturalWidth / img.naturalHeight, r = w / h;
-  let sw = img.naturalWidth, sh = img.naturalHeight;
-  if (ir > r) sw = sh * r;
-  else sh = sw / r;
-  sw /= Math.max(1, zoom);
-  sh /= Math.max(1, zoom);
-  const sx = (img.naturalWidth - sw) / 2, sy = (img.naturalHeight - sh) / 2;
-  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
-  return { canvas: c, data: ctx.getImageData(0, 0, w, h) };
+  return { c, ctx };
 }
 
-function recolorMarble(asset: MarbleAsset, data: ImageData, roles: RasterRequest["roles"]) {
-  const d = data.data;
-  const stone = hexRgb(roles.base), vein = hexRgb(roles.vein), hi = hexRgb(roles.highlight);
-  const stoneLum = (stone[0] * 0.2126 + stone[1] * 0.7152 + stone[2] * 0.0722) / 255;
-  const isLight = stoneLum > 0.5;
-  // Dark stone lightens where the texture rises; light stone darkens slightly.
-  const shadow = stone.map((c) => (isLight ? mix(c, 255, 0.25 * MARBLE_TEXTURE) : c * (1 - 0.45 * MARBLE_TEXTURE)));
-  const light = stone.map((c) => (isLight ? c * (1 - 0.2 * MARBLE_TEXTURE) : mix(c, 255, 0.38 * MARBLE_TEXTURE)));
-  for (let i = 0; i < d.length; i += 4) {
-    const det = d[i] / 255, g = (d[i + 1] / 255) * MARBLE_VEIN_STRENGTH, cr = (d[i + 2] / 255) * MARBLE_VEIN_STRENGTH;
-    const shade = asset.shadeBase + asset.shadeAmt * det;
-    for (let k = 0; k < 3; k++) {
-      let v = mix(shadow[k], light[k], det);
-      v = mix(v, Math.min(255, vein[k] * shade), g);
-      v = mix(v, hi[k], cr);
-      d[i + k] = v;
-    }
-    d[i + 3] = 255;
+/** Draw the artwork into a w×h canvas — cover-cropped (and zoomed) or whole — and return its pixels. */
+function pixels(img: HTMLImageElement, w: number, h: number, fit: RasterRequest["fit"], zoom: number) {
+  const { c, ctx } = canvas(w, h);
+  if (fit === "stretch") ctx.drawImage(img, 0, 0, w, h);
+  else {
+    const ir = img.naturalWidth / img.naturalHeight, r = w / h;
+    let sw = img.naturalWidth, sh = img.naturalHeight;
+    if (ir > r) sw = sh * r;
+    else sh = sw / r;
+    sw /= Math.max(1, zoom);
+    sh /= Math.max(1, zoom);
+    ctx.drawImage(img, (img.naturalWidth - sw) / 2, (img.naturalHeight - sh) / 2, sw, sh, 0, 0, w, h);
   }
+  return { canvas: c, ctx, data: ctx.getImageData(0, 0, w, h) };
 }
 
-function recolorFloral(data: ImageData, roles: RasterRequest["roles"]) {
-  const d = data.data;
-  const deep = hexRgb(roles.deep), soft = hexRgb(roles.highlight), gold = hexRgb(roles.vein), leaf = hexRgb(roles.base), paper = hexRgb(roles.paper);
-  for (let i = 0; i < d.length; i += 4) {
-    if (d[i + 3] === 0) continue;
-    const r0 = d[i] / 255, g0 = d[i + 1] / 255, b0 = d[i + 2] / 255;
-    const mx = Math.max(r0, g0, b0), mn = Math.min(r0, g0, b0), l = (mx + mn) / 2;
-    let hue = 0, sat = 0;
-    if (mx !== mn) {
-      const dl = mx - mn;
-      sat = l > 0.5 ? dl / (2 - mx - mn) : dl / (mx + mn);
-      hue = (mx === r0 ? (g0 - b0) / dl + (g0 < b0 ? 6 : 0) : mx === g0 ? (b0 - r0) / dl + 2 : (r0 - g0) / dl + 4) * 60;
-    }
-    let target: number[] | null = null;
-    if (l > 0.93 && sat < 0.15) target = paper;
-    else if (sat < 0.08 || l < 0.06) target = null;
-    else if (hue >= 60 && hue < 170) target = leaf;
-    else if (hue >= 30 && hue < 60) target = gold;
-    else if (hue < 30 || hue >= 300) target = l > 0.55 ? soft : deep;
-    else target = soft;
-    if (target) {
-      const f = Math.min(1, Math.max(0.05, sat * 1.3));
-      d[i] = mix(d[i], target[0], f);
-      d[i + 1] = mix(d[i + 1], target[1], f);
-      d[i + 2] = mix(d[i + 2], target[2], f);
-    }
+function statsFor(asset: MarbleAsset, img: HTMLImageElement): MarbleStats {
+  let s = stats.get(asset.id);
+  if (!s) {
+    const w = MARBLE_STATS_PX, h = Math.round((w * img.naturalHeight) / img.naturalWidth);
+    s = marbleStats(pixels(img, w, h, "cover", 1).data.data);
+    stats.set(asset.id, s);
   }
+  return s;
 }
 
-function toUrl(canvas: HTMLCanvasElement, alpha: boolean): Promise<string> {
-  return new Promise((res, rej) =>
-    canvas.toBlob((b) => (b ? res(URL.createObjectURL(b)) : rej(new Error("Recolor failed"))), alpha ? "image/png" : "image/jpeg", 0.92),
-  );
+async function renderMarble(asset: MarbleAsset, img: HTMLImageElement, r: RasterRequest, w: number, h: number) {
+  const out = pixels(img, w, h, "cover", r.zoom);
+  const map = new Uint8ClampedArray(out.data.data);
+  const luts = marbleLUTs(statsFor(asset, img), { stone: r.roles.base, vein: r.roles.vein, highlight: r.roles.highlight }, MARBLE_TEXTURE);
+  paintMarblePixels(out.data.data, luts, MARBLE_VEIN_STRENGTH, !asset.veins);
+  out.ctx.putImageData(out.data, 0, 0);
+  if (asset.veins) {
+    // Real vein artwork, cropped exactly like the layer map (the two share one frame).
+    const veinImg = await loadImage(asset.veins.url);
+    const v = pixels(veinImg, w, h, "cover", r.zoom);
+    const own = jcsPaletteRoles(asset.veins.originalPalette);
+    const original = !!own && own.vein.toLowerCase() === r.roles.vein.toLowerCase() && own.highlight.toLowerCase() === r.roles.highlight.toLowerCase();
+    if (!original) toneTransferPixels(v.data.data, "veins", { gold: r.roles.vein, light: r.roles.highlight, stone: r.roles.base });
+    veinCoverage(v.data.data, map, asset.veins.alpha, MARBLE_VEIN_STRENGTH);
+    v.ctx.putImageData(v.data, 0, 0);
+    out.ctx.drawImage(v.canvas, 0, 0);
+  }
+  return out.canvas;
+}
+
+function renderFloral(img: HTMLImageElement, r: RasterRequest, w: number, h: number) {
+  const out = pixels(img, w, h, r.fit, r.zoom);
+  toneTransferPixels(out.data.data, "floral", {
+    paper: r.roles.paper,
+    gold: r.roles.vein,
+    leaf: r.roles.base,
+    blush: floralSoftFill(r.roles.highlight, r.roles.paper, r.roles.deep),
+    deep: r.roles.deep,
+  });
+  out.ctx.putImageData(out.data, 0, 0);
+  return out.canvas;
+}
+
+function toUrl(c: HTMLCanvasElement, alpha: boolean): Promise<string> {
+  return new Promise((res, rej) => c.toBlob((b) => (b ? res(URL.createObjectURL(b)) : rej(new Error("Recolor failed"))), alpha ? "image/png" : "image/jpeg", 0.92));
 }
 
 export function ensureRaster(r: RasterRequest): Promise<string> {
@@ -142,12 +146,10 @@ export function ensureRaster(r: RasterRequest): Promise<string> {
   if (!p) {
     const asset = findAsset(r.assetId);
     if (!asset || asset.type === "accent" || typeof document === "undefined") return Promise.reject(new Error("Raster recolor unavailable"));
+    const w = Math.max(1, Math.round(r.pxW)), h = Math.max(1, Math.round(r.pxH));
     p = loadImage(asset.url).then(async (img) => {
-      const { canvas, data } = coverPixels(img, Math.max(1, Math.round(r.pxW)), Math.max(1, Math.round(r.pxH)), r.zoom);
-      if (asset.type === "marble") recolorMarble(asset, data, r.roles);
-      else recolorFloral(data, r.roles);
-      canvas.getContext("2d")!.putImageData(data, 0, 0);
-      const url = await toUrl(canvas, asset.type === "floral" && (asset as FloralAsset).usage !== "bouquet");
+      const c = asset.type === "marble" ? await renderMarble(asset, img, r, w, h) : renderFloral(img, r, w, h);
+      const url = await toUrl(c, asset.type === "floral");
       done.set(key, url);
       pending.delete(key);
       listeners.forEach((fn) => fn());

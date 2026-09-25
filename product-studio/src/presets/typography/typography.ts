@@ -1,3 +1,4 @@
+import againstUrl from "../../design-library/assets/fonts/against.otf?url";
 import type {
   FontCategory,
   FontGroup,
@@ -19,6 +20,8 @@ export type FontDefinition = {
    * (tests, SSR). The browser uses canvas measurement of the loaded font.
    */
   avgCharEm: number;
+  /** Self-hosted brand face (not on Google Fonts): served from the design-library snapshot. */
+  localUrl?: string;
 };
 
 /** Curated catalog. Brand faces (Dove Expressions brand system) listed first per category. */
@@ -44,6 +47,8 @@ export const FONT_CATALOG: FontDefinition[] = [
   { family: "Kalam", category: "handwritten", googleSpec: "wght@400;700", fallback: "cursive", avgCharEm: 0.5 },
   { family: "Homemade Apple", category: "handwritten", googleSpec: "wght@400", fallback: "cursive", avgCharEm: 0.7 },
   // Display
+  // Dove Expressions brand display face (JCS brand/against.otf, snapshot 14e4e75). avgCharEm measured from the font file.
+  { family: "Against", category: "display", googleSpec: "", fallback: "Georgia, serif", avgCharEm: 0.7, localUrl: againstUrl },
   { family: "Cinzel", category: "display", googleSpec: "wght@400;600;700", fallback: "Georgia, serif", avgCharEm: 0.66 },
   { family: "Abril Fatface", category: "display", googleSpec: "wght@400", fallback: "Georgia, serif", avgCharEm: 0.58 },
   { family: "Bodoni Moda", category: "display", googleSpec: "ital,wght@0,400;0,700;1,400", fallback: "Georgia, serif", avgCharEm: 0.52 },
@@ -154,7 +159,16 @@ export function resolveTypography(
 }
 
 export function googleFontsHref(families: string[]): string {
-  const unique = [...new Set(families)].map(findFont);
+  const unique = [...new Set(families)].map(findFont).filter((f) => !f.localUrl);
   const params = unique.map((f) => `family=${encodeURIComponent(f.family).replace(/%20/g, "+")}:${f.googleSpec}`).join("&");
   return `https://fonts.googleapis.com/css2?${params}&display=swap`;
+}
+
+/** @font-face rules for self-hosted faces among `families`. */
+export function localFontFaces(families: string[]): string {
+  return [...new Set(families)]
+    .map(findFont)
+    .filter((f) => f.localUrl)
+    .map((f) => `@font-face{font-family:"${f.family}";src:url("${f.localUrl}") format("opentype");font-display:swap;}`)
+    .join("\n");
 }

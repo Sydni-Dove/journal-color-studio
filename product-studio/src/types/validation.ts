@@ -23,7 +23,14 @@ export type ValidationRule =
   | "layout-incompatible"
   | "min-cell"
   | "min-writing-area"
-  | "sidebar-balance";
+  | "sidebar-balance"
+  | "decoration-clipped"
+  | "decoration-no-room"
+  | "decoration-overlap"
+  | "decoration-dead-space"
+  | "title-rule-gap"
+  | "label-border-inset"
+  | "text-region";
 
 export type ValidationIssue = {
   severity: ValidationSeverity;

@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { googleFontsHref } from "../presets/typography/typography";
+import { googleFontsHref, localFontFaces } from "../presets/typography/typography";
 import type { FontSelection } from "../types/tokens";
 
 const LINK_ID = "ps-google-fonts";
+const LOCAL_ID = "ps-local-fonts";
 
 /**
  * Loads the selected font families and reports when they are ready, so text
@@ -23,6 +24,14 @@ export function useFontLoader(fonts: FontSelection): boolean {
       link.rel = "stylesheet";
       document.head.appendChild(link);
     }
+    let local = document.getElementById(LOCAL_ID) as HTMLStyleElement | null;
+    if (!local) {
+      local = document.createElement("style");
+      local.id = LOCAL_ID;
+      document.head.appendChild(local);
+    }
+    const faces = localFontFaces(families);
+    if (local.textContent !== faces) local.textContent = faces;
     if (link.href !== href) {
       setReady(false);
       link.href = href;

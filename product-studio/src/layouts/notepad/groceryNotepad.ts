@@ -41,7 +41,8 @@ export const groceryNotepad: LayoutDefinition = {
   solve(ctx): SolvedPage[] {
     const s = ctx.spacing;
     const frame = pageFrame(ctx, 0, { headerH: STUDIO_GROCERY.header.valueIn });
-    const nodes: LayoutNode[] = [...frame.nodes, ...headerTitle("grocery-header", frame.header, ctx.wording.groceryList, "pageTitle", "center")];
+    const title = headerTitle("grocery-header", ctx, frame.zones, "pageTitle", ctx.wording.groceryList, "pageTitle", "header-center");
+    const nodes: LayoutNode[] = [...frame.nodes, ...title.nodes];
     const twoCols = frame.body.w + 1e-6 >= STUDIO_GROCERY.twoColumnMinWidth.valueIn;
     const colCount = twoCols ? 2 : 1;
     const cols = distributeEqual(frame.body.x, frame.body.w, colCount, s.section);
@@ -61,13 +62,13 @@ export const groceryNotepad: LayoutDefinition = {
         rowsPerCategory = Math.min(rowsPerCategory, list.rows);
         nodes.push(
           group(id, "Section", blockRect),
-          text(`${id}-title`, headRect, ctx.wording[key], "sectionHeading", { component: "SectionHeader", vAlign: "bottom" }),
+          text(`${id}-title`, { ...headRect, h: headH - s.headingToContentGap }, ctx.wording[key], "sectionHeading", { component: "SectionHeader", vAlign: "bottom" }),
           rule(`${id}-rule`, x, y + headH, x + cols.size, y + headH, { strokePt: 0.75 }),
           ...list.nodes,
         );
       });
     });
-    const diagnostics = [...frame.diagnostics];
+    const diagnostics = [...frame.diagnostics, ...title.diagnostics];
     if (rowsPerCategory < 2) {
       diagnostics.push({ severity: "warning", rule: "min-writing-area", componentId: "grocery", message: `Only ${rowsPerCategory} row(s) per category fit on this sheet.` });
     }
@@ -76,6 +77,6 @@ export const groceryNotepad: LayoutDefinition = {
       { label: "Rows per category", value: rowsPerCategory, unit: "count", provenance: { geometryClass: "user-design", basis: `floor((block − ${headH}) ÷ ${rowH})` } },
       { label: "Category subhead", value: headH, unit: "in", provenance: STUDIO_GROCERY.categoryHead.provenance },
     ];
-    return [{ nodes, diagnostics, metrics }];
+    return [{ nodes, diagnostics, metrics, regions: { mainContent: frame.body, writingArea: frame.body } }];
   },
 };

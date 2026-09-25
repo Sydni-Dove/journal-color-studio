@@ -7,9 +7,10 @@ import { fillWritingRegion, lineSpacingIn } from "../../engines/patterns/pattern
 import { STUDIO_STROKES } from "../../presets/studioDefaults";
 import type { CalendarMonth } from "../../types/calendar";
 import type { Rect } from "../../types/geometry";
-import type { LayoutDiagnostic, LayoutMetric, LayoutNode } from "../../types/layout";
+import type { ElementPosition, LayoutDiagnostic, LayoutMetric, LayoutNode, SemanticTextKey, TextAnchor, TextNode } from "../../types/layout";
 import type { LayoutPlacement } from "../../types/project";
-import type { TextAlign } from "../../types/tokens";
+import type { TextAlign, TypographyRole } from "../../types/tokens";
+import { heuristicMeasurer, styleForRole } from "../../engines/typography/textMeasure";
 import type { LayoutContext } from "./types";
 import { box, checkbox, group, lineBoxIn, rule, stackDiagnostic, text } from "./nodes";
 
@@ -17,9 +18,108 @@ export type FrameResult = {
   header: Rect;
   body: Rect;
   footer: Rect | null;
+  /** Where semantic text may be placed on this page. */
+  zones: TextZones;
   nodes: LayoutNode[];
   diagnostics: LayoutDiagnostic[];
 };
+
+/**
+ * Text zones of a page. `belowHeaderY` is the top of whatever sits under the
+ * header (its rule, or the content), which titles keep `titleToRuleGap` from.
+ */
+export type TextZones = { header: Rect; footer: Rect | null; safe: Rect; belowHeaderY: number };
+
+export const PAGE_TEXT_ANCHORS: TextAnchor[] = [
+  "header-left",
+  "header-center",
+  "header-right",
+  "above-content-left",
+  "above-content-center",
+  "above-content-right",
+  "footer-left",
+  "footer-center",
+  "footer-right",
+];
+export const SECTION_TEXT_ANCHORS: TextAnchor[] = ["above-content-left", "above-content-center", "above-content-right"];
+export const FOOTER_TEXT_ANCHORS: TextAnchor[] = ["footer-left", "footer-center", "footer-right"];
+
+/** Anchors a semantic text element supports on a page with these zones. */
+export function anchorsFor(key: SemanticTextKey, zones: Pick<TextZones, "footer">): TextAnchor[] {
+  if (key === "sectionHeading") return SECTION_TEXT_ANCHORS;
+  if (key === "footer") return zones.footer ? FOOTER_TEXT_ANCHORS : [];
+  return zones.footer ? PAGE_TEXT_ANCHORS : PAGE_TEXT_ANCHORS.filter((a) => !a.startsWith("footer"));
+}
+
+const alignOf = (a: TextAnchor): TextAlign => (a.endsWith("left") ? "left" : a.endsWith("right") ? "right" : "center");
+
+/**
+ * Place a semantic text element (the user decides the anchor and fine
+ * offsets; the system keeps it inside the print-safe area).
+ *   header-*         centred in the header zone, never closer than titleToRuleGap to what is below
+ *   above-content-*  sitting titleToRuleGap above the rule / content
+ *   footer-*         centred in the footer zone
+ * `trailingIn` reserves width after the text that moves with it (e.g. a write-in line).
+ */
+export function positionText(
+  ctx: LayoutContext,
+  key: SemanticTextKey,
+  zones: TextZones,
+  id: string,
+  value: string,
+  role: TypographyRole,
+  defaultAnchor: TextAnchor,
+  opts: { component?: TextNode["component"]; trailingIn?: number } = {},
+): { node: TextNode; ink: Rect; anchor: TextAnchor; diagnostics: LayoutDiagnostic[] } {
+  const s = ctx.spacing;
+  const supported = anchorsFor(key, zones);
+  const want: ElementPosition | undefined = ctx.options.textPositions?.[key];
+  const diagnostics: LayoutDiagnostic[] = [];
+  let anchor = want && supported.includes(want.anchor) ? want.anchor : defaultAnchor;
+  if (!supported.includes(anchor)) anchor = supported[0] ?? defaultAnchor;
+  if (want && want.anchor !== anchor) {
+    diagnostics.push({ severity: "info", rule: "text-position", componentId: id, message: `"${value}" cannot use ${want.anchor} on this page; placed at ${anchor}.` });
+  }
+  const lineH = lineBoxIn(ctx.typography, role);
+  const inkW = heuristicMeasurer(value, styleForRole(ctx.typography, role)) + (opts.trailingIn ?? 0);
+  const inFooter = anchor.startsWith("footer") && zones.footer;
+  const zone = inFooter ? zones.footer! : zones.header;
+  // The zone must hold the text: a header title also keeps titleToRuleGap above what follows.
+  const roomH = inFooter ? zone.h : zones.belowHeaderY - s.titleToRuleGap - zone.y;
+  if (lineH > roomH + 1e-6) {
+    diagnostics.push({ severity: "error", rule: "text-overflow", componentId: id, message: `"${value}" is ${lineH.toFixed(3)}" tall but its ${inFooter ? "footer" : "header"} zone holds ${Math.max(0, roomH).toFixed(3)}".`, measurement: { actualIn: lineH, limitIn: roomH } });
+  }
+  if (inkW > zones.safe.w + 1e-6) {
+    diagnostics.push({ severity: "error", rule: "text-overflow", componentId: id, message: `"${value}" is ${inkW.toFixed(3)}" wide; the safe area is ${zones.safe.w.toFixed(3)}".`, measurement: { actualIn: inkW, limitIn: zones.safe.w } });
+  }
+  let y: number;
+  if (inFooter) y = zone.y + (zone.h - lineH) / 2;
+  else if (anchor.startsWith("above-content")) y = zones.belowHeaderY - s.titleToRuleGap - lineH;
+  else y = Math.min(zone.y + (zone.h - lineH) / 2, zones.belowHeaderY - s.titleToRuleGap - lineH);
+  const align = alignOf(anchor);
+  let x = align === "left" ? zone.x : align === "right" ? zone.x + zone.w - inkW : zone.x + (zone.w - inkW) / 2;
+  // Fine offsets, limited to the print-safe area.
+  const safe = zones.safe;
+  const ox = want?.offsetXIn ?? 0, oy = want?.offsetYIn ?? 0;
+  const tx = Math.min(Math.max(x + ox, safe.x), safe.x + safe.w - inkW);
+  const ty = Math.min(Math.max(y + oy, safe.y), safe.y + safe.h - lineH);
+  if (Math.abs(tx - (x + ox)) > 1e-6 || Math.abs(ty - (y + oy)) > 1e-6) {
+    diagnostics.push({ severity: "info", rule: "text-position", componentId: id, message: `"${value}" offset limited to keep it inside the print-safe area.` });
+  }
+  x = tx;
+  y = ty;
+  // The node spans to the safe edge on its open side, so real glyph widths keep the chosen alignment.
+  const textW = inkW - (opts.trailingIn ?? 0);
+  let rect: Rect;
+  if (align === "left") rect = { x, y, w: safe.x + safe.w - x, h: lineH };
+  else if (align === "right") rect = { x: safe.x, y, w: x + inkW - (opts.trailingIn ?? 0) - safe.x, h: lineH };
+  else {
+    const cx = x + textW / 2, half = Math.min(cx - safe.x, safe.x + safe.w - cx);
+    rect = { x: cx - half, y, w: 2 * half, h: lineH };
+  }
+  const node: TextNode = { ...text(id, rect, value, role, { component: opts.component ?? "PageHeader", align, vAlign: "middle", semantic: key }), placement: { anchor, defaultAnchor } };
+  return { node, ink: { x, y, w: inkW, h: lineH }, anchor, diagnostics };
+}
 
 /**
  * Standard page frame inside the safe area:
@@ -28,7 +128,8 @@ export type FrameResult = {
 export function pageFrame(
   ctx: LayoutContext,
   pageIndex: number,
-  opts: { headerH: number; forceFooter?: boolean },
+  /** headerRule: false when nothing rules off the header (titles keep their gap from the content instead). */
+  opts: { headerH: number; forceFooter?: boolean; headerRule?: boolean },
 ): FrameResult {
   // Footer zone exists when the user turned on page numbers or the footer
   // (or the layout requires one); both options are honored by every layout.
@@ -55,22 +156,38 @@ export function pageFrame(
   const body = { x: area.x, y: st.byId.body.start, w: area.w, h: st.byId.body.size };
   const footer = footerOn ? { x: area.x, y: st.byId.footer.start, w: area.w, h: footerH } : null;
 
+  const zones: TextZones = { header, footer, safe: g.safeRect, belowHeaderY: header.y + header.h + (opts.headerRule === false ? s.headerGap : 0) };
   const nodes: LayoutNode[] = [group(`p${pageIndex}-header`, "PageHeader", header)];
+  const diagnostics = stackDiagnostic(st, `p${pageIndex}-frame`, "Header + footer");
   if (footer) {
     nodes.push(group(`p${pageIndex}-footer`, "PageFooter", footer));
     const pn = ctx.options.showPageNumbers ? String(ctx.pageNumbers[pageIndex] ?? "") : "";
     const label = [footerText, pn].filter(Boolean).join("  ·  ");
-    if (label) nodes.push(text(`p${pageIndex}-footer-text`, footer, label, "footer", { component: "PageFooter" }));
+    if (label) {
+      const t = positionText(ctx, "footer", zones, `p${pageIndex}-footer-text`, label, "footer", "footer-center", { component: "PageFooter" });
+      nodes.push(t.node);
+      diagnostics.push(...t.diagnostics);
+    }
   }
-  return { header, body, footer, nodes, diagnostics: stackDiagnostic(st, `p${pageIndex}-frame`, "Header + footer") };
+  return { header, body, footer, zones, nodes, diagnostics };
 }
 
-/** Title text inside a header rect, with a rule under it. */
-export function headerTitle(id: string, header: Rect, title: string, role: "monthTitle" | "weekTitle" | "pageTitle" | "productTitle", align?: TextAlign): LayoutNode[] {
-  return [
-    text(`${id}-title`, header, title, role, { component: "PageHeader", align, vAlign: "middle" }),
-    rule(`${id}-rule`, header.x, header.y + header.h, header.x + header.w, header.y + header.h, { strokePt: STUDIO_STROKES.headerRulePt, component: "PageHeader" }),
-  ];
+/** Page title (a positionable semantic element) with the header rule under the header zone. */
+export function headerTitle(
+  id: string,
+  ctx: LayoutContext,
+  zones: TextZones,
+  key: SemanticTextKey,
+  title: string,
+  role: "monthTitle" | "weekTitle" | "pageTitle" | "productTitle",
+  defaultAnchor: TextAnchor,
+): { nodes: LayoutNode[]; diagnostics: LayoutDiagnostic[] } {
+  const h = zones.header;
+  const t = positionText(ctx, key, zones, `${id}-title`, title, role, defaultAnchor);
+  return {
+    nodes: [t.node, rule(`${id}-rule`, h.x, h.y + h.h, h.x + h.w, h.y + h.h, { strokePt: STUDIO_STROKES.headerRulePt, component: "PageHeader" })],
+    diagnostics: t.diagnostics,
+  };
 }
 
 /** Checklist rows: checkbox + writing line, row count solved from height. */
@@ -151,20 +268,48 @@ export function section(
    *          that live inside a connected grid whose rules are drawn once by
    *          the grid itself.
    */
-  opts: { boxed?: boolean; padded?: boolean; titleRole?: "sectionHeading" | "subheading" | "label" } = {},
+  opts: { boxed?: boolean; padded?: boolean; titleRole?: "sectionHeading" | "subheading" | "label"; semantic?: "sectionHeading" } = {},
 ): { nodes: LayoutNode[]; diagnostics: LayoutDiagnostic[] } {
   const s = ctx.spacing;
   const titleRole = opts.titleRole ?? "sectionHeading";
+  // Content keeps box padding; the heading keeps its own (larger) inset from the section's edges.
   const pad = opts.boxed || opts.padded ? s.boxPadding : 0;
+  const hin = opts.boxed || opts.padded ? s.sectionHeadingInset : 0;
   const inner: Rect = { x: rect.x + pad, y: rect.y + pad, w: rect.w - 2 * pad, h: rect.h - 2 * pad };
+  const headRect: Rect = { x: rect.x + hin, y: rect.y + hin, w: rect.w - 2 * hin, h: rect.h - 2 * hin };
   const titleH = title ? lineBoxIn(ctx.typography, titleRole) : 0;
-  const st = solveStack(inner.y, inner.h, [
+  const top = title ? headRect.y : inner.y;
+  const st = solveStack(top, rect.y + rect.h - pad - top, [
     { id: "title", kind: "fixed", size: titleH },
     { id: "content", kind: "elastic", min: 0 },
-  ], title ? s.boxPadding : 0);
+  ], title ? s.headingToContentGap : 0);
   const nodes: LayoutNode[] = [group(id, "Section", rect)];
+  const diagnostics: LayoutDiagnostic[] = [];
   if (opts.boxed) nodes.push(box(`${id}-box`, rect, { component: "Section", strokePt: STUDIO_STROKES.boxRulePt }));
-  if (title) nodes.push(text(`${id}-title`, { x: inner.x, y: st.byId.title.start, w: inner.w, h: titleH }, title, titleRole, { component: "SectionHeader" }));
+  if (title) {
+    let tRect: Rect = { x: headRect.x, y: st.byId.title.start, w: headRect.w, h: titleH };
+    let align: TextAlign | undefined;
+    if (opts.semantic) {
+      // User-positionable heading: alignment within the section + offsets kept inside the section.
+      const want = ctx.options.textPositions?.[opts.semantic];
+      const anchor = want && SECTION_TEXT_ANCHORS.includes(want.anchor) ? want.anchor : "above-content-left";
+      align = alignOf(anchor);
+      const inkW = Math.min(headRect.w, heuristicMeasurer(title, styleForRole(ctx.typography, titleRole)));
+      const baseX = align === "left" ? headRect.x : align === "right" ? headRect.x + headRect.w - inkW : headRect.x + (headRect.w - inkW) / 2;
+      const x = Math.min(Math.max(baseX + (want?.offsetXIn ?? 0), headRect.x), headRect.x + headRect.w - inkW);
+      const y = Math.min(Math.max(tRect.y + (want?.offsetYIn ?? 0), headRect.y), st.byId.content.start - titleH);
+      if (want && (Math.abs(x - baseX - want.offsetXIn) > 1e-6 || Math.abs(y - tRect.y - want.offsetYIn) > 1e-6)) {
+        diagnostics.push({ severity: "info", rule: "text-position", componentId: `${id}-title`, message: `"${title}" offset limited to keep it inside its section.` });
+      }
+      tRect = align === "left" ? { x, y, w: headRect.x + headRect.w - x, h: titleH } : align === "right" ? { x: headRect.x, y, w: x + inkW - headRect.x, h: titleH } : { x: x + inkW / 2 - Math.min(x + inkW / 2 - headRect.x, headRect.x + headRect.w - x - inkW / 2), y, w: 2 * Math.min(x + inkW / 2 - headRect.x, headRect.x + headRect.w - x - inkW / 2), h: titleH };
+    }
+    const t = text(`${id}-title`, tRect, title, titleRole, { component: "SectionHeader", align, semantic: opts.semantic });
+    if (opts.semantic) {
+      const want = ctx.options.textPositions?.[opts.semantic];
+      t.placement = { anchor: want && SECTION_TEXT_ANCHORS.includes(want.anchor) ? want.anchor : "above-content-left", defaultAnchor: "above-content-left" };
+    }
+    nodes.push(t);
+  }
   const contentRect: Rect = { x: inner.x, y: st.byId.content.start, w: inner.w, h: st.byId.content.size };
   if (content === "surface") {
     nodes.push(...writingSurface(`${id}-surface`, contentRect, ctx));
@@ -173,7 +318,7 @@ export function section(
   } else {
     nodes.push(group(`${id}-notes`, "NotesArea", contentRect));
   }
-  return { nodes, diagnostics: stackDiagnostic(st, id, `Section "${title}"`) };
+  return { nodes, diagnostics: [...diagnostics, ...stackDiagnostic(st, id, `Section "${title}"`)] };
 }
 
 export const PLACEMENT_ALIGN: Record<LayoutPlacement, TextAlign> = {
@@ -230,7 +375,7 @@ export function calendarGrid(
         nodes.push(
           text(
             `${cid}-date`,
-            { x: cellRect.x + s.boxPadding, y: cellRect.y + s.boxPadding, w: cellRect.w - 2 * s.boxPadding, h: dateH },
+            { x: cellRect.x + s.dateToCellInset, y: cellRect.y + s.dateToCellInset, w: cellRect.w - 2 * s.dateToCellInset, h: dateH },
             String(cell.day.day),
             dateRole,
             { component: "CalendarCell", align, vAlign: "top" },
@@ -247,7 +392,7 @@ export function calendarGrid(
       { label: "Calendar rows", value: month.rows, unit: "count", provenance: { geometryClass: "studio-recommended", basis: ctx.calendar?.settings.sixRowMonths ? "6-row universal grid (research 1.4)" : `natural rows for ${month.name}` } },
       { label: "Column width = W / 7 (connected grid)", value: cols.size, unit: "in", provenance: { ...derived, basis: `${rect.w.toFixed(3)} / 7, zero internal gap` } },
       { label: "Row height = H / n (connected grid)", value: rows.size, unit: "in", provenance: { ...derived, basis: `${rect.h.toFixed(3)} / ${month.rows}, zero internal gap` } },
-      { label: "Cell padding", value: s.boxPadding, unit: "in", provenance: { ...derived, basis: "spacing token boxPadding (research 0.06–0.12\")" } },
+      { label: "Date inset", value: s.dateToCellInset, unit: "in", provenance: { ...derived, basis: "spacing token dateToCellInset (research box padding 0.06–0.12\")" } },
     ],
   };
 }
@@ -332,10 +477,13 @@ export function weekdayHeader(
   // Same column math as the grid below (pass the grid's gap), so every label
   // is centred on exactly its solved column.
   const cols = distributeEqual(rect.x, rect.w, labels.length, gap);
+  // Centred in the header row, but never closer than labelToBorderInset to the grid below it.
+  const lineH = lineBoxIn(ctx.typography, role);
+  const y = Math.min(rect.y + (rect.h - lineH) / 2, rect.y + rect.h - ctx.spacing.labelToBorderInset - lineH);
   return [
     group(id, "Grid", rect, { columnEdges: cols.edges }),
     ...labels.map((l, i) =>
-      text(`${id}-${i}`, { x: cols.starts[i], y: rect.y, w: cols.size, h: rect.h }, l, role, { align: "center", component: "SectionHeader" }),
+      text(`${id}-${i}`, { x: cols.starts[i], y, w: cols.size, h: lineH }, l, role, { align: "center", component: "SectionHeader" }),
     ),
   ];
 }

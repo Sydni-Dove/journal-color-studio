@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ResolvedDocument } from "../../engines/document/resolve";
 import { planPrint } from "../../engines/print/printPlan";
-import { geometryFor } from "../../engines/document/resolve";
+import { compositionFor, geometryFor } from "../../engines/document/resolve";
 import { rasterRequests } from "../../themes/decorationPlan";
 import { prepareRasters } from "../../themes/recolor";
 import { createCanvasMeasurer, heuristicMeasurer } from "../../engines/typography/textMeasure";
 import { validateProject } from "../../engines/validation/validate";
 import type { ExportSettings } from "../../types/project";
 import type { ValidationIssue } from "../../types/validation";
-import { Check, Field, Segmented } from "../editor/ui";
+import { Check, LabeledNumeric, Segmented } from "../editor/ui";
 import { PrintDocument } from "./PrintDocument";
 
 export function IssueList({ issues, onGoTo }: { issues: ValidationIssue[]; onGoTo?: (page: number) => void }) {
@@ -66,8 +66,8 @@ export function ExportDialog({ doc, currentIndex, fontsReady, onClose, onGoTo, o
     setPreparing(true);
     setPrepError(null);
     try {
-      const geos = [...new Set(plan.sequence)].map((i) => geometryFor(doc, doc.recipe.pages[i]));
-      await prepareRasters(rasterRequests(geos, doc.decorative, doc.colors));
+      const pages = [...new Set(plan.sequence)].map((i) => ({ g: geometryFor(doc, doc.recipe.pages[i]), comp: compositionFor(doc, i) }));
+      await prepareRasters(rasterRequests(pages, doc.decorative, doc.colors));
       setPrinting(true);
     } catch (e) {
       setPrepError(`Decoration could not be prepared: ${(e as Error).message}`);
@@ -122,12 +122,20 @@ export function ExportDialog({ doc, currentIndex, fontsReady, onClose, onGoTo, o
         />
         {settings.scope === "page-range" && (
           <div className="row">
-            <Field label="From">
-              <input type="number" min={1} value={settings.pageRange?.from ?? 1} onChange={(e) => onSettings({ ...settings, pageRange: { from: +e.target.value, to: settings.pageRange?.to ?? doc.recipe.pageCount } })} />
-            </Field>
-            <Field label="To">
-              <input type="number" min={1} value={settings.pageRange?.to ?? doc.recipe.pageCount} onChange={(e) => onSettings({ ...settings, pageRange: { from: settings.pageRange?.from ?? 1, to: +e.target.value } })} />
-            </Field>
+            <LabeledNumeric
+                label="From"
+                rules={{ min: 1, max: settings.pageRange?.to ?? doc.recipe.pageCount, integer: true }}
+                step={1}
+                value={settings.pageRange?.from ?? 1}
+                onCommit={(from) => from !== null && onSettings({ ...settings, pageRange: { from, to: settings.pageRange?.to ?? doc.recipe.pageCount } })}
+              />
+            <LabeledNumeric
+                label="To"
+                rules={{ min: settings.pageRange?.from ?? 1, max: doc.recipe.pageCount, integer: true }}
+                step={1}
+                value={settings.pageRange?.to ?? doc.recipe.pageCount}
+                onCommit={(to) => to !== null && onSettings({ ...settings, pageRange: { from: settings.pageRange?.from ?? 1, to } })}
+              />
           </div>
         )}
         {isPad && (

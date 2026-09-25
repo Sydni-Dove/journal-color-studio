@@ -1,3 +1,4 @@
+import type { ElementPosition, SemanticTextKey } from "./layout";
 import type { BindingType } from "./binding";
 import type { CalendarSettings } from "./calendar";
 import type { Edge, LogicalEdge, Orientation } from "./geometry";
@@ -58,6 +59,8 @@ export type LayoutOptions = {
   dailySections: WordingKey[];
   /** Journal prompt text (guided pages). */
   promptText: string;
+  /** User placement of semantic text (Week of, month title, Notes…). Absent = layout default. */
+  textPositions?: Partial<Record<SemanticTextKey, ElementPosition>>;
 };
 
 export type ExportSettings = {

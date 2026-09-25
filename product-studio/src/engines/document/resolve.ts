@@ -33,6 +33,8 @@ import { resolveTrim, type ResolvedTrim } from "../geometry/dimensions";
 import { computePageGeometry } from "../geometry/pageGeometry";
 import { expandRecipe, type ExpandedRecipe } from "../recipe/recipe";
 import { normalizeDecoration } from "../../themes/decorationPlan";
+import { resolveComposition } from "../composition/composition";
+import type { Composition } from "../../types/composition";
 import { DEFAULT_DECORATIVE } from "../../presets/products/projectFactory";
 
 // ─── Small keyed cache ─────────────────────────────────────────────────────
@@ -251,4 +253,9 @@ export function recipeLayouts(doc: ResolvedDocument): { layout: LayoutDefinition
     const layout = getLayout(id);
     return { layout, fit: layout.fit({ page, spacing: doc.spacing, typography: doc.typography, options: doc.project.layoutOptions }) };
   });
+}
+
+/** Composition (regions + protected content) of a page — what the renderer and validation both use. */
+export function compositionFor(doc: ResolvedDocument, index: number): Composition {
+  return resolveComposition(geometryFor(doc, doc.recipe.pages[index]), solvePage(doc, index), doc.typography, doc.spacing);
 }

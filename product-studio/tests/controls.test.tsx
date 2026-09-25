@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { geometryFor, layoutAvailability, resolveDocument, solvePage } from "../src/engines/document/resolve";
+import { compositionFor, geometryFor, layoutAvailability, resolveDocument, solvePage } from "../src/engines/document/resolve";
 import { computeUsage } from "../src/engines/document/usage";
 import { heuristicMeasurer, type TextStyle } from "../src/engines/typography/textMeasure";
 import { textCollisions, validateProject } from "../src/engines/validation/validate";
@@ -246,11 +246,16 @@ describe("Example C / Issue 2 — size-aware layouts on inserts", () => {
 
 describe("decoration, palette and font changes reach the renderer", () => {
   it("selecting Floral changes the decorative assets", () => {
-    const p = journal();
-    const geo = geometryFor(resolveDocument(p), { side: "recto" });
+    // Monthly: its corners have free space (a full-page lined journal has none — validation reports that).
+    const p = monthly();
     p.decorativeTheme = { ...p.decorativeTheme, style: "floral", assetId: "jcs-floral-corner", placement: "corners" };
-    const plan = planDecoration(geo, p.decorativeTheme, resolveDocument(p).colors)!;
-    expect(plan.pieces.map((x) => x.kind === "raster" && x.assetId)).toEqual(["jcs-floral-corner", "jcs-floral-corner"]);
+    const doc = resolveDocument(p);
+    const plan = planDecoration(geometryFor(doc, doc.recipe.pages[0]), p.decorativeTheme, doc.colors, compositionFor(doc, 0))!;
+    // Every placed piece is the corner art; a corner without room (here: top-left, in the coil punch zone
+    // beside the title) is reported with a reason instead of being sliced.
+    expect(plan.pieces.length).toBeGreaterThanOrEqual(1);
+    expect(plan.pieces.every((x) => x.kind === "raster" && x.assetId === "jcs-floral-corner")).toBe(true);
+    for (const r of plan.reports) expect(!!r.rect || !!r.reason).toBe(true);
     expect(render(p)).toContain('data-asset="jcs-floral-corner"');
   });
   it("marble recolors with the palette (raster key carries the role colors)", () => {
@@ -315,21 +320,20 @@ describe("validation catches visual failures the old validator missed", () => {
 });
 
 describe("decoration never covers functional content", () => {
-  it("header band is the top margin; every placement except explicit full-page-under-writing excludes the safe area", () => {
+  it("fields respect content: the header band ends above the content, frames keep a clearance, full page sits behind", () => {
     const p = monthly();
-    const g = geometryFor(resolveDocument(p), { side: "recto" });
-    for (const [style, assetId, placement] of [
-      ["marble", "jcs-marble-boldgold", "header-band"],
-      ["floral", "jcs-floral-corner", "corners"],
-      ["accent", "jcs-accent-stripes", "corners"],
-      ["watercolor", undefined, "border-frame"],
-      ["marble", "jcs-marble-veined", "full-page"],
-    ] as const) {
-      const plan = planDecoration(g, { ...p.decorativeTheme, style, assetId, placement, applyToInterior: false }, resolveDocument(p).colors)!;
-      expect(plan.excludeSafe).toBe(true);
-      if (placement === "header-band") expect(plan.clip.y + plan.clip.h).toBeCloseTo(g.trimOffset.y + g.safeRect.y, 10);
-    }
-    const under = planDecoration(g, { ...p.decorativeTheme, style: "marble", assetId: "jcs-marble-veined", placement: "full-page", applyToInterior: true }, resolveDocument(p).colors)!;
-    expect(under.excludeSafe).toBe(false);
+    const doc = resolveDocument(p);
+    const g = geometryFor(doc, doc.recipe.pages[0]);
+    const comp = compositionFor(doc, 0);
+    const clr = doc.spacing.decorationToContentClearance;
+    const band = planDecoration(g, { ...p.decorativeTheme, style: "marble", assetId: "jcs-marble-boldgold", placement: "header-band" }, doc.colors, comp)!;
+    const piece = band.pieces[0];
+    expect(piece.kind === "raster" && piece.rect.y + piece.rect.h).toBeCloseTo(g.trimOffset.y + comp.content!.y - clr, 9);
+    const frame = planDecoration(g, { ...p.decorativeTheme, style: "watercolor", placement: "border-frame" }, doc.colors, comp)!;
+    expect(frame.knockouts).toHaveLength(1);
+    expect(frame.knockouts[0].x).toBeCloseTo(g.trimOffset.x + comp.content!.x - clr, 9);
+    const behind = planDecoration(g, { ...p.decorativeTheme, style: "marble", assetId: "jcs-marble-veined", placement: "full-page" }, doc.colors, comp)!;
+    expect(behind.knockouts).toHaveLength(0);
+    expect(behind.reports[0].allowContentOverlap).toBe(true);
   });
 });

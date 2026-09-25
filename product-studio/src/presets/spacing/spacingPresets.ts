@@ -8,6 +8,14 @@ import type { SpacingDensity, SpacingTokens } from "../../types/tokens";
  *   checkbox         0.14–0.18" (research 3.2.3)
  *   checkbox gap     0.10–0.14" (research 3.2.3)
  * Balanced reproduces the blueprint values; compact/airy use the range ends.
+ *
+ * Semantic spacing (studio-recommended, applied by the shared components):
+ *   titleToRuleGap        title ink → rule under it
+ *   headingToContentGap   section heading → its content
+ *   labelToBorderInset    label → box / cell border        (≥ box padding)
+ *   dateToCellInset       calendar date → cell border      (= box padding range)
+ *   sectionHeadingInset   section heading → section edges
+ *   decorationToContentClearance  decoration → functional content (≈ 1/8")
  */
 export const SPACING_PRESETS: Record<SpacingDensity, SpacingTokens> = {
   compact: {
@@ -22,6 +30,12 @@ export const SPACING_PRESETS: Record<SpacingDensity, SpacingTokens> = {
     listRow: 0.32,
     checkbox: 0.14,
     checkboxGap: 0.1,
+    titleToRuleGap: 0.1,
+    headingToContentGap: 0.06,
+    labelToBorderInset: 0.07,
+    dateToCellInset: 0.06,
+    sectionHeadingInset: 0.07,
+    decorationToContentClearance: 0.1,
   },
   balanced: {
     page: 0,
@@ -35,6 +49,12 @@ export const SPACING_PRESETS: Record<SpacingDensity, SpacingTokens> = {
     listRow: 0.36,
     checkbox: 0.16,
     checkboxGap: 0.12,
+    titleToRuleGap: 0.14,
+    headingToContentGap: 0.08,
+    labelToBorderInset: 0.1,
+    dateToCellInset: 0.08,
+    sectionHeadingInset: 0.1,
+    decorationToContentClearance: 0.125,
   },
   airy: {
     page: 0,
@@ -48,6 +68,12 @@ export const SPACING_PRESETS: Record<SpacingDensity, SpacingTokens> = {
     listRow: 0.4,
     checkbox: 0.18,
     checkboxGap: 0.14,
+    titleToRuleGap: 0.18,
+    headingToContentGap: 0.12,
+    labelToBorderInset: 0.13,
+    dateToCellInset: 0.11,
+    sectionHeadingInset: 0.13,
+    decorationToContentClearance: 0.18,
   },
 };
 

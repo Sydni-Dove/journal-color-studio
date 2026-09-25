@@ -1,3 +1,4 @@
+import type { DecorativeTheme } from "../types/theme";
 /**
  * Project persistence — localStorage, one key per project plus an index.
  * Structured project JSON is the source of truth; generated HTML is never
@@ -49,7 +50,25 @@ export function migrate(raw: unknown): ProductProject | null {
     // than guessed at.
     return null;
   }
-  return p;
+  return migrateDecoration(p);
+}
+
+/**
+ * In-schema field migration: "full-page" without "extend under writing areas"
+ * always rendered as a margin frame; "full-page" now means behind content.
+ * Runs once on load (base design and every variant), never per render.
+ */
+export function migrateDecoration(p: ProductProject): ProductProject {
+  const fix = <T extends Partial<DecorativeTheme> | undefined>(t: T): T => {
+    if (!t || !("applyToInterior" in t)) return t;
+    const { applyToInterior, ...rest } = t;
+    return (rest.placement === "full-page" && applyToInterior === false ? { ...rest, placement: "border-frame" } : rest) as T;
+  };
+  return {
+    ...p,
+    decorativeTheme: fix(p.decorativeTheme),
+    variants: p.variants.map((v) => ({ ...v, overrides: { ...v.overrides, decorativeTheme: fix(v.overrides.decorativeTheme) } })),
+  };
 }
 
 export const localProjectStore: ProjectStore = {

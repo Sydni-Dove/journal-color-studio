@@ -21,10 +21,11 @@ import { formatWeekRange, formatWeekRangeShort, MONTH_NAMES, parseIso } from "..
 import { distributeEqual } from "../../engines/layout/math";
 import { STUDIO_PLANNER, STUDIO_STROKES, STUDIO_WEEKLY_VARIANTS } from "../../presets/studioDefaults";
 import type { CalendarDay } from "../../types/calendar";
+import type { LayoutRegions } from "../../types/composition";
 import type { Rect } from "../../types/geometry";
 import type { LayoutDiagnostic, LayoutMetric, LayoutNode, SolvedPage } from "../../types/layout";
 import type { WordingKey } from "../../types/tokens";
-import { connectedTracks, headerTitle, pageFrame, PLANNER_GRID_GAP_IN, runsOf, section, writingSurface } from "../shared/components";
+import { connectedTracks, headerTitle, pageFrame, PLANNER_GRID_GAP_IN, runsOf, SECTION_TEXT_ANCHORS, section, writingSurface } from "../shared/components";
 import { group, lineBoxIn, rule, text } from "../shared/nodes";
 import type { FitContext, FitResult, LayoutContext, LayoutDefinition } from "../shared/types";
 
@@ -63,21 +64,30 @@ export function fitWeekly(ctx: FitContext): FitResult {
   };
 }
 
-/** Day name (left) + date (right), bottom-aligned on the shared header rule. */
+/**
+ * Day name (left) + date (right) above the shared header rule, inset from the
+ * grid's rules by labelToBorderInset. A slot title (date = null: Notes /
+ * sidebar heading) is the positionable "sectionHeading": left / centre / right
+ * within its slot plus offsets kept inside the slot's header band.
+ */
 function headerLabels(id: string, head: Rect, label: string, date: string | null, ctx: LayoutContext): LayoutNode[] {
   const labelH = lineBoxIn(ctx.typography, "subheading");
   const dateH = lineBoxIn(ctx.typography, "date");
-  // Same inset as the sections below, so labels clear the shared rules.
-  const pad = ctx.spacing.boxPadding;
-  const bottom = head.y + head.h;
-  const nameW = date === null ? head.w - 2 * pad : head.w * 0.62 - pad;
-  const nodes: LayoutNode[] = [
-    text(`${id}-name`, { x: head.x + pad, y: bottom - labelH, w: nameW, h: labelH }, label, "subheading", { component: "SectionHeader", align: "left", vAlign: "bottom" }),
-  ];
-  if (date !== null) {
-    nodes.push(text(`${id}-date`, { x: head.x + head.w * 0.62, y: bottom - dateH, w: head.w * 0.38 - pad, h: dateH }, date, "date", { component: "SectionHeader", align: "right", vAlign: "bottom" }));
+  const pad = ctx.spacing.labelToBorderInset;
+  const bottom = head.y + head.h - pad;
+  if (date === null) {
+    const want = ctx.options.textPositions?.sectionHeading;
+    const anchor = want && SECTION_TEXT_ANCHORS.includes(want.anchor) ? want.anchor : "above-content-left";
+    const align = anchor.endsWith("left") ? "left" : anchor.endsWith("right") ? "right" : "center";
+    const inner: Rect = { x: head.x + pad, y: head.y + pad, w: head.w - 2 * pad, h: head.h - 2 * pad };
+    const dx = Math.max(-inner.w, Math.min(inner.w, want?.offsetXIn ?? 0));
+    const y = Math.min(Math.max(bottom - labelH + (want?.offsetYIn ?? 0), inner.y), bottom - labelH);
+    return [{ ...text(`${id}-name`, { x: inner.x + dx, y, w: inner.w, h: labelH }, label, "subheading", { component: "SectionHeader", align, vAlign: "bottom", semantic: "sectionHeading" }), placement: { anchor, defaultAnchor: "above-content-left" } }];
   }
-  return nodes;
+  return [
+    text(`${id}-name`, { x: head.x + pad, y: bottom - labelH, w: head.w * 0.62 - pad, h: labelH }, label, "subheading", { component: "SectionHeader", align: "left", vAlign: "bottom" }),
+    text(`${id}-date`, { x: head.x + head.w * 0.62, y: bottom - dateH, w: head.w * 0.38 - pad, h: dateH }, date, "date", { component: "SectionHeader", align: "right", vAlign: "bottom" }),
+  ];
 }
 
 /**
@@ -111,8 +121,8 @@ function dayRow(id: string, rect: Rect, day: CalendarDay, weekdayName: string, c
   const dateH = lineBoxIn(ctx.typography, "date");
   return [
     group(id, "Section", rect),
-    text(`${id}-name`, { x: labelRect.x + s.boxPadding, y: labelRect.y + s.boxPadding, w: labelW - 2 * s.boxPadding, h: nameH }, weekdayName, "subheading", { component: "SectionHeader", vAlign: "top" }),
-    text(`${id}-date`, { x: labelRect.x + s.boxPadding, y: labelRect.y + s.boxPadding + nameH, w: labelW - 2 * s.boxPadding, h: dateH }, String(day.day), "date", { component: "SectionHeader", vAlign: "top" }),
+    text(`${id}-name`, { x: labelRect.x + s.labelToBorderInset, y: labelRect.y + s.labelToBorderInset, w: labelW - 2 * s.labelToBorderInset, h: nameH }, weekdayName, "subheading", { component: "SectionHeader", vAlign: "top" }),
+    text(`${id}-date`, { x: labelRect.x + s.labelToBorderInset, y: labelRect.y + s.labelToBorderInset + nameH, w: labelW - 2 * s.labelToBorderInset, h: dateH }, String(day.day), "date", { component: "SectionHeader", vAlign: "top" }),
     ...writingSurface(`${id}-surface`, writing, ctx),
   ];
 }
@@ -171,9 +181,11 @@ export const weeklySpread: LayoutDefinition = {
     const sizes: number[] = [];
     const pages = [0, 1].map((p): SolvedPage => {
       const frame = pageFrame(ctx, p, { headerH: STUDIO_PLANNER.weeklyTitle.valueIn });
-      const title = p === 0 ? weekLabel : monthLabel;
-      const nodes: LayoutNode[] = [...frame.nodes, ...headerTitle(`wk${p}-header`, frame.header, title, "weekTitle", p === 0 ? "left" : "right")];
-      const diagnostics = [...frame.diagnostics];
+      const title = p === 0
+        ? headerTitle(`wk${p}-header`, ctx, frame.zones, "weekOf", weekLabel, "weekTitle", "header-left")
+        : headerTitle(`wk${p}-header`, ctx, frame.zones, "monthYear", monthLabel, "weekTitle", "header-right");
+      const nodes: LayoutNode[] = [...frame.nodes, ...title.nodes];
+      const diagnostics = [...frame.diagnostics, ...title.diagnostics];
       const grid = connectedTracks(`wk${p}-grid`, frame.body, SLOTS_PER_PAGE, horizontal ? "rows" : "columns");
       const tracks = grid.tracks;
       sizes.push(tracks.size);
@@ -200,7 +212,7 @@ export const weeklySpread: LayoutDefinition = {
         const content = sidebar ? "checklist" : "surface";
         if (sidebar) nodes.push(group(`wk${p}-sidebar-bounds`, "Sidebar", r));
         if (horizontal) {
-          const sec = section(sid, r, title, ctx, content, { padded: true, titleRole: "subheading" });
+          const sec = section(sid, r, title, ctx, content, { padded: true, titleRole: "subheading", semantic: "sectionHeading" });
           nodes.push(...sec.nodes);
           diagnostics.push(...sec.diagnostics);
         } else {
@@ -239,7 +251,14 @@ export const weeklySpread: LayoutDefinition = {
           : { label: "Slot width = W / 4 (connected grid)", value: tracks.size, unit: "in", provenance: { geometryClass: "user-design", basis: `${frame.body.w.toFixed(3)} / 4, zero internal gap` } },
       ];
       if (!horizontal) metrics.push({ label: "Sections per day", value: ctx.options.sectionsPerDay, unit: "count", provenance: { geometryClass: "user-design", basis: "blueprint B2 default 3" } });
-      return { nodes, diagnostics, metrics };
+      const regions: LayoutRegions = { mainContent: frame.body, calendar: frame.body };
+      const extra = slots[p].findIndex((x) => x.kind === "extra");
+      if (extra >= 0) {
+        const r = grid.trackRects[extra];
+        if (ctx.options.showSidebar) regions.sidebar = r;
+        if (!ctx.options.showSidebar || ctx.options.sidebarContent === "notes") regions.notes = r;
+      }
+      return { nodes, diagnostics, metrics, regions };
     });
 
     if (Math.abs(sizes[0] - sizes[1]) > 1e-4) {

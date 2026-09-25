@@ -37,10 +37,12 @@ export const todoNotepad: LayoutDefinition = {
   solve(ctx): SolvedPage[] {
     const frame = pageFrame(ctx, 0, { headerH: STUDIO_NOTEPAD.header.valueIn });
     const list = checklistRows("todo", frame.body, ctx);
+    const title = headerTitle("todo-header", ctx, frame.zones, "pageTitle", ctx.wording.toDo, "pageTitle", "header-center");
     return [
       {
-        nodes: [...frame.nodes, ...headerTitle("todo-header", frame.header, ctx.wording.toDo, "pageTitle", "center"), ...list.nodes],
-        diagnostics: frame.diagnostics,
+        nodes: [...frame.nodes, ...title.nodes, ...list.nodes],
+        diagnostics: [...frame.diagnostics, ...title.diagnostics],
+        regions: { mainContent: frame.body, writingArea: frame.body },
         metrics: [
           { label: "Header height", value: STUDIO_NOTEPAD.header.valueIn, unit: "in", provenance: STUDIO_NOTEPAD.header.provenance },
           { label: "Writing region height", value: frame.body.h, unit: "in", provenance: { geometryClass: "user-design", basis: "safe height − header − gaps − footer" } },

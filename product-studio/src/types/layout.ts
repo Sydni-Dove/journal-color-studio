@@ -1,3 +1,4 @@
+import type { LayoutRegions } from "./composition";
 import type { Rect } from "./geometry";
 import type { Provenance } from "./measurement";
 import type { ColorToken, TextAlign, TypographyRole } from "./tokens";
@@ -62,7 +63,30 @@ export type TextNode = NodeBase & {
   /** Single-line labels must not wrap; prompts may. */
   wrap: boolean;
   color?: ColorToken;
+  /** Semantic element this text is (user-positionable page titles, headings, footer). */
+  semantic?: SemanticTextKey;
+  /** Where a semantic element was placed, and the layout's default for it. */
+  placement?: { anchor: TextAnchor; defaultAnchor: TextAnchor };
 };
+
+/**
+ * Semantic text elements the user can reposition (controlled anchors plus
+ * print-safe fine offsets — not free drag-and-drop).
+ */
+export type SemanticTextKey = "pageTitle" | "monthYear" | "weekOf" | "productTitle" | "dateLabel" | "footer" | "sectionHeading";
+
+export type TextAnchor =
+  | "header-left"
+  | "header-center"
+  | "header-right"
+  | "above-content-left"
+  | "above-content-center"
+  | "above-content-right"
+  | "footer-left"
+  | "footer-center"
+  | "footer-right";
+
+export type ElementPosition = { anchor: TextAnchor; offsetXIn: number; offsetYIn: number };
 
 export type LinesNode = NodeBase & {
   type: "lines";
@@ -136,4 +160,8 @@ export type SolvedPage = {
   nodes: LayoutNode[];
   diagnostics: LayoutDiagnostic[];
   metrics: LayoutMetric[];
+  /** Physical regions the layout declares for composition (calendar, notes, writing area…). */
+  regions?: LayoutRegions;
+  /** Node id of the page's title (composition anchor "title"); defaults to the first page-title semantic. */
+  titleId?: string;
 };

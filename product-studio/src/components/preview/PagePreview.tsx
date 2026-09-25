@@ -8,6 +8,7 @@ import { geometryFor, solvePage, type ResolvedDocument } from "../../engines/doc
 import { CSS_PX_PER_IN } from "../../engines/units/units";
 import { PrintablePage } from "../../primitives/PrintablePage";
 import { DebugOverlay, type DebugFlags } from "../debug/DebugOverlay";
+import { NumericInput } from "../editor/ui";
 
 export type FitMode = "page" | "width" | "zoom";
 
@@ -94,17 +95,12 @@ export function PagePreview({ doc, index, onIndex, debug, issueIds }: Props) {
         <button className="btn btn--icon" onClick={() => step(-1)} disabled={index === 0} aria-label="Previous page">‹</button>
         <div className="page-counter">
           <span>Page</span>
-          <input
-            type="number"
-            inputMode="numeric"
-            min={1}
-            max={pages.length}
+          <NumericInput
+            ariaLabel="Page number"
+            step={1}
+            rules={{ min: 1, max: pages.length, integer: true }}
             value={current.pageNumber}
-            onChange={(e) => {
-              const n = parseInt(e.target.value, 10);
-              if (n >= 1 && n <= pages.length) onIndex(n - 1);
-            }}
-            aria-label="Page number"
+            onCommit={(n) => n !== null && onIndex(n - 1)}
           />
           <span>of {pages.length}</span>
         </div>
@@ -148,6 +144,7 @@ export function PagePreview({ doc, index, onIndex, debug, issueIds }: Props) {
                   colors={doc.colors}
                   typography={doc.typography}
                   decorative={doc.decorative}
+                  spacing={doc.spacing}
                   mode="editor"
                   overlay={<DebugOverlay geometry={geos[k]} nodes={solved.nodes} flags={debug} issueIds={issueIds} />}
                 />

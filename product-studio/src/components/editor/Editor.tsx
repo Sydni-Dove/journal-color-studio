@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
-import { geometryFor, resolveDocument, solvePage, type ResolvedDocument } from "../../engines/document/resolve";
+import { compositionFor, geometryFor, resolveDocument, solvePage, type ResolvedDocument } from "../../engines/document/resolve";
+import { planDecoration } from "../../themes/decorationPlan";
 import { computeUsage } from "../../engines/document/usage";
 import { createCanvasMeasurer, heuristicMeasurer } from "../../engines/typography/textMeasure";
 import { finalizeReport, validatePage, validateProductLevel } from "../../engines/validation/validate";
@@ -9,7 +10,7 @@ import { DEBUG_ALL, DEBUG_LABELS, DEBUG_OFF, type DebugFlags } from "../debug/De
 import { GeometryInfo } from "../debug/GeometryInfo";
 import { ExportDialog, IssueList } from "../export/ExportDialog";
 import { PagePreview, visibleIndices } from "../preview/PagePreview";
-import { ColorPanel, DecorationPanel, LayoutPanel, PatternPanel, SpacingPanel, TypographyPanel, VariantsPanel, WordingPanel } from "./DesignPanels";
+import { ColorPanel, DecorationPanel, LayoutPanel, PatternPanel, SpacingPanel, TextPlacementPanel, TypographyPanel, VariantsPanel, WordingPanel } from "./DesignPanels";
 import { PagesPanel, ProductPanel, ProductionPanel } from "./ProductionPanels";
 import { Section, type EditorNav } from "./ui";
 import { getLayout } from "../../layouts/registry";
@@ -63,6 +64,12 @@ export function Editor({ project, onChange, onBack, saveStatus }: Props) {
   const issueIds = useMemo(() => new Set((check?.issues ?? []).map((i) => i.componentId ?? "").filter(Boolean)), [check]);
 
   const current = doc && doc.recipe.pages.length ? Math.min(index, doc.recipe.pages.length - 1) : 0;
+  // How the decoration was composed on the page being viewed (shown in the Decoration panel).
+  const decor = useMemo(() => {
+    if (!doc || !doc.recipe.pages.length) return null;
+    const plan = planDecoration(geometryFor(doc, doc.recipe.pages[current]), doc.decorative, doc.colors, compositionFor(doc, current));
+    return { reports: plan?.reports ?? [], colors: doc.colors, pageNumber: doc.recipe.pages[current].pageNumber };
+  }, [doc, current]);
   const nav: EditorNav = {
     currentLayoutId: doc?.recipe.pages[current]?.layoutId ?? "",
     goToLayout: (id) => doc && setIndex(Math.max(0, doc.recipe.pages.findIndex((p) => p.layoutId === id && !p.filler))),
@@ -105,7 +112,8 @@ export function Editor({ project, onChange, onBack, saveStatus }: Props) {
               <TypographyPanel nav={nav} project={project} update={update} usage={usage} />
               <ColorPanel nav={nav} project={project} update={update} usage={usage} />
               <WordingPanel nav={nav} project={project} update={update} usage={usage} />
-              <DecorationPanel nav={nav} project={project} update={update} usage={usage} />
+              <TextPlacementPanel nav={nav} project={project} update={update} usage={usage} />
+              <DecorationPanel nav={nav} project={project} update={update} usage={usage} decor={decor} />
               <VariantsPanel nav={nav} project={project} update={update} usage={usage} />
             </>
           )}

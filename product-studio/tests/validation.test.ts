@@ -91,7 +91,7 @@ describe("validation engine", () => {
 
   it("warns about full-bleed backgrounds on writable pads", () => {
     const p = notepad();
-    p.decorativeTheme = { ...p.decorativeTheme, style: "marble", placement: "full-page", applyToInterior: true };
+    p.decorativeTheme = { ...p.decorativeTheme, style: "marble", placement: "full-page" };
     expect(validateProject(p, heuristicMeasurer).issues.some((i) => i.rule === "decoration")).toBe(true);
   });
 

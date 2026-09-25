@@ -1,3 +1,4 @@
+import type { DecorationPlacementOverrides } from "./composition";
 import type { ColorToken, ColorTokens, FontSelection, TypographyRole, TypographyRoleStyle } from "./tokens";
 
 // ─── Functional patterns (writing surfaces) ────────────────────────────────
@@ -41,22 +42,40 @@ export type FunctionalPattern = {
  */
 export type DecorativeStyle = "none" | "solid" | "marble" | "watercolor" | "floral" | "accent";
 
-export type DecorativePlacement = "full-page" | "header-band" | "border-frame" | "corners";
+/**
+ * Placement = WHAT kind of composition. Fields (solid / marble / watercolor)
+ * cover an area; objects (florals, line art) are anchored to page regions.
+ *   full-page     field behind everything, soft strength (overlap by definition)
+ *   header-band   field / band from the top edge down to just above the content
+ *   border-frame  field / tiled texture around the content with a clearance
+ *   corners       objects at page corners (pair or single, see `corners`)
+ *   title-flank   objects flanking the title, sitting on its header rule
+ *   top-bottom    objects centred on the top and bottom edges
+ *   behind-title  object behind the title at subtle strength (intentional overlap)
+ */
+export type DecorativePlacement = "full-page" | "header-band" | "border-frame" | "corners" | "title-flank" | "top-bottom" | "behind-title";
+
+/** Which corners a "corners" placement uses. */
+export type CornerSet = "opposite-tl-br" | "opposite-tr-bl" | "tl" | "tr" | "bl" | "br";
 
 export type DecorativeTheme = {
   style: DecorativeStyle;
   /** design-library asset id (marble / floral / accent styles). */
   assetId?: string;
   placement: DecorativePlacement;
-  /** Size of accent / floral corner art relative to the default, or marble zoom. */
+  /** Size of accent / floral art relative to the default, or marble zoom. */
   scale: number;
   opacity: number;
   /** Role colors: base (stone / leaves / accent ink), veins, highlights. */
   colorA: ColorToken;
   colorB: ColorToken;
   colorC: ColorToken;
-  /** Full-page decoration may extend under writing areas (off keeps them clean). */
-  applyToInterior: boolean;
+  /** @deprecated Superseded by placement "full-page" (behind content) vs "border-frame"; migrated on load. */
+  applyToInterior?: boolean;
+  /** Corners used by the "corners" placement (default depends on the artwork). */
+  corners?: CornerSet;
+  /** Advanced placement overrides for object decorations (anchor, alignment, size limits, offsets, rules). */
+  layout?: DecorationPlacementOverrides;
 };
 
 // ─── Generic theme interface (future Journal Color Studio integration) ─────

@@ -1,35 +1,68 @@
 # Design library — Journal Color Studio snapshot
 
-A one-way copy of approved visual assets from Journal Color Studio
-(`Sydni-Dove/journal-color-studio`, commit `8282a74`, taken 2026-09-25).
-Product Studio does not import any Journal Color Studio code and keeps
-working if that app changes. To refresh an asset, copy the new file over,
-bump `version` in `library.ts`, and update its `sha1`.
+A **one-way copy** of approved visual assets and design data from Journal Color
+Studio. Product Studio never imports Journal Color Studio code, has no runtime
+dependency on it, and keeps working if that app changes or disappears. The
+recolor rendering (`themes/recolorMath.ts`, `themes/recolor.ts`) and the
+composition engine are Product Studio's own implementations of the snapshotted
+formats and data.
 
-| Asset id | Source file | Type | Recolor roles (Product Studio) |
-| -------- | ----------- | ---- | ------------------------------ |
-| jcs-marble-veined | marble-layers.png | marble layer map (R stone detail, G veins, B highlights) | base / veins / highlights |
-| jcs-marble-boldgold | marble-layers-canva.png | marble layer map | base / veins / highlights |
-| jcs-marble-goldleaf | marble-layers-goldleaf.png | marble layer map | base / veins / highlights |
-| jcs-marble-white | marble-layers-white.png | marble layer map | base / veins / highlights |
-| jcs-floral-bouquet | floral-cover.jpg | full-color floral art (hue-family recolor) | leaves / gold / deep flowers / soft flowers / paper |
-| jcs-floral-corner | floral-corner.png | full-color floral art with alpha | same |
-| jcs-floral-sprig | floral-header.png | full-color floral art with alpha | same |
-| jcs-accent-topo / -waves / -arcs / -ribbon / -dots / -stripes | accent-*.png | single-color line art (white alpha mask) | line color |
+| | |
+|---|---|
+| Source repository | `Sydni-Dove/journal-color-studio` |
+| Source branch | `integration/multi-journal-plus-patterns` (the current app: pattern branch `claude/journal-color-studio-patterns-18bg62` merged onto the Sept 24 four-journal baseline `integration/multi-journal-baseline`; `main` is an ancestor) |
+| Source commit | `14e4e75` (verified 2026-09-25) |
+| Previous snapshot | `8282a74` (`main`, 2026-09-25) |
 
-Also snapshotted as neutral data:
-- **Marble shading constants.** `shadeBase` / `shadeAmt` for each texture.
-- **Watercolor bloom layout.** Positions, radii, roles and alpha values
-  (`WATERCOLOR_BLOOMS`).
-- **The 13 approved Journal Color Studio palettes.** Adapted to Product
-  Studio tokens in `palettes.ts`.
+To refresh: fetch every branch, identify the branch carrying the current
+designs, compare each file's SHA-1 below against that commit
+(`git show <commit>:<file> | sha1sum`), copy only changed or newly approved
+files, record them here and in `library.ts`, and re-run
+`python3 tools/build_occupancy.py` if artwork changed.
 
-**Not imported, because nothing in Product Studio uses them yet:**
-- cover lettering
-- bevel frame
-- ornament divider
-- hand-drawn line strip
-- the blush watercolor layer map (Journal Color Studio renders watercolor
-  procedurally)
+## Files
 
-They will be snapshotted once a layout uses them.
+| Asset id | File (in `assets/`) | Source commit | SHA-1 | Status at 14e4e75 |
+|---|---|---|---|---|
+| jcs-marble-veined | marble-layers.png | 8282a74 | 00c64f3d5b184494bf20d97b242670ac94fa65eb | identical — untouched |
+| jcs-marble-boldgold | marble-layers-canva.png | 8282a74 | 3a927ad8c4c8beae5e5310c9d5b9e517677b2228 | identical — untouched |
+| jcs-marble-boldgold (veins) | marble-canva-source.png | 14e4e75 | 6d1340bf5fe4f9d2da4624612346128354dbbff5 | **new** — real vein artwork overlay |
+| jcs-marble-goldleaf | marble-layers-goldleaf.png | 8282a74 | 497da5d008f29be0e0e6095c6f947a27df5b2cd5 | identical — untouched |
+| jcs-marble-goldleaf (veins) | marble-goldleaf-gold.png | 14e4e75 | 768a91750cfe97935ce9b381543f2cd4434432d5 | **new** — transparent gold-leaf overlay |
+| jcs-marble-white | marble-layers-white.png | 8282a74 | bd7ce03f23dbc3af604fdc1e9e82e003093a6b92 | identical — untouched |
+| jcs-floral-bouquet | floral-bouquet.png | 14e4e75 | 57b03db65e1c35cd0687beb308995cc10211e9ba | **replaced** — `floral-cover.jpg` (lettering baked in) is retired upstream and removed here |
+| jcs-floral-corner | floral-corner.png | 8282a74 | 26c5d487e764d0a7b68166e2942eb6490f8c7395 | identical — untouched |
+| jcs-floral-sprig | floral-header.png | 8282a74 | 368b2f4921410c7bcecd7d313d5450e406c9a095 | identical — untouched |
+| jcs-accent-topo | accent-topo.png | 8282a74 | 3d615764f1a005f719f0fd4edffc05edcaa1db9b | identical — untouched |
+| jcs-accent-waves | accent-waves.png | 8282a74 | 5d368bc089bbc8bdd696eafa4586099edf53cdb8 | identical — untouched |
+| jcs-accent-arcs | accent-arcs.png | 8282a74 | 5ec31ff823f5ceb11350ceb4903f3aa00d2f9145 | identical — untouched |
+| jcs-accent-ribbon | accent-ribbon.png | 8282a74 | fd31dee797dd7da16bc6ad13158255a0db259457 | identical — untouched |
+| jcs-accent-dots | accent-dots.png | 8282a74 | d11bd55dbb84963ebfc95e0505fa7681a05c9247 | identical — untouched |
+| jcs-accent-stripes | accent-stripes.png | 8282a74 | bed6f555cdeb7b89a8b87abbe656d5649ccf2c8c | identical — untouched |
+| font "Against" | fonts/against.otf (JCS `brand/against.otf`) | 14e4e75 | f033e74f39effdab4662789625e923475a8bd95f | **new** — Dove Expressions brand display face |
+
+## Design data (re-implemented, not imported)
+
+| Data | Where | Status at 14e4e75 |
+|---|---|---|
+| Palettes (JCS `PALETTES`) | `palettes.ts` | **refreshed** — Floral Garden roles changed; *Abstract Watercolor* and the 9-palette orange pack added |
+| Marble recolor | `themes/recolorMath.ts` (`marbleStats`, `marbleLUTs`, `paintMarblePixels`, `veinCoverage`) | **refreshed** — Lab lookup-table stone + real vein overlays tone-transferred with the `veins` preset (the artwork's own colourway draws the overlay untouched) |
+| Floral recolor | `themes/recolorMath.ts` (`toneTransferPixels` `floral` preset, `floralSoftFill`) | **refreshed** — Lab tone transfer per colour family (was an HSL hue-bucket blend) |
+| Accent placement metadata (`ACCENT_CAPS`, `ACCENT_SUPPORT`, `drawAccent` constants) | `placement.ts` | **new** |
+| Floral header flank (`floralFlank`), soft interior backgrounds | `placement.ts` | **new** |
+| Marble shading constants (`shadeBase` / `shadeAmt`) | `library.ts` | identical (kept for reference; the LUT recolor supersedes them) |
+| Watercolor bloom layout (`paintWatercolor`) | `library.ts` `WATERCOLOR_BLOOMS` | identical — untouched |
+| Occupancy grids | `occupancy.ts` (generated by `tools/build_occupancy.py`) | derived from the files above |
+
+## Present upstream but not snapshotted
+
+Nothing in Product Studio renders these yet (or they are cover-only or marked
+temporary upstream). They will be snapshotted when a layout uses them:
+`floral-peony.png` (declared upstream but not rendered by the current app),
+`floral-ring.png` (title plate), `floral-bar.png` / `floral-line.png` (header
+bar / gold line), `pattern-*.png` stripe/pattern maps (new background family;
+candy/scribble/abstract marked "rebuild when full-size exports are
+available"), `canva/*` leathers, washes, marbles, lettering and abstract layers
+(cover backgrounds), `brand/*` logos, `bevel-frame.png`, `ornament-divider.png`,
+`lines-hand.png`, `marble-layers-blush.png` (watercolor is procedural),
+`title-*.png` cover lettering.

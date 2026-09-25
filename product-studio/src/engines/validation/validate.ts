@@ -6,6 +6,8 @@ import { validateDimensions } from "../geometry/dimensions";
 import { validateCalendarSettings } from "../calendar/calendar";
 import { rectContains, rectsIntersect } from "../layout/math";
 import { geometryFor, resolveDocument, solvePage, type ResolvedDocument } from "../document/resolve";
+import { inkBoxFor } from "../typography/ink";
+import { compositionChecks } from "./composition";
 import { styleForRole, type TextMeasurer } from "../typography/textMeasure";
 import { GEOMETRY_EPSILON_IN, ptToIn } from "../units/units";
 import { MIN_PRINT_FONT_PT } from "../../presets/typography/typography";
@@ -75,7 +77,7 @@ export function validateProductLevel(doc: ResolvedDocument): ValidationIssue[] {
   }
 
   const deco = doc.decorative;
-  if (binding.id === "glued-pad" && deco.style !== "none" && deco.placement === "full-page" && deco.applyToInterior) {
+  if (binding.id === "glued-pad" && deco.style !== "none" && deco.placement === "full-page") {
     add("warning", "decoration", "Full-page backgrounds are discouraged on writable pads (UPrinting artwork guidance). Consider a header band.");
   }
   if (deco.style !== "none" && deco.placement === "full-page" && !project.production.includeBleed) {
@@ -149,9 +151,12 @@ export function validatePage(doc: ResolvedDocument, index: number, measure: Text
   const s = solved ?? solvePage(doc, index);
   const issues: ValidationIssue[] = [];
   const counts = new Map<string, number>();
+  const worst = new Map<string, ValidationIssue["severity"]>();
+  const RANK = { info: 0, warning: 1, error: 2 } as const;
   const push = (rule: ValidationRule, id: string, message: string, measurement?: ValidationIssue["measurement"], severity: ValidationIssue["severity"] = "error") => {
     const n = (counts.get(rule) ?? 0) + 1;
     counts.set(rule, n);
+    if (RANK[severity] > RANK[worst.get(rule) ?? "info"]) worst.set(rule, severity);
     if (n <= MAX_ISSUES_PER_RULE_PER_PAGE) issues.push({ severity, rule, page: page.pageNumber, componentId: id, message, measurement });
   };
 
@@ -164,11 +169,16 @@ export function validatePage(doc: ResolvedDocument, index: number, measure: Text
     "min-cell": "min-cell",
     "min-writing-area": "min-writing-area",
     "sidebar-balance": "sidebar-balance",
+    "text-position": "text-region",
+    "text-overflow": "text-overflow",
   };
   for (const d of s.diagnostics) {
     const rule: ValidationRule = DIAGNOSTIC_RULES[d.rule] ?? "layout-solver";
     push(rule, d.componentId, d.message, d.measurement ? { actual: d.measurement.actualIn, limit: d.measurement.limitIn, unit: "in" } : undefined, d.severity);
   }
+
+  // Visual composition: decoration placement, title / label spacing, positioned text.
+  compositionChecks(doc, g, s, measure, push);
 
   // Visual usability, not just containment: rendered text must not collide.
   for (const c of textCollisions(s, doc, measure)) push("text-collision", c.a, c.message, c.measurement);
@@ -193,7 +203,8 @@ export function validatePage(doc: ResolvedDocument, index: number, measure: Text
   }
   for (const [rule, n] of counts) {
     if (n > MAX_ISSUES_PER_RULE_PER_PAGE) {
-      issues.push({ severity: "error", rule: rule as ValidationRule, page: page.pageNumber, componentId: null, message: `…and ${n - MAX_ISSUES_PER_RULE_PER_PAGE} more "${rule}" issues on this page.` });
+      // The summary carries the rule's worst severity (warnings never become export-blocking errors).
+      issues.push({ severity: worst.get(rule) ?? "error", rule: rule as ValidationRule, page: page.pageNumber, componentId: null, message: `…and ${n - MAX_ISSUES_PER_RULE_PER_PAGE} more "${rule}" issues on this page.` });
     }
   }
   return issues;
@@ -201,15 +212,7 @@ export function validatePage(doc: ResolvedDocument, index: number, measure: Text
 
 /** Where a text node's ink actually sits: measured width, aligned inside its box. */
 export function inkBox(node: Extract<LayoutNode, { type: "text" }>, doc: ResolvedDocument, measure: TextMeasurer) {
-  const role = doc.typography.roles[node.role];
-  const lineH = ptToIn(role.sizePt * role.lineHeight);
-  const width = Math.min(measure(node.text, styleForRole(doc.typography, node.role)), node.wrap ? node.rect.w : Infinity);
-  const align = node.align ?? role.align;
-  const x = align === "left" ? node.rect.x : align === "right" ? node.rect.x + node.rect.w - width : node.rect.x + (node.rect.w - width) / 2;
-  const lines = node.wrap ? Math.max(1, Math.ceil(measure(node.text, styleForRole(doc.typography, node.role)) / Math.max(node.rect.w, EPS))) : 1;
-  const h = lineH * lines;
-  const y = node.vAlign === "top" ? node.rect.y : node.vAlign === "bottom" ? node.rect.y + node.rect.h - h : node.rect.y + (node.rect.h - h) / 2;
-  return { x, y, w: width, h };
+  return inkBoxFor(node, doc.typography, measure);
 }
 
 /** Collision tolerance: glyph boxes include line-height padding, so allow a hairline of overlap. */

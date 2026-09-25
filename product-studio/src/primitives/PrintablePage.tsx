@@ -7,11 +7,13 @@
  *   4 Layout structure  5 Text / labels  6 User content (reserved)
  *   + debug overlay (editor only; never printed)
  */
-import { memo, type CSSProperties, type ReactNode } from "react";
+import { memo, useMemo, type CSSProperties, type ReactNode } from "react";
+import { resolveComposition } from "../engines/composition/composition";
+import { resolveSpacing } from "../presets/spacing/spacingPresets";
 import type { PageGeometry } from "../types/geometry";
 import type { SolvedPage } from "../types/layout";
 import type { DecorativeTheme } from "../types/theme";
-import type { ColorTokens, TypographySettings } from "../types/tokens";
+import type { ColorTokens, SpacingTokens, TypographySettings } from "../types/tokens";
 import { fontStack } from "../presets/typography/typography";
 import { DecorativeLayer } from "../themes/DecorativeLayer";
 import { PatternLayer, StructureLayer, TextLayer } from "./nodes";
@@ -32,6 +34,8 @@ type Props = {
   colors: ColorTokens;
   typography: TypographySettings;
   decorative: DecorativeTheme;
+  /** Spacing tokens (decoration clearance). Defaults to the balanced preset. */
+  spacing?: SpacingTokens;
   mode: "editor" | "print";
   overlay?: ReactNode;
 };
@@ -47,7 +51,11 @@ export const SafeArea = ({ geometry: g, children }: { geometry: PageGeometry; ch
   </svg>
 );
 
-export const PrintablePage = memo(function PrintablePage({ geometry: g, solved, colors, typography, decorative, mode, overlay }: Props) {
+const DEFAULT_SPACING = resolveSpacing("balanced");
+
+export const PrintablePage = memo(function PrintablePage({ geometry: g, solved, colors, typography, decorative, spacing = DEFAULT_SPACING, mode, overlay }: Props) {
+  // Composition regions + protected content come from the SAME solved nodes drawn below.
+  const composition = useMemo(() => resolveComposition(g, solved, typography, spacing), [g, solved, typography, spacing]);
   const style: CSSProperties = {
     ...themeVars(colors, typography),
     width: `${g.mediaWidthIn}in`,
@@ -58,7 +66,7 @@ export const PrintablePage = memo(function PrintablePage({ geometry: g, solved, 
       {/* 1 background */}
       <div className="ps-layer ps-bg" />
       {/* 2 decorative */}
-      <DecorativeLayer geometry={g} theme={decorative} colors={colors} />
+      <DecorativeLayer geometry={g} theme={decorative} colors={colors} composition={composition} />
       {/* 3 functional pattern */}
       <SafeArea geometry={g}>
         <PatternLayer nodes={solved.nodes} />

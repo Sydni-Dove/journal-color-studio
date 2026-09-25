@@ -30,6 +30,19 @@ export type SpacingTokens = {
   checkbox: number;
   /** Checkbox → text/line gap. */
   checkboxGap: number;
+  // ── Semantic spacing (shared components read these; never local nudges) ──
+  /** Title ink bottom → the rule (or content) under it. */
+  titleToRuleGap: number;
+  /** Section heading → the content it labels. */
+  headingToContentGap: number;
+  /** Label text → the border of the box / cell it sits in. */
+  labelToBorderInset: number;
+  /** Calendar date → its cell's borders. */
+  dateToCellInset: number;
+  /** Section heading → its section's edges. */
+  sectionHeadingInset: number;
+  /** Decoration → any protected functional content. */
+  decorationToContentClearance: number;
 };
 
 // ─── Typography ────────────────────────────────────────────────────────────

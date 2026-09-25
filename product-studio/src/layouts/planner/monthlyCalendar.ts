@@ -16,6 +16,7 @@
 import { distributeEqual, solveStack } from "../../engines/layout/math";
 import { STUDIO_MONTHLY_VARIANTS } from "../../presets/studioDefaults";
 import type { Rect } from "../../types/geometry";
+import type { LayoutRegions } from "../../types/composition";
 import type { LayoutMetric, LayoutNode, SolvedPage } from "../../types/layout";
 import { CALENDAR_GRID_GAP_IN, calendarGrid, headerTitle, pageFrame, section, weekdayHeader } from "../shared/components";
 import { lineBoxIn, stackDiagnostic } from "../shared/nodes";
@@ -135,8 +136,9 @@ export const monthlyCalendar: LayoutDefinition = {
     const showSidebar = ctx.options.showSidebar && fit.sidebarAvailable;
 
     const frame = pageFrame(ctx, 0, { headerH: v.zones.titleH.valueIn });
-    const nodes: LayoutNode[] = [...frame.nodes, ...headerTitle("month-header", frame.header, `${month.name} ${month.year}`, "monthTitle")];
-    const diagnostics = [...frame.diagnostics];
+    const title = headerTitle("month-header", ctx, frame.zones, "monthYear", `${month.name} ${month.year}`, "monthTitle", "header-left");
+    const nodes: LayoutNode[] = [...frame.nodes, ...title.nodes];
+    const diagnostics = [...frame.diagnostics, ...title.diagnostics];
     if (ctx.options.showSidebar && !showSidebar) {
       diagnostics.push({ severity: "info", rule: "sidebar-unavailable", componentId: "month-sidebar", message: `Sidebar hidden: ${fit.sidebarReason}` });
     }
@@ -184,7 +186,7 @@ export const monthlyCalendar: LayoutDefinition = {
     }
 
     if (sidebarRect) {
-      const sb = section("month-sidebar", sidebarRect, ctx.wording[ctx.options.sidebarContent], ctx, "surface", { boxed: false });
+      const sb = section("month-sidebar", sidebarRect, ctx.wording[ctx.options.sidebarContent], ctx, "surface", { boxed: false, semantic: "sectionHeading" });
       nodes.push(...sb.nodes);
       diagnostics.push(...sb.diagnostics);
     }
@@ -199,6 +201,11 @@ export const monthlyCalendar: LayoutDefinition = {
       ...grid.metrics,
     ];
     if (sidebarRect) metrics.push({ label: "Sidebar width", value: sidebarRect.w, unit: "in", provenance: { geometryClass: "user-design", basis: "layout option (studio default 1.4\")" } });
-    return [{ nodes, diagnostics, metrics }];
+    const regions: LayoutRegions = { mainContent: frame.body, calendar: { ...gridArea } };
+    if (sidebarRect) {
+      regions.sidebar = sidebarRect;
+      if (ctx.options.sidebarContent === "notes") regions.notes = sidebarRect;
+    }
+    return [{ nodes, diagnostics, metrics, regions }];
   },
 };

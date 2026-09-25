@@ -10,11 +10,13 @@ import { SPACING_LABELS } from "../../presets/spacing/spacingPresets";
 import { PALETTES, findPalette } from "../../presets/themes/palettes";
 import { DEFAULT_ROLES, FONT_CATALOG, FONT_CATEGORY_LABEL, ROLE_LABELS } from "../../presets/typography/typography";
 import { DEFAULT_WORDING } from "../../presets/wording";
-import { DESIGN_ASSETS, findAsset } from "../../design-library/library";
-import { normalizeDecoration, placementsFor } from "../../themes/decorationPlan";
+import { DESIGN_ASSETS, JCS_SNAPSHOT } from "../../design-library/library";
+import { COMPOSITION_ANCHORS, type AlignX, type AlignY, type CompositionAnchor, type DecorationPlacementOverrides } from "../../types/composition";
+import type { ElementPosition, SemanticTextKey, TextAnchor } from "../../types/layout";
+import { defaultCorners, isObjectPlacement, normalizeDecoration, opacityCap, placementsFor, type PieceReport } from "../../themes/decorationPlan";
 import type { ProductProject } from "../../types/project";
-import type { DecorativePlacement, DecorativeTheme, FunctionalPatternKind } from "../../types/theme";
-import type { ColorToken, FontCategory, FontGroup, SpacingDensity, WordingKey } from "../../types/tokens";
+import type { CornerSet, DecorativePlacement, DecorativeTheme, FunctionalPatternKind } from "../../types/theme";
+import type { ColorToken, ColorTokens, FontCategory, FontGroup, SpacingDensity, WordingKey } from "../../types/tokens";
 import { AppliesTo, Check, Field, NumberField, Section, Segmented, Select, type EditorNav } from "./ui";
 
 type Update = (fn: (p: ProductProject) => ProductProject) => void;
@@ -286,7 +288,23 @@ const DESIGN_CHOICES: { value: string; label: string; style: DecorativeTheme["st
   { value: "watercolor", label: "Watercolor wash", style: "watercolor" },
   ...DESIGN_ASSETS.map((a) => ({ value: a.id, label: `${a.type === "marble" ? "Marble" : a.type === "floral" ? "Floral" : "Line art"} — ${a.label}`, style: a.type, assetId: a.id })),
 ];
-const PLACEMENT_LABEL: Record<DecorativePlacement, string> = { "full-page": "Full page", "header-band": "Header band", "border-frame": "Margin frame", corners: "Opposite corners" };
+const PLACEMENT_LABEL: Record<DecorativePlacement, string> = {
+  "full-page": "Full page (behind content, soft)",
+  "header-band": "Header band (above the title)",
+  "border-frame": "Margin frame (around content)",
+  corners: "Corners",
+  "title-flank": "Flanking the title",
+  "top-bottom": "Top + bottom edges",
+  "behind-title": "Behind the title (subtle)",
+};
+const CORNER_LABEL: Record<CornerSet, string> = {
+  "opposite-tl-br": "Top-left + bottom-right",
+  "opposite-tr-bl": "Top-right + bottom-left",
+  tl: "Top left only",
+  tr: "Top right only",
+  bl: "Bottom left only",
+  br: "Bottom right only",
+};
 const ROLE_NAMES: Record<string, [string, string, string]> = {
   solid: ["Fill", "", ""],
   marble: ["Stone", "Veins", "Highlights"],
@@ -295,43 +313,183 @@ const ROLE_NAMES: Record<string, [string, string, string]> = {
   accent: ["", "Line color", ""],
 };
 const DECOR_TOKENS: ColorToken[] = ["decorBase", "decorativeAccent", "decorHighlight", "primary", "accent", "border", "background", "text"];
+const ALIGN_LABEL = { start: "Start", center: "Center", end: "End" } as const;
+/** Behind-content backgrounds above this strength compete with writing (JCS soft interiors use 0.16). */
+const BEHIND_CONTENT_HINT = 0.3;
 
-export function DecorationPanel({ project, update }: PanelProps) {
+/** What the Size control scales, per design (null = the design has no size). */
+function sizeControl(d: DecorativeTheme): { label: string; min: number; max: number } | null {
+  if (d.style === "marble") return { label: "Zoom", min: 1, max: 3 };
+  if (d.style === "floral") return { label: "Size", min: 0.3, max: 2 };
+  if (d.style === "accent" && d.placement !== "behind-title") return { label: d.placement === "header-band" || d.placement === "border-frame" ? "Pattern size" : "Size", min: 0.3, max: 3 };
+  return null;
+}
+
+/** Human names for plan pieces. */
+function pieceName(r: PieceReport): string {
+  const corner: Record<string, string> = { topLeftAccent: "Top-left corner", topRightAccent: "Top-right corner", bottomLeftAccent: "Bottom-left corner", bottomRightAccent: "Bottom-right corner" };
+  if (r.id.startsWith("corner")) return corner[r.anchor] ?? "Corner";
+  return (
+    { "flank-after": "After the title", "flank-before": "Before the title", top: "Top edge", bottom: "Bottom edge", behind: "Behind the title", field: "Background", band: "Band" } as Record<string, string>
+  )[r.id] ?? r.id;
+}
+
+type DecorStatus = { reports: PieceReport[]; colors: ColorTokens; pageNumber: number } | null;
+
+export function DecorationPanel({ project, update, usage, decor }: PanelProps & { decor?: DecorStatus }) {
   const d = normalizeDecoration(applyVariant(project).decorativeTheme);
   const set = (patch: Partial<DecorativeTheme>) => setLook(update, { decorativeTheme: patch });
+  const setLayout = (patch: Partial<DecorationPlacementOverrides>) => set({ layout: { ...(d.layout ?? {}), ...patch } });
   const choice = d.style === "marble" || d.style === "floral" || d.style === "accent" ? d.assetId! : d.style;
   const placements = placementsFor(d);
-  const asset = findAsset(d.assetId);
   const roles = ROLE_NAMES[d.style] ?? ["", "", ""];
-  const hasScale = d.style === "accent" || (d.style === "floral" && asset?.type === "floral" && asset.usage !== "bouquet") || d.style === "marble" || (asset?.type === "floral" && asset.usage === "bouquet");
-  const scaleLabel = d.style === "accent" || (asset?.type === "floral" && asset.usage !== "bouquet") ? "Size" : "Zoom";
+  const size = sizeControl(d);
+  const cap = opacityCap(d);
+  const object = isObjectPlacement(d);
+  const o = d.layout ?? {};
+  // Show each token's actual colour: tokens that share a colour in this palette look identical on the page.
+  const tokenOptions = DECOR_TOKENS.map((c) => ({ value: c, label: decor?.colors[c] ? `${TOKEN_LABEL[c]} · ${decor.colors[c]}` : TOKEN_LABEL[c] }));
   return (
     <Section title="Decoration">
-      <p className="hint">Designs from Journal Color Studio (snapshot). Decoration is its own layer — it never moves lines, grids or calendars.</p>
+      <p className="hint">
+        Designs from Journal Color Studio (snapshot {JCS_SNAPSHOT.commit}). Decoration is composed around the page's content — it never moves lines, grids or calendars, and keeps
+        a clearance from them unless you allow overlap.
+      </p>
       <Select
         label="Design"
         value={choice}
         options={DESIGN_CHOICES.map((c) => ({ value: c.value, label: c.label }))}
         onChange={(v) => {
           const c = DESIGN_CHOICES.find((x) => x.value === v)!;
-          set(normalizeDecoration({ ...d, style: c.style, assetId: c.assetId }));
+          set(normalizeDecoration({ ...d, style: c.style, assetId: c.assetId, layout: undefined }));
         }}
       />
       {d.style !== "none" && (
         <>
-          {placements.length > 1 && <Select label="Placement" value={d.placement} options={placements.map((p) => ({ value: p, label: PLACEMENT_LABEL[p] }))} onChange={(placement) => set({ placement })} />}
+          {placements.length > 1 && <Select label="Placement" value={d.placement} options={placements.map((p) => ({ value: p, label: PLACEMENT_LABEL[p] }))} onChange={(placement) => set(normalizeDecoration({ ...d, placement, layout: undefined }))} />}
+          {d.placement === "corners" && (
+            <Select
+              label="Corners"
+              value={d.corners ?? "__auto"}
+              options={[
+                ...(d.style === "floral" ? [{ value: "__auto", label: "Automatic — the pair with the most room" }] : [{ value: "__auto", label: `Default — ${CORNER_LABEL[defaultCorners(d.assetId)]}` }]),
+                ...(Object.keys(CORNER_LABEL) as CornerSet[]).map((c) => ({ value: c, label: CORNER_LABEL[c] })),
+              ]}
+              onChange={(v) => set({ corners: v === "__auto" ? undefined : (v as CornerSet) })}
+            />
+          )}
+          {decor && decor.reports.some((r) => r.anchor !== "field") && (
+            <ul className="decor-status" aria-label="Placement on this page">
+              {decor.reports.map((r) => (
+                <li key={r.id} className={r.rect ? "" : "decor-status--off"}>
+                  <strong>{pieceName(r)}</strong> (page {decor.pageNumber}):{" "}
+                  {r.rect ? (r.scale < 0.999 ? `placed at ${Math.round(r.scale * 100)}% of its size to stay clear of content` : "placed at full size") : `not placed — ${r.reason}`}
+                </li>
+              ))}
+            </ul>
+          )}
           <div className="row">
-            {hasScale && <NumberField label={scaleLabel} step={0.1} min={scaleLabel === "Zoom" ? 1 : 0.3} max={3} value={d.scale} onChange={(scale) => set({ scale })} />}
-            <NumberField label="Opacity" step={0.05} min={0.05} max={1} value={d.opacity} onChange={(opacity) => set({ opacity: Math.min(1, Math.max(0.05, opacity)) })} />
+            {size && <NumberField label={size.label} step={0.1} min={size.min} max={size.max} value={d.scale} onChange={(scale) => set({ scale })} />}
+            <NumberField label={cap < 1 ? `Opacity (max ${cap})` : "Opacity"} step={0.05} min={0.05} max={cap} value={d.opacity} onChange={(opacity) => set({ opacity })} />
           </div>
+          {d.placement === "full-page" && d.opacity > BEHIND_CONTENT_HINT && <p className="hint">Behind writing, keep opacity ≤ {BEHIND_CONTENT_HINT} for legibility (Journal Color Studio interiors use 0.16).</p>}
           <div className="row">
-            {roles[0] && <Select label={roles[0]} value={d.colorA} options={DECOR_TOKENS.map((c) => ({ value: c, label: TOKEN_LABEL[c] }))} onChange={(colorA) => set({ colorA })} />}
-            {roles[1] && <Select label={roles[1]} value={d.colorB} options={DECOR_TOKENS.map((c) => ({ value: c, label: TOKEN_LABEL[c] }))} onChange={(colorB) => set({ colorB })} />}
-            {roles[2] && <Select label={roles[2]} value={d.colorC} options={DECOR_TOKENS.map((c) => ({ value: c, label: TOKEN_LABEL[c] }))} onChange={(colorC) => set({ colorC })} />}
+            {roles[0] && <Select label={roles[0]} value={d.colorA} options={tokenOptions} onChange={(colorA) => set({ colorA })} />}
+            {roles[1] && <Select label={roles[1]} value={d.colorB} options={tokenOptions} onChange={(colorB) => set({ colorB })} />}
+            {roles[2] && <Select label={roles[2]} value={d.colorC} options={tokenOptions} onChange={(colorC) => set({ colorC })} />}
           </div>
-          {d.placement === "full-page" && <Check label="Extend under writing areas" checked={d.applyToInterior} onChange={(applyToInterior) => set({ applyToInterior })} />}
+          {object && (
+            <details className="subsection">
+              <summary>Advanced placement</summary>
+              <p className="hint">The artwork is sized to its region and shrunk (never cropped) to stay clear of content. Offsets are nudges; the page rules still apply.</p>
+              <Select
+                label="Anchor"
+                value={o.anchor ?? "__default"}
+                options={[{ value: "__default", label: "Default for this placement" }, ...COMPOSITION_ANCHORS.filter((a) => usage.compositionAnchors.includes(a.value))]}
+                onChange={(v) => setLayout({ anchor: v === "__default" ? undefined : (v as CompositionAnchor) })}
+              />
+              <div className="row">
+                <Select label="Align X" value={o.alignX ?? "__default"} options={[{ value: "__default", label: "Default" }, ...(["start", "center", "end"] as const).map((v) => ({ value: v, label: ALIGN_LABEL[v] }))]} onChange={(v) => setLayout({ alignX: v === "__default" ? undefined : (v as AlignX) })} />
+                <Select label="Align Y" value={o.alignY ?? "__default"} options={[{ value: "__default", label: "Default" }, ...(["start", "center", "end"] as const).map((v) => ({ value: v, label: ALIGN_LABEL[v] }))]} onChange={(v) => setLayout({ alignY: v === "__default" ? undefined : (v as AlignY) })} />
+              </div>
+              <div className="row">
+                <NumberField label="Max width" suffix="in" step={0.1} min={0} max={20} value={o.maxWidthIn ?? 0} onChange={(v) => setLayout({ maxWidthIn: v > 0 ? v : undefined })} />
+                <NumberField label="Max height" suffix="in" step={0.1} min={0} max={20} value={o.maxHeightIn ?? 0} onChange={(v) => setLayout({ maxHeightIn: v > 0 ? v : undefined })} />
+              </div>
+              <p className="hint">0 = no limit.</p>
+              <div className="row">
+                <NumberField label="Offset X" suffix="in" step={0.05} min={-3} max={3} value={o.offsetXIn ?? 0} onChange={(offsetXIn) => setLayout({ offsetXIn })} />
+                <NumberField label="Offset Y" suffix="in" step={0.05} min={-3} max={3} value={o.offsetYIn ?? 0} onChange={(offsetYIn) => setLayout({ offsetYIn })} />
+              </div>
+              <Check label="Allow overlap with content" checked={o.allowContentOverlap ?? d.placement === "behind-title"} onChange={(allowContentOverlap) => setLayout({ allowContentOverlap })} />
+              <Check label="Allow bleed past the trim" checked={o.allowBleed ?? (d.placement !== "title-flank" && d.placement !== "behind-title")} onChange={(allowBleed) => setLayout({ allowBleed })} />
+              <Check label="Allow cropping at the page edge" checked={o.allowClipping ?? false} onChange={(allowClipping) => setLayout({ allowClipping })} />
+              <button type="button" className="btn" onClick={() => set({ layout: undefined })}>
+                Reset placement
+              </button>
+            </details>
+          )}
         </>
       )}
+    </Section>
+  );
+}
+
+const TEXT_LABEL: Record<SemanticTextKey, string> = {
+  pageTitle: "Page title",
+  monthYear: "Month / year title",
+  weekOf: "Week of",
+  productTitle: "Product title",
+  dateLabel: "Date label",
+  footer: "Footer",
+  sectionHeading: "Section headings (Notes, Priorities…)",
+};
+const ANCHOR_LABEL: Record<TextAnchor, string> = {
+  "header-left": "Header — left",
+  "header-center": "Header — center",
+  "header-right": "Header — right",
+  "above-content-left": "Above content — left",
+  "above-content-center": "Above content — center",
+  "above-content-right": "Above content — right",
+  "footer-left": "Footer — left",
+  "footer-center": "Footer — center",
+  "footer-right": "Footer — right",
+};
+const SECTION_ANCHOR_LABEL: Partial<Record<TextAnchor, string>> = { "above-content-left": "Left", "above-content-center": "Center", "above-content-right": "Right" };
+
+/** Controlled placement of semantic text: logical anchors + print-safe fine offsets. */
+export function TextPlacementPanel({ project, update, usage, nav }: PanelProps) {
+  if (!usage.semanticText.length) return null;
+  const positions = project.layoutOptions.textPositions ?? {};
+  const setPos = (key: SemanticTextKey, pos: ElementPosition | undefined) =>
+    update((p) => {
+      const next = { ...(p.layoutOptions.textPositions ?? {}) };
+      if (pos) next[key] = pos;
+      else delete next[key];
+      return { ...p, layoutOptions: { ...p.layoutOptions, textPositions: next } };
+    });
+  return (
+    <Section title="Text placement">
+      <p className="hint">Move titles and headings between the positions each layout supports. Offsets are fine nudges; text always stays inside the print-safe area.</p>
+      {usage.semanticText.map(({ key, example, anchors, layoutIds, anchor, defaultAnchor }) => {
+        const cur = positions[key];
+        const anchorLabel = key === "sectionHeading" ? SECTION_ANCHOR_LABEL : ANCHOR_LABEL;
+        return (
+          <div key={key} className="field-group">
+            <AppliesTo ids={layoutIds} nav={nav} />
+            <Select
+              label={`${TEXT_LABEL[key]} — “${example.length > 24 ? example.slice(0, 23) + "…" : example}”`}
+              value={anchor}
+              options={anchors.map((a) => ({ value: a, label: `${anchorLabel[a] ?? a}${a === defaultAnchor ? " (layout default)" : ""}` }))}
+              onChange={(v) => setPos(key, v === defaultAnchor && !cur?.offsetXIn && !cur?.offsetYIn ? undefined : { anchor: v as TextAnchor, offsetXIn: cur?.offsetXIn ?? 0, offsetYIn: cur?.offsetYIn ?? 0 })}
+            />
+            <div className="row">
+              <NumberField label="Offset X" suffix="in" step={0.05} min={-5} max={5} value={cur?.offsetXIn ?? 0} onChange={(offsetXIn) => setPos(key, { anchor, offsetYIn: cur?.offsetYIn ?? 0, offsetXIn })} />
+              <NumberField label="Offset Y" suffix="in" step={0.05} min={-5} max={5} value={cur?.offsetYIn ?? 0} onChange={(offsetYIn) => setPos(key, { anchor, offsetXIn: cur?.offsetXIn ?? 0, offsetYIn })} />
+            </div>
+          </div>
+        );
+      })}
     </Section>
   );
 }

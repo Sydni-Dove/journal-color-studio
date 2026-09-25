@@ -13,12 +13,15 @@ import { WEEKDAY_NAMES, weekdayOrder } from "../../engines/calendar/calendar";
 import { fitCount, solveStack } from "../../engines/layout/math";
 import { gridPitchIn, lineSpacingIn } from "../../engines/patterns/patterns";
 import { STUDIO_PLANNER, STUDIO_STROKES } from "../../presets/studioDefaults";
+import type { LayoutRegions } from "../../types/composition";
 import type { Rect } from "../../types/geometry";
 import type { LayoutMetric, LayoutNode, SolvedPage } from "../../types/layout";
-import { connectedGrid, pageFrame, PLANNER_GRID_GAP_IN, section, weekdayHeader, writingSurface } from "../shared/components";
-import { group, lineBoxIn, rule, stackDiagnostic, text } from "../shared/nodes";
+import { connectedGrid, pageFrame, PLANNER_GRID_GAP_IN, positionText, section, weekdayHeader, writingSurface } from "../shared/components";
+import { group, rule, stackDiagnostic } from "../shared/nodes";
 import { minimumAreaFit, type LayoutDefinition } from "../shared/types";
 
+/** The "Week of" write-in line spans this share of the header width (blueprint B6 header). */
+const WEEK_OF_LINE_SHARE = 0.3;
 /** Desk pads are large-format products; a 10" × 6" usable area is the smallest that holds 7 writable day columns. */
 const DESK_PAD_MIN_USABLE = { w: 10, h: 6 };
 
@@ -48,22 +51,27 @@ export const weeklyDeskPad: LayoutDefinition = {
   fit: minimumAreaFit(DESK_PAD_MIN_USABLE.w, DESK_PAD_MIN_USABLE.h, "Weekly desk pad"),
   solve(ctx): SolvedPage[] {
     const s = ctx.spacing;
-    const frame = pageFrame(ctx, 0, { headerH: STUDIO_PLANNER.deskPadHeader.valueIn });
+    const frame = pageFrame(ctx, 0, { headerH: STUDIO_PLANNER.deskPadHeader.valueIn, headerRule: false });
     const nodes: LayoutNode[] = [...frame.nodes];
     const diagnostics = [...frame.diagnostics];
 
-    // Header: week-of label with a write-in line, product title on the right.
+    // Header: "Week of" + its write-in line (one positionable unit), product title (positionable).
     const h = frame.header;
-    const labelH = lineBoxIn(ctx.typography, "weekTitle");
-    const labelW = h.w * 0.25;
+    const lineLen = h.w * WEEK_OF_LINE_SHARE;
+    const weekOf = positionText(ctx, "weekOf", frame.zones, "dp-weekof", ctx.wording.weekOf, "weekTitle", "above-content-left", { trailingIn: s.checkboxGap + lineLen });
+    const labelW = weekOf.ink.w - s.checkboxGap - lineLen;
+    const lineY = weekOf.ink.y + weekOf.ink.h - s.boxPadding;
+    const product = positionText(ctx, "productTitle", frame.zones, "dp-title", ctx.wording.productTitle, "pageTitle", "above-content-right");
     nodes.push(
-      text("dp-weekof", { x: h.x, y: h.y + h.h - labelH, w: labelW, h: labelH }, ctx.wording.weekOf, "weekTitle", { component: "PageHeader", vAlign: "bottom" }),
-      rule("dp-weekof-line", h.x + labelW, h.y + h.h - s.boxPadding, h.x + h.w * 0.55, h.y + h.h - s.boxPadding, { strokePt: STUDIO_STROKES.writingLinePt, color: "line" }),
-      text("dp-title", { x: h.x + h.w * 0.6, y: h.y + h.h - labelH, w: h.w * 0.4, h: labelH }, ctx.wording.productTitle, "pageTitle", { component: "PageHeader", align: "right", vAlign: "bottom" }),
+      weekOf.node,
+      rule("dp-weekof-line", weekOf.ink.x + labelW + s.checkboxGap, lineY, weekOf.ink.x + weekOf.ink.w, lineY, { strokePt: STUDIO_STROKES.writingLinePt, color: "line", component: "PageHeader" }),
+      product.node,
     );
+    diagnostics.push(...weekOf.diagnostics, ...product.diagnostics);
 
     // Columns: week grid (elastic) + optional priorities strip (fixed).
     let gridArea: Rect = frame.body;
+    let stripRect: Rect | null = null;
     if (ctx.options.showSidebar) {
       const st = solveStack(frame.body.x, frame.body.w, [
         { id: "grid", kind: "elastic", min: 0 },
@@ -73,7 +81,8 @@ export const weeklyDeskPad: LayoutDefinition = {
       diagnostics.push(...stackDiagnostic(st, "dp-columns", "Priorities strip"));
       gridArea = { ...frame.body, w: st.byId.grid.size };
       const strip = { ...frame.body, x: st.byId.strip.start, w: st.byId.strip.size };
-      const sec = section("dp-priorities", strip, ctx.wording[ctx.options.sidebarContent], ctx, "checklist", { boxed: true });
+      stripRect = strip;
+      const sec = section("dp-priorities", strip, ctx.wording[ctx.options.sidebarContent], ctx, "checklist", { boxed: true, semantic: "sectionHeading" });
       nodes.push(group("dp-strip", "Sidebar", strip), ...sec.nodes);
       diagnostics.push(...sec.diagnostics);
     }
@@ -120,6 +129,8 @@ export const weeklyDeskPad: LayoutDefinition = {
         ? { label: "Grid cells per row (height)", value: fitCount(rows.size - 2 * s.boxPadding, gridPitchIn(ctx.pattern)), unit: "count", provenance: { geometryClass: "user-design", basis: `floor(row inner ÷ ${gridPitchIn(ctx.pattern).toFixed(4)})` } }
         : { label: "Ruled lines per row", value: fitCount(rows.size - 2 * s.boxPadding, lineSpacingIn(ctx.pattern)), unit: "count", provenance: { geometryClass: "user-design", basis: `floor(row inner ÷ ${lineSpacingIn(ctx.pattern).toFixed(4)})` } },
     ];
-    return [{ nodes, diagnostics, metrics }];
+    const regions: LayoutRegions = { mainContent: frame.body, calendar: gridRect, writingArea: gridRect };
+    if (stripRect) regions.sidebar = stripRect;
+    return [{ nodes, diagnostics, metrics, regions, titleId: "dp-title" }];
   },
 };

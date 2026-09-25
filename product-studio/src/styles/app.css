@@ -577,3 +577,53 @@ h2 {
   opacity: 0.45;
   cursor: not-allowed;
 }
+
+/* Numeric input feedback (shared NumericInput) — plain text, not a field label. */
+.field-msg,
+.field > span.field-msg {
+  font-size: 12px;
+  line-height: 1.3;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+}
+.field-msg--error {
+  color: var(--ui-error);
+}
+.field-msg--note {
+  color: var(--ui-muted);
+}
+
+/* Nested option groups (advanced decoration placement, per-element text placement). */
+.subsection {
+  border: 1px solid var(--ui-line);
+  border-radius: var(--ui-radius);
+  padding: 0 10px 10px;
+  display: grid;
+  gap: 10px;
+}
+.subsection > summary {
+  min-height: var(--ui-touch);
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 13px;
+}
+.field-group {
+  display: grid;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed var(--ui-line);
+}
+.decor-status {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+  color: var(--ui-muted);
+  display: grid;
+  gap: 4px;
+}
+.decor-status--off {
+  color: var(--ui-warn);
+}

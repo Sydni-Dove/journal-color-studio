@@ -10,7 +10,10 @@ import { STUDIO_PAD } from "../../presets/studioDefaults";
 import type { Edge, LogicalEdge } from "../../types/geometry";
 import type { ProductProject } from "../../types/project";
 import type { RecipeItem, RepeatRule } from "../../types/recipe";
-import { Check, Field, NumberField, Section, Segmented, Select, type EditorNav } from "./ui";
+import { Check, Field, LabeledNumeric, NumberField, Section, Segmented, Select, type EditorNav } from "./ui";
+
+/** Upper bound for a user margin entry (inches); larger values leave no usable page. */
+const MAX_USER_MARGIN_IN = 3;
 import { representativeGeometry } from "../../engines/document/resolve";
 
 type Update = (fn: (p: ProductProject) => ProductProject) => void;
@@ -120,16 +123,15 @@ export function ProductionPanel({ project, update, doc, nav }: PanelProps & { do
       <div className="field-label">Margins (blank = studio default; never below required)</div>
       <div className="row">
         {(["top", "bottom", "inside", "outside"] as LogicalEdge[]).map((e) => (
-          <Field key={e} label={e}>
-            <input
-              type="number"
-              inputMode="decimal"
-              step={0.05}
-              placeholder="auto"
-              value={prod.userMargins?.[e] ?? ""}
-              onChange={(ev) => setMargin(e, ev.target.value === "" ? undefined : parseFloat(ev.target.value))}
-            />
-          </Field>
+          <LabeledNumeric
+            key={e}
+            label={e}
+            step={0.05}
+            placeholder="auto"
+            rules={{ min: 0, max: MAX_USER_MARGIN_IN, allowEmpty: true }}
+            value={prod.userMargins?.[e]}
+            onCommit={(v) => setMargin(e, v ?? undefined)}
+          />
         ))}
       </div>
     </Section>
@@ -273,14 +275,36 @@ export function PagesPanel({ project, update, doc, usage, nav }: PanelProps & { 
   );
 }
 
-/** What the chosen printer + binding actually require on this page (the visible effect of the printer profile). */
+/**
+ * What the chosen printer + binding actually change. They set REQUIREMENTS
+ * (minimum margins, binding keep-out, bleed); the page only moves when a
+ * requirement exceeds the margin already in use — this says which case applies.
+ */
 function RequirementSummary({ doc }: { doc: ResolvedDocument }) {
   const g = representativeGeometry(doc);
-  const req = g.margins.map((m) => `${m.logicalEdge} ${m.requiredIn}"`).join(" · ");
   const bleed = doc.printProfile.bleedRules.bleed ? `${doc.printProfile.bleedRules.bleed.value}" (${doc.printProfile.bleedRules.edges})` : "none";
+  const binding = g.keepOuts.filter((k) => k.kind !== "glue").map((k) => `${k.label} ${+k.depthIn.toFixed(3)}"`).join(", ");
+  const glue = g.keepOuts.filter((k) => k.kind === "glue").map((k) => `${k.label} ${+k.depthIn.toFixed(3)}"`).join(", ");
+  const driving = g.margins.filter((m) => m.requiredIn >= m.effectiveIn - 1e-6);
+  // Other printers with exactly the same requirements for this product (the choice then records the target printer).
+  const sig = (id: string) => {
+    const pr = PRINT_PROFILES.find((x) => x.id === id)!;
+    return JSON.stringify([pr.safeMargins.noBleed?.value ?? null, pr.safeMargins.withBleed?.value ?? null, pr.bleedRules.bleed?.value ?? null, pr.bleedRules.edges, pr.gutterRules]);
+  };
+  const twins = PRINT_PROFILES.filter((x) => x.id !== doc.printProfile.id && x.bindingRules.supported.includes(doc.project.production.bindingType) && sig(x.id) === sig(doc.printProfile.id)).map((x) => x.label);
+  const ring = doc.project.production.bindingType.startsWith("ring");
   return (
-    <p className="hint">
-      Required minimums — {req}. Bleed: {bleed}. Effective margins use the larger of these and the studio defaults (see Geometry info).
-    </p>
+    <div className="hint" data-testid="requirement-summary">
+      <p style={{ margin: 0 }}>
+        {`On this page: ${g.margins.map((m) => `${m.logicalEdge} ${+m.effectiveIn.toFixed(3)}" (needs ≥ ${+m.requiredIn.toFixed(3)}")`).join(" · ")}. Bleed: ${bleed}.${binding ? ` Binding clearance: ${binding}.` : ""}${glue ? ` Glue zone: ${glue}.` : ""}`}
+      </p>
+      <p style={{ margin: "4px 0 0" }}>
+        {driving.length
+          ? `The ${driving.map((m) => m.logicalEdge).join(", ")} margin${driving.length > 1 ? "s are" : " is"} set by this printer/binding requirement — changing them moves the page.`
+          : "Every margin already exceeds what this printer and binding require, so switching printer or binding does not move this page; it changes the requirements, keep-out zones, validation and export."}
+      </p>
+      {twins.length > 0 && <p style={{ margin: "4px 0 0" }}>{`${twins.join(", ")} ${twins.length > 1 ? "have" : "has"} the same requirements for this product — the choice records which printer the file is for.`}</p>}
+      {ring && <p style={{ margin: "4px 0 0" }}>6-ring and 7-ring share the same page clearance; the ring count sets the punch pattern (production), not the page.</p>}
+    </div>
   );
 }

@@ -19,7 +19,7 @@ export function text(
   rect: Rect,
   value: string,
   role: TypographyRole,
-  opts: { component?: PrimitiveName; align?: TextAlign; vAlign?: TextNode["vAlign"]; wrap?: boolean; color?: ColorToken } = {},
+  opts: { component?: PrimitiveName; align?: TextAlign; vAlign?: TextNode["vAlign"]; wrap?: boolean; color?: ColorToken; semantic?: TextNode["semantic"] } = {},
 ): TextNode {
   return {
     type: "text",
@@ -33,6 +33,7 @@ export function text(
     vAlign: opts.vAlign ?? "middle",
     wrap: opts.wrap ?? false,
     color: opts.color,
+    ...(opts.semantic ? { semantic: opts.semantic } : {}),
   };
 }
 

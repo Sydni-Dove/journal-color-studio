@@ -8,8 +8,7 @@ import { fitCount } from "../../engines/layout/math";
 import { fillWritingRegion, lineSpacingIn } from "../../engines/patterns/patterns";
 import { STUDIO_JOURNAL } from "../../presets/studioDefaults";
 import type { LayoutMetric, LayoutNode, SolvedPage } from "../../types/layout";
-import { pageFrame } from "../shared/components";
-import { lineBoxIn, text } from "../shared/nodes";
+import { pageFrame, positionText } from "../shared/components";
 import { minimumAreaFit, type LayoutCapability, type LayoutContext, type LayoutDefinition } from "../shared/types";
 
 const WRITING_PAGE: Omit<LayoutCapability, "wordingKeys" | "supportedProductTypes"> = {
@@ -31,11 +30,13 @@ function writingPage(ctx: LayoutContext, heading: string | null): SolvedPage {
   const g = ctx.pages[0];
   // The heading zone ends where the first writing row begins (J-B1/J-B4: 0.5" zone).
   const headerH = STUDIO_JOURNAL.headingZone.valueIn - ctx.spacing.headerGap;
-  const frame = pageFrame(ctx, 0, { headerH });
+  const frame = pageFrame(ctx, 0, { headerH, headerRule: false });
   const nodes: LayoutNode[] = [...frame.nodes];
+  const diagnostics = [...frame.diagnostics];
   if (heading) {
-    const h = lineBoxIn(ctx.typography, "label");
-    nodes.push(text("journal-heading", { x: frame.header.x, y: frame.header.y + frame.header.h - h, w: frame.header.w, h }, heading, "label", { component: "PageHeader", vAlign: "bottom" }));
+    const t = positionText(ctx, heading === ctx.wording.date ? "dateLabel" : "pageTitle", frame.zones, "journal-heading", heading, "label", "above-content-left");
+    nodes.push(t.node);
+    diagnostics.push(...t.diagnostics);
   }
   // Margin-ruled paper: margin line measured from the page's INSIDE trim edge
   // so it mirrors with the gutter.
@@ -53,7 +54,7 @@ function writingPage(ctx: LayoutContext, heading: string | null): SolvedPage {
       { label: "Line count = floor(region ÷ spacing)", value: fitCount(frame.body.h, spacing), unit: "count", provenance: { geometryClass: "user-design", basis: `floor(${frame.body.h.toFixed(4)} ÷ ${spacing.toFixed(4)})` } },
     );
   }
-  return { nodes, diagnostics: frame.diagnostics, metrics };
+  return { nodes, diagnostics, metrics, regions: { mainContent: frame.body, writingArea: frame.body } };
 }
 
 export const linedJournal: LayoutDefinition = {

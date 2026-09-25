@@ -31,7 +31,6 @@ export const DEFAULT_DECORATIVE: DecorativeTheme = {
   colorA: "decorBase",
   colorB: "decorativeAccent",
   colorC: "decorHighlight",
-  applyToInterior: false,
 };
 
 export function newId(prefix = "p"): string {
