@@ -1887,38 +1887,151 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   const withColon = (s, id) => (textEdited(s, id) ? T(s, id) : `${T(s, id)}:`);
   const textEdited = (s, id) => { const v = s.text?.[s.journal]?.[id]; return typeof v === 'string' && v !== textSlot(s.journal, id)?.text; };
 
-  // Layout safety for slot text. A line may shrink to fit its designed width, down to TEXT_MIN_FIT of its designed size;
-  // past that it is condensed into the same width (never wider, so it can't run off the page or into other elements) and
-  // the slot is flagged so the Text content panel can warn that the wording is too long. Nothing else on the page moves.
-  const TEXT_MIN_FIT = .6;
-  function fillFit(ctx, s, id, text, x, y, maxW) {
+  // Layout safety for slot text. Glyphs are never stretched or squeezed: every fit keeps the font's own proportions.
+  //   1. Set the wording at its designed size.
+  //   2. If it's too wide, reduce the size proportionally…
+  //   3. …but never below the slot's minimum readable size (FIT_RULES, by role).
+  //   4. Where the slot's own box has room for more lines, wrap within it (largest size that fits).
+  //   5. If it still can't fit, it is shortened with "…" inside its space and flagged, so the Text content panel shows
+  //      "Too long to fit here". Nothing else on the page moves, and text never leaves its space.
+  // lines = how many lines the slot's box can hold (1 unless its layout has room); min = smallest size, as a fraction.
+  const FIT_RULES = {
+    coverTitle: { min: .55, lines: 2 }, coverSubtitle: { min: .6, lines: 2 }, coverTagline: { min: .65, lines: 2 },
+    pageTitle: { min: .6, lines: 1 }, sectionHeading: { min: .65, lines: 1 }, sectionSubtitle: { min: .65, lines: 1 },
+    recurringLabel: { min: .7, lines: 1 }, footerLabel: { min: .6, lines: 2 },
+  };
+  const TEXT_MIN_FIT = .6;                       // the footer scripture's existing shrink limit
+  const fitRule = (s, id) => FIT_RULES[textSlot(s.journal, id)?.role] || { min: TEXT_MIN_FIT, lines: 1 };
+  const setPx = (ctx, px) => { ctx.font = ctx.font.replace(/(\d*\.?\d+)px/, `${px}px`); };
+  // Greedy word wrap to maxW (a single word wider than maxW stays whole; the caller checks).
+  function wrapWords(ctx, text, maxW) {
+    const out = [];
+    for (const para of text.split('\n')) {
+      let line = '';
+      for (const word of para.split(' ')) {
+        const test = line ? `${line} ${word}` : word;
+        if (line && ctx.measureText(test).width > maxW) { out.push(line); line = word; } else line = test;
+      }
+      out.push(line);
+    }
+    return out;
+  }
+  // Two lines of similar width (the widest line as short as possible), or null when the text has one word.
+  function splitBalanced(ctx, text) {
+    const words = text.split(' ').filter(Boolean);
+    if (words.length < 2) return null;
+    let best = null;
+    for (let i = 1; i < words.length; i++) {
+      const L = [words.slice(0, i).join(' '), words.slice(i).join(' ')], w = Math.max(...L.map((l) => ctx.measureText(l).width));
+      if (!best || w < best.w) best = { w, L };
+    }
+    return best.L;
+  }
+  // Shorten a line with "…" until it fits maxW (whole words first, then characters).
+  function ellipsize(ctx, line, maxW, width = (t) => ctx.measureText(t).width, force = false) {
+    if (!force && width(line) <= maxW) return line;
+    let t = line.trim();
+    while (t.includes(' ') && width(`${t}…`) > maxW) t = t.slice(0, t.lastIndexOf(' '));
+    while (t.length > 1 && width(`${t}…`) > maxW) t = t.slice(0, -1);
+    return `${t}…`;
+  }
+  // Fits text in maxW at the current ctx.font (its px is the designed size). Leaves ctx.font at the chosen size.
+  // Returns { lines, px, fit }. lineH = line pitch in ems; maxH = height available for the lines (px).
+  function fitText(ctx, text, maxW, { lines: maxLines = 1, min = TEXT_MIN_FIT, lineH = 1.2, maxH = Infinity } = {}) {
+    const px0 = parseFloat(ctx.font.match(/(\d*\.?\d+)px/)[1]), w0 = ctx.measureText(text).width;
+    if (w0 <= maxW) return { lines: [text], px: px0, fit: true };
+    const p1 = px0 * maxW / w0;
+    if (p1 >= px0 * min) { setPx(ctx, p1); return { lines: [text], px: p1, fit: true }; }
+    if (maxLines > 1) {
+      for (let sc = 1; sc >= min - 1e-9; sc -= .02) {
+        const p = px0 * sc; setPx(ctx, p);
+        const L = wrapWords(ctx, text, maxW);
+        if (L.length <= maxLines && L.every((l) => ctx.measureText(l).width <= maxW) && L.length * p * lineH <= maxH + .5) return { lines: L, px: p, fit: true };
+      }
+    }
+    const p = px0 * min; setPx(ctx, p);
+    const n = Math.max(1, Math.min(maxLines, Math.floor(maxH / (p * lineH)) || 1));
+    const L = wrapWords(ctx, text, maxW), kept = L.slice(0, n);
+    kept[kept.length - 1] = ellipsize(ctx, kept[kept.length - 1], maxW, undefined, L.length > n);
+    return { lines: kept.map((l) => ellipsize(ctx, l, maxW)), px: p, fit: false };
+  }
+  // Slot text at a fixed position: designed size, shrinks to maxW, wraps downward only when the caller says its layout
+  // has room (lines > 1), otherwise shortened + flagged. Untouched wording that fits draws exactly as before.
+  function fillFit(ctx, s, id, text, x, y, maxW, { lines = 1, lineH = 1.2 } = {}) {
     if (!text) return;
-    const w = ctx.measureText(text).width;
-    if (w <= maxW) { ctx.fillText(text, x, y); return; }
-    const k = maxW / w, f = ctx.font;
-    ctx.font = f.replace(/(\d*\.?\d+)px/, (m, px) => `${parseFloat(px) * Math.max(k, TEXT_MIN_FIT)}px`);
-    if (k < TEXT_MIN_FIT) s._warn?.add(id);
-    ctx.fillText(text, x, y, maxW);
+    const f = ctx.font, r = fitText(ctx, text, maxW, { lines, min: fitRule(s, id).min, lineH });
+    if (!r.fit) s._warn?.add(id);
+    r.lines.forEach((l, i) => ctx.fillText(l, x, y + i * r.px * lineH));
     ctx.font = f;
   }
-  // One line of slot text set in a box (lettering replaced by typed wording), baseline on the box's bottom edge like the
-  // artwork it stands in for. It is set at the size the ORIGINAL wording has in that box, so a new word looks like the
-  // lettering it replaces; longer wording shrinks to the box width. growLeft: empty page space (same units as w) a short
-  // label may widen into, keeping its right edge (e.g. a "Date" label that ends at its writing line).
-  function typesetInBox(ctx, s, id, text, x, y, w, h, fam, color, scale = 1, { orig = text, growLeft = 0, weight = 500 } = {}) {
+  // Slot text set in a box (lettering replaced by typed wording), last baseline on the box's bottom edge like the
+  // artwork it stands in for. Designed size = the size the ORIGINAL wording has in that box, so a new word looks like
+  // the lettering it replaces. Longer wording shrinks to the slot's minimum, then wraps if the box (plus growUp: open
+  // space above it inside the design) has room for the slot's lines. growLeft: open space a one-line label may widen
+  // into, keeping its right edge (a "Date" label that ends at its writing line).
+  // designLines: the original lettering is set on that many lines (typed wording then fills the same lines first).
+  function typesetInBox(ctx, s, id, text, x, y, w, h, fam, color, scale = 1, { orig = text, growLeft = 0, growUp = 0, weight = 500, designLines = 1 } = {}) {
     if (!text) return;
+    const rule = fitRule(s, id), GAP = .35;               // gap between wrapped lines, in cap heights
     ctx.save(); ctx.fillStyle = color; ctx.textBaseline = 'alphabetic';
     ctx.font = `${weight} 100px "${fam}", Georgia, serif`;
-    const fitPx = (t, bw) => { const m = ctx.measureText(t); return Math.min(100 * h / (m.actualBoundingBoxAscent || 70), 100 * bw / Math.max(1, m.width)); };
-    const px0 = fitPx(orig, w), mw = ctx.measureText(text).width;
-    let px = Math.min(px0, fitPx(text, w)), bx = x, bw = w;
-    if (growLeft && px < px0) { bw = Math.min(w + growLeft, w * px0 / px); bx = x + w - bw; px = Math.min(px0, 100 * bw / Math.max(1, mw)); }
-    if (px < px0 * TEXT_MIN_FIT) s._warn?.add(id);
-    px *= scale;
-    ctx.font = `${weight} ${px}px "${fam}", Georgia, serif`;
-    if (bw > w) { ctx.textAlign = 'right'; ctx.fillText(text, bx + bw, y + h, bw); }
-    else { ctx.textAlign = 'center'; ctx.fillText(text, x + w / 2, y + h, w); }
-    ctx.restore();
+    const capOf = (t) => (ctx.measureText(t).actualBoundingBoxAscent || 70) / 100;          // cap height per px
+    const fitPx = (t, bw) => Math.min(h / capOf(t), 100 * bw / Math.max(1, ctx.measureText(t).width));
+    const px0 = fitPx(orig, w), mw = ctx.measureText(text).width / 100, done = (lines, px, fit, right = false, bw = w) => {
+      if (!fit) s._warn?.add(id);
+      ctx.font = `${weight} 100px "${fam}", Georgia, serif`;                       // capOf() measures at 100px
+      const cap = capOf(lines.join(' ')) * px * scale, pitch = cap * (1 + GAP);
+      ctx.font = `${weight} ${px * scale}px "${fam}", Georgia, serif`;
+      ctx.textAlign = right ? 'right' : 'center';
+      lines.forEach((l, i) => ctx.fillText(l, right ? x + w : x + w / 2, y + h - (lines.length - 1 - i) * pitch));
+      ctx.restore();
+    };
+    if (designLines > 1 && text !== orig) {
+      // A two-line design: the original words' two-line size is the designed size; typed wording takes the same lines
+      // (balanced), shrinking to the minimum; one line when it's short enough to sit on one at that size.
+      const n = designLines, capO = capOf(orig), oL = splitBalanced(ctx, orig) || [orig];
+      const pD = Math.min((h + growUp) / (capO * (n + GAP * (n - 1))), 100 * w / Math.max(1, ...oL.map((l) => ctx.measureText(l).width)));
+      for (let p = pD; p >= pD * rule.min - 1e-6; p -= pD * .02) {
+        const one = ctx.measureText(text).width * p / 100 <= w;
+        const L = one ? [text] : (splitBalanced(ctx, text) || [text]);
+        if (L.every((l) => ctx.measureText(l).width * p / 100 <= w)) { done(L, p, true); return; }
+      }
+      // Too long even at the minimum: the design's lines filled in reading order, "…" where the wording is cut.
+      const p = pD * rule.min;
+      ctx.font = `${weight} ${p}px "${fam}", Georgia, serif`;
+      const W2 = wrapWords(ctx, text, w), L = W2.slice(0, n);
+      L[L.length - 1] = ellipsize(ctx, L[L.length - 1], w, undefined, W2.length > n);
+      ctx.font = `${weight} 100px "${fam}", Georgia, serif`;
+      done(L.map((l) => { ctx.font = `${weight} ${p}px "${fam}", Georgia, serif`; const e = ellipsize(ctx, l, w); ctx.font = `${weight} 100px "${fam}", Georgia, serif`; return e; }), p, false); return;
+    }
+    // 1–3: one line at the designed size, shrinking (widening into growLeft first) down to the minimum.
+    let px = Math.min(px0, fitPx(text, w));
+    if (px >= px0 * rule.min && px >= px0 - 1e-6) { done([text], px, true); return; }
+    if (growLeft) {
+      const bw = Math.min(w + growLeft, mw * px0);
+      const p = Math.min(px0, bw / mw);
+      if (p >= px0 * rule.min) { done([text], p, true, bw > w, bw); return; }
+    } else if (px >= px0 * rule.min) { done([text], px, true); return; }
+    // 4: wrap inside the box (and any open space above it), largest size that fits.
+    const room = h + growUp, capH = capOf(text);
+    for (let n = 2; n <= rule.lines; n++) {
+      const maxPx = Math.min(px0, room / (capH * (n + GAP * (n - 1))));
+      for (let p = maxPx; p >= px0 * rule.min - 1e-6; p -= px0 * .02) {
+        ctx.font = `${weight} ${p}px "${fam}", Georgia, serif`;
+        const L = wrapWords(ctx, text, w);
+        if (L.length <= n && L.every((l) => ctx.measureText(l).width <= w)) { ctx.font = `${weight} 100px "${fam}", Georgia, serif`; done(L, p, true); return; }
+      }
+      ctx.font = `${weight} 100px "${fam}", Georgia, serif`;
+    }
+    // 5: at the minimum size, as many lines as the space holds, shortened with "…".
+    const p = px0 * rule.min, fw = w + growLeft;          // a widening label keeps its extra room
+    const n = Math.max(1, Math.min(rule.lines, Math.floor((room / (capH * p) + GAP) / (1 + GAP))));
+    ctx.font = `${weight} ${p}px "${fam}", Georgia, serif`;
+    const L = wrapWords(ctx, text, fw), kept = L.slice(0, n);
+    kept[kept.length - 1] = ellipsize(ctx, kept[kept.length - 1], fw, undefined, L.length > n);
+    const out = kept.map((l) => ellipsize(ctx, l, fw));
+    ctx.font = `${weight} 100px "${fam}", Georgia, serif`;
+    done(out, p, false, growLeft > 0, fw);
   }
 
   // ---------- Cover title ----------
@@ -1936,34 +2049,82 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
 
   // Real type for the cover title: a large first word over a small letter-spaced second line, both
   // measured with the font's actual glyph bounds and scaled down (never squashed) to fit the safe area.
+  // Longer wording: the whole title shrinks proportionally; below the cover title's minimum size, the title (and then
+  // the subtitle) may wrap to two lines inside the same safe area; if even that can't fit, the lines are shortened
+  // with "…" at the minimum size and flagged. The original wording always takes the one-line layout, as before.
   function drawCustomTitle(ctx, W, box, s) {
     const fam = `"${s.coverFont}", Georgia, serif`;
     const TOP_W = 600, SUB_W = 500, SUB = .4, TRACK = .24, GAP = .17;   // sub-line size, tracking (em) and gap, as fractions of the top size
     // The subtitle line is set in capitals by design (display only: the stored wording keeps its own case).
     const top = T(s, 'coverTitle'), sub = T(s, 'coverSubtitle').toUpperCase();
     ctx.textBaseline = 'alphabetic';                                    // glyph bounds are baseline-relative
-    const at = (px, t1 = top, t2 = sub) => {
-      ctx.font = `${TOP_W} ${px}px ${fam}`; const m1 = ctx.measureText(t1);
-      ctx.font = `${SUB_W} ${px * SUB}px ${fam}`; const m2 = ctx.measureText(t2), w2 = trackedWidth(ctx, t2, px * SUB * TRACK);
-      const a1 = m1.actualBoundingBoxAscent, d1 = m1.actualBoundingBoxDescent, a2 = m2.actualBoundingBoxAscent, d2 = m2.actualBoundingBoxDescent;
-      return { w: Math.max(m1.width, w2, 1), h: Math.max(1, a1 + d1 + px * GAP + a2 + d2), a1, d1, a2 };
+    // Rows of the title block at size px: title line(s) over subtitle line(s), each measured with its own glyph bounds.
+    const layout = (px, tops, subs) => {
+      const rows = [];
+      ctx.font = `${TOP_W} ${px}px ${fam}`;
+      tops.forEach((t) => { const m = ctx.measureText(t); rows.push({ t, sub: false, w: m.width, a: m.actualBoundingBoxAscent, d: m.actualBoundingBoxDescent }); });
+      ctx.font = `${SUB_W} ${px * SUB}px ${fam}`;
+      subs.forEach((t) => { const m = ctx.measureText(t); rows.push({ t, sub: true, w: trackedWidth(ctx, t, px * SUB * TRACK), a: m.actualBoundingBoxAscent, d: m.actualBoundingBoxDescent }); });
+      let h = 0;
+      rows.forEach((r, i) => { if (i) h += r.sub && !rows[i - 1].sub ? px * GAP : r.sub ? px * SUB * .5 : px * .1; r.y = h + r.a; h += r.a + r.d; });
+      return { rows, w: Math.max(1, ...rows.map((r) => r.w)), h: Math.max(1, h) };
     };
-    const ref = at(100);
-    const fit = Math.min(box.w / ref.w, box.h / ref.h) * 100;          // largest size that fits
-    // Longer wording scales the whole title down inside the same safe area; far smaller than the original wording would
-    // set is flagged as too long.
-    const orig = at(100, textSlot('dream', 'coverTitle').text, textSlot('dream', 'coverSubtitle').text.toUpperCase());
-    if (fit < Math.min(box.w / orig.w, box.h / orig.h) * 100 * TEXT_MIN_FIT) s._warn?.add(textEdited(s, 'coverTitle') ? 'coverTitle' : 'coverSubtitle');
+    const fitOf = (L) => Math.min(box.w / L.w, box.h / L.h) * 100;      // largest size that fits (layouts measured at 100px)
+    const split2 = (t) => {                                              // two balanced lines, or null for one word
+      const words = t.split(' ').filter(Boolean); if (words.length < 2) return null;
+      let best = null;
+      for (let i = 1; i < words.length; i++) {
+        const a = words.slice(0, i).join(' '), b = words.slice(i).join(' ');
+        const L = layout(100, [a, b], []); if (!best || L.w < best.w) best = { w: L.w, lines: [a, b] };
+      }
+      return best.lines;
+    };
+    const origFit = fitOf(layout(100, [textSlot('dream', 'coverTitle').text], [textSlot('dream', 'coverSubtitle').text.toUpperCase()]));
+    const minFit = origFit * FIT_RULES.coverTitle.min;
+    const t2 = split2(top), s2 = split2(sub);
+    const options = [[[top], [sub]], t2 && [t2, [sub]], s2 && [[top], s2], t2 && s2 && [t2, s2]].filter(Boolean);
+    let tops = [top], subs = [sub], fit = fitOf(layout(100, tops, subs));
+    if (fit < minFit) {
+      const ok = options.map(([a, b]) => ({ a, b, f: fitOf(layout(100, a, b)) })).filter((o) => o.f >= minFit).sort((x, y) => y.f - x.f)[0];
+      if (ok) ({ a: tops, b: subs, f: fit } = ok);
+      else {
+        // Too long even on two lines: at the minimum size, the line arrangement that keeps the most wording inside the
+        // safe area, each line shortened with "…" to the safe width.
+        s._warn?.add(textEdited(s, 'coverTitle') ? 'coverTitle' : 'coverSubtitle');
+        fit = minFit;
+        // n lines filled in reading order (as many words as fit on each), "…" only where wording is cut.
+        const fill = (t, n, width) => {
+          const words = t.split(' '), out = [];
+          while (words.length && out.length < n) {
+            let line = words.shift();
+            while (words.length && width(`${line} ${words[0]}`) <= box.w) line += ` ${words.shift()}`;
+            out.push(line);
+          }
+          const i = out.length - 1;
+          out[i] = ellipsize(ctx, out[i], box.w, width, words.length > 0);
+          return out;
+        };
+        const cut = (a, b) => {
+          ctx.font = `${TOP_W} ${fit}px ${fam}`; const ta = fill(top, a.length, (u) => ctx.measureText(u).width);
+          ctx.font = `${SUB_W} ${fit * SUB}px ${fam}`; const tb = fill(sub, b.length, (u) => trackedWidth(ctx, u, fit * SUB * TRACK));
+          const L = layout(fit, ta, tb);
+          return { a: ta, b: tb, fits: L.h <= box.h && L.w <= box.w + .5, kept: [...ta, ...tb].join('').replace(/…/g, '').length };
+        };
+        const best = options.map(([a, b]) => cut(a, b)).filter((o) => o.fits).sort((x, y) => y.kept - x.kept)[0] || cut([top], [sub]);
+        tops = best.a; subs = best.b;
+        fit = Math.min(fit, fitOf(layout(100, tops, subs)));
+      }
+    }
     const px = Math.min(fit, fit * .88 * (s.coverFontScale ?? 100) / 100);
-    const m = at(px);
+    const m = layout(px, tops, subs);
     const y0 = box.y + (box.h - m.h) / 2, cx = box.x + box.w / 2;
     ctx.save();
     ctx.fillStyle = coverTitleColor(s); ctx.textBaseline = 'alphabetic';
     if (s.titleShadow > 0) { ctx.shadowColor = `rgba(0,0,0,${s.titleShadow / 100 * .45})`; ctx.shadowBlur = W * .008; ctx.shadowOffsetX = W * .002; ctx.shadowOffsetY = W * .003; }
-    ctx.font = `${TOP_W} ${px}px ${fam}`; ctx.textAlign = 'center';
-    ctx.fillText(top, cx, y0 + m.a1);
-    ctx.font = `${SUB_W} ${px * SUB}px ${fam}`;
-    fillTracked(ctx, sub, cx, y0 + m.a1 + m.d1 + px * GAP + m.a2, px * SUB * TRACK);
+    m.rows.forEach((r) => {
+      if (r.sub) { ctx.font = `${SUB_W} ${px * SUB}px ${fam}`; fillTracked(ctx, r.t, cx, y0 + r.y, px * SUB * TRACK); }
+      else { ctx.font = `${TOP_W} ${px}px ${fam}`; ctx.textAlign = 'center'; ctx.fillText(r.t, cx, y0 + r.y); }
+    });
     ctx.restore();
   }
 
@@ -2302,7 +2463,9 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     }
   }
   // Canva text box -> canvas text: size in Canva px, baseline ≈ 76% down the box (Cormorant/Radley metrics).
-  function canvaText(ctx, W, H, text, { cx, top, h, size, family = 'head', color, italic = false, weight = 500, align = 'center', shadow = false, fitW = 0, s, onBox = false, bg = null, id = null }) {
+  // id: the text slot (edited wording follows the slot's fitting rules, lines > 1 wraps downward); orig: the original
+  // wording as this design displays it (its fitted size is the designed size for typed wording).
+  function canvaText(ctx, W, H, text, { cx, top, h, size, family = 'head', color, italic = false, weight = 500, align = 'center', shadow = false, fitW = 0, s, onBox = false, bg = null, id = null, orig = null, lines = 1 }) {
     const surface = bg || s.palette.paper;
     if (onBox) color = textOnPanel(s, color, surface);
     else color = family === 'body' ? bodyInk(s, color, surface) : textOn(color, surface, 3);
@@ -2311,13 +2474,15 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     let px = size * k * scale / 100;
     ctx.save();
     ctx.font = `${italic ? 'italic ' : ''}${weight} ${px}px "${fam}", Georgia, serif`;
-    if (fitW) {
-      const m = ctx.measureText(text).width;
-      if (m > fitW * k) { if (id && fitW * k / m < TEXT_MIN_FIT) s._warn?.add(id); px *= fitW * k / m; ctx.font = `${italic ? 'italic ' : ''}${weight} ${px}px "${fam}", Georgia, serif`; }
-    }
+    const edited = id && textEdited(s, id), ref = edited ? (orig ?? textSlot(s.journal, id)?.text ?? text) : text;
+    if (fitW) { const m = ctx.measureText(ref).width; if (m > fitW * k) { px *= fitW * k / m; ctx.font = `${italic ? 'italic ' : ''}${weight} ${px}px "${fam}", Georgia, serif`; } }
     ctx.fillStyle = color; ctx.textAlign = align; ctx.textBaseline = 'alphabetic';
     if (shadow) { ctx.shadowColor = 'rgba(0,0,0,.28)'; ctx.shadowBlur = 4 * k; ctx.shadowOffsetY = 2 * k; }
-    ctx.fillText(text, cX(W, H, cx), cY(W, H, top + h * .76));
+    if (edited && fitW) {
+      const r = fitText(ctx, text, fitW * k, { lines, min: fitRule(s, id).min, lineH: 1.15 });
+      if (!r.fit) s._warn?.add(id);
+      r.lines.forEach((l, i) => ctx.fillText(l, cX(W, H, cx), cY(W, H, top + h * .76) + i * r.px * 1.15));
+    } else ctx.fillText(text, cX(W, H, cx), cY(W, H, top + h * .76));
     ctx.restore();
   }
   // Header titles as set on each Canva page (Notes/Keys/Dream/Interpretation Summary).
@@ -2596,8 +2761,8 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
         const { k } = canvaFit(W, H), bx = cX(W, H, 134.71), by = cY(W, H, 321.12), bw = 546.58 * k, bh = 413.24 * k;
         ctx.fillStyle = p.highlight; ctx.fillRect(bx, by, bw, bh);
         ctx.strokeStyle = p.paper; ctx.lineWidth = 8 * k; ctx.strokeRect(bx, by, bw, bh);
-        canvaText(ctx, W, H, withColon(s, 'belongsLabel'), { cx: 159.9, top: 387.8, h: 57.5, size: 48.4, italic: true, weight: 400, align: 'left', color: p.title, fitW: 500, s, onBox: true, bg: p.highlight, id: 'belongsLabel' });
-        canvaText(ctx, W, H, withColon(s, 'dateLabel'), { cx: 159.9, top: 550.3, h: 57.5, size: 48.4, italic: true, weight: 400, align: 'left', color: p.title, fitW: 500, s, onBox: true, bg: p.highlight, id: 'dateLabel' });
+        canvaText(ctx, W, H, withColon(s, 'belongsLabel'), { cx: 159.9, top: 387.8, h: 57.5, size: 48.4, italic: true, weight: 400, align: 'left', color: p.title, fitW: 500, s, onBox: true, bg: p.highlight, id: 'belongsLabel', orig: 'This Journal Belongs To:' });
+        canvaText(ctx, W, H, withColon(s, 'dateLabel'), { cx: 159.9, top: 550.3, h: 57.5, size: 48.4, italic: true, weight: 400, align: 'left', color: p.title, fitW: 500, s, onBox: true, bg: p.highlight, id: 'dateLabel', orig: 'Date:' });
         return;
       } else if (s.marble === 'floral') {
         // Floral colors with a non-floral header style: keep the simple corner treatment.
@@ -2638,7 +2803,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
         drawFloralArt(ctx, W, H, s, FLORAL_ART.howto3);
         ctx.fillStyle = p.plate; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
         ctx.font = headFont(H * .06, { weight: 600, italic: true });
-        const title = T(s, 'howtoTitle'), sc = Math.max(TEXT_MIN_FIT, Math.min(1, W * .77 / Math.max(1, ctx.measureText(title).width)));
+        const title = T(s, 'howtoTitle'), sc = textEdited(s, 'howtoTitle') ? 1 : Math.min(1, W * .77 / Math.max(1, ctx.measureText(title).width));
         ctx.font = headFont(H * .06 * sc, { weight: 600, italic: true }); fillFit(ctx, s, 'howtoTitle', title, W / 2, H * .118, W * .77);
       } else {
         if (s.footer === 'on') stoneBar(ctx, 0, 0, W, H * .022, s);
@@ -2742,7 +2907,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
         [['N = Not Interpreted', 348], ['I = Interpreted', 512.2], ['A = Application', 659.1]].forEach(([t, x]) => canvaText(ctx, W, H, t, { family: 'body', color: c, cx: x, top: 42.9, h: 24.1, size: 20.6, weight: 400, s }));
         pill(52.9, 93);
         // This design sets the title in capitals (display only).
-        canvaText(ctx, W, H, T(s, 'contentsTitle').toUpperCase(), { family: 'body', color: c, cx: 403.3, top: 99, h: 53.4, size: 45, fitW: 640, s, id: 'contentsTitle' });
+        canvaText(ctx, W, H, T(s, 'contentsTitle').toUpperCase(), { family: 'body', color: c, cx: 403.3, top: 99, h: 53.4, size: 45, fitW: 640, s, id: 'contentsTitle', orig: 'TABLE OF CONTENTS' });
         pill(59.3, 184.9);
         [['Date', 150.7], ['Name', 394], ['Status', 641]].forEach(([t, x]) => canvaText(ctx, W, H, t, { family: 'body', color: c, cx: x, top: 198.3, h: 46, size: 39.2, s }));
         const box = ASSETS['el:checkbox']; if (!box) ensureAsset('el:checkbox').catch(() => {});
@@ -2861,7 +3026,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
         const { k } = canvaFit(W, H);
         [['keyActions', 112.27, 171.2, 249], ['keySymbols', 427.5, 171.2, 568.8], ['keyEmotions', 110.51, 597.9, 249.2], ['keyScriptures', 427.5, 597.9, 571]].forEach(([id, l, top, lx]) => {
           ctx.fillStyle = readingPanel(p, s); ctx.fillRect(cX(W, H, l), cY(W, H, top), 277.47 * k, 392.83 * k);
-          canvaText(ctx, W, H, T(s, id), { cx: lx, top: top + (id === 'keyEmotions' || id === 'keyScriptures' ? 21 : 0), h: 41.5, size: 35.17, color: p.plate, shadow: true, s, fitW: 260, id });
+          canvaText(ctx, W, H, T(s, id), { cx: lx, top: top + (id === 'keyEmotions' || id === 'keyScriptures' ? 21 : 0), h: 41.5, size: 35.17, color: p.plate, shadow: true, s, fitW: 260, id, lines: 2 });
         });
         return;
       }
@@ -2870,7 +3035,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
         const x = W * fx, y = H * fy, w = W * .335, h = H * .37;
         if (isFloral) { ctx.fillStyle = readingSurface(p); roundRect(ctx, x, y, w, h, W * .012); ctx.fill(); ctx.strokeStyle = p.plate; ctx.lineWidth = Math.max(1.5, W * .0028); ctx.stroke(); }
         else { ctx.strokeStyle = soft; ctx.lineWidth = Math.max(1.5, W * .003); ctx.strokeRect(x, y, w, h); }
-        ctx.fillStyle = isFloral ? p.plate : label; ctx.font = font(H * .024); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; fillFit(ctx, s, id, T(s, id), x + w / 2, y + H * .042, w * .9);
+        ctx.fillStyle = isFloral ? p.plate : label; ctx.font = font(H * .024); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; fillFit(ctx, s, id, T(s, id), x + w / 2, y + H * .042, w * .9, { lines: 2 });
         // A single small sprig peeking from each box's right edge, sized to stay clear of the neighbouring box.
         if (isFloral && ASSETS.floralHeader) {
           const sw = w * .22, sh = sw * .9, sx = x + w - sw * .45, sy = y + h * .58 - sh / 2;
@@ -2915,7 +3080,9 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   // Cover titles typed in the cover font when Cover lettering = Custom font.
   const LETTER_TEXT = { 'pink-prayer': 'PRAYER', 'pink-journal': 'JOURNAL', 'pw-prayer': 'PRAYER', 'pw-journal': 'JOURNAL', 'ww-title': 'WARRING WOMAN', 'ww-sub': 'PRAYER JOURNAL' };
   // Date labels end at their writing line with open header space to their left: typed wording may widen into it (Canva px).
-  const LETTER_GROW = { 'pink-date': 200, 'pw-date': 220 };
+  // Titles with open space above them inside the design may wrap upward into it (Canva px).
+  // lines: the original lettering's own line count (Warring Woman's title is set on two lines).
+  const LETTER_GROW = { 'pink-date': { left: 200 }, 'pw-date': { left: 220 }, 'pink-prayer': { up: 100 }, 'pw-prayer': { up: 55 }, 'ww-title': { lines: 2 } };
   // The text slot each piece of lettering artwork says (the Dove Expressions signature is brand artwork, not a slot).
   const LETTER_SLOT = { 'pink-prayer': 'coverTitle', 'pink-journal': 'coverSubtitle', 'pink-journaling': 'sugTitle', 'pink-suggestions': 'sugSubtitle',
     'pink-dear': 'letterGreeting', 'pink-date': 'dateLabel', 'pw-prayer': 'coverTitle', 'pw-journal': 'coverSubtitle', 'pw-date': 'dateLabel',
@@ -3075,7 +3242,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     if ((s.titleStyle === 'custom' && isTitle) || (slot && textEdited(s, slot))) {
       const text = slot ? T(s, slot) : LETTER_TEXT[name], orig = slot ? textSlot(s.journal, slot)?.text ?? text : text;
       const fam = isTitle ? s.coverFont : (s.headingFont || s.bodyFont), scale = (isTitle ? s.coverFontScale : s.headingFontScale) / 100;
-      typesetInBox(ctx, s, slot, text, ox + l * k, oy + t * k, w * k, h * k, fam, color, scale, { orig, growLeft: (LETTER_GROW[name] || 0) * k });
+      typesetInBox(ctx, s, slot, text, ox + l * k, oy + t * k, w * k, h * k, fam, color, scale, { orig, growLeft: (LETTER_GROW[name]?.left || 0) * k, growUp: (LETTER_GROW[name]?.up || 0) * k, designLines: LETTER_GROW[name]?.lines || 1 });
       return;
     }
     const key = `lt:${name}`, img = ASSETS[key];
@@ -4080,7 +4247,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       const long = slot.text.length > 60;
       row.innerHTML = `<div class="head"><span><strong></strong><small></small></span><button class="reset" type="button">Reset</button></div>
         ${long ? '<textarea rows="3"></textarea>' : '<input type="text">'}
-        <div class="orig"></div><span class="hint warn hidden">Too long to fit here: it’s been squeezed to stay inside its space. Try shorter wording.</span>`;
+        <div class="orig"></div><span class="hint warn hidden">Too long to fit here. It’s been shortened with “…” to stay inside its space. Try shorter wording.</span>`;
       row.querySelector('strong').textContent = slot.label;
       row.querySelector('small').textContent = ROLE_NAMES[slot.role] || '';
       row.querySelector('.orig').textContent = `Original: ${slot.text}`;
@@ -4320,7 +4487,8 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
 
   $('exportCover').onclick = async () => {
     if (busy) return; setBusy(true, 'Preparing cover…');
-    try { const c = document.createElement('canvas'); renderCover(c, 2666, state); download(await toBlob(c, 'image/png'), `marble-journal-cover-${slug()}.png`); toast('Production-size cover downloaded'); }
+    // Through renderPage, like the preview and the PDF: it picks the selected journal's own cover renderer.
+    try { const c = document.createElement('canvas'); renderPage(c, 2666, state, 'cover'); download(await toBlob(c, 'image/png'), `marble-journal-cover-${slug()}.png`); toast('Production-size cover downloaded'); }
     catch { toast('Cover export stopped. Please try again.'); } finally { setBusy(false); }
   };
   $('exportLined').onclick = async () => {
