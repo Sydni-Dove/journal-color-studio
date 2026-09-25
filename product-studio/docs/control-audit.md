@@ -141,3 +141,67 @@ It was verified in Chromium on the rendered DOM as well.
 There is no desk-pad **monthly** layout yet. The weekly desk pad is not a
 month calendar. A future desk-pad monthly must use `calendarGrid` and will
 inherit this automatically.
+
+## Follow-up — connected weekly grid (2026-09-25)
+
+**Why it looked disconnected.** The weekly spread was assembled from
+free-standing cards:
+- Slots were spaced by the `column` spacing token (vertical variant) or the
+  `row` token (horizontal variant).
+- Each Morning / Afternoon / Evening section was a `section(..., { boxed: true })`
+  with its own border, separated from the next by the `row` gap.
+- Each horizontal day row drew its own box.
+- The sidebar / notes slot was another boxed card.
+
+Days themselves drew no outline. So a day column read as three stacked
+cards, and the page read as 12 cards with gutters between them. Both
+pages already used the same grid logic (`distributeEqual` over 4 slots). The
+difference was never left vs right; it was cards vs grid.
+
+**What changed.** This is a structural fix at the shared layer.
+
+- `components.ts` adds:
+  - `connectedTracks()`: N contiguous tracks at `PLANNER_GRID_GAP_IN = 0`
+    (the same rule as `CALENDAR_GRID_GAP_IN`), stroked once as one square
+    outer border plus one shared rule per interior boundary;
+  - `runsOf()`;
+  - a `padded` section option that keeps the inset but draws no border.
+- In `weeklySpread.ts`, both pages build one `connectedTracks` grid, so days
+  and sections never draw boxes. The spread keeps its separate outer slot;
+  on each page:
+  - **vertical**: one header rule runs across the whole grid. Section
+    dividers are drawn once per run of neighboring days. The sidebar or
+    notes title sits in the same header row, and its content sits below
+    the rule.
+  - **horizontal**: one label-column rule runs per run of day rows. The
+    sidebar or notes row spans the full width.
+- Header labels use the full `boxPadding` inset, so dates clear the shared
+  rules.
+- `fitWeekly` measures with the zero gap.
+
+The physical geometry is unchanged: trim, margins, safe area, header zone
+and body rectangle are all the same. Only the internal division changes.
+Slot width is now W / 4 instead of (W − 3·gap) / 4.
+
+**Intentional spacing that remains:**
+- the spread gutter between left and right pages (binding geometry);
+- the header gap between the week title and the grid;
+- the `boxPadding` inset of text and writing surfaces inside each
+  cell, so ink never touches a rule;
+- the `column` gap between the day label and the writing lines in the
+  horizontal variant (inside a cell, not between cells).
+
+**Tests.** `tests/weekly-grid.test.tsx` covers 7×9 with sidebar and with
+notes, Half Letter, and Franklin Compact with sidebar and with notes. It
+checks both pages of each and asserts:
+- the four slots are contiguous and tile the grid exactly;
+- the only box on the page is the square grid border;
+- there are 3 shared slot rules, exactly on the boundaries;
+- vertical: one full-width header rule; section dividers cover exactly the
+  day columns once; sections inside a day are contiguous;
+- horizontal: label rules cover exactly the day rows at one x;
+- the rendered markup has no `-box` card rectangles.
+
+Chromium DOM check across all 10 pages found: 0 card rects, `rx = 0`,
+3 shared rules, 0 px track-width spread, no doubled lines. Every page of
+all six scenarios validates with 0 errors and 0 warnings.

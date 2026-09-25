@@ -11,16 +11,21 @@
  *   sidebar ON : verso = [sidebar, Mon, Tue, Wed]   recto = [Thu … Sun]
  *   sidebar OFF: verso = [Mon … Thu]                recto = [Fri, Sat, Sun, notes]
  * The extra slot always sits on the OUTER edge. Slots are equal on both pages.
+ *
+ * Both pages are ONE connected grid (connectedTracks, zero gap): the grid
+ * draws its outer border and one shared rule between neighbouring slots;
+ * the header rule and section dividers are drawn once across each run of
+ * neighbouring days. Days and sections never draw their own boxes.
  */
 import { formatWeekRange, formatWeekRangeShort, MONTH_NAMES, parseIso } from "../../engines/calendar/calendar";
-import { distributeEqual, solveStack } from "../../engines/layout/math";
+import { distributeEqual } from "../../engines/layout/math";
 import { STUDIO_PLANNER, STUDIO_STROKES, STUDIO_WEEKLY_VARIANTS } from "../../presets/studioDefaults";
 import type { CalendarDay } from "../../types/calendar";
 import type { Rect } from "../../types/geometry";
 import type { LayoutDiagnostic, LayoutMetric, LayoutNode, SolvedPage } from "../../types/layout";
 import type { WordingKey } from "../../types/tokens";
-import { headerTitle, pageFrame, section, writingSurface } from "../shared/components";
-import { box, group, lineBoxIn, rule, stackDiagnostic, text } from "../shared/nodes";
+import { connectedTracks, headerTitle, pageFrame, PLANNER_GRID_GAP_IN, runsOf, section, writingSurface } from "../shared/components";
+import { group, lineBoxIn, rule, text } from "../shared/nodes";
 import type { FitContext, FitResult, LayoutContext, LayoutDefinition } from "../shared/types";
 
 const SLOTS_PER_PAGE = 4;
@@ -40,13 +45,14 @@ export function fitWeekly(ctx: FitContext): FitResult {
   const s = ctx.spacing;
   const b = bodySize(ctx);
   const V = STUDIO_WEEKLY_VARIANTS.vertical, H = STUDIO_WEEKLY_VARIANTS.horizontal;
-  const slotW = (b.w - (SLOTS_PER_PAGE - 1) * s.column) / SLOTS_PER_PAGE;
+  // Connected grid: tracks are contiguous (PLANNER_GRID_GAP_IN = 0).
+  const slotW = (b.w - (SLOTS_PER_PAGE - 1) * PLANNER_GRID_GAP_IN) / SLOTS_PER_PAGE;
   const sections = Math.max(1, ctx.options.sectionsPerDay);
-  const sectionH = (b.h - STUDIO_PLANNER.dayHeader.valueIn - s.row - (sections - 1) * s.row) / sections;
+  const sectionH = (b.h - STUDIO_PLANNER.dayHeader.valueIn) / sections;
   if (slotW + 1e-6 >= V.minSlotW.valueIn && sectionH + 1e-6 >= V.minSectionH.valueIn) {
     return { ok: true, variant: "vertical", variantLabel: "Vertical day columns", sidebarAvailable: true };
   }
-  const rowH = (b.h - (SLOTS_PER_PAGE - 1) * s.row) / SLOTS_PER_PAGE;
+  const rowH = (b.h - (SLOTS_PER_PAGE - 1) * PLANNER_GRID_GAP_IN) / SLOTS_PER_PAGE;
   const writingW = b.w - H.dayLabelW.valueIn - s.column;
   if (rowH + 1e-6 >= H.minRowH.valueIn && writingW + 1e-6 >= H.minWritingW.valueIn) {
     return { ok: true, variant: "horizontal", variantLabel: "Horizontal day rows (insert)", sidebarAvailable: true };
@@ -57,39 +63,45 @@ export function fitWeekly(ctx: FitContext): FitResult {
   };
 }
 
-function dayHeaderNodes(id: string, head: Rect, weekdayName: string, day: CalendarDay, ctx: LayoutContext): LayoutNode[] {
+/** Day name (left) + date (right), bottom-aligned on the shared header rule. */
+function headerLabels(id: string, head: Rect, label: string, date: string | null, ctx: LayoutContext): LayoutNode[] {
   const labelH = lineBoxIn(ctx.typography, "subheading");
   const dateH = lineBoxIn(ctx.typography, "date");
-  const pad = ctx.spacing.boxPadding / 2;
+  // Same inset as the sections below, so labels clear the shared rules.
+  const pad = ctx.spacing.boxPadding;
   const bottom = head.y + head.h;
-  return [
-    text(`${id}-name`, { x: head.x + pad, y: bottom - labelH, w: head.w * 0.62 - pad, h: labelH }, weekdayName, "subheading", { component: "SectionHeader", align: "left", vAlign: "bottom" }),
-    text(`${id}-date`, { x: head.x + head.w * 0.62, y: bottom - dateH, w: head.w * 0.38 - pad, h: dateH }, String(day.day), "date", { component: "SectionHeader", align: "right", vAlign: "bottom" }),
-    rule(`${id}-rule`, head.x, bottom, head.x + head.w, bottom, { strokePt: STUDIO_STROKES.headerRulePt }),
+  const nameW = date === null ? head.w - 2 * pad : head.w * 0.62 - pad;
+  const nodes: LayoutNode[] = [
+    text(`${id}-name`, { x: head.x + pad, y: bottom - labelH, w: nameW, h: labelH }, label, "subheading", { component: "SectionHeader", align: "left", vAlign: "bottom" }),
   ];
+  if (date !== null) {
+    nodes.push(text(`${id}-date`, { x: head.x + head.w * 0.62, y: bottom - dateH, w: head.w * 0.38 - pad, h: dateH }, date, "date", { component: "SectionHeader", align: "right", vAlign: "bottom" }));
+  }
+  return nodes;
 }
 
+/**
+ * Vertical day column inside the connected grid. The column draws NO border:
+ * its left/right edges are the grid's shared rules, the header rule and the
+ * section dividers are drawn once per run of neighbouring days by the page.
+ */
 function dayColumn(id: string, rect: Rect, day: CalendarDay, weekdayName: string, ctx: LayoutContext): { nodes: LayoutNode[]; diagnostics: LayoutDiagnostic[] } {
-  const s = ctx.spacing;
-  const st = solveStack(rect.y, rect.h, [
-    { id: "head", kind: "fixed", size: STUDIO_PLANNER.dayHeader.valueIn },
-    { id: "body", kind: "elastic", min: 0 },
-  ], s.row);
-  const head = { ...rect, y: st.byId.head.start, h: st.byId.head.size };
-  const body = { ...rect, y: st.byId.body.start, h: st.byId.body.size };
-  const nodes: LayoutNode[] = [group(id, "Section", rect), ...dayHeaderNodes(id, head, weekdayName, day, ctx)];
+  const head = { ...rect, h: STUDIO_PLANNER.dayHeader.valueIn };
+  const body = { ...rect, y: rect.y + head.h, h: rect.h - head.h };
+  const nodes: LayoutNode[] = [group(id, "Section", rect), ...headerLabels(id, head, weekdayName, String(day.day), ctx)];
   const n = Math.max(1, ctx.options.sectionsPerDay);
-  const rows = distributeEqual(body.y, body.h, n, s.row);
-  const diagnostics: LayoutDiagnostic[] = [...stackDiagnostic(st, id, "Day header")];
+  const rows = distributeEqual(body.y, body.h, n, PLANNER_GRID_GAP_IN);
+  const diagnostics: LayoutDiagnostic[] = [];
   rows.starts.forEach((y, i) => {
     const title = n === 3 ? ctx.wording[SECTION_KEYS[i]] : "";
-    const sec = section(`${id}-s${i}`, { x: body.x, y, w: body.w, h: rows.size }, title, ctx, "surface", { boxed: true, titleRole: "label" });
+    const sec = section(`${id}-s${i}`, { x: body.x, y, w: body.w, h: rows.size }, title, ctx, "surface", { padded: true, titleRole: "label" });
     nodes.push(...sec.nodes);
     diagnostics.push(...sec.diagnostics);
   });
   return { nodes, diagnostics };
 }
 
+/** Horizontal day row inside the connected grid (label column | writing). */
 function dayRow(id: string, rect: Rect, day: CalendarDay, weekdayName: string, ctx: LayoutContext): LayoutNode[] {
   const s = ctx.spacing;
   const labelW = STUDIO_WEEKLY_VARIANTS.horizontal.dayLabelW.valueIn;
@@ -99,10 +111,8 @@ function dayRow(id: string, rect: Rect, day: CalendarDay, weekdayName: string, c
   const dateH = lineBoxIn(ctx.typography, "date");
   return [
     group(id, "Section", rect),
-    box(`${id}-box`, rect, { component: "Section", strokePt: STUDIO_STROKES.boxRulePt }),
     text(`${id}-name`, { x: labelRect.x + s.boxPadding, y: labelRect.y + s.boxPadding, w: labelW - 2 * s.boxPadding, h: nameH }, weekdayName, "subheading", { component: "SectionHeader", vAlign: "top" }),
     text(`${id}-date`, { x: labelRect.x + s.boxPadding, y: labelRect.y + s.boxPadding + nameH, w: labelW - 2 * s.boxPadding, h: dateH }, String(day.day), "date", { component: "SectionHeader", vAlign: "top" }),
-    rule(`${id}-divider`, rect.x + labelW, rect.y, rect.x + labelW, rect.y + rect.h, { strokePt: STUDIO_STROKES.gridRulePt }),
     ...writingSurface(`${id}-surface`, writing, ctx),
   ];
 }
@@ -164,15 +174,15 @@ export const weeklySpread: LayoutDefinition = {
       const title = p === 0 ? weekLabel : monthLabel;
       const nodes: LayoutNode[] = [...frame.nodes, ...headerTitle(`wk${p}-header`, frame.header, title, "weekTitle", p === 0 ? "left" : "right")];
       const diagnostics = [...frame.diagnostics];
-      const tracks = horizontal
-        ? distributeEqual(frame.body.y, frame.body.h, SLOTS_PER_PAGE, s.row)
-        : distributeEqual(frame.body.x, frame.body.w, SLOTS_PER_PAGE, s.column);
+      const grid = connectedTracks(`wk${p}-grid`, frame.body, SLOTS_PER_PAGE, horizontal ? "rows" : "columns");
+      const tracks = grid.tracks;
       sizes.push(tracks.size);
-      nodes.push(group(`wk${p}-grid`, "Grid", frame.body, horizontal ? { rowEdges: tracks.edges } : { columnEdges: tracks.edges }));
+      nodes.push(...grid.nodes);
+      const isDay = (i: number) => slots[p][i].kind === "day";
+      const strokePt = STUDIO_STROKES.gridRulePt;
+      const headH = STUDIO_PLANNER.dayHeader.valueIn;
       slots[p].forEach((slot, i) => {
-        const r: Rect = horizontal
-          ? { x: frame.body.x, y: tracks.starts[i], w: frame.body.w, h: tracks.size }
-          : { x: tracks.starts[i], y: frame.body.y, w: tracks.size, h: frame.body.h };
+        const r = grid.trackRects[i];
         if (slot.kind === "day") {
           const id = `wk${p}-d${slot.index}`;
           if (horizontal) nodes.push(...dayRow(id, r, week.days[slot.index], names[slot.index], ctx));
@@ -181,22 +191,52 @@ export const weeklySpread: LayoutDefinition = {
             nodes.push(...d.nodes);
             diagnostics.push(...d.diagnostics);
           }
-        } else if (ctx.options.showSidebar) {
-          const sb = section(`wk${p}-sidebar`, r, ctx.wording[ctx.options.sidebarContent], ctx, "checklist", { boxed: true });
-          nodes.push(group(`wk${p}-sidebar-bounds`, "Sidebar", r), ...sb.nodes);
-          diagnostics.push(...sb.diagnostics);
+          return;
+        }
+        // The outer slot (sidebar or notes) is a track of the same grid.
+        const sidebar = ctx.options.showSidebar;
+        const sid = sidebar ? `wk${p}-sidebar` : `wk${p}-notes`;
+        const title = sidebar ? ctx.wording[ctx.options.sidebarContent] : ctx.wording.notes;
+        const content = sidebar ? "checklist" : "surface";
+        if (sidebar) nodes.push(group(`wk${p}-sidebar-bounds`, "Sidebar", r));
+        if (horizontal) {
+          const sec = section(sid, r, title, ctx, content, { padded: true, titleRole: "subheading" });
+          nodes.push(...sec.nodes);
+          diagnostics.push(...sec.diagnostics);
         } else {
-          const nt = section(`wk${p}-notes`, r, ctx.wording.notes, ctx, "surface", { boxed: true });
-          nodes.push(...nt.nodes);
-          diagnostics.push(...nt.diagnostics);
+          // Title sits in the shared header row, content below the header rule.
+          const head = { ...r, h: headH };
+          const sec = section(sid, { ...r, y: r.y + headH, h: r.h - headH }, "", ctx, content, { padded: true });
+          nodes.push(...headerLabels(sid, head, title, null, ctx), ...sec.nodes);
+          diagnostics.push(...sec.diagnostics);
         }
       });
+      const b = frame.body;
+      if (horizontal) {
+        // One label-column rule per run of neighbouring day rows.
+        const x = b.x + STUDIO_WEEKLY_VARIANTS.horizontal.dayLabelW.valueIn;
+        runsOf(SLOTS_PER_PAGE, isDay).forEach(([a, z], k) =>
+          nodes.push(rule(`wk${p}-label-rule${k}`, x, tracks.starts[a], x, tracks.starts[z] + tracks.size, { strokePt, component: "Grid" })),
+        );
+      } else {
+        // The header row is one rule across the whole grid.
+        nodes.push(rule(`wk${p}-head-rule`, b.x, b.y + headH, b.x + b.w, b.y + headH, { strokePt: STUDIO_STROKES.headerRulePt, component: "Grid" }));
+        // Section dividers: one rule per boundary per run of neighbouring days.
+        const n = Math.max(1, ctx.options.sectionsPerDay);
+        const secRows = distributeEqual(b.y + headH, b.h - headH, n, PLANNER_GRID_GAP_IN);
+        runsOf(SLOTS_PER_PAGE, isDay).forEach(([a, z], k) => {
+          for (let j = 1; j < n; j++) {
+            const y = secRows.starts[j];
+            nodes.push(rule(`wk${p}-sec${j}-run${k}`, tracks.starts[a], y, tracks.starts[z] + tracks.size, y, { strokePt, component: "Grid" }));
+          }
+        });
+      }
       const metrics: LayoutMetric[] = [
         { label: "Variant", value: horizontal ? 1 : 0, unit: "count", provenance: { geometryClass: "studio-recommended", basis: fit.variantLabel } },
         { label: "Week title zone", value: STUDIO_PLANNER.weeklyTitle.valueIn, unit: "in", provenance: STUDIO_PLANNER.weeklyTitle.provenance },
         horizontal
-          ? { label: "Day row height = (H − 3·gap) / 4", value: tracks.size, unit: "in", provenance: { geometryClass: "user-design", basis: `(${frame.body.h.toFixed(3)} − 3 × ${s.row}) / 4` } }
-          : { label: "Slot width = (W − 3·gap) / 4", value: tracks.size, unit: "in", provenance: { geometryClass: "user-design", basis: `(${frame.body.w.toFixed(3)} − 3 × ${s.column}) / 4` } },
+          ? { label: "Day row height = H / 4 (connected grid)", value: tracks.size, unit: "in", provenance: { geometryClass: "user-design", basis: `${frame.body.h.toFixed(3)} / 4, zero internal gap` } }
+          : { label: "Slot width = W / 4 (connected grid)", value: tracks.size, unit: "in", provenance: { geometryClass: "user-design", basis: `${frame.body.w.toFixed(3)} / 4, zero internal gap` } },
       ];
       if (!horizontal) metrics.push({ label: "Sections per day", value: ctx.options.sectionsPerDay, unit: "count", provenance: { geometryClass: "user-design", basis: "blueprint B2 default 3" } });
       return { nodes, diagnostics, metrics };

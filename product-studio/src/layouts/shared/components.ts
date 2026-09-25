@@ -145,11 +145,17 @@ export function section(
   title: string,
   ctx: LayoutContext,
   content: "surface" | "checklist" | "blank",
-  opts: { boxed?: boolean; titleRole?: "sectionHeading" | "subheading" | "label" } = {},
+  /**
+   * boxed  — the section draws its own border (a free-standing card).
+   * padded — inset like a boxed section but WITHOUT a border, for sections
+   *          that live inside a connected grid whose rules are drawn once by
+   *          the grid itself.
+   */
+  opts: { boxed?: boolean; padded?: boolean; titleRole?: "sectionHeading" | "subheading" | "label" } = {},
 ): { nodes: LayoutNode[]; diagnostics: LayoutDiagnostic[] } {
   const s = ctx.spacing;
   const titleRole = opts.titleRole ?? "sectionHeading";
-  const pad = opts.boxed ? s.boxPadding : 0;
+  const pad = opts.boxed || opts.padded ? s.boxPadding : 0;
   const inner: Rect = { x: rect.x + pad, y: rect.y + pad, w: rect.w - 2 * pad, h: rect.h - 2 * pad };
   const titleH = title ? lineBoxIn(ctx.typography, titleRole) : 0;
   const st = solveStack(inner.y, inner.h, [
@@ -244,6 +250,53 @@ export function calendarGrid(
       { label: "Cell padding", value: s.boxPadding, unit: "in", provenance: { ...derived, basis: "spacing token boxPadding (research 0.06–0.12\")" } },
     ],
   };
+}
+
+/**
+ * Planner grids (weekly spreads and any other multi-slot planner page) follow
+ * the same connected-grid rule as month grids: zero gap between tracks.
+ */
+export const PLANNER_GRID_GAP_IN = CALENDAR_GRID_GAP_IN;
+
+/**
+ * N equal contiguous tracks (columns or rows) stroked ONCE: an outer border
+ * plus one shared rule per boundary between neighbouring tracks. Content
+ * placed in the tracks must not draw its own border.
+ */
+export function connectedTracks(
+  id: string,
+  rect: Rect,
+  count: number,
+  axis: "columns" | "rows",
+  strokePt: number = STUDIO_STROKES.gridRulePt,
+): { tracks: ReturnType<typeof distributeEqual>; trackRects: Rect[]; nodes: LayoutNode[] } {
+  const cols = axis === "columns";
+  const tracks = distributeEqual(cols ? rect.x : rect.y, cols ? rect.w : rect.h, count, PLANNER_GRID_GAP_IN);
+  const trackRects = tracks.starts.map((t): Rect => (cols ? { x: t, y: rect.y, w: tracks.size, h: rect.h } : { x: rect.x, y: t, w: rect.w, h: tracks.size }));
+  const nodes: LayoutNode[] = [
+    group(id, "Grid", rect, cols ? { columnEdges: tracks.edges } : { rowEdges: tracks.edges }),
+    box(`${id}-border`, rect, { component: "Grid", strokePt }),
+  ];
+  for (let i = 1; i < count; i++) {
+    const t = tracks.starts[i];
+    nodes.push(
+      cols
+        ? rule(`${id}-v${i}`, t, rect.y, t, rect.y + rect.h, { strokePt, component: "Grid" })
+        : rule(`${id}-h${i}`, rect.x, t, rect.x + rect.w, t, { strokePt, component: "Grid" }),
+    );
+  }
+  return { tracks, trackRects, nodes };
+}
+
+/** Group consecutive indices where `pred` holds into [first, last] runs. */
+export function runsOf(count: number, pred: (i: number) => boolean): Array<[number, number]> {
+  const runs: Array<[number, number]> = [];
+  for (let i = 0; i < count; i++) {
+    if (!pred(i)) continue;
+    if (runs.length && runs[runs.length - 1][1] === i - 1) runs[runs.length - 1][1] = i;
+    else runs.push([i, i]);
+  }
+  return runs;
 }
 
 /** Weekday labels over equal columns. */
