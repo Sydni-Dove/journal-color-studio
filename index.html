@@ -327,6 +327,14 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
     floralCorner: 'floral-corner.png',     // large corner bouquet: frames the Belongs-to page
     divider: 'ornament-divider.png',       // gold ornament divider (alpha mask)
     handLines: 'lines-hand.png',
+    'pattern:cabana': 'pattern-cabana.png',       // ink maps of the Canva stripe/pattern designs (0 = light ground, 255 = full ink)
+    'pattern:pinstripe': 'pattern-pinstripe.png',
+    'pattern:bias': 'pattern-bias.png',
+    'pattern:candy': 'pattern-candy.png',
+    'pattern:scribble': 'pattern-scribble.png',
+    'pattern:abstract0': 'pattern-abstract-0.png',  // abstract arches: RGB = coverage of ground, lines, leaf
+    'pattern:abstract1': 'pattern-abstract-1.png',  //   arc, striped circle, sun
+    'pattern:abstract2': 'pattern-abstract-2.png',  //   sun-over-leaf overlap, loop
     logo: 'dove-logo.png',                 // Dove Expressions wordmark, kept in its brand colors           // 11 hand-drawn ruled lines stacked as equal-height strips (alpha mask)
   };
   // Script lettering bounds inside its full-page mask, and the bevel plate geometry from the Canva cover (page fractions).
@@ -348,10 +356,15 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
     { group: 'Page', key: 'line', label: 'Ruled lines', hint: 'Writing lines + margin rule' },
     // Pattern roles only show (and only matter) when a striped background is chosen. `variant` roles are
     // the ones a repeat click on the selected palette reassigns (see paletteVariants).
-    { group: 'Stripes', key: 'stripeBackground', label: 'Stripe background', hint: 'Gaps between stripes', pattern: true, variant: true },
-    { group: 'Stripes', key: 'stripePrimary', label: 'Primary stripes', hint: 'Every other stripe', pattern: true, variant: true },
-    { group: 'Stripes', key: 'stripeSecondary', label: 'Secondary stripes', hint: 'The alternating stripes', pattern: true, variant: true },
-    { group: 'Stripes', key: 'stripeAccent', label: 'Border line', hint: 'Thin pinline around the page', toggle: 'showStripeBorder', pattern: true, variant: true },
+    { group: 'Stripes + patterns', key: 'stripeBackground', label: 'Pattern background', hint: 'Light ground between stripes', pattern: true, variant: true },
+    { group: 'Stripes + patterns', key: 'stripePrimary', label: 'Stripes / stroke', hint: 'The printed stripes or brush stroke', pattern: true, variant: true },
+    { group: 'Stripes + patterns', key: 'stripeAccent', label: 'Border line', hint: 'Thin pinline around the page', toggle: 'showStripeBorder', pattern: true, variant: true },
+    // Abstract arches (Design Elements p.38): ground = Pattern background, arch lines = Stripes / stroke, plus its own shapes.
+    { group: 'Abstract shapes', key: 'shapeLeaf', label: 'Leaf', hint: 'Large half-leaf shape', pattern: 'abstract', variant: true },
+    { group: 'Abstract shapes', key: 'shapeArc', label: 'Arc', hint: 'Wide lower-left arc', pattern: 'abstract', variant: true },
+    { group: 'Abstract shapes', key: 'shapeStripes', label: 'Striped circle', hint: 'Banded center circle', pattern: 'abstract', variant: true },
+    { group: 'Abstract shapes', key: 'shapeSun', label: 'Sun', hint: 'Circle (its overlap with the leaf deepens it)', pattern: 'abstract', variant: true },
+    { group: 'Abstract shapes', key: 'shapeLoop', label: 'Loop', hint: 'Soft outline loop', pattern: 'abstract', variant: true },
   ];
   ROLES.find((r) => r.key === 'accent').variant = true;
 
@@ -367,10 +380,16 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
     'bg-marble-goldleaf':   { type: 'background', renderer: 'marble', textureKey: 'goldleaf',  colorRoles: ['stone', 'vein', 'highlight'], label: 'Gold leaf', hint: 'Sweeping leaf veins' },
     'bg-marble-white':      { type: 'background', renderer: 'marble', textureKey: 'white',     colorRoles: ['stone', 'vein', 'highlight'], label: 'White', hint: 'Soft grey veining' },
     'bg-floral':            { type: 'background', renderer: 'floral',                          colorRoles: ['plate', 'highlight', 'trim', 'stone', 'paper'], label: 'Floral', hint: 'Watercolor bouquet' },
-    // Striped designs are graphic patterns, not photos: they rebuild from the Canva stripe element's own geometry
-    // (stripe width + spacing sampled from accent-stripes.png) with every color role swapped, never a flat tint.
-    'bg-stripes':           { type: 'background', renderer: 'pattern', textureKey: 'stripes',     colorRoles: ['stripeBackground', 'stripePrimary', 'stripeSecondary', 'stripeAccent'], label: 'Stripes', hint: 'Bold vertical stripes' },
-    'bg-stripes-diagonal':  { type: 'background', renderer: 'pattern', textureKey: 'stripesDiag', colorRoles: ['stripeBackground', 'stripePrimary', 'stripeSecondary', 'stripeAccent'], label: 'Diagonal', hint: 'Same stripes on a bias' },
+    // Stripe + pattern designs from the Canva "Design Elements" file (pages 30, 33, 34, 36, 37). They are graphic
+    // designs, not photos, so they are recolorable: each is stored as an ink map (how much of the dark source
+    // tone every pixel holds) and rebuilt in the palette's pattern roles. Stripe geometry, the fabric weave and
+    // the chalk grain all live in that map, so only the colors change — never a flat tint over the image.
+    'bg-cabana':            { type: 'background', renderer: 'pattern', textureKey: 'cabana',    colorRoles: ['stripeBackground', 'stripePrimary', 'stripeAccent'], label: 'Cabana', hint: 'Wide two-tone stripes' },
+    'bg-pinstripe':         { type: 'background', renderer: 'pattern', textureKey: 'pinstripe', colorRoles: ['stripeBackground', 'stripePrimary', 'stripeAccent'], label: 'Pinstripe', hint: 'Woven fabric stripes' },
+    'bg-bias':              { type: 'background', renderer: 'pattern', textureKey: 'bias',      colorRoles: ['stripeBackground', 'stripePrimary', 'stripeAccent'], label: 'Bias stripe', hint: 'Diagonal fabric stripes' },
+    'bg-candy':             { type: 'background', renderer: 'pattern', textureKey: 'candy',     colorRoles: ['stripeBackground', 'stripePrimary', 'stripeAccent'], label: 'Bold stripes', hint: 'Even bright stripes' },
+    'bg-scribble':          { type: 'background', renderer: 'pattern', textureKey: 'scribble',  colorRoles: ['stripeBackground', 'stripePrimary', 'stripeAccent'], label: 'Scribble', hint: 'Chalk brush stroke' },
+    'bg-abstract':          { type: 'background', renderer: 'pattern', textureKey: 'abstract',  colorRoles: ['stripeBackground', 'stripePrimary', 'shapeLeaf', 'shapeArc', 'shapeStripes', 'shapeSun', 'shapeLoop', 'stripeAccent'], label: 'Abstract arches', hint: 'Boho shapes + arch lines' },
     'plate-rectangle':      { type: 'titlePlate', renderer: 'shape', shape: 'classic', colorRoles: ['plate', 'frame', 'trim'], label: 'Rectangle', hint: 'Frame + thin trim' },
     'plate-rounded':        { type: 'titlePlate', renderer: 'shape', shape: 'rounded', colorRoles: ['plate', 'frame', 'trim'], label: 'Rounded', hint: 'Soft rounded corners' },
     'plate-oval':           { type: 'titlePlate', renderer: 'shape', shape: 'oval',    colorRoles: ['plate', 'frame', 'trim'], label: 'Oval', hint: 'Elliptical plate' },
@@ -381,7 +400,7 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
   const TEMPLATE_REGISTRY = {
     dream: {
       cover: {
-        backgroundSlot: ['bg-marble-veined', 'bg-marble-boldgold', 'bg-watercolor', 'bg-marble-goldleaf', 'bg-marble-white', 'bg-floral', 'bg-stripes', 'bg-stripes-diagonal'],
+        backgroundSlot: ['bg-marble-veined', 'bg-marble-boldgold', 'bg-watercolor', 'bg-marble-goldleaf', 'bg-marble-white', 'bg-floral', 'bg-cabana', 'bg-pinstripe', 'bg-bias', 'bg-candy', 'bg-scribble', 'bg-abstract'],
         titlePlateSlot: ['plate-rectangle', 'plate-rounded', 'plate-oval', 'plate-circle', 'plate-bevel', 'plate-none'],
       },
     },
@@ -448,7 +467,8 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
     const picks = [];
     for (let round = 0; picks.length < 5 && groups.some((g) => g[round]); round++) {
       for (const g of groups) {
-        const t = g.find((c, i) => i >= round && !picks.some((p) => p[0] === c[0] && p[1] === c[1]));
+        // Skip repeats and plain swaps (ground <-> stripe): on 50/50 stripes a swap looks like the same design.
+        const t = g.find((c, i) => i >= round && !picks.some((p) => (p[0] === c[0] && p[1] === c[1]) || (p[0] === c[1] && p[1] === c[0])));
         if (t && picks.length < 5) picks.push(t);
       }
     }
@@ -466,7 +486,13 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
     const accents = [pl.accent.toUpperCase(), ...inks.filter((c) => c !== pl.accent.toUpperCase() && contrast(c, pl.stone) >= 1.3)];
     const variants = picks.map(([bg, a, b], i) => {
       const edge = inks.filter((c) => c !== bg && c !== a && c !== b).sort((x, y) => contrast(bg, y) - contrast(bg, x))[0] || a;
-      return { stripeBackground: bg, stripePrimary: a, stripeSecondary: b, stripeAccent: edge, accent: accents[i % accents.length] };
+      // Abstract shapes: the palette's other colors, rotated per variation; the loop stays a soft tone near the ground.
+      const others = inks.filter((c) => c !== bg && c !== a && contrast(bg, c) >= 1.25);
+      const pool = others.length >= 4 ? others : [...others, ...[a, ...others].map((c) => deepen(c, .75))];
+      const pick = (n) => pool[(i + n) % pool.length];
+      const loop = uniq([pl.highlight, pl.paper, pl.line, ...(pl.swatches || [])]).filter((c) => c !== bg).sort((x, y) => contrast(bg, x) - contrast(bg, y))[0] || deepen(bg, .93);
+      return { stripeBackground: bg, stripePrimary: a, stripeAccent: edge, accent: accents[i % accents.length],
+        shapeLeaf: pick(0), shapeArc: pick(1), shapeStripes: pick(2), shapeSun: pick(3), shapeLoop: loop };
     });
     variantCache.set(key, variants);
     return variants;
@@ -497,7 +523,8 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
     state.palette.accent ??= state.palette.trim;
     // Saves from before the stripe roles existed: derive them from the saved colors' own first variation
     // (not the defaults' merged-in values), so a saved palette still matches its palette button.
-    if (saved && !saved.palette?.stripeBackground) {
+    state.marble = { stripes: 'candy', stripesDiag: 'bias' }[state.marble] || state.marble;
+    if (saved && !saved.palette?.shapeLeaf) {
       const { accent, ...stripes } = paletteVariants(state.palette)[0] || {};
       Object.assign(state.palette, stripes);
     }
@@ -672,7 +699,18 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
   // primary/secondary colors line up across tiles. Only colors are swapped; widths, spacing and the
   // original anti-aliased edges are kept, so the pattern never flattens into one tint.
   const STRIPE_TILE = { x: 53, w: 992, row: 350 };
-  const PATTERNS = { stripes: { angle: 0 }, stripesDiag: { angle: -Math.PI / 4 } };
+  // How each pattern background fills a page. 'width': vertical stripes are fitted to the page width and run the
+  // full height (stretching along a stripe changes nothing). 'cover': scaled evenly and cropped. 'contain': the
+  // whole element shown on the pattern background.
+  // `original` = the design's own Canva colors (for "As designed").
+  const PATTERNS = {
+    cabana: { fit: 'width', original: { stripeBackground: '#FCF7F1', stripePrimary: '#8D9DB6' } },
+    pinstripe: { fit: 'cover', original: { stripeBackground: '#EDF1FA', stripePrimary: '#07080D' } },
+    bias: { fit: 'cover', original: { stripeBackground: '#F1F2F6', stripePrimary: '#040306' } },
+    candy: { fit: 'width', original: { stripeBackground: '#FFFFFF', stripePrimary: '#FBDC60' } },
+    scribble: { fit: 'contain', pad: .05, original: { stripeBackground: '#FFFFFF', stripePrimary: '#2B2B2B' } },
+    abstract: { fit: 'cover', layers: 3, original: { stripeBackground: '#F5D9D5', stripePrimary: '#010101', shapeLeaf: '#304C35', shapeArc: '#C16A4E', shapeStripes: '#A7642F', shapeSun: '#D8805C', shapeLoop: '#E9D5CF' } },
+  };
   let stripeRow = null;
   function stripeGeometry() {
     if (stripeRow) return stripeRow;
@@ -724,22 +762,76 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
     ctx.restore();
     return true;
   }
-  // Striped background. At full size one stripe period matches the element spanning the page width, as in Canva.
+  const inkCache = new Map();
+  function inkMap(key, w, h, asset = key, rgba = false) {
+    const img = ASSETS[`pattern:${asset}`];
+    if (!img) { ensureAsset(`pattern:${asset}`).catch(() => {}); return null; }
+    const ck = `${asset}|${w}x${h}`;
+    if (inkCache.has(ck)) return inkCache.get(ck);
+    const pat = PATTERNS[key], iw = img.naturalWidth, ih = img.naturalHeight;
+    const c = scratch('ink', w, h), x = c.getContext('2d', { willReadFrequently: true });
+    x.fillStyle = '#000'; x.fillRect(0, 0, w, h);
+    x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high';
+    if (pat.fit === 'width') x.drawImage(img, 0, 0, w, h);
+    else if (pat.fit === 'contain') {
+      const k = Math.min(w * (1 - 2 * pat.pad) / iw, h * (1 - 2 * pat.pad) / ih);
+      x.drawImage(img, (w - iw * k) / 2, (h - ih * k) / 2, iw * k, ih * k);
+    } else {
+      const ir = iw / ih, r = w / h;
+      let sx = 0, sy = 0, sw = iw, sh = ih;
+      if (ir > r) { sw = ih * r; sx = (iw - sw) / 2; } else { sh = iw / r; sy = (ih - sh) / 2; }
+      x.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
+    }
+    const d = x.getImageData(0, 0, w, h).data;
+    let t = d;
+    if (!rgba) { t = new Uint8Array(w * h); for (let i = 0; i < t.length; i++) t[i] = d[i * 4]; }
+    if (inkCache.size > 18) inkCache.delete(inkCache.keys().next().value);
+    inkCache.set(ck, t);
+    return t;
+  }
+  // Pattern background: the ink map rebuilt between the pattern background and stripe colors (palette roles).
   function paintPattern(ctx, x, y, w, h, s, soft = false) {
-    const p = s.palette, pat = PATTERNS[s.marble];
+    const p = s.palette;
     // Thin header bars stay a flat stone color (like Floral) so bar titles keep their designed contrast.
     if (h < w * .5 && !soft) { ctx.fillStyle = p.stone; ctx.fillRect(x, y, w, h); return; }
-    ctx.fillStyle = soft ? p.paper : p.stripeBackground; ctx.fillRect(x, y, w, h);
-    ctx.save();
-    if (soft) ctx.globalAlpha = .16;
-    fillStripes(ctx, x, y, w, h, w * STRIPE_TILE.w / 1238, [p.stripeBackground, p.stripePrimary, p.stripeSecondary], pat.angle);
-    ctx.restore();
+    const pat = PATTERNS[s.marble], paper = hexRgb(p.paper);
+    const out = ctx.createImageData(w, h), d = out.data;
+    if (pat.layers) {
+      // Multi-shape design: each shape's coverage (anti-aliased edges included) takes its role's color.
+      const maps = [0, 1, 2].map((i) => inkMap(s.marble, w, h, `${s.marble}${i}`, true));
+      if (maps.some((m) => !m)) { ctx.fillStyle = p.stripeBackground; ctx.fillRect(x, y, w, h); return; }
+      const cols = [p.stripeBackground, p.stripePrimary, p.shapeLeaf, p.shapeArc, p.shapeStripes, p.shapeSun, deepen(p.shapeSun, .69), p.shapeLoop].map(hexRgb);
+      for (let j = 0; j < d.length; j += 4) {
+        let r = 0, g = 0, b = 0, sum = 0;
+        for (let m = 0; m < 3; m++) for (let c = 0; c < 3; c++) {
+          const v = maps[m][j + c], ci = m * 3 + c;
+          if (!v || ci > 7) continue;
+          r += cols[ci][0] * v; g += cols[ci][1] * v; b += cols[ci][2] * v; sum += v;
+        }
+        const px = sum ? [r / sum, g / sum, b / sum] : cols[0];
+        for (let k = 0; k < 3; k++) d[j + k] = soft ? mix(paper[k], px[k], .16) : px[k];
+        d[j + 3] = 255;
+      }
+    } else {
+      const t = inkMap(s.marble, w, h);
+      if (!t) { ctx.fillStyle = p.stripeBackground; ctx.fillRect(x, y, w, h); return; }
+      const B = hexRgb(p.stripeBackground), P = hexRgb(p.stripePrimary);
+      for (let i = 0, j = 0; i < t.length; i++, j += 4) {
+        const v = t[i] / 255;
+        for (let k = 0; k < 3; k++) { const c = B[k] + (P[k] - B[k]) * v; d[j + k] = soft ? mix(paper[k], c, .16) : c; }
+        d[j + 3] = 255;
+      }
+    }
+    const tmp = scratch('patternOut', w, h);
+    tmp.getContext('2d').putImageData(out, 0, 0);
+    ctx.drawImage(tmp, x, y, w, h);
     if (s.showStripeBorder && !soft) {
       const o = Math.round(w * .035);
       ctx.strokeStyle = p.stripeAccent; ctx.lineWidth = Math.max(1, w * .006);
       ctx.strokeRect(x + o, y + o, w - 2 * o, h - 2 * o);
     }
   }
+
 
   // Recolors a full-color photo (not an alpha mask) onto the palette's flower roles: plate = deep
   // flowers, highlight = soft flowers, stone = leaves, trim = gold, paper = page white. Mirrors the
@@ -1695,7 +1787,7 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
     const box = $('roles'); box.innerHTML = '';
     let group = '';
     // Stripe roles only appear while a striped background is in use.
-    ROLES.filter((r) => !r.pattern || state.marble in PATTERNS).forEach((r) => {
+    ROLES.filter((r) => !r.pattern || (r.pattern === true ? state.marble in PATTERNS : state.marble === r.pattern)).forEach((r) => {
       if (r.group !== group) {
         group = r.group;
         const g = document.createElement('div'); g.className = 'group-label'; g.textContent = group; box.appendChild(g);
@@ -1713,6 +1805,12 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
       col.oninput = () => { state.palette[r.key] = col.value; commit(false); buildPalettes(); };
       row.append(lab, col); box.appendChild(row);
     });
+    if (PATTERNS[state.marble]) {
+      const row = document.createElement('div'); row.className = 'role';
+      const b = document.createElement('button'); b.className = 'btn'; b.textContent = 'As designed (Canva colors)';
+      b.onclick = () => { Object.assign(state.palette, PATTERNS[state.marble].original); commit(); };
+      row.append(b); box.appendChild(row);
+    }
   }
 
   const currentType = () => { const list = pageList(state); state.page = Math.min(Math.max(0, state.page || 0), list.length - 1); return list[state.page]; };
