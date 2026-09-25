@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Colorway QA</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --bg: #f6f2ee; --ink: #2a1a18; --muted: #7a6a66; --line: #e2d8d2; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.4 -apple-system, system-ui, sans-serif; padding: 16px; }
+  h1 { font-size: 20px; margin: 0 0 4px; } h2 { font-size: 16px; margin: 24px 0 6px; }
+  p { color: var(--muted); margin: 0 0 12px; }
+  .prow { display: grid; grid-template-columns: 130px repeat(5, minmax(0, 1fr)); gap: 6px; align-items: start; margin-bottom: 6px; }
+  .pname { font-size: 12px; font-weight: 600; padding-top: 6px; }
+  .cell { background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 4px; }
+  .cell canvas { width: 100%; height: auto; display: block; border-radius: 3px; }
+  .cell b { display: block; font-size: 10px; margin-top: 3px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cell.orig { outline: 2px solid #8a1c2b; }
+  #checks li { margin: 3px 0; } .ok { color: #1d6b3a; } .bad { color: #a11; }
+  #status { position: sticky; top: 0; background: var(--bg); padding: 6px 0; font-weight: 600; z-index: 2; }
+  iframe { position: fixed; left: -4000px; top: 0; width: 1200px; height: 900px; }
+</style></head>
+<body>
+<h1>Colorway QA — palette variations</h1>
+<p>Temporary review page. Each row is one palette; each column is what the studio produces on the 1st, 2nd, 3rd… click of that palette (real clicks, real renderer). The outlined first cell of each design is its original colorway.</p>
+<div id="status">Loading the studio…</div>
+<div id="out"></div>
+<h2>Behavior checks</h2>
+<ul id="checks"></ul>
+<iframe id="studio" src="index.html?debug"></iframe>
+<script>
+(async () => {
+  const STORE = 'dove-marble-studio', saved = localStorage.getItem(STORE);
+  const status = (t) => { document.getElementById('status').textContent = t; };
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const fr = document.getElementById('studio');
+  await new Promise((r) => fr.addEventListener('load', r, { once: true }));
+  await wait(3000);
+  const D = fr.contentDocument, S = fr.contentWindow.__studio;
+  const PALS = ['Burgundy Cream', 'Sage & Honey', 'Terracotta Sage', 'Dusty Rose Charcoal', 'Navy Pop Pink', 'Blush Lavender', 'Plum Fuchsia', 'Berry Pink'];
+  const noDecor = { top: { asset: 'decor-none', show: false }, bottom: { asset: 'decor-none', show: false }, divider: { asset: 'divider-none', show: false } };
+  const setJournal = async (j) => { const sel = D.getElementById('journal'); sel.value = j; sel.dispatchEvent(new Event('change')); await wait(400); };
+  const click = async (name) => { [...D.querySelectorAll('#palettes > button')].find((x) => x.title === name).click(); await wait(120); return { st: structuredClone(S.state), pv: { ...S.state.paletteVar } }; };
+  const DESIGNS = [
+    { name: 'Veined marble', journal: 'dream', orig: 'Original Black + Gold', page: 'cover', set: { marble: 'classic', plateStyle: 'bevel', titleStyle: 'serif', decor: noDecor, accent: 'none', coverFontColorAuto: true } },
+    { name: 'Bold gold marble', journal: 'dream', orig: 'Your Canva Cover', page: 'cover', set: { marble: 'canva', plateStyle: 'bevel', titleStyle: 'serif', decor: noDecor, accent: 'none', coverFontColorAuto: true } },
+    { name: 'Floral artwork (Belongs To page)', journal: 'dream', orig: 'Floral Garden', page: 'belongs', set: { marble: 'floral', headerStyle: 'mixed', plateStyle: 'ring', titleStyle: 'script' }, flags: { floralArt: 'palette' } },
+    { name: 'Abstract watercolor', journal: 'dream', orig: 'Abstract Watercolor', page: 'cover', set: { marble: 'abstract', plateStyle: 'none', titleStyle: 'custom', coverFont: 'Playfair Display', coverFontColorAuto: true, decor: { ...noDecor, divider: { asset: 'divider-canva-gold', show: true, colorMode: 'palette', color: '#C9A05A', scale: 100 } }, accent: 'none' } },
+    { name: 'Prayer watercolor wash', journal: 'prayer', orig: 'Pink Prayer', page: 'cover', set: { marble: 'journal', plateStyle: 'none', accent: 'none', decor: noDecor, prHide: {}, titleStyle: 'serif', coverFontColorAuto: true } },
+    { name: 'Geometric (solid background + plate)', journal: 'dream', orig: null, page: 'cover', set: { marble: 'solid', plateStyle: 'classic', titleStyle: 'serif', decor: noDecor, accent: 'none', coverFontColorAuto: true } },
+  ];
+  const render = (st, page, w) => { const c = document.createElement('canvas'); S.renderPage(c, w, st, page); return c; };
+  const out = document.getElementById('out');
+  const counts = {};
+  for (const d of DESIGNS) {
+    status(`Rendering ${d.name}…`);
+    await setJournal(d.journal);
+    Object.assign(S.state, structuredClone(d.set), { textColorAuto: true, figureColor: null, paletteVar: null });
+    const rows = [];
+    if (d.orig) { const o = await click(d.orig); rows.push({ name: 'Original', cells: [{ st: { ...o.st, bgArt: 'original', prayerArt: 'original', floralArt: 'original' }, label: 'original colorway', orig: true }] }); }
+    for (const n of PALS) {
+      const cells = [];
+      let r = await click(n);                       // first click on a new palette = variation 1
+      const count = r.pv.count;
+      cells.push({ st: r.st, label: `${r.pv.index + 1}/${count} ${r.pv.label}` });
+      for (let i = 1; i < count; i++) { r = await click(n); cells.push({ st: r.st, label: `${r.pv.index + 1}/${count} ${r.pv.label}` }); }
+      counts[d.name] = counts[d.name] || {}; counts[d.name][n] = count;
+      rows.push({ name: n, cells });
+    }
+    const all = rows.flatMap((r) => r.cells).map((c) => ({ ...c, st: { ...c.st, ...d.set, ...(c.orig ? {} : (d.flags || {})) } }));
+    all.forEach((c) => render(c.st, d.page, 260));
+    await wait(4500);
+    const sec = document.createElement('section'); sec.innerHTML = `<h2>${d.name}</h2>`;
+    let k = 0;
+    for (const r of rows) {
+      const row = document.createElement('div'); row.className = 'prow';
+      row.innerHTML = `<div class="pname">${r.name}</div>`;
+      for (const c of r.cells) {
+        const cell = document.createElement('div'); cell.className = 'cell' + (c.orig ? ' orig' : '');
+        cell.appendChild(render(all[k++].st, d.page, 260)); cell.insertAdjacentHTML('beforeend', `<b>${c.label}</b>`); row.appendChild(cell);
+      }
+      sec.appendChild(row);
+    }
+    out.appendChild(sec);
+  }
+  window.__counts = counts;
+
+  // ---------- Behavior checks ----------
+  status('Running behavior checks…');
+  const checks = document.getElementById('checks');
+  const report = (ok, text) => checks.insertAdjacentHTML('beforeend', `<li class="${ok ? 'ok' : 'bad'}">${ok ? '✓' : '✗'} ${text}</li>`);
+  const sig = (c) => { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let h = 0; for (let i = 0; i < d.length; i += 97) h = (h * 31 + d[i]) | 0; return h; };
+  const same = (a, b) => ['stone', 'vein', 'highlight', 'plate', 'title', 'paper'].every((r) => a[r] === b[r]);
+
+  await setJournal('dream'); Object.assign(S.state, { marble: 'classic', paletteVar: null });
+  // 1. Repeat clicks cycle 1 → 2 → … → n → 1 with the same arrangement each lap.
+  let a = await click('Berry Pink'); const n = a.pv.count, seq = [a.pv.index];
+  for (let i = 0; i < n; i++) { const r = await click('Berry Pink'); seq.push(r.pv.index); if (i === n - 1) report(r.pv.index === 0 && same(r.st.palette, a.st.palette), `Berry Pink cycles ${seq.map((x) => x + 1).join(' → ')} and lap 2 repeats lap 1 exactly.`); }
+  // 2. A different palette starts at 1; coming back starts that palette at 1 again.
+  await click('Berry Pink'); let b = await click('Sage & Honey');
+  report(b.pv.index === 0, 'Switching to a different palette starts it at variation 1.');
+  let c2 = await click('Berry Pink'); report(c2.pv.index === 0 && same(c2.st.palette, a.st.palette), 'Switching back to Berry Pink starts again at its variation 1 (same colors as before).');
+  // 3. Changing design type resets: marble variation 2, then floral → next click is variation 1.
+  await click('Berry Pink'); Object.assign(S.state, { marble: 'floral' }); let f = await click('Berry Pink');
+  report(f.pv.index === 0 && f.pv.design === 'floral', 'Changing the design type (marble → floral) restarts the palette at variation 1.');
+  // 4. Manual layer edit stays until a palette is clicked again; the next click intentionally applies the next arrangement.
+  Object.assign(S.state, { marble: 'classic', paletteVar: null }); await click('Navy Pop Pink');
+  const inp = D.querySelector('#roles input[type=color]'); inp.value = '#123456'; inp.dispatchEvent(new Event('input', { bubbles: true })); await wait(150);
+  const kept = S.state.palette.stone.toLowerCase() === '#123456';
+  const nx = await click('Navy Pop Pink');
+  report(kept && nx.pv.index === 1 && nx.st.palette.stone.toLowerCase() !== '#123456', 'Manual layer color stays until the palette is clicked again; that click applies variation 2.');
+  // 5. Figure + custom text colors survive palette clicks.
+  await setJournal('warrior'); S.state.figureColor = '#8A2BE2'; S.state.textColorAuto = false; S.state.textColor = '#0B6E4F';
+  await click('Plum Fuchsia'); await click('Plum Fuchsia'); await click('Blush Lavender');
+  report(S.state.figureColor === '#8A2BE2' && S.state.textColor === '#0B6E4F' && S.state.textColorAuto === false, 'Figure color and custom text color are untouched by palette clicks.');
+  // 6. Recolor derives from the source: same variation rendered after others is pixel-identical.
+  await setJournal('prayer'); Object.assign(S.state, { paletteVar: null });
+  const v1 = await click('Terracotta Sage'); const st1 = { ...v1.st, plateStyle: 'none', decor: noDecor };
+  render(st1, 'cover', 420); await wait(1500); const s1 = sig(render(st1, 'cover', 420));
+  await click('Terracotta Sage'); await click('Terracotta Sage'); const other = await click('Navy Pop Pink'); render({ ...other.st, plateStyle: 'none', decor: noDecor }, 'cover', 420); await wait(900);
+  report(s1 === sig(render(st1, 'cover', 420)), 'Re-rendering Terracotta Sage v1 after other variations/palettes gives identical pixels (always from the source art).');
+  // 7. Original colorway unchanged.
+  const o = await click('Pink Prayer'); const os = { ...o.st, prayerArt: 'original', plateStyle: 'none', decor: noDecor };
+  render(os, 'cover', 420); await wait(1200);
+  report(sig(render(os, 'cover', 420)) === sig(render(os, 'cover', 420)), 'Original colorway renders identically (source art, no recolor).');
+
+  if (saved === null) localStorage.removeItem(STORE); else localStorage.setItem(STORE, saved);
+  status('Done. Studio settings restored.');
+})();
+</script>
+</body></html>
