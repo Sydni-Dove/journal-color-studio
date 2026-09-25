@@ -165,17 +165,17 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
             <option value="stripes">Bold stripes</option>
           </select>
         </div>
-        <div class="field"><span>Accent placement</span>
-          <select id="accentPlace">
-            <option value="corners">Opposite corners</option>
-            <option value="center">Behind the title</option>
-            <option value="full">Full page</option>
-            <option value="custom">Large + drag to place</option>
-          </select>
+        <div class="field"><span>Accent layout</span>
+          <select id="accentPlace"></select>
         </div>
       </div>
       <label class="slider" id="accentOpacityRow"><span>Accent opacity <b id="accentVal"></b></span><input type="range" id="accentOpacity" min="5" max="100"></label>
+      <label class="slider hidden" id="accentTileRow"><span>Pattern size <b id="accentTileVal"></b></span><input type="range" id="accentTile" min="40" max="200"></label>
+      <label class="slider hidden" id="accentSpacingRow"><span>Repeat spacing <b id="accentSpacingVal"></b></span><input type="range" id="accentSpacing" min="0" max="100"></label>
       <label class="slider hidden" id="accentScaleRow"><span>Element size <b id="accentScaleVal"></b></span><input type="range" id="accentScale" min="30" max="180"></label>
+      <label class="slider hidden" id="accentXRow"><span>X position <b id="accentXVal"></b></span><input type="range" id="accentXIn" min="0" max="100"></label>
+      <label class="slider hidden" id="accentYRow"><span>Y position <b id="accentYVal"></b></span><input type="range" id="accentYIn" min="0" max="100"></label>
+      <label class="slider hidden" id="accentRotRow"><span>Rotation <b id="accentRotVal"></b></span><input type="range" id="accentRot" min="-180" max="180"></label>
       <div class="role hidden" id="accentDragRow"><span class="hint">Drag the element on the cover preview to reposition it.</span></div>
       <div class="role" id="accentLinedRow"><label><input type="checkbox" id="accentLined"> Also show accent faintly on lined pages</label></div>
       <label class="slider" id="shadowRow"><span>Lettering shadow <b id="shadowVal"></b></span><input type="range" id="titleShadow" min="0" max="100"></label>
@@ -346,7 +346,14 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
     { group: 'Accent', key: 'accent', label: 'Accent art', hint: 'Line art from your elements' },
     { group: 'Page', key: 'paper', label: 'Paper', hint: 'Lined page background' },
     { group: 'Page', key: 'line', label: 'Ruled lines', hint: 'Writing lines + margin rule' },
+    // Pattern roles only show (and only matter) when a striped background is chosen. `variant` roles are
+    // the ones a repeat click on the selected palette reassigns (see paletteVariants).
+    { group: 'Stripes', key: 'stripeBackground', label: 'Stripe background', hint: 'Gaps between stripes', pattern: true, variant: true },
+    { group: 'Stripes', key: 'stripePrimary', label: 'Primary stripes', hint: 'Every other stripe', pattern: true, variant: true },
+    { group: 'Stripes', key: 'stripeSecondary', label: 'Secondary stripes', hint: 'The alternating stripes', pattern: true, variant: true },
+    { group: 'Stripes', key: 'stripeAccent', label: 'Border line', hint: 'Thin pinline around the page', toggle: 'showStripeBorder', pattern: true, variant: true },
   ];
+  ROLES.find((r) => r.key === 'accent').variant = true;
 
   // ---------- Slot-based asset + template registry (Dream Journal cover, phase 1) ----------
   // Each cover is built from fixed slots (background, title plate, title text). A slot only ever shows
@@ -360,6 +367,10 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
     'bg-marble-goldleaf':   { type: 'background', renderer: 'marble', textureKey: 'goldleaf',  colorRoles: ['stone', 'vein', 'highlight'], label: 'Gold leaf', hint: 'Sweeping leaf veins' },
     'bg-marble-white':      { type: 'background', renderer: 'marble', textureKey: 'white',     colorRoles: ['stone', 'vein', 'highlight'], label: 'White', hint: 'Soft grey veining' },
     'bg-floral':            { type: 'background', renderer: 'floral',                          colorRoles: ['plate', 'highlight', 'trim', 'stone', 'paper'], label: 'Floral', hint: 'Watercolor bouquet' },
+    // Striped designs are graphic patterns, not photos: they rebuild from the Canva stripe element's own geometry
+    // (stripe width + spacing sampled from accent-stripes.png) with every color role swapped, never a flat tint.
+    'bg-stripes':           { type: 'background', renderer: 'pattern', textureKey: 'stripes',     colorRoles: ['stripeBackground', 'stripePrimary', 'stripeSecondary', 'stripeAccent'], label: 'Stripes', hint: 'Bold vertical stripes' },
+    'bg-stripes-diagonal':  { type: 'background', renderer: 'pattern', textureKey: 'stripesDiag', colorRoles: ['stripeBackground', 'stripePrimary', 'stripeSecondary', 'stripeAccent'], label: 'Diagonal', hint: 'Same stripes on a bias' },
     'plate-rectangle':      { type: 'titlePlate', renderer: 'shape', shape: 'classic', colorRoles: ['plate', 'frame', 'trim'], label: 'Rectangle', hint: 'Frame + thin trim' },
     'plate-rounded':        { type: 'titlePlate', renderer: 'shape', shape: 'rounded', colorRoles: ['plate', 'frame', 'trim'], label: 'Rounded', hint: 'Soft rounded corners' },
     'plate-oval':           { type: 'titlePlate', renderer: 'shape', shape: 'oval',    colorRoles: ['plate', 'frame', 'trim'], label: 'Oval', hint: 'Elliptical plate' },
@@ -370,7 +381,7 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
   const TEMPLATE_REGISTRY = {
     dream: {
       cover: {
-        backgroundSlot: ['bg-marble-veined', 'bg-marble-boldgold', 'bg-watercolor', 'bg-marble-goldleaf', 'bg-marble-white', 'bg-floral'],
+        backgroundSlot: ['bg-marble-veined', 'bg-marble-boldgold', 'bg-watercolor', 'bg-marble-goldleaf', 'bg-marble-white', 'bg-floral', 'bg-stripes', 'bg-stripes-diagonal'],
         titlePlateSlot: ['plate-rectangle', 'plate-rounded', 'plate-oval', 'plate-circle', 'plate-bevel', 'plate-none'],
       },
     },
@@ -391,15 +402,85 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
     { name: 'Blush Rose', stone: '#E9CFCB', vein: '#BB9167', highlight: '#FFF6F2', plate: '#82445E', frame: '#5A2B3F', trim: '#BB9167', title: '#FFFCFC', paper: '#FFFCFC', line: '#D5A9B4' },
     { name: 'Teal + Coral', stone: '#0D2F33', vein: '#D19A4A', highlight: '#E7A18E', plate: '#155D66', frame: '#09201F', trim: '#D19A4A', title: '#FFFDFC', paper: '#FFFDFC', line: '#AFC7C4' },
     { name: 'Terracotta', stone: '#2A140E', vein: '#BD8B43', highlight: '#DDAA86', plate: '#914631', frame: '#1C0D09', trim: '#BD8B43', title: '#FFFCF8', paper: '#FFFCF8', line: '#D2B39C' },
+    // Orange pack (palettes/orange-palettes-for-journal-color-studio.json, one-way snapshot). `swatches` keeps the
+    // source colors; roles use them directly except the deep ink shades (title/frame), which are the palette's
+    // strongest color taken darker (same hue) so page text and plate lettering stay legible on light paper.
+    { name: 'Orange Light', id: 'orange-light', swatches: ['#FFFFFF', '#FFD7B5', '#FFB38A', '#FF9248', '#FF6700'], stone: '#FFD7B5', vein: '#FF6700', highlight: '#FFFFFF', plate: '#FFFFFF', frame: '#FF6700', trim: '#FF9248', title: '#993E00', paper: '#FFFFFF', line: '#FFB38A', accent: '#FF9248' },
+    { name: 'Halloween Orange', id: 'halloween-orange', swatches: ['#FFEDE4', '#FFD3BE', '#FBB38F', '#F18B57', '#EB6521'], stone: '#EB6521', vein: '#FFD3BE', highlight: '#FFEDE4', plate: '#FFEDE4', frame: '#8C380D', trim: '#F18B57', title: '#8C380D', paper: '#FFFAF7', line: '#FBB38F', accent: '#FFD3BE' },
+    { name: 'Ultra Orange', id: 'ultra-orange', swatches: ['#FFE0D7', '#FFC2AF', '#FF9C7E', '#FF7B53', '#FF3B00'], stone: '#FF3B00', vein: '#FFE0D7', highlight: '#FFC2AF', plate: '#FFE0D7', frame: '#992300', trim: '#FF7B53', title: '#992300', paper: '#FFFAF8', line: '#FF9C7E', accent: '#FFC2AF' },
+    { name: 'Pure Orange', id: 'pure-orange', swatches: ['#F6BC76', '#FBB766', '#FDAB49', '#FD9B26', '#FF8C00'], stone: '#FF8C00', vein: '#F6BC76', highlight: '#FFF3E4', plate: '#FFF3E4', frame: '#995400', trim: '#FDAB49', title: '#995400', paper: '#FFFBF5', line: '#FBB766', accent: '#FD9B26' },
+    { name: 'Amber Orange', id: 'amber-orange', swatches: ['#F9A709', '#EDA211', '#E19D1A', '#D79920', '#CE972B'], stone: '#CE972B', vein: '#F9A709', highlight: '#FDF2DC', plate: '#FDF2DC', frame: '#7F5D1A', trim: '#E19D1A', title: '#7F5D1A', paper: '#FFFCF5', line: '#EDA211', accent: '#F9A709' },
+    { name: 'Orange Spectrum', id: 'orange-spectrum', swatches: ['#FFD106', '#FFA500', '#F9A12D', '#FF5600', '#FF3400'], stone: '#FF5600', vein: '#FFD106', highlight: '#FFA500', plate: '#FFFFFF', frame: '#991F00', trim: '#FFD106', title: '#991F00', paper: '#FFFFFF', line: '#F9A12D', accent: '#FFD106' },
+    { name: 'Tropical Sunrise', id: 'tropical-sunrise', swatches: ['#FF9F1C', '#FFBF69', '#FFFFFF', '#CBF3F0', '#2EC4B6'], stone: '#2EC4B6', vein: '#FF9F1C', highlight: '#CBF3F0', plate: '#FFFFFF', frame: '#1D7C73', trim: '#FF9F1C', title: '#1D7C73', paper: '#FFFFFF', line: '#FFBF69', accent: '#FFBF69' },
+    { name: 'Peach Cloud', id: 'peach-cloud', swatches: ['#FFDCDC', '#FFF2EB', '#FFE8CD', '#FFD6BA'], stone: '#FFD6BA', vein: '#FFDCDC', highlight: '#FFF2EB', plate: '#FFF2EB', frame: '#DE9D78', trim: '#FFDCDC', title: '#6F4A33', paper: '#FFF2EB', line: '#FFD6BA', accent: '#FFE8CD' },
+    { name: 'Tiger Amber & Blues', id: 'tiger-amber-blues', swatches: ['#8ECAE6', '#219EBC', '#021433', '#FFB703', '#FB8500'], stone: '#021433', vein: '#FFB703', highlight: '#8ECAE6', plate: '#219EBC', frame: '#021433', trim: '#FB8500', title: '#FFFFFF', paper: '#FFFFFF', line: '#8ECAE6', accent: '#FFB703' },
   ];
 
   PALETTES.forEach((pl) => { pl.accent ??= pl.trim; });
 
+  // ---------- Palette variations (repeat-click) ----------
+  // Clicking the already-selected palette cycles through alternate, still-valid assignments of the
+  // variant roles (stripe roles + accent art) drawn from that palette's own colors. Base roles never change,
+  // so marble, plate, lettering and page text stay exactly as designed. Hoisted helpers: runs before `hexRgb`.
+  function relLum(hex) {
+    const c = [1, 3, 5].map((i) => { const v = parseInt(hex.slice(i, i + 2), 16) / 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; });
+    return .2126 * c[0] + .7152 * c[1] + .0722 * c[2];
+  }
+  function contrast(a, b) { const x = relLum(a), y = relLum(b); return (Math.max(x, y) + .05) / (Math.min(x, y) + .05); }
+  function rgbDist(a, b) { let d = 0; for (const i of [1, 3, 5]) d += (parseInt(a.slice(i, i + 2), 16) - parseInt(b.slice(i, i + 2), 16)) ** 2; return Math.sqrt(d); }
+  function deepen(hex, k) { return '#' + [1, 3, 5].map((i) => Math.round(parseInt(hex.slice(i, i + 2), 16) * k).toString(16).padStart(2, '0')).join('').toUpperCase(); }
+  const STRIPE_MIN_CONTRAST = 1.5;   // stripe vs the background it sits on: always reads as a separate stripe
+  const variantCache = new Map();
+  function paletteVariants(pl) {
+    const key = ['paper', 'stone', 'plate', 'frame', 'highlight', 'vein', 'trim', 'title', 'line', 'accent'].map((k) => pl[k]).join() + (pl.swatches || []).join();
+    if (variantCache.has(key)) return variantCache.get(key);
+    // Candidate colors in design-priority order (background candidates favour paper/stone; stripes favour the strong roles).
+    const uniq = (arr) => arr.filter(Boolean).map((c) => c.toUpperCase()).filter((c, i, a) => a.indexOf(c) === i);
+    const bgs = uniq([pl.paper, pl.stone, pl.highlight, pl.plate, ...(pl.swatches || [])]);
+    const inks = uniq([pl.stone, pl.plate, pl.frame, pl.vein, pl.trim, pl.accent, pl.title, pl.highlight, ...(pl.swatches || []), pl.line]);
+    const groups = bgs.map((bg) => {
+      const ok = inks.filter((c) => c !== bg && contrast(bg, c) >= STRIPE_MIN_CONTRAST);
+      const out = [];
+      for (const a of ok) for (const b of ok) if (a !== b && rgbDist(a, b) >= 40) out.push([bg, a, b]);
+      return out;
+    }).filter((g) => g.length);
+    // Round-robin across backgrounds so consecutive clicks look genuinely different (new ground, not just swapped stripes).
+    const picks = [];
+    for (let round = 0; picks.length < 5 && groups.some((g) => g[round]); round++) {
+      for (const g of groups) {
+        const t = g.find((c, i) => i >= round && !picks.some((p) => p[0] === c[0] && p[1] === c[1]));
+        if (t && picks.length < 5) picks.push(t);
+      }
+    }
+    if (!picks.length) {
+      // Soft all-pastel palettes (e.g. Peach Cloud): keep the lightest as ground and deepen the stripe colors,
+      // same hue, until they clear the minimum contrast so stripes never melt into the background.
+      const byLum = [...uniq([pl.paper, pl.stone, pl.highlight, pl.plate, pl.trim, pl.vein, pl.accent, ...(pl.swatches || [])])].sort((a, b) => relLum(b) - relLum(a));
+      const bg = byLum[0];
+      const lift = (c) => { let k = 1, out = c; while (contrast(bg, out) < STRIPE_MIN_CONTRAST && k > .3) { k -= .04; out = deepen(c, k); } return out; };
+      for (let i = byLum.length - 1; i > 0 && picks.length < 3; i--) {
+        const a = lift(byLum[i]), b = lift(byLum[i === 1 ? byLum.length - 1 : i - 1]);
+        picks.push([bg, a, rgbDist(a, b) >= 20 ? b : deepen(b, .8)]);
+      }
+    }
+    const accents = [pl.accent.toUpperCase(), ...inks.filter((c) => c !== pl.accent.toUpperCase() && contrast(c, pl.stone) >= 1.3)];
+    const variants = picks.map(([bg, a, b], i) => {
+      const edge = inks.filter((c) => c !== bg && c !== a && c !== b).sort((x, y) => contrast(bg, y) - contrast(bg, x))[0] || a;
+      return { stripeBackground: bg, stripePrimary: a, stripeSecondary: b, stripeAccent: edge, accent: accents[i % accents.length] };
+    });
+    variantCache.set(key, variants);
+    return variants;
+  }
+  // Variation 0 is each palette's designed default.
+  PALETTES.forEach((pl) => Object.assign(pl, paletteVariants(pl)[0]));
+  const paletteColors = (pl) => Object.fromEntries(ROLES.map((r) => [r.key, pl[r.key]]));
+
   const DEFAULTS = {
     view: 'cover', quality: 'proof',
-    palette: { ...PALETTES[1] },
+    palette: paletteColors(PALETTES[1]),
     marble: 'classic', plateStyle: 'classic', titleStyle: 'script', titleShadow: 30,
     accent: 'none', accentPlace: 'corners', accentOpacity: 70, accentLined: false, accentScale: 90, accentX: .5, accentY: .5,
+    accentRot: 0, accentTile: 100, accentSpacing: 0, showStripeBorder: false,
     showVeins: true, showHighlights: true, showPlate: true, showFrame: true, showTrim: true,
     texture: 60, veinStrength: 100, plateOpacity: 88,
     headerStyle: 'mixed', lineSpacing: '25', footer: 'on', marginLine: false,
@@ -414,6 +495,12 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
     if (saved) state = { ...state, ...saved, palette: { ...state.palette, ...(saved.palette || {}) } };
     delete state.palette.look;
     state.palette.accent ??= state.palette.trim;
+    // Saves from before the stripe roles existed: derive them from the saved colors' own first variation
+    // (not the defaults' merged-in values), so a saved palette still matches its palette button.
+    if (saved && !saved.palette?.stripeBackground) {
+      const { accent, ...stripes } = paletteVariants(state.palette)[0] || {};
+      Object.assign(state.palette, stripes);
+    }
     if (!['mixed', 'block', 'rule', 'bar', 'band', 'soft', 'plain'].includes(state.headerStyle)) state.headerStyle = 'mixed';
     if (state.pageCount < 10) state.pageCount = DEFAULTS.pageCount;
   } catch {}
@@ -534,6 +621,7 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
   // soft = true washes the marble toward the paper color (used for the soft header).
   function paintMarble(ctx, x, y, w, h, s, soft = false) {
     w = Math.max(1, Math.round(w)); h = Math.max(1, Math.round(h));
+    if (s.marble in PATTERNS) { paintPattern(ctx, x, y, w, h, s, soft); return; }
     if (s.marble === 'blush') { paintWatercolor(ctx, x, y, w, h, s, soft); return; }
     if (s.marble === 'floral') {
       // The bouquet art only reads well full-bleed (covers, back cover); thin bars stay a flat deep-flower color.
@@ -576,6 +664,81 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
     const tmp = scratch('marble', w, h);
     tmp.getContext('2d').putImageData(out, 0, 0);
     ctx.drawImage(tmp, x, y, w, h);
+  }
+
+  // ---------- Stripe patterns (recolorable design assets) ----------
+  // Geometry comes from the Canva stripe element itself (accent-stripes.png): columns 53..1045 are exactly
+  // 18 stripe periods, stripe edge to stripe edge, so the tile repeats with no seam and the alternating
+  // primary/secondary colors line up across tiles. Only colors are swapped; widths, spacing and the
+  // original anti-aliased edges are kept, so the pattern never flattens into one tint.
+  const STRIPE_TILE = { x: 53, w: 992, row: 350 };
+  const PATTERNS = { stripes: { angle: 0 }, stripesDiag: { angle: -Math.PI / 4 } };
+  let stripeRow = null;
+  function stripeGeometry() {
+    if (stripeRow) return stripeRow;
+    const img = ASSETS['accent:stripes'];
+    if (!img) { ensureAsset('accent:stripes').catch(() => {}); return null; }
+    const n = STRIPE_TILE.w, c = scratch('stripeRow', n, 1), x = c.getContext('2d', { willReadFrequently: true });
+    x.clearRect(0, 0, n, 1);
+    x.drawImage(img, STRIPE_TILE.x, STRIPE_TILE.row, n, 1, 0, 0, n, 1);
+    const d = x.getImageData(0, 0, n, 1).data, a = new Uint8Array(n), idx = new Uint8Array(n), ON = 120;
+    for (let i = 0; i < n; i++) a[i] = d[i * 4 + 3];
+    for (let i = 0, k = 0; i < n; i++) { if (i && a[i] >= ON && a[i - 1] < ON) k++; idx[i] = k; }
+    // A soft leading edge belongs to the stripe that starts next (the last column leads into the next tile's stripe 0).
+    for (let i = 0; i < n; i++) if (a[i] && a[i] < ON && (i === n - 1 || a[i + 1] >= ON)) idx[i] = i === n - 1 ? idx[i] + 1 : idx[i + 1];
+    stripeRow = { a, idx, max: Math.max(...a) || 255 };
+    return stripeRow;
+  }
+  // One opaque (bg set) or transparent (bg null, used by the accent art) stripe tile at an integer pixel width.
+  const stripeTileCache = new Map();
+  function stripeTile(px, bg, c1, c2) {
+    const g = stripeGeometry();
+    if (!g) return null;
+    const w = Math.max(4, Math.round(px)), key = `${w}|${bg}|${c1}|${c2}`;
+    if (stripeTileCache.has(key)) return stripeTileCache.get(key);
+    const n = STRIPE_TILE.w, src = document.createElement('canvas'); src.width = n; src.height = 1;
+    const sx = src.getContext('2d'), id = sx.createImageData(n, 1), d = id.data;
+    const B = bg && hexRgb(bg), P = hexRgb(c1), S = hexRgb(c2 || c1);
+    for (let i = 0; i < n; i++) {
+      const col = g.idx[i] % 2 ? S : P, t = g.a[i] / g.max;
+      for (let k = 0; k < 3; k++) d[i * 4 + k] = B ? mix(B[k], col[k], t) : col[k];
+      d[i * 4 + 3] = B ? 255 : g.a[i];
+    }
+    sx.putImageData(id, 0, 0);
+    const out = document.createElement('canvas'); out.width = w; out.height = 8;
+    const ox = out.getContext('2d'); ox.imageSmoothingEnabled = true; ox.imageSmoothingQuality = 'high';
+    ox.drawImage(src, 0, 0, w, 8);
+    if (stripeTileCache.size > 24) stripeTileCache.delete(stripeTileCache.keys().next().value);
+    stripeTileCache.set(key, out);
+    return out;
+  }
+  // Fill a rectangle with the stripe repeat at a given tile width, optionally on a bias. The repeat is
+  // anchored at the rectangle's center so crops are even on both sides.
+  function fillStripes(ctx, x, y, w, h, tileW, [bg, c1, c2], angle = 0) {
+    const tile = stripeTile(tileW, bg, c1, c2);
+    if (!tile) return false;
+    ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+    ctx.translate(Math.round(x + w / 2), Math.round(y + h / 2)); ctx.rotate(angle);
+    const R = Math.ceil(Math.hypot(w, h) / 2) + tile.width;
+    ctx.fillStyle = ctx.createPattern(tile, 'repeat'); ctx.fillRect(-R, -R, 2 * R, 2 * R);
+    ctx.restore();
+    return true;
+  }
+  // Striped background. At full size one stripe period matches the element spanning the page width, as in Canva.
+  function paintPattern(ctx, x, y, w, h, s, soft = false) {
+    const p = s.palette, pat = PATTERNS[s.marble];
+    // Thin header bars stay a flat stone color (like Floral) so bar titles keep their designed contrast.
+    if (h < w * .5 && !soft) { ctx.fillStyle = p.stone; ctx.fillRect(x, y, w, h); return; }
+    ctx.fillStyle = soft ? p.paper : p.stripeBackground; ctx.fillRect(x, y, w, h);
+    ctx.save();
+    if (soft) ctx.globalAlpha = .16;
+    fillStripes(ctx, x, y, w, h, w * STRIPE_TILE.w / 1238, [p.stripeBackground, p.stripePrimary, p.stripeSecondary], pat.angle);
+    ctx.restore();
+    if (s.showStripeBorder && !soft) {
+      const o = Math.round(w * .035);
+      ctx.strokeStyle = p.stripeAccent; ctx.lineWidth = Math.max(1, w * .006);
+      ctx.strokeRect(x + o, y + o, w - 2 * o, h - 2 * o);
+    }
   }
 
   // Recolors a full-color photo (not an alpha mask) onto the palette's flower roles: plate = deep
@@ -669,29 +832,124 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
     return { x: x + b, y: y + b, w: w - 2 * b, h: h - 2 * b };
   }
 
+  // ---------- Accent layout ----------
+  // Only placement/tiling/scale changes per layout; the artwork itself and its palette tint never do.
+  const ACCENT_LAYOUTS = [
+    ['corners', 'Opposite corners'], ['tl', 'Top left'], ['tr', 'Top right'], ['bl', 'Bottom left'], ['br', 'Bottom right'],
+    ['left', 'Left side'], ['right', 'Right side'], ['top', 'Top band'], ['bottom', 'Bottom band'], ['diagonal', 'Diagonal sweep'],
+    ['center', 'Center field'], ['full', 'Full page'], ['repeat', 'Full page repeat'], ['scatter', 'Full-page scatter'],
+    ['bleed', 'Full bleed'], ['custom', 'Custom'],
+  ];
+  const CORNERS = ['corners', 'tl', 'tr', 'bl', 'br'];
+  // Layouts each element supports; anything else is hidden for that element (no broken combinations).
+  const ACCENT_SUPPORT = {
+    stripes: [...CORNERS, 'left', 'right', 'top', 'bottom', 'center', 'full', 'repeat', 'bleed', 'custom'],
+    dots: [...CORNERS, 'left', 'right', 'top', 'bottom', 'center', 'full', 'repeat', 'scatter', 'bleed', 'custom'],
+    arcs: [...CORNERS, 'left', 'right', 'center', 'full', 'repeat', 'bleed', 'custom'],
+    topo: [...CORNERS, 'left', 'right', 'top', 'bottom', 'center', 'full', 'repeat', 'bleed', 'custom'],
+    waves: [...CORNERS, 'left', 'right', 'top', 'bottom', 'center', 'full', 'repeat', 'bleed', 'custom'],
+    ribbon: [...CORNERS, 'left', 'right', 'diagonal', 'center', 'full', 'bleed', 'custom'],
+  };
+  // Sides: pattern-like art fills a band; a single motif (dot cluster, arcs, ribbon) sits on the edge instead.
+  const SIDE_BAND = { stripes: true, topo: true, waves: true };
+  // One repeat tile's width (page-width fraction) at Pattern size 100%.
+  const REPEAT_TILE = { dots: .34, arcs: .26, topo: .5, waves: .5 };
+  const BLEED = .125 * 72 / PAGE_W;   // 1/8 in past the trim, as a page-width fraction
+  const accentLayout = (s) => ((ACCENT_SUPPORT[s.accent] || []).includes(s.accentPlace) ? s.accentPlace : 'corners');
+
   // Accent line art, tinted with the accent color. On lined pages it sits faintly in the bottom corner, under the lines.
   function drawAccent(ctx, W, H, s, lined = false) {
     const img = ASSETS[`accent:${s.accent}`];
     if (!img) return;
     const ar = img.naturalWidth / img.naturalHeight, color = s.palette.accent || s.palette.trim;
-    const put = (x, y, w, rot = 0) => {
+    const put = (x, y, w, rot = 0, fx = false, fy = false) => {
       const h = w / ar, m = tintedMask(img, w, h, color);
-      ctx.save(); ctx.translate(x + w / 2, y + h / 2); ctx.rotate(rot); ctx.drawImage(m, -w / 2, -h / 2, w, h); ctx.restore();
+      ctx.save(); ctx.translate(x + w / 2, y + h / 2); ctx.rotate(rot); ctx.scale(fx ? -1 : 1, fy ? -1 : 1);
+      ctx.drawImage(m, -w / 2, -h / 2, w, h); ctx.restore();
+    };
+    // Mirror-tiling: neighbours are flipped so line art meets itself at every edge (no hard seams), at the
+    // element's own proportions. gap adds even spacing between copies.
+    const tileArea = (rx, ry, rw, rh, tw, gap = 0) => {
+      tw = Math.max(4, Math.round(tw));
+      const th = Math.max(4, Math.round(tw / ar)), m = tintedMask(img, tw, th, color);
+      const gx = Math.round(tw * gap), gy = Math.round(th * gap), stepX = tw + gx, stepY = th + gy;
+      const cols = Math.ceil(rw / stepX) + 2, rows = Math.ceil(rh / stepY) + 2;
+      const x0 = Math.round(rx + rw / 2 - (cols * stepX - gx) / 2), y0 = Math.round(ry + rh / 2 - (rows * stepY - gy) / 2);
+      ctx.save(); ctx.beginPath(); ctx.rect(rx, ry, rw, rh); ctx.clip();
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+        ctx.save(); ctx.translate(x0 + c * stepX + tw / 2, y0 + r * stepY + th / 2); ctx.scale(c % 2 ? -1 : 1, r % 2 ? -1 : 1);
+        ctx.drawImage(m, -tw / 2, -th / 2, tw, th); ctx.restore();
+      }
+      ctx.restore();
+    };
+    const isStripes = s.accent === 'stripes', k = (s.accentTile ?? 100) / 100, gap = (s.accentSpacing ?? 0) / 100;
+    // Stripes repeat as a true pattern at the element's native scale (it spans the page width in Canva).
+    const stripeW = W * STRIPE_TILE.w / img.naturalWidth * k;
+    const band = (x, y, w, h, tileW) => {
+      if (isStripes) fillStripes(ctx, x, y, w, h, stripeW, [null, color, color]);
+      else tileArea(x, y, w, h, tileW);
     };
     ctx.globalAlpha = s.accentOpacity / 100 * (lined ? .35 : 1);
-    if (lined) {
+    const L = lined ? 'lined' : accentLayout(s);
+    if (L === 'lined') {
       const w = W * .38; put(W - w * .82, H - (w / ar) * .82, w);
-    } else if (s.accentPlace === 'custom') {
+    } else if (L === 'custom') {
       const w = W * ((s.accentScale ?? 90) / 100);
-      put(s.accentX * W - w / 2, s.accentY * H - (w / ar) / 2, w);
-    } else if (s.accentPlace === 'center') {
+      put(s.accentX * W - w / 2, s.accentY * H - (w / ar) / 2, w, (s.accentRot || 0) * Math.PI / 180);
+    } else if (L === 'center') {
       const w = W * .82; put((W - w) / 2, (H - w / ar) / 2, w);
-    } else if (s.accentPlace === 'full') {
+    } else if (L === 'full') {
       const w = Math.max(W * 1.05, H * 1.05 * ar); put((W - w) / 2, (H - w / ar) / 2, w);
-    } else {
+    } else if (L === 'corners') {
       const w = W * .5, h = w / ar;
       put(W - w * .8, -h * .2, w);
       put(-w * .2, H - h * .8, w, Math.PI);
+    } else if (['tl', 'tr', 'bl', 'br'].includes(L)) {
+      // Same size and overhang as "Opposite corners", one corner at a time, mirrored to face into the page.
+      const w = W * .5, h = w / ar;
+      if (L === 'tr') put(W - w * .8, -h * .2, w);
+      if (L === 'bl') put(-w * .2, H - h * .8, w, Math.PI);
+      if (L === 'tl') put(-w * .2, -h * .2, w, 0, true);
+      if (L === 'br') put(W - w * .8, H - h * .8, w, 0, false, true);
+    } else if (L === 'top' || L === 'bottom') {
+      const bh = Math.round(H * .16);
+      band(0, L === 'top' ? 0 : H - bh, W, bh, bh * 1.4 * ar * k);
+    } else if (L === 'left' || L === 'right') {
+      const right = L === 'right';
+      if (SIDE_BAND[s.accent]) {
+        const bw = Math.round(W * .24);
+        band(right ? W - bw : 0, 0, bw, H, bw * 1.4 * k);
+      } else if (s.accent === 'arcs') {
+        const h = H * .75, w = h * ar;   // the arcs' center sits on the page edge
+        put(right ? W - w : 0, (H - h) / 2, w, 0, !right);
+      } else if (s.accent === 'ribbon') {
+        // The ribbon flows corner to corner; turned 45° it runs down the page edge as a side sweep.
+        const w = H * .8, h = w / ar, cx = right ? W - w * .15 : w * .15;
+        put(cx - w / 2, (H - h) / 2, w, right ? Math.PI / 4 : -Math.PI / 4, !right);
+      } else {
+        const w = W * .5, h = w / ar;
+        put(right ? W - w * .65 : -w * .35, (H - h) / 2, w, 0, !right);
+      }
+    } else if (L === 'diagonal') {
+      const w = W * 1.15; put((W - w) / 2, (H - w / ar) / 2, w, -Math.atan2(H, W));
+    } else if (L === 'repeat') {
+      if (isStripes) fillStripes(ctx, 0, 0, W, H, stripeW, [null, color, color]);
+      else tileArea(0, 0, W, H, W * (REPEAT_TILE[s.accent] || .4) * k, gap);
+    } else if (L === 'scatter') {
+      // Fixed, hand-balanced positions so the scatter never jumps between redraws or exports.
+      const SPOTS = [[.12, .1, 1, 0], [.82, .2, .8, 1.3], [.45, .45, .6, 2.2], [.1, .62, .75, 3.6], [.85, .72, .95, 4.4], [.5, .92, .7, 5.5], [.55, .08, .55, .6], [.3, .8, .5, 2.9]];
+      const base = W * .34 * k * (1 + gap);
+      for (const [fx, fy, sc, rot] of SPOTS) { const w = base * sc; put(fx * W - w / 2, fy * H - (w / ar) / 2, w, rot); }
+    } else if (L === 'bleed') {
+      // Cover the page plus 1/8 in past every trim edge, on whole pixels, so nothing leaves a white sliver at the cut.
+      const b = Math.ceil(W * BLEED), TW = W + 2 * b, TH = H + 2 * b;
+      if (isStripes) fillStripes(ctx, -b, -b, TW, TH, stripeW, [null, color, color]);
+      else {
+        // The outer 1.5% of the art (soft, partly transparent edge pixels) is pushed beyond the bleed.
+        const inset = .015, sw = img.naturalWidth * (1 - 2 * inset), sh = img.naturalHeight * (1 - 2 * inset);
+        const sc = Math.max(TW / sw, TH / sh), fw = Math.ceil(img.naturalWidth * sc);
+        put(Math.floor((W - fw) / 2), Math.floor((H - fw / ar) / 2), fw);
+      }
     }
     ctx.globalAlpha = 1;
   }
@@ -1371,8 +1629,16 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
   let ready = false, comparing = false, busy = false;
   const canvas = $('canvas');
 
+  // Which palette (and which of its variations) the current colors are. Any manual recolor reads as "Custom".
+  const same = (a, b) => (a || '').toLowerCase() === (b || '').toLowerCase();
   function paletteMatch() {
-    return PALETTES.find((pl) => ROLES.every((r) => pl[r.key].toLowerCase() === state.palette[r.key].toLowerCase()));
+    for (const pl of PALETTES) {
+      if (!ROLES.every((r) => r.variant || same(pl[r.key], state.palette[r.key]))) continue;
+      const vs = paletteVariants(pl);
+      const variant = vs.findIndex((v) => ROLES.every((r) => !r.variant || same(v[r.key], state.palette[r.key])));
+      if (variant >= 0) return { pl, variant, count: vs.length };
+    }
+    return null;
   }
 
   function buildPalettes() {
@@ -1380,13 +1646,20 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
     const match = paletteMatch();
     PALETTES.forEach((pl) => {
       const b = document.createElement('button');
-      if (match && match.name === pl.name) b.className = 'selected';
-      b.title = pl.name;
-      b.innerHTML = `<canvas class="thumb" data-palette="${pl.name}"></canvas><div class="swatch-row">${['stone', 'vein', 'highlight', 'plate', 'trim'].map((k) => `<i style="background:${pl[k]}"></i>`).join('')}</div><span>${pl.name}</span>`;
-      b.onclick = () => { const { look, ...colors } = pl; state.palette = colors; if (look) Object.assign(state, look); commit(); };
+      const selected = match && match.pl === pl;
+      if (selected) b.className = 'selected';
+      b.title = selected && match.count > 1 ? `${pl.name} — click again for another arrangement` : pl.name;
+      const chips = pl.swatches || ['stone', 'vein', 'highlight', 'plate', 'trim'].map((k) => pl[k]);
+      b.innerHTML = `<canvas class="thumb" data-palette="${pl.name}"></canvas><div class="swatch-row">${chips.map((c) => `<i style="background:${c}"></i>`).join('')}</div><span>${pl.name}</span>`;
+      b.onclick = () => {
+        // Repeat click on the selected palette: next valid arrangement of its variant roles (stripes + accent art).
+        const cur = paletteMatch();
+        if (cur && cur.pl === pl && cur.count > 1) { Object.assign(state.palette, paletteVariants(pl)[(cur.variant + 1) % cur.count]); commit(); return; }
+        state.palette = paletteColors(pl); if (pl.look) Object.assign(state, pl.look); commit();
+      };
       box.appendChild(b);
     });
-    $('paletteName').textContent = match ? match.name : 'Custom version';
+    $('paletteName').textContent = match ? (match.count > 1 ? `${match.pl.name} · variation ${match.variant + 1} of ${match.count}` : match.pl.name) : 'Custom version';
   }
 
   // Background/title-plate buttons are generated from the registry's approved slot list for this
@@ -1421,7 +1694,8 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
   function buildRoles() {
     const box = $('roles'); box.innerHTML = '';
     let group = '';
-    ROLES.forEach((r) => {
+    // Stripe roles only appear while a striped background is in use.
+    ROLES.filter((r) => !r.pattern || state.marble in PATTERNS).forEach((r) => {
       if (r.group !== group) {
         group = r.group;
         const g = document.createElement('div'); g.className = 'group-label'; g.textContent = group; box.appendChild(g);
@@ -1455,13 +1729,31 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
     $('shadowVal').textContent = state.titleShadow + '%';
     $('accentVal').textContent = state.accentOpacity + '%';
     for (const id of ['accentPlace', 'accentOpacityRow', 'accentLinedRow']) ($(id).closest('.field') || $(id)).classList.toggle('hidden', state.accent === 'none');
-    const customAccent = state.accent !== 'none' && state.accentPlace === 'custom';
-    $('accentScaleRow').classList.toggle('hidden', !customAccent);
-    $('accentDragRow').classList.toggle('hidden', !customAccent);
+    // Only the layouts this element supports are offered.
+    const supported = ACCENT_SUPPORT[state.accent] || [];
+    const sel = $('accentPlace'), sig = supported.join();
+    if (sel.dataset.sig !== sig) {
+      sel.dataset.sig = sig;
+      sel.innerHTML = ACCENT_LAYOUTS.filter(([v]) => supported.includes(v)).map(([v, label]) => `<option value="${v}">${label}</option>`).join('');
+    }
+    const layout = accentLayout(state), on = state.accent !== 'none';
+    const customAccent = on && layout === 'custom';
+    const banded = ['top', 'bottom'].includes(layout) || (['left', 'right'].includes(layout) && SIDE_BAND[state.accent]);
+    const tiled = on && (['repeat', 'scatter'].includes(layout) || banded || (layout === 'bleed' && state.accent === 'stripes'));
+    $('accentTileRow').classList.toggle('hidden', !tiled);
+    $('accentSpacingRow').classList.toggle('hidden', !(on && ['repeat', 'scatter'].includes(layout) && state.accent !== 'stripes'));
+    for (const id of ['accentScaleRow', 'accentXRow', 'accentYRow', 'accentRotRow', 'accentDragRow']) $(id).classList.toggle('hidden', !customAccent);
     $('accentScaleVal').textContent = (state.accentScale ?? 90) + '%';
+    $('accentTileVal').textContent = (state.accentTile ?? 100) + '%';
+    $('accentSpacingVal').textContent = (state.accentSpacing ?? 0) + '%';
+    $('accentXVal').textContent = Math.round(state.accentX * 100) + '%';
+    $('accentYVal').textContent = Math.round(state.accentY * 100) + '%';
+    $('accentRotVal').textContent = (state.accentRot || 0) + '°';
     canvas.style.cursor = customAccent && currentType() === 'cover' ? 'grab' : '';
-    $('accent').value = state.accent; $('accentPlace').value = state.accentPlace; $('accentLined').checked = state.accentLined;
+    $('accent').value = state.accent; $('accentPlace').value = layout; $('accentLined').checked = state.accentLined;
     $('accentScale').value = state.accentScale ?? 90;
+    $('accentTile').value = state.accentTile ?? 100; $('accentSpacing').value = state.accentSpacing ?? 0;
+    $('accentXIn').value = Math.round(state.accentX * 100); $('accentYIn').value = Math.round(state.accentY * 100); $('accentRot').value = state.accentRot || 0;
     for (const id of ['texture', 'veinStrength', 'plateOpacity', 'titleShadow', 'accentOpacity']) $(id).value = state[id];
     $('textureVal').textContent = state.texture + '%';
     $('veinVal').textContent = state.veinStrength + '%';
@@ -1499,7 +1791,7 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
     ACCENTS.forEach(([key, label]) => {
       const b = document.createElement('button'); b.dataset.accent = key;
       b.innerHTML = `<canvas width="72" height="72"></canvas>${label}`;
-      b.onclick = () => { state.accent = key; goTo('cover'); commit(false); };
+      b.onclick = () => { state.accent = key; if (key !== 'none') state.accentPlace = accentLayout(state); goTo('cover'); commit(false); };
       box.appendChild(b);
     });
   }
@@ -1512,8 +1804,8 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
       const base = { ...state, accentOpacity: Math.max(state.accentOpacity, 60) };
       // Each palette previewed as a mini cover with the current marble, plate, lettering and accent.
       document.querySelectorAll('#palettes canvas[data-palette]').forEach((c) => {
-        const { look, ...colors } = PALETTES.find((pl) => pl.name === c.dataset.palette);
-        renderCover(c, 96, { ...base, ...(look || {}), palette: colors });
+        const pl = PALETTES.find((x) => x.name === c.dataset.palette);
+        renderCover(c, 96, { ...base, ...(pl.look || {}), palette: paletteColors(pl) });
       });
       // Each background previewed in the current colors.
       document.querySelectorAll('#marbleSeg button').forEach((b) => {
@@ -1582,9 +1874,12 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
   $('textColorAuto').onchange = (e) => { state.textColorAuto = e.target.checked; commit(false); };
   $('textColor').oninput = (e) => { state.textColor = e.target.value; commit(false); };
   document.querySelectorAll('#titleSeg button').forEach((b) => b.onclick = () => { state.titleStyle = b.dataset.title; goTo('cover'); commit(false); });
-  $('accent').onchange = (e) => { state.accent = e.target.value; commit(false); };
+  $('accent').onchange = (e) => { state.accent = e.target.value; if (state.accent !== 'none') state.accentPlace = accentLayout(state); commit(false); };
   $('accentPlace').onchange = (e) => { state.accentPlace = e.target.value; goTo('cover'); commit(true); };
   $('accentScale').oninput = (e) => { state.accentScale = Number(e.target.value); commit(false); };
+  for (const id of ['accentTile', 'accentSpacing', 'accentRot']) $(id).oninput = (e) => { state[id] = Number(e.target.value); goTo('cover'); commit(false); };
+  $('accentXIn').oninput = (e) => { state.accentX = Number(e.target.value) / 100; goTo('cover'); commit(false); };
+  $('accentYIn').oninput = (e) => { state.accentY = Number(e.target.value) / 100; goTo('cover'); commit(false); };
   $('accentLined').onchange = (e) => { state.accentLined = e.target.checked; toInterior(); commit(false); };
 
   // Drag the accent element directly on the cover preview when "Large + drag to place" is chosen.
@@ -1595,7 +1890,7 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
       return { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height };
     };
     canvas.addEventListener('pointerdown', (e) => {
-      if (state.accent === 'none' || state.accentPlace !== 'custom' || !['cover'].includes(currentType())) return;
+      if (state.accent === 'none' || accentLayout(state) !== 'custom' || !['cover'].includes(currentType())) return;
       dragging = true; canvas.setPointerCapture(e.pointerId);
       const { x, y } = toCanvasXY(e);
       state.accentX = x; state.accentY = y; draw();
@@ -1605,7 +1900,7 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
       const { x, y } = toCanvasXY(e);
       state.accentX = Math.min(1, Math.max(0, x)); state.accentY = Math.min(1, Math.max(0, y)); draw();
     });
-    const end = () => { if (dragging) { dragging = false; save(); refreshThumbs(); } };
+    const end = () => { if (dragging) { dragging = false; save(); syncControls(); refreshThumbs(); } };
     canvas.addEventListener('pointerup', end);
     canvas.addEventListener('pointercancel', end);
   })();
@@ -1619,7 +1914,7 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
   for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) cmp.addEventListener(ev, () => { if (comparing) { comparing = false; draw(); } });
 
   const toast = (msg) => { const t = $('toast'); t.textContent = msg; t.classList.remove('hidden'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.add('hidden'), 3500); };
-  const slug = () => (paletteMatch()?.name || 'custom').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  const slug = () => (paletteMatch()?.pl.name || 'custom').toLowerCase().replace(/[^a-z0-9]+/g, '-');
   const toBlob = (c, type, q) => new Promise((res, rej) => c.toBlob((b) => b ? res(b) : rej(new Error('Could not prepare the page image.')), type, q));
   const download = (blob, name) => { const u = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = u; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(u), 1000); };
   const dpi = () => state.quality === 'print' ? 300 : 150;
