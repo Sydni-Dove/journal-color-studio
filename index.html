@@ -327,8 +327,9 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
     floralCorner: 'floral-corner.png',     // large corner bouquet: frames the Belongs-to page
     divider: 'ornament-divider.png',       // gold ornament divider (alpha mask)
     handLines: 'lines-hand.png',
-    // TEMPORARY PLACEHOLDERS: the pattern maps below come from ~1240 px page images. Rebuild them from full-resolution
-    // Canva exports with tools/build_pattern_maps.py before merging (same crops, same masks, same roles).
+    // Pattern maps are built with tools/build_pattern_maps.py (same crops, same masks, same roles at any resolution).
+    // cabana / pinstripe / bias: from 2125 px transparent Canva exports (216 DPI page).
+    // TEMPORARY PLACEHOLDERS: candy / scribble / abstract are still from ~1545 px page images; rebuild before merging.
     'pattern:cabana': 'pattern-cabana.png',       // ink maps of the Canva stripe/pattern designs (0 = light ground, 255 = full ink)
     'pattern:pinstripe': 'pattern-pinstripe.png',
     'pattern:bias': 'pattern-bias.png',
