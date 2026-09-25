@@ -163,7 +163,7 @@ describe("Example A — recipe layout must render what the state says", () => {
     p.recipe.items[0] = { id: "week", layoutId: "planner-monthly", repeat: { kind: "every-month" } };
     const after = solvePage(resolveDocument(p), 0);
     expect(after).not.toBe(before);
-    expect(after.nodes.filter((n) => n.component === "CalendarCell" && n.type === "box")).toHaveLength(42);
+    expect(after.nodes.filter((n) => n.component === "CalendarCell" && n.type === "group")).toHaveLength(42);
   });
 });
 
@@ -218,14 +218,15 @@ describe("Example C / Issue 2 — size-aware layouts on inserts", () => {
     const p = insert("franklin-compact", "planner-monthly");
     const doc = resolveDocument(p);
     for (let i = 0; i < doc.recipe.pages.length; i++) expect(textCollisions(solvePage(doc, i), doc, heuristicMeasurer)).toHaveLength(0);
-    const cell = solvePage(doc, 0).nodes.find((n) => n.component === "CalendarCell" && n.type === "box")!;
+    const cell = solvePage(doc, 0).nodes.find((n) => n.component === "CalendarCell" && n.type === "group")!;
     expect(cell.rect.w).toBeGreaterThanOrEqual(0.34);
     const r = validateProject(p, heuristicMeasurer);
     expect(r.issues.filter((i) => i.severity === "error")).toEqual([]);
   });
-  it("Filofax Personal uses the micro monthly; Filofax Pocket is reported incompatible (never squashed)", () => {
+  it("Filofax Personal uses the compact monthly; Filofax Pocket is reported incompatible (never squashed)", () => {
+    // With the connected (zero-gap) grid, Filofax Personal cells are 0.356" — above the compact minimum.
     const personal = layoutAvailability(resolveDocument(insert("filofax-personal", "planner-monthly"))).find((x) => x.layoutId === "planner-monthly")!;
-    expect(personal.fit.ok && personal.fit.variant).toBe("micro");
+    expect(personal.fit.ok && personal.fit.variant).toBe("compact");
     const pocket = layoutAvailability(resolveDocument(insert("filofax-pocket", "planner-monthly"))).find((x) => x.layoutId === "planner-monthly")!;
     expect(pocket.fit.ok).toBe(false);
     const r = validateProject(insert("filofax-pocket", "planner-monthly"), heuristicMeasurer, { pageIndices: [0] });

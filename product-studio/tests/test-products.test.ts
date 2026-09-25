@@ -100,7 +100,7 @@ describe("TP3 — 7 × 9 monthly coil planner", () => {
   it("every month is a 7 × 6 grid of equal cells with one date per day", () => {
     doc.recipe.pages.forEach((_, i) => {
       const nodes = solvePage(doc, i).nodes;
-      const cells = nodes.filter((n) => n.component === "CalendarCell" && n.type === "box");
+      const cells = nodes.filter((n) => n.component === "CalendarCell" && n.type === "group");
       expect(cells).toHaveLength(42);
       const w = cells[0].rect.w, h = cells[0].rect.h;
       cells.forEach((c) => {

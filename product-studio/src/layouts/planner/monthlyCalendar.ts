@@ -17,9 +17,17 @@ import { distributeEqual, solveStack } from "../../engines/layout/math";
 import { STUDIO_MONTHLY_VARIANTS } from "../../presets/studioDefaults";
 import type { Rect } from "../../types/geometry";
 import type { LayoutMetric, LayoutNode, SolvedPage } from "../../types/layout";
-import { calendarGrid, headerTitle, pageFrame, section, weekdayHeader } from "../shared/components";
+import { CALENDAR_GRID_GAP_IN, calendarGrid, headerTitle, pageFrame, section, weekdayHeader } from "../shared/components";
 import { lineBoxIn, stackDiagnostic } from "../shared/nodes";
 import type { FitContext, FitResult, LayoutDefinition } from "../shared/types";
+import { MONTH_NAMES } from "../../engines/calendar/calendar";
+import { heuristicMeasurer, styleForRole } from "../../engines/typography/textMeasure";
+
+/** Widest month title any month can produce ("September 2027"), measured in the title role. */
+function widestTitleIn(ctx: FitContext): number {
+  const style = styleForRole(ctx.typography, "monthTitle");
+  return Math.max(...MONTH_NAMES.map((m) => heuristicMeasurer(`${m} 2027`, style)));
+}
 
 /** Month grids are sized for the universal 6-row case so every month fits the same structure. */
 const WORST_CASE_ROWS = 6;
@@ -52,12 +60,14 @@ function measure(ctx: FitContext, v: Variant, withSidebar: boolean): Measure {
   const gridH = g.usableHeightIn - 2 * s.page - v.zones.titleH.valueIn - s.headerGap - v.zones.weekdayH.valueIn - footer;
   return {
     gridW,
-    colW: (gridW - 6 * s.column) / 7,
-    rowH: (gridH - (WORST_CASE_ROWS - 1) * s.row) / WORST_CASE_ROWS,
+    colW: (gridW - 6 * CALENDAR_GRID_GAP_IN) / 7,
+    rowH: (gridH - (WORST_CASE_ROWS - 1) * CALENDAR_GRID_GAP_IN) / WORST_CASE_ROWS,
   };
 }
 
 const fits = (m: Measure, v: Variant) => m.colW + 1e-6 >= v.zones.minCellW.valueIn && m.rowH + 1e-6 >= v.zones.minCellH.valueIn;
+/** The month title must fit the page width — a variant is never offered if its title would overflow. */
+const titleFits = (ctx: FitContext) => widestTitleIn(ctx) <= ctx.page.usableWidthIn - 2 * ctx.spacing.page + 1e-6;
 
 function sidebarBalanced(ctx: FitContext): boolean {
   return ctx.options.sidebarWidthIn <= ctx.page.usableWidthIn * STUDIO_MONTHLY_VARIANTS.maxSidebarShare + 1e-6;
@@ -72,11 +82,14 @@ export function fitMonthly(ctx: FitContext): FitResult {
       ? `A ${ctx.options.sidebarWidthIn}" sidebar would take more than ${Math.round(STUDIO_MONTHLY_VARIANTS.maxSidebarShare * 100)}% of this page's width.`
       : "The page is too narrow for a sidebar beside a full 7-column grid.";
   for (const v of VARIANTS) {
-    if (fits(measure(ctx, v, v.allowsSidebar && ctx.options.showSidebar && sidebarFits), v)) {
+    if (titleFits(ctx) && fits(measure(ctx, v, v.allowsSidebar && ctx.options.showSidebar && sidebarFits), v)) {
       return { ok: true, variant: v.id, variantLabel: v.label, sidebarAvailable: v.allowsSidebar && sidebarFits, sidebarReason: v.allowsSidebar ? sidebarReason : `${v.label} has no sidebar.` };
     }
   }
   const m = measure(ctx, VARIANTS[VARIANTS.length - 1], false);
+  if (!titleFits(ctx)) {
+    return { ok: false, reason: `Too narrow for a monthly calendar: the month title needs ${widestTitleIn(ctx).toFixed(2)}" but the page has ${ctx.page.usableWidthIn.toFixed(2)}" of usable width.` };
+  }
   return {
     ok: false,
     reason: `Too small for a monthly calendar: cells would be ${m.colW.toFixed(2)}" × ${m.rowH.toFixed(2)}" (minimum ${STUDIO_MONTHLY_VARIANTS.micro.minCellW.valueIn}" × ${STUDIO_MONTHLY_VARIANTS.micro.minCellH.valueIn}").`,
@@ -153,13 +166,13 @@ export const monthlyCalendar: LayoutDefinition = {
     const gridRect = { ...gridArea, y: vs.byId.grid.start, h: vs.byId.grid.size };
 
     const labels = v.weekdayLabels === "initial" ? ctx.calendar.weekdayInitials : ctx.calendar.weekdayShortNames;
-    nodes.push(...weekdayHeader("month-weekdays", weekdayRect, labels, ctx, v.weekdayRole));
+    nodes.push(...weekdayHeader("month-weekdays", weekdayRect, labels, ctx, v.weekdayRole, CALENDAR_GRID_GAP_IN));
     const grid = calendarGrid("month-grid", gridRect, month, ctx, v.dateRole);
     nodes.push(...grid.nodes);
 
     // Solved cells must honor the variant minimum (guards against solver drift).
-    const colW = distributeEqual(gridRect.x, gridRect.w, 7, s.column).size;
-    const rowH = distributeEqual(gridRect.y, gridRect.h, month.rows, s.row).size;
+    const colW = distributeEqual(gridRect.x, gridRect.w, 7, CALENDAR_GRID_GAP_IN).size;
+    const rowH = distributeEqual(gridRect.y, gridRect.h, month.rows, CALENDAR_GRID_GAP_IN).size;
     if (colW + 1e-6 < v.zones.minCellW.valueIn || rowH + 1e-6 < v.zones.minCellH.valueIn) {
       diagnostics.push({
         severity: "error",

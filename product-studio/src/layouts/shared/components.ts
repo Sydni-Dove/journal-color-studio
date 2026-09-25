@@ -177,9 +177,17 @@ export const PLACEMENT_ALIGN: Record<LayoutPlacement, TextAlign> = {
 };
 
 /**
- * Month grid: 7 equal columns × N equal rows.
- *   colW = (gridW − 6 × colGap) / 7
- *   rowH = (gridH − (N − 1) × rowGap) / N
+ * Traditional month grids are ONE continuous connected grid: adjacent cells
+ * share borders, with zero internal gap in both directions.
+ */
+export const CALENDAR_GRID_GAP_IN = 0;
+
+/**
+ * Month grid: 7 equal columns × N equal rows, contiguous.
+ *   colW = W / 7    rowH = H / N     (internal gap = CALENDAR_GRID_GAP_IN = 0)
+ * Cells are geometry-only regions (CalendarCell groups). The grid is stroked
+ * once — outer border + shared interior rules — so no border is ever doubled
+ * and no cell reads as an individual card.
  */
 export function calendarGrid(
   id: string,
@@ -189,16 +197,29 @@ export function calendarGrid(
   dateRole: "date" | "number" | "label" = "date",
 ): { nodes: LayoutNode[]; metrics: LayoutMetric[] } {
   const s = ctx.spacing;
-  const cols = distributeEqual(rect.x, rect.w, 7, s.column);
-  const rows = distributeEqual(rect.y, rect.h, month.rows, s.row);
+  const cols = distributeEqual(rect.x, rect.w, 7, CALENDAR_GRID_GAP_IN);
+  const rows = distributeEqual(rect.y, rect.h, month.rows, CALENDAR_GRID_GAP_IN);
   const dateH = lineBoxIn(ctx.typography, dateRole);
   const align = PLACEMENT_ALIGN[ctx.options.datePlacement];
-  const nodes: LayoutNode[] = [group(id, "Grid", rect, { columnEdges: cols.edges, rowEdges: rows.edges })];
+  const strokePt = STUDIO_STROKES.gridRulePt;
+  const nodes: LayoutNode[] = [
+    group(id, "Grid", rect, { columnEdges: cols.edges, rowEdges: rows.edges }),
+    box(`${id}-border`, rect, { component: "Grid", strokePt }),
+  ];
+  // Shared interior rules: one line per boundary between adjacent columns / rows.
+  for (let c = 1; c < 7; c++) {
+    const x = cols.starts[c];
+    nodes.push(rule(`${id}-v${c}`, x, rect.y, x, rect.y + rect.h, { strokePt, component: "Grid" }));
+  }
+  for (let r = 1; r < month.rows; r++) {
+    const y = rows.starts[r];
+    nodes.push(rule(`${id}-h${r}`, rect.x, y, rect.x + rect.w, y, { strokePt, component: "Grid" }));
+  }
   month.grid.forEach((week, r) =>
     week.forEach((cell, c) => {
       const cellRect: Rect = { x: cols.starts[c], y: rows.starts[r], w: cols.size, h: rows.size };
       const cid = `${id}-r${r}c${c}`;
-      nodes.push(box(cid, cellRect, { component: "CalendarCell", strokePt: STUDIO_STROKES.gridRulePt }));
+      nodes.push(group(cid, "CalendarCell", cellRect));
       if (cell.inMonth) {
         nodes.push(
           text(
@@ -218,17 +239,25 @@ export function calendarGrid(
     metrics: [
       { label: "Calendar columns", value: 7, unit: "count", provenance: { geometryClass: "studio-recommended", basis: "7 weekday columns" } },
       { label: "Calendar rows", value: month.rows, unit: "count", provenance: { geometryClass: "studio-recommended", basis: ctx.calendar?.settings.sixRowMonths ? "6-row universal grid (research 1.4)" : `natural rows for ${month.name}` } },
-      { label: "Column width = (W − 6·gap) / 7", value: cols.size, unit: "in", provenance: { ...derived, basis: `(${rect.w.toFixed(3)} − 6 × ${s.column}) / 7` } },
-      { label: "Row height = (H − (n−1)·gap) / n", value: rows.size, unit: "in", provenance: { ...derived, basis: `(${rect.h.toFixed(3)} − ${month.rows - 1} × ${s.row}) / ${month.rows}` } },
+      { label: "Column width = W / 7 (connected grid)", value: cols.size, unit: "in", provenance: { ...derived, basis: `${rect.w.toFixed(3)} / 7, zero internal gap` } },
+      { label: "Row height = H / n (connected grid)", value: rows.size, unit: "in", provenance: { ...derived, basis: `${rect.h.toFixed(3)} / ${month.rows}, zero internal gap` } },
       { label: "Cell padding", value: s.boxPadding, unit: "in", provenance: { ...derived, basis: "spacing token boxPadding (research 0.06–0.12\")" } },
     ],
   };
 }
 
 /** Weekday labels over equal columns. */
-export function weekdayHeader(id: string, rect: Rect, labels: string[], ctx: LayoutContext, role: "subheading" | "label" = "subheading"): LayoutNode[] {
-  // Same column math as the grid below, so every label is centred on its solved column.
-  const cols = distributeEqual(rect.x, rect.w, labels.length, ctx.spacing.column);
+export function weekdayHeader(
+  id: string,
+  rect: Rect,
+  labels: string[],
+  ctx: LayoutContext,
+  role: "subheading" | "label" = "subheading",
+  gap: number = ctx.spacing.column,
+): LayoutNode[] {
+  // Same column math as the grid below (pass the grid's gap), so every label
+  // is centred on exactly its solved column.
+  const cols = distributeEqual(rect.x, rect.w, labels.length, gap);
   return [
     group(id, "Grid", rect, { columnEdges: cols.edges }),
     ...labels.map((l, i) =>

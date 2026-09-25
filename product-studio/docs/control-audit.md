@@ -103,3 +103,41 @@ except these, which are correct by design and now say so in the panel:
 - **Repeat count.** Changes the page count, not page 1.
 - **Six-row months on January 2027.** January already needs 6 rows; the
   "Show February" link demonstrates the change.
+
+## Follow-up — connected monthly grid (2026-09-25)
+
+**Root issue.** The shared `calendarGrid` primitive spaced cells with the
+spacing tokens (`column` / `row`, 0.06" in Balanced) and stroked every cell
+as its own box. The result looked like separate cards, and it would have
+doubled the borders even at zero gap.
+
+**Fix, made centrally so every monthly layout inherits it.** The primitive
+now:
+- uses `CALENDAR_GRID_GAP_IN = 0`;
+- emits cells as geometry-only regions;
+- strokes the grid once: one square outer border plus a single shared rule
+  on each interior boundary.
+
+The weekday header takes the grid's gap, so its seven columns are the grid's
+columns. The monthly `fit()` uses the same zero gap. It also now requires the
+longest month title to fit the page width.
+
+**Consequences.**
+- Filofax Personal cells grew from 0.304" to 0.356", so it now selects the
+  compact variant (0 errors, 0 warnings).
+- Filofax Pocket stays incompatible, now with an explicit title-width reason.
+
+**Tests.** `tests/calendar-grid.test.tsx` asserts, on every month of 7×9,
+A5, Half Letter, Franklin Compact and Filofax Personal:
+- zero horizontal and vertical gap;
+- cells tile the grid exactly;
+- one border with `rx = 0`, 6 vertical and N−1 horizontal rules, no
+  duplicates;
+- no per-cell rectangles in the rendered markup;
+- weekday label boxes equal the grid columns.
+
+It was verified in Chromium on the rendered DOM as well.
+
+There is no desk-pad **monthly** layout yet. The weekly desk pad is not a
+month calendar. A future desk-pad monthly must use `calendarGrid` and will
+inherit this automatically.
