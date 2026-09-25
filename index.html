@@ -190,6 +190,32 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       <div class="field"><span>Title plate</span>
         <div class="seg" id="plateSeg"></div>
       </div>
+      <div class="field" id="titleFillField"><span>Title box fill</span>
+        <div class="role"><label><input type="checkbox" id="titleFillOn"> Fill behind title</label></div>
+        <div class="row2" id="titleFillColorRow">
+          <div class="field"><span>Fill color</span>
+            <select id="titleFillColor">
+              <option value="paper">Paper (palette)</option>
+              <option value="neutral">Neutral cream</option>
+              <option value="plate">Plate color (palette)</option>
+              <option value="highlight">Highlight (palette)</option>
+              <option value="stone">Stone (palette)</option>
+              <option value="trim">Gold trim (palette)</option>
+              <option value="white">White</option>
+              <option value="black">Black</option>
+              <option value="custom">Custom color</option>
+            </select>
+          </div>
+          <div class="field"><span>Custom</span><input type="color" id="titleFillCustom" aria-label="Custom title fill color" style="height:36px;width:100%"></div>
+        </div>
+        <label class="slider" id="titleFillOpacityRow"><span>Fill opacity <b id="titleFillOpacityVal"></b></span><input type="range" id="titleFillOpacity" min="0" max="100"></label>
+        <div class="seg" id="titleFillPad" style="margin-top:8px">
+          <button data-pad="tight"><strong>Tight</strong><small>Close to the title</small></button>
+          <button data-pad="normal"><strong>Normal</strong></button>
+          <button data-pad="generous"><strong>Generous</strong><small>To the frame</small></button>
+        </div>
+        <span class="hint" id="titleFillNote">Sits behind the title and inside its frame. The title, frame and artwork don’t move.</span>
+      </div>
       <div class="field"><span>Cover lettering</span>
         <div class="seg" id="titleSeg">
           <button data-title="custom"><strong>Custom font</strong><small>Real type, your font</small></button>
@@ -847,6 +873,8 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     bodyFont: 'Cormorant Garamond', bodyFontScale: 100,
     textColorAuto: true, textColor: '#2A1A18',
     text: {},                            // edited wording per journal: { [journal]: { [slotId]: string } } (see TEXT_SLOTS)
+    // Title box fill behind the cover title (off by default). color: a palette role, 'neutral', 'white', 'black' or 'custom'.
+    titleFill: { on: false, color: 'paper', custom: '#FFFFFF', opacity: 85, pad: 'normal' },
   };
   const STORE_KEY = 'dove-marble-studio';
   let state = structuredClone(DEFAULTS);
@@ -902,6 +930,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     }
     if (state.journal === 'dream' && state.marble === 'journal') state.marble = DEFAULTS.marble;
     if (!state.text || typeof state.text !== 'object') state.text = {};
+    state.titleFill = { ...DEFAULTS.titleFill, ...(state.titleFill && typeof state.titleFill === 'object' ? state.titleFill : {}) };
     state.customPalettes = Array.isArray(state.customPalettes) ? state.customPalettes : [];          // the procedural watercolor was retired
     state.decor = Object.fromEntries(Object.entries(DEFAULTS.decor).map(([k, d]) => [k, { ...d, ...(state.decor?.[k] || {}) }]));
   } catch {}
@@ -2036,6 +2065,92 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     done(out, p, false, growLeft > 0, fw);
   }
 
+  // ---------- Title box fill ----------
+  // An optional fill behind the cover title, for readability over busy or low-contrast backgrounds. Its own setting per
+  // journal (state.titleFill), independent of palette, background, wording and typography. Render stack:
+  //   background → background art → title plate / frame → TITLE FILL → (Prayer: its gold frame + glitter again, on top)
+  //   → title lettering → foreground art (figures).
+  // The region is the title's own: the chosen plate's interior (inside its trim or bevel), or, with no plate, the
+  // journal's own title area: Dream's title safe area, the Prayer cover's gold frame interior, the Prayer Warrior title
+  // above the figure, the Warring Woman title circle. Padding only changes the fill's size; nothing else moves.
+  const FILL_PAD = { tight: 0, normal: 1, generous: 2 };
+  function titleFillColor(s) {
+    const f = s.titleFill, p = s.palette;
+    if (!f?.on || !(f.opacity > 0)) return null;
+    const hex = f.color === 'custom' ? f.custom : f.color === 'white' ? '#FFFFFF' : f.color === 'black' ? '#000000' : f.color === 'neutral' ? '#F4EFE6' : (p[f.color] || p.paper);
+    return { hex, css: rgba(hex, f.opacity / 100) };
+  }
+  // Prayer journals with no plate: each cover's own title region, in Canva px on the 816×1056 page.
+  const PR_TITLE_REGION = {
+    // Inside the gold frame's inner edge (measured from prayer-cover-gold.png); tight = the title band inside it.
+    prayer: (lvl) => (lvl === 2 ? { rect: [205.9, 311.4, 439.4, 439.7] } : lvl === 1 ? { rect: [215.9, 321.4, 419.4, 419.7] } : { rect: [215.9, 406.7, 419.4, 257.6] }),
+    // Around the title, inside the white card and clear of the figure (her head starts at y 363).
+    warrior: (lvl) => { const pad = [10, 20, 32][lvl], t = PR_TITLE_BOX.warrior;
+      const x0 = Math.max(68, t[0] - pad), y0 = Math.max(72, t[1] - pad), x1 = Math.min(748, t[0] + t[2] + pad), y1 = Math.min(350, t[1] + t[3] + pad);
+      return { rect: [x0, y0, x1 - x0, y1 - y0], radius: 12 }; },
+    // The title circle (inside the gold ring).
+    warring: (lvl) => { const k = [.92, .96, 1][lvl]; return { ellipse: [261.71 + 554.29 / 2, 175.88 + 547.57 / 2, 554.29 / 2 * k, 547.57 / 2 * k] }; },
+  };
+  // Builds the fill's path on ctx (canvas px). L = the cover's plate layout.
+  function titleFillPath(ctx, W, H, s, L) {
+    const lvl = FILL_PAD[s.titleFill?.pad] ?? 1;
+    const rr = (x, y, w, h, r) => { if (r > 0) roundRect(ctx, x, y, w, h, Math.min(r, w / 2, h / 2)); else { ctx.beginPath(); ctx.rect(x, y, w, h); } };
+    if (L.kind === 'rect' || L.kind === 'ellipse') {
+      const st = L.style, r = (st.radius || 0) * W, inner = (st.trimInset + st.trim) * W;             // inside the trim line
+      let hw = L.hw - inner, hh = L.hh - inner;
+      if (lvl === 1) { hw -= W * .012; hh -= W * .012; }
+      if (lvl === 0) { hw = Math.min(hw, L.hw * st.safeW + W * .02); hh = Math.min(hh, L.hh * st.safeH + W * .02); }
+      platePath(ctx, L.kind, L.cx, L.cy, hw, hh, Math.max(0, r - inner));
+      return;
+    }
+    if (L.kind === 'bevel' && L.inner) {
+      const b = L.inner, safe = { x: b.x + b.w * .1, y: b.y + b.h * .12, w: b.w * .8, h: b.h * .76 };
+      const g = lvl === 2 ? b : lvl === 1 ? { x: b.x + W * .012, y: b.y + W * .012, w: b.w - W * .024, h: b.h - W * .024 }
+        : { x: Math.max(b.x, safe.x - W * .02), y: Math.max(b.y, safe.y - W * .02), w: Math.min(b.w, safe.w + W * .04), h: Math.min(b.h, safe.h + W * .04) };
+      rr(g.x, g.y, g.w, g.h, 0);
+      return;
+    }
+    if (s.journal !== 'dream' && L.kind === 'none' && PR_TITLE_REGION[s.journal]) {
+      const { k, ox, oy } = prFit(W, H), reg = PR_TITLE_REGION[s.journal](lvl);
+      if (reg.ellipse) { const [cx, cy, rx, ry] = reg.ellipse; ctx.beginPath(); ctx.ellipse(ox + cx * k, oy + cy * k, rx * k, ry * k, 0, 0, Math.PI * 2); return; }
+      const [l, t, w, h] = reg.rect;
+      rr(ox + l * k, oy + t * k, w * k, h * k, (reg.radius || 0) * k);
+      return;
+    }
+    // No plate (Dream) or the floral ring: the title's safe area, padded.
+    const a = L.safe || L.title, pad = W * [.015, .035, .06][lvl];
+    const x = Math.max(W * .03, a.x - pad), y = Math.max(H * .03, a.y - pad);
+    rr(x, y, Math.min(W * .97, a.x + a.w + pad) - x, Math.min(H * .97, a.y + a.h + pad) - y, W * .02);
+  }
+  function drawTitleFill(ctx, W, H, s, L) {
+    const c = titleFillColor(s);
+    if (!c) return;
+    ctx.save(); titleFillPath(ctx, W, H, s, L); ctx.fillStyle = c.css; ctx.fill(); ctx.restore();
+    // The Prayer cover's gold frame, glitter swipe and dots stay above the fill: its gold layer is drawn again, clipped to the fill.
+    if (s.journal === 'prayer' && L.kind === 'none') {
+      ctx.save(); titleFillPath(ctx, W, H, s, L); ctx.clip();
+      drawPr(ctx, W, H, s, [['coverGold', ...PINK.cover.find((r) => r[0] === 'coverWash').slice(1)]]);
+      ctx.restore();
+    }
+  }
+  // Readability check (preview only): the share of the pixels behind the title (the fill, when it's on) that sit below
+  // 3:1 contrast with the title color. Measured right before the lettering is drawn; a warning only, nothing changes.
+  function probeTitle(ctx, s, r, color) {
+    if (!s._probe || !color) return;
+    const cw = ctx.canvas.width, ch = ctx.canvas.height;
+    const x = Math.max(0, Math.floor(r.x)), y = Math.max(0, Math.floor(r.y)), w = Math.min(cw - x, Math.ceil(r.w)), h = Math.min(ch - y, Math.ceil(r.h));
+    if (w < 2 || h < 2) return;
+    const d = ctx.getImageData(x, y, w, h).data, [tr, tg, tb] = hexRgb(color), lt = .2126 * LIN[tr] + .7152 * LIN[tg] + .0722 * LIN[tb];
+    let low = 0, n = 0;
+    for (let i = 0; i < d.length; i += 16) {
+      const l = .2126 * LIN[d[i]] + .7152 * LIN[d[i + 1]] + .0722 * LIN[d[i + 2]];
+      if ((Math.max(l, lt) + .05) / (Math.min(l, lt) + .05) < 3) low++;
+      n++;
+    }
+    s._probe.share = n ? low / n : 0;
+    s._probe.filled = !!titleFillColor(s);
+  }
+
   // ---------- Cover title ----------
   const coverTitleColor = (s) => (s.coverFontColorAuto === false ? s.coverFontColor : s.palette.title);
 
@@ -2294,10 +2409,13 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     if (L.kind === 'bevel') {
       const inner = drawBevelPlate(ctx, L.x, L.y, L.w, L.h, BEVEL_SRC_BORDER * L.w / (ASSETS.bevel ? ASSETS.bevel.naturalWidth : 921), s);
       safe = { x: inner.x + inner.w * .1, y: inner.y + inner.h * .12, w: inner.w * .8, h: inner.h * .76 };
+      L.inner = inner;
     } else {
       if (L.kind !== 'none' && L.kind !== 'ring') drawTitlePlateShape(ctx, L, W, s);
       safe = L.safe;
     }
+    // 2b. Optional title box fill, inside the plate / frame and under the lettering.
+    drawTitleFill(ctx, W, H, s, L);
     // 3. A whisper of accent art inside the plate, under the lettering.
     if (s.accent !== 'none' && s.accentPlace === 'behindTitleSubtle') {
       ctx.save();
@@ -2306,6 +2424,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       ctx.restore();
     }
     // 4. Title.
+    probeTitle(ctx, s, safe, coverTitleColor(s));
     drawCoverTitle(ctx, W, H, safe, s);
   }
 
@@ -3230,14 +3349,20 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     }
   }
   // Original lettering (tinted only once colors are customized); cover titles can be typed in the cover font instead.
+  // The color a piece of lettering is drawn in (shared with the title readability check).
+  function letterColor(s, name, onPlate = false) {
+    const p = s.palette, role = LETTER_ROLE[name];
+    const isTitle = !!LETTER_TEXT[name], customTitle = isTitle && s.coverFontColorAuto === false, customInk = role === 'ink' && s.textColorAuto === false;
+    return customTitle ? s.coverFontColor : customInk ? s.textColor
+      : onPlate ? readableOn(p.plate, [p.title, p.paper, p.trim, '#FFFFFF', '#2A1A18'])
+      : role === 'ink' ? prInk(p) : p[role];
+  }
   function drawLetter(ctx, W, H, s, name, onPlate = false) {
     const { k, ox, oy } = prFit(W, H), [l, t, w, h] = LETTERING[name], p = s.palette;
     // On a title plate the lettering takes the plate's lettering color, like the Dream cover.
     const role = LETTER_ROLE[name];
     const isTitle = !!LETTER_TEXT[name], customTitle = isTitle && s.coverFontColorAuto === false, customInk = role === 'ink' && s.textColorAuto === false;
-    const color = customTitle ? s.coverFontColor : customInk ? s.textColor
-      : onPlate ? readableOn(p.plate, [p.title, p.paper, p.trim, '#FFFFFF', '#2A1A18'])
-      : role === 'ink' ? prInk(p) : p[role];
+    const color = letterColor(s, name, onPlate);
     // Real type in the artwork's own box: cover titles in Custom font, and any lettering whose wording was edited (the
     // artwork can only say its original words). Titles use the cover font; labels and headings use the heading font.
     const slot = LETTER_SLOT[name];
@@ -3347,15 +3472,19 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     if (s.decor) { drawDecorSlot(ctx, W, H, s, 'top', L, D); drawDecorSlot(ctx, W, H, s, 'bottom', L, D); }
     if (D) drawDividers(ctx, W, s, L, D);
     if (L.kind === 'ring') { if (s.showFrame) drawRingPlate(ctx, W, H, s, L); }
-    else if (L.kind === 'bevel') drawBevelPlate(ctx, L.x, L.y, L.w, L.h, BEVEL_SRC_BORDER * L.w / (ASSETS.bevel ? ASSETS.bevel.naturalWidth : 921), s);
+    else if (L.kind === 'bevel') L.inner = drawBevelPlate(ctx, L.x, L.y, L.w, L.h, BEVEL_SRC_BORDER * L.w / (ASSETS.bevel ? ASSETS.bevel.naturalWidth : 921), s);
     else if (L.kind !== 'none') drawTitlePlateShape(ctx, L, W, s);
+    drawTitleFill(ctx, W, H, s, L);                  // optional title box fill, under the lettering
     if (s.accent !== 'none' && s.accentPlace === 'behindTitleSubtle') {
       ctx.save();
       if (L.kind === 'ellipse' || L.kind === 'rect') { platePath(ctx, L.kind, L.cx, L.cy, L.hw, L.hh, (L.style.radius || 0) * W); ctx.clip(); }
       drawAccent(ctx, W, H, s, false, L.bounds);
       ctx.restore();
     }
-    return L.kind === 'bevel' || ((L.kind === 'rect' || L.kind === 'ellipse') && s.showPlate && s.plateOpacity > 40);
+    const onPlate = L.kind === 'bevel' || ((L.kind === 'rect' || L.kind === 'ellipse') && s.showPlate && s.plateOpacity > 40);
+    const titleArt = { prayer: 'pink-prayer', warrior: 'pw-prayer', warring: 'ww-title' }[s.journal];
+    if (s._probe && titleArt) probeTitle(ctx, s, L.title, letterColor(s, titleArt, onPlate));
+    return onPlate;
   }
 
   // --- Pink Prayer Journal ---
@@ -4058,9 +4187,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     floralNote.textContent = state.plateStyle === 'none'
       ? 'This bouquet artwork has its original “Dream Journal” lettering printed in, so with no plate that lettering is the title. Pick a plate to set your own title.'
       : 'The plate is sized to cover the lettering printed in this bouquet artwork.';
-    const cr = titleContrast(state), warn = $('contrastWarn');
-    warn.classList.toggle('hidden', !(cr && cr < 3));
-    if (cr && cr < 3) warn.textContent = `Low contrast (${cr.toFixed(1)}:1): the title may be hard to read on this plate. Try a lighter or darker title color.`;
+    syncTitleFill();
     $('coverFontNote').textContent = state.titleStyle === 'custom' ? '' : '(used when Cover lettering = Custom font)';
     $('shadowVal').textContent = state.titleShadow + '%';
     $('accentVal').textContent = state.accentOpacity + '%';
@@ -4118,7 +4245,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     cancelAnimationFrame(raf);
     raf = requestAnimationFrame(() => {
       const base = comparing ? { ...state, palette: { ...(paletteByName(recommendedName()) || DEFAULTS.palette) }, prayerArt: 'original', bgArt: 'original' } : state;
-      const s = { ...base, _warn: new Set() };            // text slots too long for their layout on this page
+      const s = { ...base, _warn: new Set(), _probe: {} };  // text slots too long for their layout; title readability
       // Render at the screen's actual pixel density (capped at 2x) so photographic art like the
       // Floral cover stays crisp instead of being upscaled/blurred by the browser on retina displays.
       // The CSS box is governed purely by this width:height ratio plus max-width/max-height (both still
@@ -4128,6 +4255,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       try { renderPage(canvas, Math.round(760 * dpr), s, currentType()); }
       catch (e) { console.error(e); showBlocked(e); }
       showTextWarnings(s._warn);
+      if (!comparing && currentType() === 'cover') showContrastWarning(s._probe);
     });
   }
 
@@ -4218,6 +4346,33 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       status.querySelector('strong').textContent = 'This page could not be drawn';
       status.querySelector('small').textContent = `${e?.message || e} — try refreshing.`;
     }
+  }
+
+  // ---------- Title box fill controls + readability warning ----------
+  function syncTitleFill() {
+    const f = state.titleFill, art = state.journal === 'dream' && artworkTitle(state);
+    $('titleFillField').classList.toggle('hidden', art);          // the title is printed in the background artwork: no title region
+    $('titleFillOn').checked = !!f.on;
+    $('titleFillColor').value = f.color; $('titleFillCustom').value = f.custom; $('titleFillOpacity').value = f.opacity;
+    $('titleFillOpacityVal').textContent = f.opacity + '%';
+    for (const id of ['titleFillColorRow', 'titleFillOpacityRow', 'titleFillPad']) $(id).classList.toggle('hidden', !f.on);
+    $('titleFillCustom').closest('.field').classList.toggle('hidden', f.color !== 'custom');
+    document.querySelectorAll('#titleFillPad button').forEach((b) => b.classList.toggle('active', b.dataset.pad === f.pad));
+    if (art) $('contrastWarn').classList.add('hidden');
+  }
+  const setTitleFill = (patch) => { state.titleFill = { ...state.titleFill, ...patch }; goTo('cover'); commit(false); };
+  $('titleFillOn').onchange = (e) => setTitleFill({ on: e.target.checked });
+  $('titleFillColor').onchange = (e) => setTitleFill({ color: e.target.value });
+  $('titleFillCustom').oninput = (e) => setTitleFill({ custom: e.target.value, color: 'custom' });
+  $('titleFillOpacity').oninput = (e) => setTitleFill({ opacity: Number(e.target.value) });
+  document.querySelectorAll('#titleFillPad button').forEach((b) => b.onclick = () => setTitleFill({ pad: b.dataset.pad }));
+  // Shown when more than a third of what sits behind the title is under 3:1 contrast with the title color.
+  function showContrastWarning(probe) {
+    const warn = $('contrastWarn'), low = probe && probe.share > .35;
+    warn.classList.toggle('hidden', !low);
+    if (low) warn.textContent = probe.filled
+      ? 'Low title contrast: the title color is close to the title box fill. Try another fill color, more opacity, or another title color.'
+      : 'Low title contrast: the background behind the title is close to the title color. Try “Fill behind title” or another title color.';
   }
 
   // ---------- Text content (editable wording) ----------
@@ -4316,11 +4471,11 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   // Each journal keeps its own look (colors + lettering + fonts); a journal opened for the first time starts from its Canva design.
   const LOOK_KEYS = ['marble', 'bgArt', 'palette', 'prayerArt', 'titleStyle', 'coverFont', 'coverFontColorAuto', 'coverFontColor', 'headingFont', 'bodyFont', 'plateStyle', 'showPlate',
     'showFrame', 'showTrim', 'plateOpacity', 'decor', 'accent', 'accentPlace', 'accentOpacity', 'accentScale', 'accentLined', 'titleShadow',
-    'figureColor', 'prHide', 'prCardOpacity', 'prGlow'];
+    'figureColor', 'prHide', 'prCardOpacity', 'prGlow', 'titleFill'];
   function journalDefaultLook(j) {
     const pal = JOURNALS[j]?.palette && paletteByName(JOURNALS[j].palette);
     return pal ? { palette: { ...pal }, prayerArt: 'original', titleStyle: 'serif', coverFont: 'Cinzel', coverFontColorAuto: true, headingFont: 'Cormorant Garamond', bodyFont: 'Cormorant Garamond',
-      plateStyle: 'none', showPlate: true, showFrame: true, showTrim: true, accent: 'none', decor: structuredClone(DEFAULTS.decor), marble: 'journal', bgArt: 'original', figureColor: null, prHide: {}, prCardOpacity: 85, prGlow: 100 } : null;
+      plateStyle: 'none', showPlate: true, showFrame: true, showTrim: true, accent: 'none', decor: structuredClone(DEFAULTS.decor), marble: 'journal', bgArt: 'original', figureColor: null, prHide: {}, prCardOpacity: 85, prGlow: 100, titleFill: structuredClone(DEFAULTS.titleFill) } : null;
   }
   function applyLook(look, j = state.journal) {
     if (!look) return;
@@ -4332,6 +4487,8 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     state.looks[state.journal] = structuredClone(Object.fromEntries(LOOK_KEYS.map((k) => [k, state[k]])));
     state.journal = e.target.value; state.page = 0;
     applyLook(state.looks[state.journal] || journalDefaultLook(state.journal));
+    // Title box fill is per journal: its own saved setting, or off (never carried over from the journal just left).
+    state.titleFill = structuredClone(state.looks[state.journal]?.titleFill || DEFAULTS.titleFill);
     commit(true);
   };
 
