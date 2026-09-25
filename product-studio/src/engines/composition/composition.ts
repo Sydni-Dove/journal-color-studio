@@ -10,7 +10,7 @@
  *              writingArea, mainContent (declared in SolvedPage.regions, with
  *              node-derived fallbacks)
  */
-import type { Composition, CompositionAnchor, LayoutRegions, ProtectedKind, ProtectedRect } from "../../types/composition";
+import type { Composition, CompositionAnchor, Corner, CornerRegion, LayoutRegions, ProtectedKind, ProtectedRect } from "../../types/composition";
 import type { PageGeometry, Rect } from "../../types/geometry";
 import type { LayoutNode, SolvedPage, TextNode } from "../../types/layout";
 import type { SpacingTokens, TypographySettings } from "../../types/tokens";
@@ -71,15 +71,35 @@ export function titleNode(nodes: LayoutNode[], titleId?: string): TextNode | und
   return undefined;
 }
 
+export type DecorationSpacingKey = "decorationToContentGap" | "decorationToTitleGap" | "decorationToRuleGap" | "titleAccentGap" | "cornerInset" | "edgeBleedAmount";
+
+/** Contained corner regions: each page quadrant, inset from the trim edges by `inset`. */
+export function cornerRegions(W: number, H: number, inset: number, clearance: number): Record<Corner, CornerRegion> {
+  const q = (corner: Corner): CornerRegion => {
+    const left = corner === "tl" || corner === "bl", top = corner === "tl" || corner === "tr";
+    return {
+      corner,
+      x: left ? inset : W / 2,
+      y: top ? inset : H / 2,
+      width: W / 2 - inset,
+      height: H / 2 - inset,
+      insetFromTrimIn: inset,
+      clearanceFromContentIn: clearance,
+    };
+  };
+  return { tl: q("tl"), tr: q("tr"), bl: q("bl"), br: q("br") };
+}
+
 export function resolveComposition(
   g: PageGeometry,
   solved: SolvedPage,
   typography: TypographySettings,
-  spacing: Pick<SpacingTokens, "decorationToContentClearance">,
+  spacing: Pick<SpacingTokens, DecorationSpacingKey>,
   measure: TextMeasurer = heuristicMeasurer,
 ): Composition {
   const W = g.trimWidthIn, H = g.trimHeightIn;
-  const clearance = spacing.decorationToContentClearance;
+  const clearance = spacing.decorationToContentGap;
+  const inset = spacing.cornerInset;
   const regions: LayoutRegions = {
     page: { x: 0, y: 0, w: W, h: H },
     safeArea: g.safeRect,
@@ -125,11 +145,24 @@ export function resolveComposition(
   Object.assign(regions, fallback, declared);
 
   const rule = nodes.find((n) => n.type === "rule" && n.component === "PageHeader" && n.id.endsWith("-rule"));
+  if (rule) regions.titleRule = rule.rect;
+  const align = title ? (title.align ?? typography.roles[title.role].align) : "left";
   return {
     regions,
     protected: prot,
     content: union(raw),
     headerRule: rule ? rule.rect : null,
+    titleId: title?.id ?? null,
+    titleAlign: align === "center" ? "center" : align === "right" ? "end" : "start",
+    corners: cornerRegions(W, H, inset, clearance),
+    gaps: {
+      toContent: clearance,
+      toTitle: spacing.decorationToTitleGap,
+      toRule: spacing.decorationToRuleGap,
+      titleAccent: spacing.titleAccentGap,
+      cornerInset: inset,
+      edgeBleed: spacing.edgeBleedAmount,
+    },
     titleEmIn,
     clearanceIn: clearance,
     trim: { w: W, h: H },

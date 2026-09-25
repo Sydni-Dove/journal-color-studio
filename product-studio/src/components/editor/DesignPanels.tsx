@@ -13,9 +13,9 @@ import { DEFAULT_WORDING } from "../../presets/wording";
 import { DESIGN_ASSETS, JCS_SNAPSHOT } from "../../design-library/library";
 import { COMPOSITION_ANCHORS, type AlignX, type AlignY, type CompositionAnchor, type DecorationPlacementOverrides } from "../../types/composition";
 import type { ElementPosition, SemanticTextKey, TextAnchor } from "../../types/layout";
-import { defaultCorners, isObjectPlacement, normalizeDecoration, opacityCap, placementsFor, type PieceReport } from "../../themes/decorationPlan";
+import { defaultCorners, edgesFor, isObjectPlacement, normalizeDecoration, opacityCap, placementsFor, titlePositionsFor, type PieceReport } from "../../themes/decorationPlan";
 import type { ProductProject } from "../../types/project";
-import type { CornerSet, DecorativePlacement, DecorativeTheme, FunctionalPatternKind } from "../../types/theme";
+import type { CornerSet, DecorativePlacement, DecorativeTheme, EdgeTreatment, FunctionalPatternKind, TitleAccentPosition } from "../../types/theme";
 import type { ColorToken, ColorTokens, FontCategory, FontGroup, SpacingDensity, WordingKey } from "../../types/tokens";
 import { AppliesTo, Check, Field, NumberField, Section, Segmented, Select, type EditorNav } from "./ui";
 
@@ -292,18 +292,40 @@ const PLACEMENT_LABEL: Record<DecorativePlacement, string> = {
   "full-page": "Full page (behind content, soft)",
   "header-band": "Header band (above the title)",
   "border-frame": "Margin frame (around content)",
-  corners: "Corners",
-  "title-flank": "Flanking the title",
+  corners: "Corner accent",
+  "title-accent": "Title accent",
   "top-bottom": "Top + bottom edges",
   "behind-title": "Behind the title (subtle)",
+  "edge-accent": "Edge accent (runs off the side edge)",
+  "header-flourish": "Header flourish (on the title rule)",
+  "footer-flourish": "Footer flourish (below the content)",
 };
 const CORNER_LABEL: Record<CornerSet, string> = {
-  "opposite-tl-br": "Top-left + bottom-right",
-  "opposite-tr-bl": "Top-right + bottom-left",
-  tl: "Top left only",
-  tr: "Top right only",
-  bl: "Bottom left only",
-  br: "Bottom right only",
+  "opposite-tl-br": "Upper-left + lower-right",
+  "opposite-tr-bl": "Upper-right + lower-left",
+  all: "All four corners",
+  top: "Upper corners",
+  bottom: "Lower corners",
+  tl: "Upper-left only",
+  tr: "Upper-right only",
+  bl: "Lower-left only",
+  br: "Lower-right only",
+};
+const EDGE_LABEL: Record<EdgeTreatment, string> = {
+  contained: "Contained — whole artwork visible (default)",
+  bleed: "Bleed off the edge — intentional crop",
+};
+const TITLE_POSITION_LABEL: Record<TitleAccentPosition, string> = {
+  "title-left": "Left of title",
+  "title-right": "Right of title",
+  "title-above": "Above title",
+  "title-above-center": "Centered above title",
+  "title-below": "Below title",
+  "title-below-center": "Centered below title",
+  "rule-left": "Left end of title rule",
+  "rule-center": "Center of title rule",
+  "rule-right": "Right end of title rule",
+  "rule-both": "Both ends of title rule",
 };
 const ROLE_NAMES: Record<string, [string, string, string]> = {
   solid: ["Fill", "", ""],
@@ -329,9 +351,12 @@ function sizeControl(d: DecorativeTheme): { label: string; min: number; max: num
 function pieceName(r: PieceReport): string {
   const corner: Record<string, string> = { topLeftAccent: "Top-left corner", topRightAccent: "Top-right corner", bottomLeftAccent: "Bottom-left corner", bottomRightAccent: "Bottom-right corner" };
   if (r.id.startsWith("corner")) return corner[r.anchor] ?? "Corner";
+  const title: Record<string, string> = { "title-left": "Left of the title", "title-right": "Right of the title", "title-above": "Above the title", "title-below": "Below the title", "rule-left": "Left end of the title rule", "rule-center": "Center of the title rule", "rule-right": "Right end of the title rule" };
   return (
-    { "flank-after": "After the title", "flank-before": "Before the title", top: "Top edge", bottom: "Bottom edge", behind: "Behind the title", field: "Background", band: "Band" } as Record<string, string>
-  )[r.id] ?? r.id;
+    title[r.id] ??
+    ({ top: "Top edge", bottom: "Bottom edge", behind: "Behind the title", field: "Background", band: "Band", "header-flourish": "Header flourish", "footer-flourish": "Footer flourish", "edge-accent": "Edge accent" } as Record<string, string>)[r.id] ??
+    r.id
+  );
 }
 
 type DecorStatus = { reports: PieceReport[]; colors: ColorTokens; pageNumber: number } | null;
@@ -347,6 +372,8 @@ export function DecorationPanel({ project, update, usage, decor }: PanelProps & 
   const cap = opacityCap(d);
   const object = isObjectPlacement(d);
   const o = d.layout ?? {};
+  const edges = edgesFor(d.assetId);
+  const titlePositions = titlePositionsFor(d.assetId);
   // Show each token's actual colour: tokens that share a colour in this palette look identical on the page.
   const tokenOptions = DECOR_TOKENS.map((c) => ({ value: c, label: decor?.colors[c] ? `${TOKEN_LABEL[c]} · ${decor.colors[c]}` : TOKEN_LABEL[c] }));
   return (
@@ -378,12 +405,23 @@ export function DecorationPanel({ project, update, usage, decor }: PanelProps & 
               onChange={(v) => set({ corners: v === "__auto" ? undefined : (v as CornerSet) })}
             />
           )}
+          {d.placement === "corners" && edges.length > 1 && (
+            <Select label="Edge" value={d.edge ?? "contained"} options={edges.map((e) => ({ value: e, label: EDGE_LABEL[e] }))} onChange={(v) => set({ edge: v === "contained" ? undefined : (v as EdgeTreatment), layout: undefined })} />
+          )}
+          {d.placement === "title-accent" && (
+            <Select
+              label="Position"
+              value={d.titlePosition ?? "__auto"}
+              options={[{ value: "__auto", label: "Automatic — balances the title" }, ...titlePositions.map((t) => ({ value: t, label: TITLE_POSITION_LABEL[t] }))]}
+              onChange={(v) => set({ titlePosition: v === "__auto" ? undefined : (v as TitleAccentPosition), layout: undefined })}
+            />
+          )}
           {decor && decor.reports.some((r) => r.anchor !== "field") && (
             <ul className="decor-status" aria-label="Placement on this page">
               {decor.reports.map((r) => (
                 <li key={r.id} className={r.rect ? "" : "decor-status--off"}>
                   <strong>{pieceName(r)}</strong> (page {decor.pageNumber}):{" "}
-                  {r.rect ? (r.scale < 0.999 ? `placed at ${Math.round(r.scale * 100)}% of its size to stay clear of content` : "placed at full size") : `not placed — ${r.reason}`}
+                  {r.rect ? `${r.scale < 0.999 ? `placed at ${Math.round(r.scale * 100)}% of its size to stay ${r.mode === "contained" ? "fully visible and " : ""}clear of content` : "placed at full size"}${r.mode === "bleed" && r.intentionalClip && r.clippedShare > 0 ? " — bleeds off the edge on purpose" : ""}` : `not placed — ${r.reason}`}
                 </li>
               ))}
             </ul>
@@ -392,6 +430,12 @@ export function DecorationPanel({ project, update, usage, decor }: PanelProps & 
             {size && <NumberField label={size.label} step={0.1} min={size.min} max={size.max} value={d.scale} onChange={(scale) => set({ scale })} />}
             <NumberField label={cap < 1 ? `Opacity (max ${cap})` : "Opacity"} step={0.05} min={0.05} max={cap} value={d.opacity} onChange={(opacity) => set({ opacity })} />
           </div>
+          {object && (
+            <div className="row">
+              <NumberField label="Offset X" suffix="in" step={0.05} min={-3} max={3} value={o.offsetXIn ?? 0} onChange={(offsetXIn) => setLayout({ offsetXIn })} />
+              <NumberField label="Offset Y" suffix="in" step={0.05} min={-3} max={3} value={o.offsetYIn ?? 0} onChange={(offsetYIn) => setLayout({ offsetYIn })} />
+            </div>
+          )}
           {d.placement === "full-page" && d.opacity > BEHIND_CONTENT_HINT && <p className="hint">Behind writing, keep opacity ≤ {BEHIND_CONTENT_HINT} for legibility (Journal Color Studio interiors use 0.16).</p>}
           <div className="row">
             {roles[0] && <Select label={roles[0]} value={d.colorA} options={tokenOptions} onChange={(colorA) => set({ colorA })} />}
@@ -401,7 +445,10 @@ export function DecorationPanel({ project, update, usage, decor }: PanelProps & 
           {object && (
             <details className="subsection">
               <summary>Advanced placement</summary>
-              <p className="hint">The artwork is sized to its region and shrunk (never cropped) to stay clear of content. Offsets are nudges; the page rules still apply.</p>
+              <p className="hint">
+                The system places the artwork against its target (title, rule, corner, edge) with the spacing tokens, and shrinks it — never crops it — to stay clear of content unless
+                bleed is chosen. These settings are fine adjustments; the page rules still apply.
+              </p>
               <Select
                 label="Anchor"
                 value={o.anchor ?? "__default"}
@@ -417,13 +464,13 @@ export function DecorationPanel({ project, update, usage, decor }: PanelProps & 
                 <NumberField label="Max height" suffix="in" step={0.1} min={0} max={20} value={o.maxHeightIn ?? 0} onChange={(v) => setLayout({ maxHeightIn: v > 0 ? v : undefined })} />
               </div>
               <p className="hint">0 = no limit.</p>
-              <div className="row">
-                <NumberField label="Offset X" suffix="in" step={0.05} min={-3} max={3} value={o.offsetXIn ?? 0} onChange={(offsetXIn) => setLayout({ offsetXIn })} />
-                <NumberField label="Offset Y" suffix="in" step={0.05} min={-3} max={3} value={o.offsetYIn ?? 0} onChange={(offsetYIn) => setLayout({ offsetYIn })} />
-              </div>
               <Check label="Allow overlap with content" checked={o.allowContentOverlap ?? d.placement === "behind-title"} onChange={(allowContentOverlap) => setLayout({ allowContentOverlap })} />
-              <Check label="Allow bleed past the trim" checked={o.allowBleed ?? (d.placement !== "title-flank" && d.placement !== "behind-title")} onChange={(allowBleed) => setLayout({ allowBleed })} />
-              <Check label="Allow cropping at the page edge" checked={o.allowClipping ?? false} onChange={(allowClipping) => setLayout({ allowClipping })} />
+              {d.placement !== "corners" && (
+                <>
+                  <Check label="Allow bleed past the trim" checked={o.allowBleed ?? (d.placement === "top-bottom" || d.placement === "edge-accent")} onChange={(allowBleed) => setLayout({ allowBleed })} />
+                  <Check label="Allow cropping at the page edge" checked={o.allowClipping ?? false} onChange={(allowClipping) => setLayout({ allowClipping })} />
+                </>
+              )}
               <button type="button" className="btn" onClick={() => set({ layout: undefined })}>
                 Reset placement
               </button>

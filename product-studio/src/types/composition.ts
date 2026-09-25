@@ -13,6 +13,7 @@ export type CompositionAnchor =
   | "safeArea"
   | "header"
   | "title"
+  | "titleRule"
   | "mainContent"
   | "calendar"
   | "notes"
@@ -29,6 +30,7 @@ export const COMPOSITION_ANCHORS: { value: CompositionAnchor; label: string }[] 
   { value: "safeArea", label: "Safe area" },
   { value: "header", label: "Header" },
   { value: "title", label: "Title" },
+  { value: "titleRule", label: "Title rule" },
   { value: "mainContent", label: "Main content" },
   { value: "calendar", label: "Calendar / grid" },
   { value: "notes", label: "Notes" },
@@ -49,6 +51,34 @@ export type ProtectedKind = "text" | "rule" | "surface" | "box" | "mark" | "keep
 /** Functional content decoration must not hit (unless a placement allows overlap). */
 export type ProtectedRect = { id: string; kind: ProtectedKind; rect: Rect };
 
+export type Corner = "tl" | "tr" | "bl" | "br";
+
+/**
+ * The physical region a CONTAINED corner decoration may occupy: the page
+ * quadrant inset from the trim by `cornerInset`. Clearance from content is
+ * enforced against the protected rects (already inflated by it), so the
+ * artwork's real footprint can wrap around the content's corner.
+ */
+export type CornerRegion = {
+  corner: Corner;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  insetFromTrimIn: number;
+  clearanceFromContentIn: number;
+};
+
+/** Decoration spacing tokens (inches) the planner places against. */
+export type DecorationGaps = {
+  toContent: number;
+  toTitle: number;
+  toRule: number;
+  titleAccent: number;
+  cornerInset: number;
+  edgeBleed: number;
+};
+
 export type Composition = {
   /** Resolved physical regions (only anchors that exist on this page). */
   regions: LayoutRegions;
@@ -58,6 +88,13 @@ export type Composition = {
   content: Rect | null;
   /** The rule under the page title, when the header has one. */
   headerRule: Rect | null;
+  /** The page title node (its protected rect id) and how it is aligned. */
+  titleId: string | null;
+  titleAlign: "start" | "center" | "end";
+  /** Contained corner regions. */
+  corners: Record<Corner, CornerRegion>;
+  /** Decoration spacing tokens. */
+  gaps: DecorationGaps;
   /** Font size of the page title (inches) — scales title-relative ornaments. */
   titleEmIn: number;
   /** Decoration ↔ content clearance used to inflate `protected`. */

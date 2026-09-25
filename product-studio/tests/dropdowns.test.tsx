@@ -49,7 +49,7 @@ describe("Decoration → Placement: every offered option changes the solved plan
       expect(options.length).toBeGreaterThan(1);
       const plans = options.map((placement) => {
         const pl = plan(withDeco(2, { ...d, placement }));
-        return JSON.stringify([pl.pieces.map((x) => ("rect" in x ? x.rect : x.region)), pl.knockouts]);
+        return JSON.stringify([pl.pieces.map((x) => ("rect" in x ? x.rect : x.region)), pl.knockouts, pl.reports.map((r) => [r.id, r.reason])]);
       });
       const renders = options.map((placement) => render(withDeco(2, { ...d, placement })));
       expect(new Set(plans).size, "solved").toBe(options.length);
@@ -59,12 +59,21 @@ describe("Decoration → Placement: every offered option changes the solved plan
 });
 
 describe("Decoration → Corners: each explicit corner set changes the solved pieces", () => {
-  it("line-art corners (always placed: JCS overhang + knockout)", () => {
-    const sets: CornerSet[] = ["opposite-tl-br", "opposite-tr-bl", "tl", "tr", "bl", "br"];
-    const solved = sets.map((corners) => JSON.stringify(plan(withDeco(3, { style: "accent", assetId: "jcs-accent-dots", placement: "corners", corners }), 1).pieces));
-    const rendered = sets.map((corners) => render(withDeco(3, { style: "accent", assetId: "jcs-accent-dots", placement: "corners", corners }), 1));
+  const sets: CornerSet[] = ["opposite-tl-br", "opposite-tr-bl", "all", "top", "bottom", "tl", "tr", "bl", "br"];
+  it("line-art corners, bleed (always placed: bled off the edge + knockout)", () => {
+    const solved = sets.map((corners) => JSON.stringify(plan(withDeco(3, { style: "accent", assetId: "jcs-accent-dots", placement: "corners", corners, edge: "bleed" }), 1).pieces));
+    const rendered = sets.map((corners) => render(withDeco(3, { style: "accent", assetId: "jcs-accent-dots", placement: "corners", corners, edge: "bleed" }), 1));
     expect(new Set(solved).size).toBe(sets.length);
     expect(new Set(rendered).size).toBe(sets.length);
+  });
+  it("line-art corners, contained: each set solves to its own corners (placed, or reported with why)", () => {
+    for (const corners of sets) {
+      const pl = plan(withDeco(2, { style: "accent", assetId: "jcs-accent-waves", placement: "corners", corners }));
+      expect(pl.reports.map((r) => r.id).sort()).toEqual(
+        ({ "opposite-tl-br": ["tl", "br"], "opposite-tr-bl": ["tr", "bl"], all: ["tl", "tr", "bl", "br"], top: ["tl", "tr"], bottom: ["bl", "br"] } as Record<string, string[]>)[corners]?.map((c) => `corner-${c}`).sort() ?? [`corner-${corners}`],
+      );
+      for (const r of pl.reports) expect(!!r.rect || !!r.reason).toBe(true);
+    }
   });
   it("floral corners: Automatic picks the pair with the most room; each corner reports placed or why not", () => {
     const auto = plan(withDeco(2, { style: "floral", assetId: "jcs-floral-corner", placement: "corners" }));

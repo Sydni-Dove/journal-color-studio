@@ -1,10 +1,14 @@
 /**
  * COMPOSITION VALIDATION — objective visual-composition failures that pure
  * geometry validation cannot see. It does not judge beauty; it catches:
- *   decoration-clipped    artwork cropped where cropping was not intended
- *   decoration-no-room    an object could not be placed without breaking a rule
- *   decoration-overlap    artwork over protected content (or excessive intended overlap)
- *   decoration-dead-space an ornament floating away from the page edge and all content
+ *   decoration-clipped         CONTAINED artwork cropped by the trim (intentional bleed is never flagged)
+ *   decoration-outside-region  contained artwork outside the region it is anchored to
+ *   decoration-bleed-contained BLEED chosen, but the artwork never reaches past the trim
+ *   decoration-no-room         an object could not be placed without breaking a rule
+ *   decoration-overlap         artwork over protected content, a rule it is not designed to sit on,
+ *                              or into the calendar / notes / writing regions (or excessive intended overlap)
+ *   decoration-too-close       artwork closer to text than its spacing token (title accents: their own gap)
+ *   decoration-dead-space      an ornament floating away from the page edge and all content
  *   title-rule-gap        a title closer to the rule / content below than titleToRuleGap
  *   label-border-inset    a label closer to a border / rule than its inset token
  *   text-region           positioned text outside the print-safe area / its zone
@@ -13,7 +17,7 @@ import type { PageGeometry, Rect } from "../../types/geometry";
 import type { LayoutNode, SolvedPage, TextNode } from "../../types/layout";
 import type { ValidationIssue, ValidationRule } from "../../types/validation";
 import { planDecoration } from "../../themes/decorationPlan";
-import { resolveComposition } from "../composition/composition";
+import { overlaps, resolveComposition } from "../composition/composition";
 import type { ResolvedDocument } from "../document/resolve";
 import { inkBoxFor } from "../typography/ink";
 import type { TextMeasurer } from "../typography/textMeasure";
@@ -57,6 +61,8 @@ export function compositionChecks(doc: ResolvedDocument, g: PageGeometry, s: Sol
   const sp = doc.spacing;
   const comp = resolveComposition(g, s, doc.typography, sp);
 
+  const texts = s.nodes.filter((n): n is TextNode => n.type === "text" && !!n.text);
+
   // ── Decoration ──
   const plan = planDecoration(g, doc.decorative, doc.colors, comp);
   if (plan) {
@@ -72,12 +78,43 @@ export function compositionChecks(doc: ResolvedDocument, g: PageGeometry, s: Sol
         push("decoration-no-room", id, `Decoration (${r.id}) was placed at ${Math.round(r.scale * 100)}% of its size to stay clear of content.`, undefined, "info");
       }
       if (r.clippedShare > 0 && !r.intentionalClip) {
-        push("decoration-clipped", id, `Decoration (${r.id}) is cropped at the page edge (${Math.round(r.clippedShare * 100)}% of its artwork) without clipping being allowed.`, { actual: r.clippedShare, limit: 0, unit: "in" }, "warning");
+        push("decoration-clipped", id, `Decoration (${r.id}) is contained but cropped at the trim (${Math.round(r.clippedShare * 100)}% of its artwork) — contained artwork must stay fully visible.`, { actual: r.clippedShare, limit: 0, unit: "in" }, "warning");
+      }
+      if (r.mode === "contained" && r.bounds) {
+        const b = r.bounds;
+        const out = r.cells.filter((c) => c.x < b.x - TOL_IN || c.y < b.y - TOL_IN || c.x + c.w > b.x + b.w + TOL_IN || c.y + c.h > b.y + b.h + TOL_IN).length;
+        if (out > 0) push("decoration-outside-region", id, `Decoration (${r.id}) extends outside its ${r.anchor} region (${Math.round((out / r.cells.length) * 100)}% of its artwork).`, { actual: out / r.cells.length, limit: 0, unit: "in" }, "warning");
+      }
+      if (r.mode === "bleed" && r.id.startsWith("corner") && r.clippedShare === 0) {
+        push("decoration-bleed-contained", id, `Decoration (${r.id}) is set to bleed off the edge, but its artwork stays inside the trim — choose Contained, or move it to the edge.`, undefined, "warning");
       }
       if (r.overlapShare > 0 && !r.allowContentOverlap) {
         push("decoration-overlap", id, `Decoration (${r.id}) covers protected content (${Math.round(r.overlapShare * 100)}% of its artwork).`, { actual: r.overlapShare, limit: 0, unit: "in" });
       } else if (r.allowContentOverlap && r.overlapShare > EXCESS_OVERLAP_SHARE && plan.opacity > EXCESS_OVERLAP_OPACITY) {
         push("decoration-overlap", id, `Decoration (${r.id}) sits over content at ${Math.round(plan.opacity * 100)}% opacity; keep intended overlap ≤ ${EXCESS_OVERLAP_OPACITY * 100}% so it stays legible.`, undefined, "warning");
+      }
+      if (r.anchor !== "field" && !r.knockout && !r.allowContentOverlap && r.cells.length) {
+        const cells = r.cells.map((c) => ({ x: c.x - ox, y: c.y - oy, w: c.w, h: c.h }));
+        // Too close to text: a title accent keeps its own gap from the title; everything else keeps decorationToContentGap.
+        let worst: { gap: number; need: number; text: string } | null = null;
+        for (const t of texts) {
+          const ink = inkBoxFor(t, doc.typography, measure);
+          const need = r.attachedTo.includes(t.id) && r.targetGapIn !== null ? r.targetGapIn : sp.decorationToContentGap;
+          const gap = cells.reduce((m, c) => Math.min(m, gapBetween(c, ink)), Infinity);
+          if (gap < need - TOL_IN && (!worst || need - gap > worst.need - worst.gap)) worst = { gap, need, text: t.text };
+        }
+        if (worst) push("decoration-too-close", id, `Decoration (${r.id}) is ${worst.gap.toFixed(3)}" from "${worst.text}"; it keeps ${worst.need}".`, { actual: worst.gap, limit: worst.need, unit: "in" }, "warning");
+        // Rules it is not designed to sit on, and the functional regions.
+        for (const n of s.nodes) {
+          if (n.type !== "rule" || !n.functional) continue;
+          const t = ptToIn(n.strokePt) / 2;
+          const rr = { x: n.rect.x - t, y: n.rect.y - t, w: n.rect.w + 2 * t, h: n.rect.h + 2 * t };
+          if (cells.some((c) => overlaps(c, rr))) push("decoration-overlap", id, `Decoration (${r.id}) crosses the rule ${n.id}.`, undefined, "warning");
+        }
+        for (const key of ["calendar", "notes", "writingArea"] as const) {
+          const reg = comp.regions[key];
+          if (reg && cells.some((c) => overlaps(c, reg))) push("decoration-overlap", id, `Decoration (${r.id}) crosses into the ${key === "writingArea" ? "writing area" : key} region.`, undefined, "warning");
+        }
       }
       if (r.anchor !== "field" && r.inkBox) {
         const ink = { x: r.inkBox.x - ox, y: r.inkBox.y - oy, w: r.inkBox.w, h: r.inkBox.h };
@@ -92,7 +129,6 @@ export function compositionChecks(doc: ResolvedDocument, g: PageGeometry, s: Sol
   }
 
   // ── Text spacing ──
-  const texts = s.nodes.filter((n): n is TextNode => n.type === "text" && !!n.text);
   const lines = borders(s.nodes);
   for (const t of texts) {
     const ink = inkBoxFor(t, doc.typography, measure);

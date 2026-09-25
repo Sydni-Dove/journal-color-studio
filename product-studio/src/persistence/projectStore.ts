@@ -56,6 +56,7 @@ export function migrate(raw: unknown): ProductProject | null {
 /**
  * In-schema field migration: "full-page" without "extend under writing areas"
  * always rendered as a margin frame; "full-page" now means behind content.
+ * (Renamed placements — "title-flank" → "title-accent" — are mapped by normalizeDecoration.)
  * Runs once on load (base design and every variant), never per render.
  */
 export function migrateDecoration(p: ProductProject): ProductProject {
@@ -64,8 +65,15 @@ export function migrateDecoration(p: ProductProject): ProductProject {
     const { applyToInterior, ...rest } = t;
     return (rest.placement === "full-page" && applyToInterior === false ? { ...rest, placement: "border-frame" } : rest) as T;
   };
+  // The decoration clearance token was renamed with the decoration spacing tokens.
+  const ov = { ...(p.spacing?.overrides ?? {}) } as Record<string, number>;
+  if ("decorationToContentClearance" in ov) {
+    ov.decorationToContentGap ??= ov.decorationToContentClearance;
+    delete ov.decorationToContentClearance;
+  }
   return {
     ...p,
+    spacing: p.spacing ? { ...p.spacing, overrides: ov } : p.spacing,
     decorativeTheme: fix(p.decorativeTheme),
     variants: p.variants.map((v) => ({ ...v, overrides: { ...v.overrides, decorativeTheme: fix(v.overrides.decorativeTheme) } })),
   };

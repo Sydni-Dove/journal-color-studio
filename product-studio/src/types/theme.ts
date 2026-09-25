@@ -44,19 +44,77 @@ export type DecorativeStyle = "none" | "solid" | "marble" | "watercolor" | "flor
 
 /**
  * Placement = WHAT kind of composition. Fields (solid / marble / watercolor)
- * cover an area; objects (florals, line art) are anchored to page regions.
- *   full-page     field behind everything, soft strength (overlap by definition)
- *   header-band   field / band from the top edge down to just above the content
- *   border-frame  field / tiled texture around the content with a clearance
- *   corners       objects at page corners (pair or single, see `corners`)
- *   title-flank   objects flanking the title, sitting on its header rule
- *   top-bottom    objects centred on the top and bottom edges
- *   behind-title  object behind the title at subtle strength (intentional overlap)
+ * cover an area; objects (florals, line art) are placed relative to semantic
+ * targets (title, title rule, page corner, page edge, header, footer).
+ *   full-page        field behind everything, soft strength (overlap by definition)
+ *   header-band      field / band from the top edge down to just above the content
+ *   border-frame     field / tiled texture around the content with a clearance
+ *   corners          objects at page corners (see `corners` + `edge`)
+ *   title-accent     an accent attached to the title or its rule (see `titlePosition`)
+ *   top-bottom       objects centred on the top and bottom edges
+ *   behind-title     object behind the title at subtle strength (intentional overlap)
+ *   edge-accent      art along the outer side edge, running off it (intentional crop)
+ *   header-flourish  art in the header, resting on the title rule, opposite the title
+ *   footer-flourish  art centred in the footer space below the content
  */
-export type DecorativePlacement = "full-page" | "header-band" | "border-frame" | "corners" | "title-flank" | "top-bottom" | "behind-title";
+export type DecorativePlacement =
+  | "full-page"
+  | "header-band"
+  | "border-frame"
+  | "corners"
+  | "title-accent"
+  | "top-bottom"
+  | "behind-title"
+  | "edge-accent"
+  | "header-flourish"
+  | "footer-flourish";
 
 /** Which corners a "corners" placement uses. */
-export type CornerSet = "opposite-tl-br" | "opposite-tr-bl" | "tl" | "tr" | "bl" | "br";
+export type CornerSet = "opposite-tl-br" | "opposite-tr-bl" | "all" | "top" | "bottom" | "tl" | "tr" | "bl" | "br";
+
+/**
+ * How an object meets the page edge.
+ *   contained  the whole artwork stays visible inside its region (inset from the trim, clear of content);
+ *              it shrinks — or reports a conflict — rather than being cropped (the default)
+ *   bleed      the artwork deliberately runs `edgeBleedAmount` past the trim edge and is cropped there
+ */
+export type EdgeTreatment = "contained" | "bleed";
+
+/** Where a title accent attaches (semantic target: the title ink or the title rule). */
+export type TitleAccentPosition =
+  | "title-left"
+  | "title-right"
+  | "title-above"
+  | "title-above-center"
+  | "title-below"
+  | "title-below-center"
+  | "rule-left"
+  | "rule-center"
+  | "rule-right"
+  | "rule-both";
+
+/**
+ * What an artwork is designed to do (declared per asset in the design
+ * library). Only placements an asset declares are offered for it.
+ */
+export type DecorationCapability =
+  | "title-left"
+  | "title-right"
+  | "title-above"
+  | "title-below"
+  | "title-rule-left"
+  | "title-rule-center"
+  | "title-rule-right"
+  | "corner-contained"
+  | "corner-bleed"
+  | "edge-accent"
+  | "margin-frame"
+  | "header-band"
+  | "header-flourish"
+  | "footer-flourish"
+  | "top-bottom"
+  | "behind-title"
+  | "background";
 
 export type DecorativeTheme = {
   style: DecorativeStyle;
@@ -74,6 +132,10 @@ export type DecorativeTheme = {
   applyToInterior?: boolean;
   /** Corners used by the "corners" placement (default depends on the artwork). */
   corners?: CornerSet;
+  /** Contained (default) or bleed, for corner objects. */
+  edge?: EdgeTreatment;
+  /** Title-accent attachment (default depends on the title's alignment). */
+  titlePosition?: TitleAccentPosition;
   /** Advanced placement overrides for object decorations (anchor, alignment, size limits, offsets, rules). */
   layout?: DecorationPlacementOverrides;
 };

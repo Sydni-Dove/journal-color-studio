@@ -28,6 +28,9 @@ export type ValidationRule =
   | "decoration-no-room"
   | "decoration-overlap"
   | "decoration-dead-space"
+  | "decoration-outside-region"
+  | "decoration-too-close"
+  | "decoration-bleed-contained"
   | "title-rule-gap"
   | "label-border-inset"
   | "text-region";

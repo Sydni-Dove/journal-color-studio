@@ -11,27 +11,34 @@
  * data (design-library/placement.ts):
  *   fields   full-page (soft, behind content), header-band (ends above the
  *            content), border-frame (around content, with a clearance)
- *   objects  corners, title-flank, top-bottom — fitted to their region
- *            against the artwork's real footprint (engines/composition/fit)
- *   line art bands / frames are mirror-tiled; corners overhang the edge as
- *            designed; content is masked away (knockout) with a clearance
+ *   objects  corners, title accents, flourishes, top-bottom — placed
+ *            relative to a semantic target (title, title rule, page corner,
+ *            page edge, footer space) and fitted against the artwork's real
+ *            footprint (engines/composition/fit)
+ *   line art bands / frames are mirror-tiled
+ *
+ * Edge treatment is explicit. CONTAINED (the default) keeps the whole artwork
+ * visible inside its region, inset from the trim by `cornerInset` and clear of
+ * content by `decorationToContentGap`; it shrinks, or reports a conflict,
+ * instead of being cropped. BLEED runs the artwork `edgeBleedAmount` past the
+ * trim on purpose — the only mode that crops.
  */
 import { DESIGN_ASSETS, SOLID_PLACEMENTS, WATERCOLOR_BLOOMS, WATERCOLOR_PLACEMENTS, findAsset, type DesignAsset } from "../design-library/library";
 import {
   ACCENT_BAND_TILE_FACTOR,
   ACCENT_CAPS,
-  ACCENT_CORNER_OVERHANG,
   ACCENT_EDGE_BAND,
-  ACCENT_PLACEMENTS,
   BOUQUET_WIDTH_OF_PAGE,
+  DECORATION_CAPABILITIES,
   FLORAL_CORNER_OF_SHORT_SIDE,
   FLORAL_FLANK,
+  LINE_FLOURISH_OF_PAGE,
 } from "../design-library/placement";
 import { inflate, union } from "../engines/composition/composition";
 import { fitObject, MIN_LONG_SIDE_IN, type ArtTransform, type ObjectSpec } from "../engines/composition/fit";
-import type { Composition, CompositionAnchor, DecorationPlacement } from "../types/composition";
+import type { Composition, CompositionAnchor, Corner, DecorationPlacement, ProtectedRect } from "../types/composition";
 import type { PageGeometry, Rect } from "../types/geometry";
-import type { CornerSet, DecorativePlacement, DecorativeTheme } from "../types/theme";
+import type { CornerSet, DecorativePlacement, DecorativeTheme, EdgeTreatment, TitleAccentPosition } from "../types/theme";
 import type { ColorToken, ColorTokens } from "../types/tokens";
 import type { RasterRequest } from "./recolor";
 
@@ -70,6 +77,18 @@ export type PieceReport = {
   allowContentOverlap: boolean;
   /** Share of the preferred size the object was placed at (1 = full size). */
   scale: number;
+  /** contained = must be fully visible; bleed = cropped at the trim on purpose; field = an area fill. */
+  mode: "contained" | "bleed" | "field";
+  /** Ink cells (MEDIA coordinates) — validation measures real clearances against these. */
+  cells: Rect[];
+  /** Region a contained piece must stay inside (MEDIA coordinates). */
+  bounds: Rect | null;
+  /** Content masked away under this piece (line-art bleed), so covering it is not an overlap. */
+  knockout: boolean;
+  /** Protected content this piece is attached to by design (the title / rule it sits beside or on). */
+  attachedTo: string[];
+  /** The gap the piece is designed to keep from its attached target (inches). */
+  targetGapIn: number | null;
 };
 
 export type DecorPlan = {
@@ -87,9 +106,39 @@ export function placementsFor(theme: Pick<DecorativeTheme, "style" | "assetId">)
   if (theme.style === "none") return [];
   if (theme.style === "solid") return SOLID_PLACEMENTS;
   if (theme.style === "watercolor") return WATERCOLOR_PLACEMENTS;
-  const asset = findAsset(theme.assetId);
-  if (asset?.type === "accent") return ACCENT_PLACEMENTS[asset.id] ?? [];
-  return asset?.placements ?? [];
+  return findAsset(theme.assetId)?.placements ?? [];
+}
+
+/** Edge treatments an asset's corners support (contained first: the default). */
+export function edgesFor(assetId: string | undefined): EdgeTreatment[] {
+  const caps = DECORATION_CAPABILITIES[assetId ?? ""] ?? [];
+  return [...(caps.includes("corner-contained") ? (["contained"] as const) : []), ...(caps.includes("corner-bleed") ? (["bleed"] as const) : [])];
+}
+
+/** Title-accent positions an asset supports (from its declared capabilities). */
+export function titlePositionsFor(assetId: string | undefined): TitleAccentPosition[] {
+  const caps = DECORATION_CAPABILITIES[assetId ?? ""] ?? [];
+  const out: TitleAccentPosition[] = [];
+  if (caps.includes("title-left")) out.push("title-left");
+  if (caps.includes("title-right")) out.push("title-right");
+  if (caps.includes("title-above")) out.push("title-above", "title-above-center");
+  if (caps.includes("title-below")) out.push("title-below", "title-below-center");
+  if (caps.includes("title-rule-left")) out.push("rule-left");
+  if (caps.includes("title-rule-center")) out.push("rule-center");
+  if (caps.includes("title-rule-right")) out.push("rule-right");
+  if (caps.includes("title-rule-left") && caps.includes("title-rule-right")) out.push("rule-both");
+  return out;
+}
+
+/**
+ * Default title accent: balance the title. A start-aligned title gets the
+ * accent at the far (right) end of its rule, an end-aligned one at the near
+ * end, a centred one centred above it.
+ */
+export function defaultTitlePosition(comp: Pick<Composition, "titleAlign" | "headerRule">): TitleAccentPosition {
+  if (comp.titleAlign === "center") return "title-above-center";
+  if (!comp.headerRule) return comp.titleAlign === "end" ? "title-left" : "title-right";
+  return comp.titleAlign === "end" ? "rule-left" : "rule-right";
 }
 
 export function assetsFor(style: DecorativeTheme["style"]): DesignAsset[] {
@@ -99,7 +148,7 @@ export function assetsFor(style: DecorativeTheme["style"]): DesignAsset[] {
 /** Opacity ceiling per placement (JCS ACCENT_CAPS); other decoration is uncapped. */
 export function opacityCap(theme: Pick<DecorativeTheme, "style" | "placement">): number {
   if (theme.style !== "accent") return 1;
-  if (theme.placement === "corners") return ACCENT_CAPS.corners.maxOpacity;
+  if (theme.placement === "corners" || theme.placement === "edge-accent" || theme.placement === "header-flourish" || theme.placement === "footer-flourish") return ACCENT_CAPS.corners.maxOpacity;
   if (theme.placement === "top-bottom") return ACCENT_CAPS.topBottom.maxOpacity;
   if (theme.placement === "behind-title") return ACCENT_CAPS.behindTitle.maxOpacity;
   return 1;
@@ -108,7 +157,7 @@ export function opacityCap(theme: Pick<DecorativeTheme, "style" | "placement">):
 /** Placements made of anchored objects (these take the advanced anchor / alignment / size controls). */
 export function isObjectPlacement(theme: Pick<DecorativeTheme, "style" | "placement">): boolean {
   if (theme.style === "floral") return true;
-  return theme.style === "accent" && (theme.placement === "corners" || theme.placement === "behind-title");
+  return theme.style === "accent" && (["corners", "behind-title", "edge-accent", "header-flourish", "footer-flourish"] as DecorativePlacement[]).includes(theme.placement);
 }
 
 export function defaultCorners(assetId: string | undefined): CornerSet {
@@ -125,10 +174,12 @@ export function normalizeDecoration(t: DecorativeTheme): DecorativeTheme {
     if (!findAsset(assetId) || findAsset(assetId)!.type !== t.style) assetId = assetsFor(t.style)[0].id;
   }
   let placement: string = t.placement;
-  // Header sprigs used "header-band"; the floral equivalent is now "title-flank" (placementsFor re-validates below).
-  if (placement === "header-band" && t.style === "floral") placement = "title-flank";
+  // Header sprigs used "header-band", then "title-flank"; both are now a title accent (placementsFor re-validates below).
+  if ((placement === "header-band" && t.style === "floral") || placement === "title-flank") placement = "title-accent";
   const next: DecorativeTheme = { ...t, assetId, placement: placement as DecorativePlacement };
   delete next.applyToInterior;
+  if (next.edge && !edgesFor(assetId).includes(next.edge)) delete next.edge;
+  if (next.titlePosition && !titlePositionsFor(assetId).includes(next.titlePosition)) delete next.titlePosition;
   const allowed = placementsFor(next);
   const fixed = allowed.length && !allowed.includes(next.placement) ? { ...next, placement: allowed[0] } : next;
   return { ...fixed, opacity: Math.min(fixed.opacity, opacityCap(fixed)) };
@@ -165,7 +216,15 @@ function rasterFor(asset: DesignAsset, rect: Rect, theme: DecorativeTheme, color
 }
 
 type Ctx = { comp: Composition; theme: DecorativeTheme; colors: ColorTokens; toMedia: (r: Rect) => Rect };
-type Spec = Omit<ObjectSpec, "assetId" | "aspect"> & { id: string };
+type Spec = Omit<ObjectSpec, "assetId" | "aspect"> & {
+  id: string;
+  mode: "contained" | "bleed";
+  corner?: Corner;
+  attachedTo?: string[];
+  targetGapIn?: number | null;
+};
+
+
 
 /** Content blocks masked out of line art (header, body, footer — each + clearance), trim coordinates. */
 function contentBlocks(comp: Composition): Rect[] {
@@ -186,7 +245,6 @@ function contentBlocks(comp: Composition): Rect[] {
   return [...[...zones.values()].map((rs) => inflate(union(rs)!, clr)), ...keepouts];
 }
 
-type Corner = "tl" | "tr" | "bl" | "br";
 const CORNER_DEF = {
   tl: { anchor: "topLeftAccent", alignX: "start", alignY: "start" },
   tr: { anchor: "topRightAccent", alignX: "end", alignY: "start" },
@@ -194,13 +252,24 @@ const CORNER_DEF = {
   br: { anchor: "bottomRightAccent", alignX: "end", alignY: "end" },
 } as const;
 
+const CORNERS_OF: Record<CornerSet, Corner[]> = {
+  "opposite-tl-br": ["tl", "br"],
+  "opposite-tr-bl": ["tr", "bl"],
+  all: ["tl", "tr", "bl", "br"],
+  top: ["tl", "tr"],
+  bottom: ["bl", "br"],
+  tl: ["tl"],
+  tr: ["tr"],
+  bl: ["bl"],
+  br: ["br"],
+};
+
 /** Corners of a set, with the transform that turns the art into each corner. */
 function cornersOf(set: CornerSet, kind: "floral" | "accent") {
   // Floral corner art grows from its top-left; JCS line-art corners are designed for the top-right.
   const t = (k: Corner): ArtTransform =>
     kind === "floral" ? { flipX: k === "tr" || k === "br", flipY: k === "bl" || k === "br" } : { flipX: k === "tl" || k === "bl", flipY: k === "bl" || k === "br" };
-  const list: Corner[] = set === "opposite-tl-br" ? ["tl", "br"] : set === "opposite-tr-bl" ? ["tr", "bl"] : [set];
-  return list.map((k) => ({ ...CORNER_DEF[k], transform: t(k) }));
+  return CORNERS_OF[set].map((k) => ({ ...CORNER_DEF[k], corner: k, transform: t(k) }));
 }
 
 /** Base object placement before user overrides. */
@@ -208,8 +277,109 @@ function base(p: Partial<DecorationPlacement>): DecorationPlacement {
   return { anchor: "page", attach: "inside", alignX: "center", alignY: "center", fit: "contain", offsetXIn: 0, offsetYIn: 0, allowContentOverlap: false, allowBleed: true, allowClipping: false, ...p };
 }
 
-/** Apply the user's advanced overrides; an overridden anchor turns a mirrored pair into one piece there. */
-function withOverrides(specs: Spec[], theme: DecorativeTheme): Spec[] {
+/** The trim inset by the corner inset: where contained art may go. */
+function containedBounds(comp: Composition): Rect {
+  const i = comp.gaps.cornerInset;
+  return { x: i, y: i, w: comp.trim.w - 2 * i, h: comp.trim.h - 2 * i };
+}
+
+/** Corner pieces: CONTAINED in the corner region (never cropped), or BLEED past the trim by edgeBleedAmount. */
+function cornerSpecs(comp: Composition, set: CornerSet, kind: "floral" | "accent", preferredW: number, edge: EdgeTreatment): Spec[] {
+  return cornersOf(set, kind).map((k) => {
+    const id = `corner-${k.corner}`;
+    const corner = k.corner;
+    if (edge === "contained") {
+      const c = comp.corners[k.corner];
+      const region = { x: c.x, y: c.y, w: c.width, h: c.height };
+      return { ...base({ anchor: k.anchor, alignX: k.alignX, alignY: k.alignY, allowBleed: false }), id, corner, mode: "contained", preferredW, region, bounds: region, transform: k.transform };
+    }
+    // Line art keeps the JCS knockout under its bleed; florals shrink clear of content.
+    return {
+      ...base({ anchor: k.anchor, alignX: k.alignX, alignY: k.alignY, fit: "natural" }),
+      id,
+      corner,
+      mode: "bleed",
+      preferredW,
+      bleedOut: comp.gaps.edgeBleed,
+      avoid: kind === "accent" ? "knockout" : "shrink",
+      transform: k.transform,
+    };
+  });
+}
+
+const sameRule = (p: ProtectedRect, rule: Rect) => p.kind === "rule" && Math.abs(p.rect.y + p.rect.h / 2 - (rule.y + rule.h / 2)) < 1e-6 && p.rect.x <= rule.x + 1e-6;
+
+/** Title-accent pieces: attached to the title's ink or to its rule, at the semantic gap tokens. */
+function titleAccentSpecs(comp: Composition, pos: TitleAccentPosition, preferredW: number): Spec[] {
+  const g = comp.gaps;
+  const contained = containedBounds(comp);
+  const title = comp.titleId;
+  const rule = comp.headerRule;
+  const onTitle = (p: ProtectedRect) => p.id === title;
+  const common = { mode: "contained" as const, preferredW, bounds: contained };
+  const beside = (side: "start" | "end"): Spec => ({
+    ...base({ anchor: "title", attach: "outside", alignX: side, alignY: "center", fit: "natural", allowBleed: false }),
+    ...common,
+    id: side === "start" ? "title-left" : "title-right",
+    attachY: "inside",
+    gapIn: g.titleAccent,
+    ignore: onTitle,
+    attachedTo: title ? [title] : [],
+    targetGapIn: g.titleAccent,
+    transform: { flipX: side === "start" },
+  });
+  const aboveBelow = (y: "start" | "end", x: "start" | "center" | "end", id: string): Spec => ({
+    ...base({ anchor: "title", attach: "outside", alignX: x, alignY: y, fit: "natural", allowBleed: false }),
+    ...common,
+    id,
+    attachX: "inside",
+    gapIn: g.toTitle,
+    ignore: onTitle,
+    attachedTo: title ? [title] : [],
+    targetGapIn: g.toTitle,
+    transform: {},
+  });
+  const onRule = (x: "start" | "center" | "end", id: string): Spec => ({
+    ...base({ anchor: "titleRule", attach: "inside", alignX: x, alignY: "end", fit: "natural", allowBleed: false }),
+    ...common,
+    id,
+    // Sits ON the title rule, a decorationToRuleGap above it; content beyond the rule is separated by the rule.
+    restOnY: rule ? rule.y - g.toRule : undefined,
+    ignore: (p) => !!rule && (sameRule(p, rule) || p.rect.y + g.toContent >= rule.y - 1e-6),
+    attachedTo: [],
+    targetGapIn: g.toRule,
+    transform: { flipX: x === "start" },
+  });
+  const titleAlign = comp.titleAlign;
+  switch (pos) {
+    case "title-left":
+      return [beside("start")];
+    case "title-right":
+      return [beside("end")];
+    case "title-above":
+      return [aboveBelow("start", titleAlign, "title-above")];
+    case "title-above-center":
+      return [aboveBelow("start", "center", "title-above")];
+    case "title-below":
+      return [aboveBelow("end", titleAlign, "title-below")];
+    case "title-below-center":
+      return [aboveBelow("end", "center", "title-below")];
+    case "rule-left":
+      return [onRule("start", "rule-left")];
+    case "rule-center":
+      return [onRule("center", "rule-center")];
+    case "rule-right":
+      return [onRule("end", "rule-right")];
+    case "rule-both":
+      return [onRule("start", "rule-left"), onRule("end", "rule-right")];
+  }
+}
+
+/** Fallback order for the automatic title accent. */
+const AUTO_TITLE_ORDER: TitleAccentPosition[] = ["rule-right", "title-right", "title-above-center", "title-above", "rule-left", "title-left", "rule-center"];
+
+/** Apply the user's advanced overrides; an overridden anchor turns a mirrored set into one piece there. */
+function withOverrides(specs: Spec[], theme: DecorativeTheme, comp: Composition): Spec[] {
   const o = theme.layout;
   if (!o) return specs;
   const list = o.anchor && specs.length > 1 ? specs.slice(0, 1) : specs;
@@ -218,8 +388,12 @@ function withOverrides(specs: Spec[], theme: DecorativeTheme): Spec[] {
     if (o.anchor && o.anchor !== s.anchor) {
       next.anchor = o.anchor;
       next.attach = "inside";
+      next.attachX = next.attachY = undefined;
       next.restOnY = undefined;
-      next.overhang = 0;
+      next.region = undefined;
+      next.bleedOut = undefined;
+      next.ignore = undefined;
+      if (next.mode === "contained") next.bounds = containedBounds(comp);
     }
     if (o.alignX) next.alignX = o.alignX;
     if (o.alignY) next.alignY = o.alignY;
@@ -231,8 +405,35 @@ function withOverrides(specs: Spec[], theme: DecorativeTheme): Spec[] {
     if (o.allowContentOverlap !== undefined) next.allowContentOverlap = o.allowContentOverlap;
     if (o.allowBleed !== undefined) next.allowBleed = o.allowBleed;
     if (o.allowClipping !== undefined) next.allowClipping = o.allowClipping;
+    // Allowing bleed / cropping on a contained piece makes it a bleed piece.
+    if (next.mode === "contained" && (next.allowClipping || (o.allowBleed && !s.allowBleed))) {
+      next.mode = "bleed";
+      next.bounds = undefined;
+    }
     return next;
   });
+}
+
+const CORNER_NAME: Record<Corner, string> = { tl: "upper-left", tr: "upper-right", bl: "lower-left", br: "lower-right" };
+
+/** Say WHY an object was not placed, in page terms. */
+function noRoomReason(comp: Composition, s: Spec, fallback = "no room"): string {
+  const c = comp.content;
+  if (s.corner && c && !fallback.startsWith("this page has no")) {
+    const left = s.corner === "tl" || s.corner === "bl", top = s.corner === "tl" || s.corner === "tr";
+    const mx = left ? c.x : comp.trim.w - (c.x + c.w), my = top ? c.y : comp.trim.h - (c.y + c.h);
+    // A binding / glue zone reaching the corner is the real blocker there.
+    const cx = left ? 0 : comp.trim.w, cy = top ? 0 : comp.trim.h;
+    const zone = comp.protected.find((q) => q.kind === "keepout" && cx >= q.rect.x - 1e-6 && cx <= q.rect.x + q.rect.w + 1e-6 && cy >= q.rect.y - 1e-6 && cy <= q.rect.y + q.rect.h + 1e-6);
+    const room = zone
+      ? `the binding / glue zone covers the ${CORNER_NAME[s.corner]} corner`
+      : `the content leaves ${mx.toFixed(2)}" × ${my.toFixed(2)}" of margin at the ${CORNER_NAME[s.corner]} corner`;
+    return s.mode === "contained"
+      ? `no room to show the whole artwork: ${room} (art keeps ${comp.gaps.cornerInset}" from the trim and ${comp.gaps.toContent}" from content) — choose other corners or "Bleed off the edge"`
+      : `no room even when bled off the edge: ${room}`;
+  }
+  if (fallback.includes('"titleRule"')) return "this page's title has no rule — choose a position beside, above or below the title";
+  return fallback;
 }
 
 function placeObjects(c: Ctx, asset: Exclude<DesignAsset, { type: "marble" }>, specs: Spec[]) {
@@ -242,23 +443,30 @@ function placeObjects(c: Ctx, asset: Exclude<DesignAsset, { type: "marble" }>, s
   let knockout = false;
   for (const s of specs) {
     const fit = fitObject({ ...s, assetId: asset.id, aspect: ar }, c.comp);
+    const knocks = s.avoid === "knockout" && !s.allowContentOverlap;
     reports.push({
       id: s.id,
       assetId: asset.id,
       anchor: s.anchor,
       rect: fit.rect ? c.toMedia(fit.rect) : null,
       inkBox: fit.inkBox ? c.toMedia(fit.inkBox) : null,
-      reason: fit.reason,
+      reason: fit.rect ? undefined : noRoomReason(c.comp, s, fit.reason),
       clippedShare: fit.clippedShare,
       // Knockout pieces never paint over content: it is masked away.
-      overlapShare: s.avoid === "knockout" && !s.allowContentOverlap ? 0 : fit.overlapShare,
+      overlapShare: knocks ? 0 : fit.overlapShare,
       intentionalClip: fit.intentionalClip,
       allowContentOverlap: s.allowContentOverlap,
       scale: fit.scale,
+      mode: s.mode,
+      cells: fit.cells.map(c.toMedia),
+      bounds: s.mode === "contained" && fit.bounds ? c.toMedia(fit.bounds) : null,
+      knockout: knocks,
+      attachedTo: s.attachedTo ?? [],
+      targetGapIn: s.targetGapIn ?? null,
     });
     if (!fit.rect) continue;
     const rect = c.toMedia(fit.rect);
-    if (s.avoid === "knockout" && !s.allowContentOverlap) knockout = true;
+    if (knocks) knockout = true;
     if (asset.type === "accent") pieces.push({ kind: "mask", assetId: asset.id, url: asset.url, rect, color: c.theme.colorB, transform: s.transform });
     else pieces.push({ kind: "raster", assetId: asset.id, rect, request: rasterFor(asset, rect, c.theme, c.colors, "stretch"), fallback: null, transform: s.transform });
   }
@@ -279,7 +487,26 @@ export function planDecoration(g: PageGeometry, input: DecorativeTheme, colors: 
   // Band: top (bleed) edge → just above the content. Frame hole: content + clearance.
   const band: Rect = { x: 0, y: 0, w: W, h: oy + (content ? Math.max(0, content.y - clr) : g.safeRect.y) };
   const frameHole = [toMedia(content ? inflate(content, clr) : g.safeRect)];
-  const fieldReport = (rect: Rect, overlap: boolean): PieceReport => ({ id: "field", assetId: theme.assetId ?? theme.style, anchor: "field", rect, inkBox: rect, clippedShare: 0, overlapShare: 0, intentionalClip: true, allowContentOverlap: overlap, scale: 1 });
+  const fieldReport = (rect: Rect, overlap: boolean): PieceReport => ({
+    id: "field",
+    assetId: theme.assetId ?? theme.style,
+    anchor: "field",
+    rect,
+    inkBox: rect,
+    clippedShare: 0,
+    overlapShare: 0,
+    intentionalClip: true,
+    allowContentOverlap: overlap,
+    scale: 1,
+    mode: "field",
+    cells: [],
+    bounds: null,
+    knockout: false,
+    attachedTo: [],
+    targetGapIn: null,
+  });
+  const edge: EdgeTreatment = theme.edge ?? "contained";
+  const run = (specs: Spec[]) => placeObjects(c, asset as Exclude<DesignAsset, { type: "marble" }>, withOverrides(specs, theme, comp));
 
   // ── Fields: solid, watercolor, marble ──
   if (theme.style === "solid" || theme.style === "watercolor" || theme.style === "marble") {
@@ -312,50 +539,34 @@ export function planDecoration(g: PageGeometry, input: DecorativeTheme, colors: 
     let specs: Spec[] = [];
     if (theme.placement === "corners") {
       const short = Math.min(g.trimWidthIn, g.trimHeightIn);
-      const specsFor = (set: CornerSet): Spec[] =>
-        cornersOf(set, "floral").map((k, i) => ({
-          ...base({ anchor: k.anchor, alignX: k.alignX, alignY: k.alignY }),
-          id: `corner${i}`,
-          preferredW: short * FLORAL_CORNER_OF_SHORT_SIDE * theme.scale,
-          transform: k.transform,
-        }));
+      const preferredW = short * FLORAL_CORNER_OF_SHORT_SIDE * theme.scale;
+      const specsFor = (set: CornerSet) => cornerSpecs(comp, set, "floral", preferredW, edge);
       if (theme.corners) specs = specsFor(theme.corners);
       else {
-        // Default: the opposite pair with the most room for the artwork (binding zones and content decide).
-        const area = (set: CornerSet) =>
-          placeObjects(c, asset, withOverrides(specsFor(set), theme)).reports.reduce((sum, r) => sum + (r.rect ? r.rect.w * r.rect.h : 0), 0);
+        // Automatic: the opposite pair with the most room for the artwork (binding zones and content decide).
+        const area = (set: CornerSet) => run(specsFor(set)).reports.reduce((sum, r) => sum + (r.rect ? r.rect.w * r.rect.h : 0), 0);
         const best = (["opposite-tl-br", "opposite-tr-bl"] as const).reduce((a, b) => (area(b) > area(a) + 1e-9 ? b : a));
         specs = specsFor(best);
       }
-    } else if (theme.placement === "title-flank") {
-      // JCS floralFlank: clusters flank the title on its header rule (resting on the rule here, so they
-      // never hang into the content just below it). Without a rule they centre on the title.
+    } else if (theme.placement === "title-accent") {
+      // JCS floralFlank sizing: the cluster is 1.5 title em tall — never smaller than the minimum ornament.
       const h = comp.titleEmIn * FLORAL_FLANK.heightPerTitleEm * theme.scale;
-      const rule = comp.headerRule;
-      // Rest on the header rule; with no rule, rest on the title's own line (rising into the header).
-      const title = comp.regions.title;
-      const rest = rule ? rule.y : title ? title.y + title.h : undefined;
-      specs = (["end", "start"] as const).map((side) => ({
-        ...base({ anchor: "title", attach: "outside", alignX: side, alignY: rest !== undefined ? "end" : "center", fit: "natural", allowBleed: false }),
-        id: side === "end" ? "flank-after" : "flank-before",
-        // Never a speck: at least the minimum ornament size even beside small titles.
-        preferredW: Math.max(h * ar, ar >= 1 ? MIN_LONG_SIDE_IN : MIN_LONG_SIDE_IN * ar),
-        restOnY: rest,
-        // The flank sits ON its line (the header rule, or the title's own line) and never crosses it, so the
-        // rule itself and content on the far side of the line are separated by the line, not by clearance.
-        ignore: (p) =>
-          rest !== undefined &&
-          ((!!rule && p.kind === "rule" && Math.abs(p.rect.y + p.rect.h / 2 - (rule.y + rule.h / 2)) < 1e-6) || p.rect.y + comp.clearanceIn >= rest - 1e-6),
-        transform: { flipX: side === "start" },
-      }));
+      const preferredW = Math.max(h * ar, ar >= 1 ? MIN_LONG_SIDE_IN : MIN_LONG_SIDE_IN * ar);
+      if (theme.titlePosition) specs = titleAccentSpecs(comp, theme.titlePosition, preferredW);
+      else {
+        // Automatic: the balancing default, else the first position where the whole accent fits.
+        const order = [defaultTitlePosition(comp), ...AUTO_TITLE_ORDER].filter((p) => titlePositionsFor(asset.id).includes(p));
+        const pick = order.find((p) => run(titleAccentSpecs(comp, p, preferredW)).reports.every((r) => r.rect)) ?? order[0];
+        specs = titleAccentSpecs(comp, pick, preferredW);
+      }
     } else if (theme.placement === "top-bottom") {
       const preferredW = trimW * BOUQUET_WIDTH_OF_PAGE * theme.scale;
       specs = [
-        { ...base({ anchor: "page", alignX: "center", alignY: "start" }), id: "top", preferredW, transform: { flipY: true } },
-        { ...base({ anchor: "page", alignX: "center", alignY: "end" }), id: "bottom", preferredW, transform: {} },
+        { ...base({ anchor: "page", alignX: "center", alignY: "start" }), id: "top", mode: "bleed", preferredW, transform: { flipY: true } },
+        { ...base({ anchor: "page", alignX: "center", alignY: "end" }), id: "bottom", mode: "bleed", preferredW, transform: {} },
       ];
     }
-    const r = placeObjects(c, asset, withOverrides(specs, theme));
+    const r = run(specs);
     return plan(r.pieces, [], r.reports);
   }
 
@@ -392,22 +603,53 @@ export function planDecoration(g: PageGeometry, input: DecorativeTheme, colors: 
   }
   if (theme.placement === "behind-title") {
     // JCS "Behind the title (subtle)": overlaps the title by design, at ≤ 16% strength.
-    const specs = withOverrides([{ ...base({ anchor: "title", allowContentOverlap: true, allowBleed: false }), id: "behind", preferredW: trimW, transform: {} }], theme);
-    const r = placeObjects(c, asset, specs);
+    const r = run([{ ...base({ anchor: "title", allowContentOverlap: true, allowBleed: false }), id: "behind", mode: "contained", preferredW: trimW, bounds: containedBounds(comp), transform: {} }]);
     return plan(r.pieces, [], r.reports);
   }
-  // Corners (JCS opposite / single corners): overhang the page edge as designed; content masked away.
+  const flourishW = trimW * LINE_FLOURISH_OF_PAGE * theme.scale;
+  if (theme.placement === "header-flourish") {
+    // In the header, resting on the title rule at the end opposite the title (or at the header's foot).
+    const side = comp.titleAlign === "end" ? "start" : "end";
+    const rule = comp.headerRule;
+    const spec: Spec = rule
+      ? {
+          ...base({ anchor: "titleRule", alignX: side, alignY: "end", fit: "natural", allowBleed: false }),
+          restOnY: rule.y - comp.gaps.toRule,
+          ignore: (p) => sameRule(p, rule) || p.rect.y + comp.gaps.toContent >= rule.y - 1e-6,
+          targetGapIn: comp.gaps.toRule,
+          id: "header-flourish",
+          mode: "contained",
+          preferredW: flourishW,
+          bounds: containedBounds(comp),
+          transform: { flipX: side === "start" },
+        }
+      : { ...base({ anchor: "header", alignX: side, alignY: "end", fit: "natural", allowBleed: false }), id: "header-flourish", mode: "contained", preferredW: flourishW, bounds: containedBounds(comp), transform: { flipX: side === "start" } };
+    const r = run([spec]);
+    return plan(r.pieces, [], r.reports);
+  }
+  if (theme.placement === "footer-flourish") {
+    // Centred in the space between the content's foot and the trim (inset), clear of content.
+    const bottom = content ? content.y + content.h + clr : g.trimHeightIn / 2;
+    const region = { x: 0, y: bottom, w: g.trimWidthIn, h: Math.max(0, g.trimHeightIn - comp.gaps.cornerInset - bottom) };
+    const r = run([
+      { ...base({ anchor: "page", alignX: "center", alignY: "center", fit: "natural", allowBleed: false }), id: "footer-flourish", mode: "contained", preferredW: flourishW, region, bounds: containedBounds(comp), transform: { flipY: true } },
+    ]);
+    return plan(r.pieces, [], r.reports);
+  }
+  if (theme.placement === "edge-accent") {
+    // Along the outer (right) edge, centred on the content, running edgeBleedAmount off the page on purpose.
+    const mid = content ?? { x: 0, y: 0, w: g.trimWidthIn, h: g.trimHeightIn };
+    const region = { x: 0, y: mid.y, w: g.trimWidthIn, h: mid.h };
+    const r = run([
+      { ...base({ anchor: "page", alignX: "end", alignY: "center", fit: "natural" }), id: "edge-accent", mode: "bleed", preferredW: flourishW, region, bleedOut: comp.gaps.edgeBleed, transform: {} },
+    ]);
+    return plan(r.pieces, [], r.reports);
+  }
+  // Corners: CONTAINED by default (the whole artwork visible, clear of content); BLEED only when chosen
+  // (JCS full-bleed corner crop: runs edgeBleedAmount past the trim, content masked away).
   const set = theme.corners ?? defaultCorners(asset.id);
-  const scaleCap = set.startsWith("opposite") ? ACCENT_CAPS.corners.maxScale : ACCENT_CAPS.singleCorner.maxScale;
-  const specs: Spec[] = cornersOf(set, "accent").map((k, i) => ({
-    ...base({ anchor: k.anchor, alignX: k.alignX, alignY: k.alignY, fit: "natural" }),
-    id: `corner${i}`,
-    preferredW: trimW * scaleCap * theme.scale,
-    overhang: ACCENT_CORNER_OVERHANG,
-    avoid: "knockout",
-    transform: k.transform,
-  }));
-  const r = placeObjects(c, asset, withOverrides(specs, theme));
+  const scaleCap = CORNERS_OF[set].length === 1 ? ACCENT_CAPS.singleCorner.maxScale : ACCENT_CAPS.corners.maxScale;
+  const r = run(cornerSpecs(comp, set, "accent", trimW * scaleCap * theme.scale, edge));
   return plan(r.pieces, r.knockout ? contentBlocks(comp).map(toMedia) : [], r.reports);
 }
 

@@ -5,11 +5,13 @@
  * The object is aligned inside (or beside) its anchor region, then scaled
  * about its alignment point to the LARGEST size ≤ its preferred size at which
  * its actual artwork footprint (alpha-occupancy cells, not its bounding box):
- *   - stays inside the drawable bounds (trim, + bleed when allowed, + any
- *     intentional overhang) unless clipping is allowed, and
+ *   - stays inside its containment bounds unless clipping is allowed:
+ *       contained  an explicit region (e.g. a corner region inset from the trim)
+ *       bleed      the trim pushed out by the deliberate bleed amount
+ *       default    the trim (+ the bleed margin when allowBleed), and
  *   - touches no protected content (already inflated by the clearance)
  *     unless overlap is allowed.
- * Below MIN_SCALE of its preferred size an object is dropped with a reason
+ * Below MIN_LONG_SIDE_IN an object is dropped with a reason
  * instead of being drawn as a speck.
  */
 import { OCCUPANCY, OCCUPANCY_GRID } from "../../design-library/occupancy";
@@ -33,8 +35,17 @@ export type ObjectSpec = DecorationPlacement & {
   /** Width before region / conflict limits (inches). */
   preferredW: number;
   transform: ArtTransform;
-  /** Share of the object pushed past the page edges it is aligned to (intentional crop, e.g. JCS corner overhang). */
-  overhang?: number;
+  /** Region to align in, instead of the anchor's own region (e.g. a contained corner region). */
+  region?: Rect;
+  /** Containment bounds for a CONTAINED object: every ink cell must stay inside (never cropped). */
+  bounds?: Rect;
+  /** BLEED: inches the art is pushed past the trim edges it is aligned to (intentional crop). */
+  bleedOut?: number;
+  /** Per-axis attach (default: `attach`), e.g. above a title (outside in Y) but aligned to its start (inside in X). */
+  attachX?: "inside" | "outside";
+  attachY?: "inside" | "outside";
+  /** Gap to the region when attached outside (default: the content clearance). */
+  gapIn?: number;
   /** Vertical centre (or resting line, with alignY "end") that overrides the region's own, e.g. a header rule. */
   restOnY?: number;
   /** Protected content this object is designed to sit on (e.g. the header rule under a flank). */
@@ -51,10 +62,14 @@ export type FitResult = {
   clippedShare: number;
   /** Share of artwork cells over protected content. */
   overlapShare: number;
-  /** True when clipping is part of the design (overhang / allowed). */
+  /** True when clipping is part of the design (bleed mode / bleed allowed / clipping allowed). */
   intentionalClip: boolean;
   /** Artwork footprint (union of ink cells), trim coordinates. */
   inkBox: Rect | null;
+  /** Ink cells, trim coordinates (validation measures real clearances against these). */
+  cells: Rect[];
+  /** The bounds the object was contained in (null = bleed / clipping allowed). */
+  bounds: Rect | null;
 };
 
 type Cell = { u0: number; v0: number; u1: number; v1: number };
@@ -96,8 +111,8 @@ function inkUnion(cells: Rect[]): Rect | null {
 }
 
 export function fitObject(spec: ObjectSpec, comp: Composition): FitResult {
-  const R = comp.regions[spec.anchor];
-  const none = (reason: string): FitResult => ({ rect: null, scale: 0, reason, clippedShare: 0, overlapShare: 0, intentionalClip: false, inkBox: null });
+  const R = spec.region ?? comp.regions[spec.anchor];
+  const none = (reason: string): FitResult => ({ rect: null, scale: 0, reason, clippedShare: 0, overlapShare: 0, intentionalClip: false, inkBox: null, cells: [], bounds: null });
   if (!R) return none(`this page has no "${spec.anchor}" region`);
   const { w: W, h: H } = comp.trim;
   const bx = spec.allowBleed ? comp.bleedIn.x : 0, by = spec.allowBleed ? comp.bleedIn.y : 0;
@@ -111,32 +126,33 @@ export function fitObject(spec: ObjectSpec, comp: Composition): FitResult {
   if (spec.attach === "inside" && spec.fit === "contain") w0 = Math.min(w0, R.w, R.h * ar);
   if (spec.attach === "inside" && spec.fit === "cover") w0 = Math.max(R.w, R.h * ar);
   if (!(w0 > 0)) return none("no size available");
-  const over = spec.overhang ?? 0;
+  const out = spec.bleedOut ?? 0;
+  const ax = spec.attachX ?? spec.attach, ay = spec.attachY ?? spec.attach;
+  const gap = spec.gapIn ?? comp.clearanceIn;
 
   const place = (w: number): Rect => {
     const h = w / ar;
-    const clr = comp.clearanceIn;
     let x: number, y: number;
-    if (spec.attach === "outside") {
-      x = spec.alignX === "start" ? R.x - clr - w : spec.alignX === "end" ? R.x + R.w + clr : R.x + (R.w - w) / 2;
-      y = spec.alignY === "start" ? R.y - clr - h : spec.alignY === "end" ? R.y + R.h + clr : R.y + (R.h - h) / 2;
-    } else {
-      x = spec.alignX === "start" ? R.x : spec.alignX === "end" ? R.x + R.w - w : R.x + (R.w - w) / 2;
-      y = spec.alignY === "start" ? R.y : spec.alignY === "end" ? R.y + R.h - h : R.y + (R.h - h) / 2;
-    }
+    if (ax === "outside") x = spec.alignX === "start" ? R.x - gap - w : spec.alignX === "end" ? R.x + R.w + gap : R.x + (R.w - w) / 2;
+    else x = spec.alignX === "start" ? R.x : spec.alignX === "end" ? R.x + R.w - w : R.x + (R.w - w) / 2;
+    if (ay === "outside") y = spec.alignY === "start" ? R.y - gap - h : spec.alignY === "end" ? R.y + R.h + gap : R.y + (R.h - h) / 2;
+    else y = spec.alignY === "start" ? R.y : spec.alignY === "end" ? R.y + R.h - h : R.y + (R.h - h) / 2;
     if (spec.restOnY !== undefined) y = spec.alignY === "end" ? spec.restOnY - h : spec.restOnY - h / 2;
-    // Pieces aligned to a page edge run to the bleed edge (+ any intentional overhang).
-    if (spec.attach === "inside") {
-      if (spec.alignX === "start" && Math.abs(R.x) < 1e-6) x -= bx + over * w;
-      if (spec.alignX === "end" && Math.abs(R.x + R.w - W) < 1e-6) x += bx + over * w;
-      if (spec.alignY === "start" && Math.abs(R.y) < 1e-6) y -= by + over * h;
-      if (spec.alignY === "end" && Math.abs(R.y + R.h - H) < 1e-6) y += by + over * h;
+    // Pieces aligned to a page edge run to the bleed edge — or, in bleed mode, deliberately past it.
+    if (ax === "inside" && !spec.bounds) {
+      // Never push more than 45% of the art off the page: the rest must still read.
+      const px = out ? Math.min(out, 0.45 * w) : bx, py = out ? Math.min(out, 0.45 * h) : by;
+      if (spec.alignX === "start" && Math.abs(R.x) < 1e-6) x -= px;
+      if (spec.alignX === "end" && Math.abs(R.x + R.w - W) < 1e-6) x += px;
+      if (ay === "inside" && spec.alignY === "start" && Math.abs(R.y) < 1e-6) y -= py;
+      if (ay === "inside" && spec.alignY === "end" && Math.abs(R.y + R.h - H) < 1e-6) y += py;
     }
     return { x: x + spec.offsetXIn, y: y + spec.offsetYIn, w, h };
   };
   const bounds = (w: number): Rect => {
-    const oX = over * w, oY = (over * w) / ar;
-    return { x: -bx - oX, y: -by - oY, w: W + 2 * (bx + oX), h: H + 2 * (by + oY) };
+    if (spec.bounds) return spec.bounds;
+    const ox = Math.max(bx, out ? Math.min(out, 0.45 * w) : 0), oy = Math.max(by, out ? Math.min(out, (0.45 * w) / ar) : 0);
+    return { x: -ox, y: -oy, w: W + 2 * ox, h: H + 2 * oy };
   };
   const protectedSet = comp.protected.filter((p) => !spec.ignore?.(p));
   const conflicts = (cells: Rect[]) => {
@@ -160,7 +176,7 @@ export function fitObject(spec: ObjectSpec, comp: Composition): FitResult {
     const minW = ar >= 1 ? MIN_LONG_SIDE_IN : MIN_LONG_SIDE_IN * ar;
     const kMin = Math.min(1, minW / w0);
     if (!valid(w0 * kMin)) {
-      return none(`no room for this artwork (≥ ${(w0 * kMin).toFixed(2)}" wide) without ${spec.allowClipping ? "covering content" : "being cropped or covering content"}`);
+      return none(`no room for this artwork (≥ ${(w0 * kMin).toFixed(2)}" wide) without ${spec.allowClipping ? "covering content" : spec.bounds ? "leaving its region or covering content" : "being cropped or covering content"}`);
     }
     let lo = kMin, hi = 1;
     for (let i = 0; i < SEARCH_STEPS; i++) {
@@ -178,7 +194,9 @@ export function fitObject(spec: ObjectSpec, comp: Composition): FitResult {
     scale: k,
     clippedShare: cells.length ? outside / cells.length : 0,
     overlapShare: cells.length ? conflicts(cells) / cells.length : 0,
-    intentionalClip: spec.allowClipping || over > 0 || spec.allowBleed,
+    intentionalClip: spec.allowClipping || out > 0 || (spec.allowBleed && !spec.bounds),
     inkBox: inkUnion(cells),
+    cells,
+    bounds: spec.allowClipping ? null : bounds(w0 * k),
   };
 }

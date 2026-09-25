@@ -325,7 +325,7 @@ describe("decoration never covers functional content", () => {
     const doc = resolveDocument(p);
     const g = geometryFor(doc, doc.recipe.pages[0]);
     const comp = compositionFor(doc, 0);
-    const clr = doc.spacing.decorationToContentClearance;
+    const clr = doc.spacing.decorationToContentGap;
     const band = planDecoration(g, { ...p.decorativeTheme, style: "marble", assetId: "jcs-marble-boldgold", placement: "header-band" }, doc.colors, comp)!;
     const piece = band.pieces[0];
     expect(piece.kind === "raster" && piece.rect.y + piece.rect.h).toBeCloseTo(g.trimOffset.y + comp.content!.y - clr, 9);

@@ -41,8 +41,19 @@ export type SpacingTokens = {
   dateToCellInset: number;
   /** Section heading → its section's edges. */
   sectionHeadingInset: number;
-  /** Decoration → any protected functional content. */
-  decorationToContentClearance: number;
+  // ── Decoration composition (physical inches; decoration is placed relative to semantic targets) ──
+  /** Decoration → any protected functional content (calendar, notes, writing area, labels). */
+  decorationToContentGap: number;
+  /** Decoration above / below the title → the title's ink. */
+  decorationToTitleGap: number;
+  /** Decoration resting on the title rule → the rule. */
+  decorationToRuleGap: number;
+  /** Accent beside the title (left / right) → the title's ink. */
+  titleAccentGap: number;
+  /** Contained corner / edge decoration → the trim edge (keeps art clear of trim drift). */
+  cornerInset: number;
+  /** Bleed decoration: how far the artwork runs past the trim edge (intentional crop). */
+  edgeBleedAmount: number;
 };
 
 // ─── Typography ────────────────────────────────────────────────────────────

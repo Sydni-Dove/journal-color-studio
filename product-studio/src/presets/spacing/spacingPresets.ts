@@ -15,7 +15,12 @@ import type { SpacingDensity, SpacingTokens } from "../../types/tokens";
  *   labelToBorderInset    label → box / cell border        (≥ box padding)
  *   dateToCellInset       calendar date → cell border      (= box padding range)
  *   sectionHeadingInset   section heading → section edges
- *   decorationToContentClearance  decoration → functional content (≈ 1/8")
+ *   decorationToContentGap  decoration → functional content (≈ 1/8")
+ *   decorationToTitleGap    decoration above / below a title → its ink
+ *   decorationToRuleGap     decoration resting on the title rule → the rule
+ *   titleAccentGap          accent beside a title → its ink
+ *   cornerInset             contained corner / edge art → trim (≥ trim drift ≈ 1/16")
+ *   edgeBleedAmount         bleed art → how far it runs past the trim (intentional crop)
  */
 export const SPACING_PRESETS: Record<SpacingDensity, SpacingTokens> = {
   compact: {
@@ -35,7 +40,12 @@ export const SPACING_PRESETS: Record<SpacingDensity, SpacingTokens> = {
     labelToBorderInset: 0.07,
     dateToCellInset: 0.06,
     sectionHeadingInset: 0.07,
-    decorationToContentClearance: 0.1,
+    decorationToContentGap: 0.1,
+    decorationToTitleGap: 0.1,
+    decorationToRuleGap: 0.04,
+    titleAccentGap: 0.08,
+    cornerInset: 0.1,
+    edgeBleedAmount: 0.4,
   },
   balanced: {
     page: 0,
@@ -54,7 +64,12 @@ export const SPACING_PRESETS: Record<SpacingDensity, SpacingTokens> = {
     labelToBorderInset: 0.1,
     dateToCellInset: 0.08,
     sectionHeadingInset: 0.1,
-    decorationToContentClearance: 0.125,
+    decorationToContentGap: 0.125,
+    decorationToTitleGap: 0.12,
+    decorationToRuleGap: 0.06,
+    titleAccentGap: 0.1,
+    cornerInset: 0.15,
+    edgeBleedAmount: 0.5,
   },
   airy: {
     page: 0,
@@ -73,7 +88,12 @@ export const SPACING_PRESETS: Record<SpacingDensity, SpacingTokens> = {
     labelToBorderInset: 0.13,
     dateToCellInset: 0.11,
     sectionHeadingInset: 0.13,
-    decorationToContentClearance: 0.18,
+    decorationToContentGap: 0.18,
+    decorationToTitleGap: 0.16,
+    decorationToRuleGap: 0.08,
+    titleAccentGap: 0.14,
+    cornerInset: 0.2,
+    edgeBleedAmount: 0.6,
   },
 };
 

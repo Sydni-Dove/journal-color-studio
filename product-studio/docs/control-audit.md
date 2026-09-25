@@ -440,3 +440,51 @@ New rules:
 
 Also fixed: a rule's "…and N more" summary is no longer always an
 export-blocking error; it carries that rule's worst severity.
+
+## Follow-up: decoration placement pass (contained vs bleed, title accents)
+
+Root causes found on the live build:
+- **Flowing-line corners cropped.** The planner applied the JCS corner overhang
+  (20% of the art's size) to every line-art corner. The fitter shifted the art
+  past the trim and widened its own bounds by the same amount, so the piece
+  counted as valid and `intentionalClip`. The SVG viewport then cut it off at
+  the media edge. The crop came from placement math plus renderer clipping;
+  the asset bounds were not involved. "Corners" meant "crop" by construction.
+- **Floral sprig looked accidental.** There was one generic flank recipe, "outside the
+  title, resting on the rule". It placed the art a content clearance (not an
+  accent gap) after the title, at the rule's level, and it dropped the "before"
+  piece for left-aligned titles. Assets had no way to declare where they belong.
+
+Changes:
+- **Edge treatment is explicit.** The new `edge` setting is `contained` (the default)
+  or `bleed`.
+  - Contained pieces fit inside a `CornerRegion`. That region is the page quadrant
+    inset by `cornerInset`, and the art keeps clear of content by
+    `decorationToContentGap`. The piece shrinks, or reports a conflict, rather
+    than being cropped.
+  - Bleed pushes the art `edgeBleedAmount` past the trim, capped at 45% of the art.
+    Line art keeps the knockout under it.
+- **Capabilities.** `DECORATION_CAPABILITIES` in `design-library/placement.ts`
+  declares, per asset, which placements it supports. Only those are offered.
+  - The sprig is a **title accent** with 10 positions: left / right / above /
+    centred above / below / centred below the title, and left end / centre /
+    right end / both ends of the title rule. "Automatic" balances the title and
+    falls back to the first position that fits.
+  - Floral corners add all four, upper and lower corners.
+  - Flowing and abstract line art add a header flourish, a footer flourish and an
+    edge accent.
+- **Tokens.** `decorationToContentGap` replaces `decorationToContentClearance`,
+  and stored overrides are migrated. New tokens: `decorationToTitleGap`,
+  `decorationToRuleGap`, `titleAccentGap`, `cornerInset` and `edgeBleedAmount`.
+  Values are in inches for each density.
+- **Controls.** The main panel holds Placement, Corners, Edge, Position, Size,
+  Opacity and Offset X/Y. Advanced keeps the anchor, alignment and limits as
+  fine adjustments. The bleed and crop checkboxes are hidden for corners,
+  where Edge governs.
+- **Validation.**
+  - New rules: `decoration-outside-region`, `decoration-too-close` (title accents
+    measured against their own gap), and `decoration-bleed-contained`.
+  - `decoration-overlap` now also covers crossing a rule or the calendar, notes or
+    writing regions.
+  - `decoration-clipped` is reserved for contained art. Intentional bleed is
+    never flagged.

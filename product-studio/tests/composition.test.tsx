@@ -60,7 +60,7 @@ describe("composition regions resolve to physical bounds", () => {
     const c = compositionFor(doc, 0);
     const kinds = new Set(c.protected.map((p) => p.kind));
     for (const k of ["text", "rule", "surface", "box", "keepout"]) expect(kinds.has(k as never), k).toBe(true);
-    expect(c.clearanceIn).toBe(doc.spacing.decorationToContentClearance);
+    expect(c.clearanceIn).toBe(doc.spacing.decorationToContentGap);
   });
 });
 
@@ -86,8 +86,8 @@ describe("decoration anchors to composition regions", () => {
     expect(html(pa)).not.toBe(html(pb));
   });
   it("offsets move the artwork (and are still bound by the page rules)", () => {
-    const a = planFor(build(2), { style: "floral", assetId: "jcs-floral-sprig", placement: "title-flank" }).plan.reports.find((r) => r.rect)!;
-    const b = planFor(build(2), { style: "floral", assetId: "jcs-floral-sprig", placement: "title-flank", layout: { offsetXIn: 0.3 } }).plan.reports.find((r) => r.rect)!;
+    const a = planFor(build(2), { style: "floral", assetId: "jcs-floral-sprig", placement: "title-accent" }).plan.reports.find((r) => r.rect)!;
+    const b = planFor(build(2), { style: "floral", assetId: "jcs-floral-sprig", placement: "title-accent", layout: { offsetXIn: 0.3 } }).plan.reports.find((r) => r.rect)!;
     expect(b.rect!.x).toBeCloseTo(a.rect!.x + 0.3, 6);
   });
 });
@@ -105,7 +105,8 @@ describe("with overlap disabled, decoration never intersects protected content",
   const cases: [number, Partial<DecorativeTheme>][] = [];
   for (const i of [0, 1, 2, 3, 4]) {
     cases.push([i, { style: "floral", assetId: "jcs-floral-corner", placement: "corners" }]);
-    cases.push([i, { style: "floral", assetId: "jcs-floral-sprig", placement: "title-flank" }]);
+    cases.push([i, { style: "floral", assetId: "jcs-floral-sprig", placement: "title-accent" }]);
+    cases.push([i, { style: "floral", assetId: "jcs-floral-corner", placement: "corners", corners: "all", edge: "bleed" }]);
     cases.push([i, { style: "floral", assetId: "jcs-floral-bouquet", placement: "top-bottom" }]);
     for (const c of ["tl", "tr", "bl", "br"] as const) cases.push([i, { style: "floral", assetId: "jcs-floral-corner", placement: "corners", corners: c }]);
   }
@@ -113,9 +114,14 @@ describe("with overlap disabled, decoration never intersects protected content",
     it(`${TEST_PRODUCTS[i].label} · ${deco.assetId} · ${deco.placement}${deco.corners ? ` (${deco.corners})` : ""}`, () => {
       const p = build(i);
       const { plan, comp, g } = planFor(p, deco);
-      // A title flank rests ON its line by design: the line and what lies beyond it are exempt.
-      const rest = deco.placement === "title-flank" ? (comp.headerRule?.y ?? (comp.regions.title ? comp.regions.title.y + comp.regions.title.h : undefined)) : undefined;
-      const guarded = comp.protected.filter((q) => rest === undefined || (q.rect.y + comp.clearanceIn < rest - 1e-6 && !(q.kind === "rule" && comp.headerRule && Math.abs(q.rect.y + q.rect.h / 2 - (comp.headerRule.y + comp.headerRule.h / 2)) < 1e-6)));
+      // A rule accent rests ON the title rule by design: the rule and what lies beyond it are exempt.
+      // A title accent is attached to the title at titleAccentGap / decorationToTitleGap (< clearance): the title is exempt.
+      const onRule = plan.reports.some((r) => r.rect && r.id.startsWith("rule-"));
+      const rest = onRule ? comp.headerRule!.y : undefined;
+      const attached = new Set(plan.reports.flatMap((r) => r.attachedTo));
+      const guarded = comp.protected.filter(
+        (q) => !attached.has(q.id) && (rest === undefined || (q.rect.y + comp.clearanceIn < rest - 1e-6 && !(q.kind === "rule" && Math.abs(q.rect.y + q.rect.h / 2 - (comp.headerRule!.y + comp.headerRule!.h / 2)) < 1e-6))),
+      );
       for (const cell of inkCells(plan, g)) {
         for (const q of guarded) expect(overlaps(cell, q.rect), `${q.id}`).toBe(false);
         if (rest !== undefined) expect(cell.y + cell.h).toBeLessThanOrEqual(rest + 1e-6);
@@ -129,8 +135,8 @@ describe("with overlap disabled, decoration never intersects protected content",
       }
     });
   }
-  it("line-art corners mask content away (knockout) instead of covering it", () => {
-    const { plan, comp } = planFor(build(3), { style: "accent", assetId: "jcs-accent-topo", placement: "corners" });
+  it("line-art corners in BLEED mode mask content away (knockout) instead of covering it", () => {
+    const { plan, comp } = planFor(build(3), { style: "accent", assetId: "jcs-accent-topo", placement: "corners", edge: "bleed" });
     expect(plan.knockouts.length).toBeGreaterThan(0);
     const content = comp.content!;
     expect(plan.knockouts.some((k) => k.x <= content.x && k.y <= content.y + 1)).toBe(true);
@@ -260,7 +266,7 @@ describe("centralized spacing", () => {
       p.spacing.density = density;
       return resolveDocument(p).spacing;
     };
-    for (const k of ["titleToRuleGap", "headingToContentGap", "labelToBorderInset", "dateToCellInset", "sectionHeadingInset", "decorationToContentClearance"] as const) {
+    for (const k of ["titleToRuleGap", "headingToContentGap", "labelToBorderInset", "dateToCellInset", "sectionHeadingInset", "decorationToContentGap"] as const) {
       expect(token("compact")[k]).toBeLessThan(token("balanced")[k]);
       expect(token("balanced")[k]).toBeLessThan(token("airy")[k]);
     }
@@ -317,7 +323,7 @@ describe("placement controls reach the rendered page", () => {
   const variants: Partial<DecorativeTheme>[] = [
     { style: "floral", assetId: "jcs-floral-corner", placement: "corners", corners: "opposite-tl-br" },
     { style: "floral", assetId: "jcs-floral-corner", placement: "corners", corners: "tr" },
-    { style: "accent", assetId: "jcs-accent-waves", placement: "corners" },
+    { style: "accent", assetId: "jcs-accent-waves", placement: "corners", edge: "bleed" },
     { style: "accent", assetId: "jcs-accent-waves", placement: "header-band" },
     { style: "accent", assetId: "jcs-accent-waves", placement: "top-bottom" },
     { style: "accent", assetId: "jcs-accent-waves", placement: "behind-title", opacity: 0.16 },
@@ -325,7 +331,7 @@ describe("placement controls reach the rendered page", () => {
     { style: "marble", assetId: "jcs-marble-goldleaf", placement: "header-band" },
     { style: "marble", assetId: "jcs-marble-goldleaf", placement: "border-frame" },
     { style: "marble", assetId: "jcs-marble-goldleaf", placement: "full-page", opacity: 0.16 },
-    { style: "floral", assetId: "jcs-floral-sprig", placement: "title-flank" },
+    { style: "floral", assetId: "jcs-floral-sprig", placement: "title-accent" },
     { style: "floral", assetId: "jcs-floral-bouquet", placement: "top-bottom" },
   ];
   it("each placement that can be placed renders differently; one that cannot says why", () => {
