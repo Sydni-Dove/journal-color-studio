@@ -1537,7 +1537,11 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   // One repeat tile's width (page-width fraction) at Pattern size 100%.
   const REPEAT_TILE = { dots: .34, arcs: .26, topo: .5, waves: .5 };
   const BLEED = .125 * 72 / PAGE_W;   // 1/8 in past the trim, as a page-width fraction
-  const accentLayout = (s) => ((ACCENT_SUPPORT[s.accent] || []).includes(s.accentPlace) ? s.accentPlace : 'corners');
+  // Prayer journals carry a central figure (and the Warring archer fills the left side), which whole-page and side
+  // layouts would run across; only the title plate is clipped out, so they keep the edge-and-corner layouts.
+  const PRAYER_LAYOUTS = [...CORNERS, ...SAFE, 'top', 'bottom'];
+  const accentLayouts = (s) => (ACCENT_SUPPORT[s.accent] || []).filter((v) => !s.journal || s.journal === 'dream' || PRAYER_LAYOUTS.includes(v));
+  const accentLayout = (s) => (accentLayouts(s).includes(s.accentPlace) ? s.accentPlace : 'corners');
 
   // Accent line art, tinted with the accent color. On lined pages it sits faintly in the bottom corner, under the lines.
   // avoid = the title plate's outer bounds on the cover; corner and edge art is clipped away from it.
@@ -3666,7 +3670,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     $('accentVal').textContent = state.accentOpacity + '%';
     for (const id of ['accentPlace', 'accentOpacityRow', 'accentLinedRow']) ($(id).closest('.field') || $(id)).classList.toggle('hidden', state.accent === 'none');
     // Only the layouts this element supports are offered.
-    const supported = ACCENT_SUPPORT[state.accent] || [];
+    const supported = accentLayouts(state);
     const sel = $('accentPlace'), sig = supported.join();
     if (sel.dataset.sig !== sig) {
       sel.dataset.sig = sig;
