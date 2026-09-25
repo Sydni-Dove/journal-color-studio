@@ -740,7 +740,9 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   const customPals = () => (typeof state !== 'undefined' && state.customPalettes) || [];
   // Every palette (for lookups); palettesFor = the ones offered for a journal: its own set + palettes you saved there.
   const allPalettes = () => [...PALETTES, ...Object.values(JOURNAL_PALETTES).flat(), ...FAMILY_PALETTES, ...customPals()];
-  const palettesFor = (j) => [...(j === 'dream' ? PALETTES : JOURNAL_PALETTES[j]), ...FAMILY_PALETTES, ...customPals().filter((pl) => (pl.journal || 'dream') === j || !pl.journal)];
+  // Prayer journals also list the As-designed palette of a marble chosen as their background (see marbleOwnPalette).
+  const bgMarblePalette = (j) => { try { const n = j !== 'dream' && j === state.journal && bgReplaced(state) && marbleOwnPalette(); return n ? PALETTES.filter((pl) => pl.name === n) : []; } catch { return []; } };
+  const palettesFor = (j) => [...(j === 'dream' ? PALETTES : [...bgMarblePalette(j), ...JOURNAL_PALETTES[j]]), ...FAMILY_PALETTES, ...customPals().filter((pl) => (pl.journal || 'dream') === j || !pl.journal)];
   const paletteByName = (name) => allPalettes().find((pl) => pl.name === name);
 
   // ---------- Palette variations (repeat-click) ----------
@@ -4028,7 +4030,11 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   }
 
   // The design's own palette: the journal's for prayer journals, the background's for the Dream Journal.
-  const recommendedName = () => state.journal !== 'dream' ? JOURNALS[state.journal].palette : ASSET_REGISTRY[currentBackgroundAsset()]?.recommendedPalette;
+  // A marble that carries its own "As designed" palette (TEXTURES[key].rec): on a prayer journal whose background it
+  // replaces, that palette is the recommended one, so the marble can be restored to its original colors there too.
+  // The journal's own watercolor keeps the journal's palette.
+  const marbleOwnPalette = () => { const bg = ASSET_REGISTRY[currentBackgroundAsset()]; return bg?.renderer === 'marble' && TEXTURES[bg.textureKey]?.rec ? bg.recommendedPalette : null; };
+  const recommendedName = () => state.journal !== 'dream' ? ((bgReplaced(state) && marbleOwnPalette()) || JOURNALS[state.journal].palette) : ASSET_REGISTRY[currentBackgroundAsset()]?.recommendedPalette;
   const currentType = () => { const list = pageList(state); state.page = Math.min(Math.max(0, state.page || 0), list.length - 1); return list[state.page]; };
   function goTo(type) { const i = pageList(state).indexOf(type); if (i >= 0) state.page = i; }
   // Interior settings should show an interior page, not the cover.
@@ -4160,7 +4166,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
         // Each background shows its own design in its own colors (not the current palette), so you can see what you'd get.
         const own = asset.recommendedPalette && paletteByName(asset.recommendedPalette);
         if (asset.renderer === 'journal') {
-          const tmp = document.createElement('canvas'), rec = paletteByName(recommendedName());
+          const tmp = document.createElement('canvas'), rec = paletteByName(JOURNALS[state.journal].palette);   // the journal's own watercolor, in its own colors
           (COVERS[state.journal] || renderCover)(tmp, 104, { ...state, marble: 'journal', palette: { ...rec }, prayerArt: 'original', plateStyle: 'none', accent: 'none', decor: structuredClone(DEFAULTS.decor), figureColor: null, prHide: {} });
           x2.drawImage(tmp, 0, (tmp.height - 80) / 2, 104, 80, 0, 0, 104, 80);
         } else paintMarble(x2, 0, 0, 104, 80, { ...state, marble: asset.textureKey || asset.renderer, _thumb: true, bgArt: 'original', palette: own ? { ...own } : state.palette });
