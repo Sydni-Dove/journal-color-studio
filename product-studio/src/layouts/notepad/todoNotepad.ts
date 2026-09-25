@@ -7,7 +7,7 @@
 import { STUDIO_NOTEPAD } from "../../presets/studioDefaults";
 import type { SolvedPage } from "../../types/layout";
 import { checklistRows, headerTitle, pageFrame } from "../shared/components";
-import type { LayoutDefinition } from "../shared/types";
+import { minimumAreaFit, type LayoutDefinition } from "../shared/types";
 
 export const todoNotepad: LayoutDefinition = {
   id: "notepad-todo",
@@ -16,12 +16,26 @@ export const todoNotepad: LayoutDefinition = {
   description: "Header band + checklist rows filling the sheet.",
   pages: 1,
   period: "none",
+  capability: {
+    supportedProductTypes: ["notepad", "insert", "worksheet", "custom"],
+    supportsPatterns: [],
+    supportsLineStyle: true,
+    supportsSidebar: false,
+    supportsDatePlacement: false,
+    supportsSectionsPerDay: false,
+    supportsWritingRows: false,
+    supportsPageNumbers: true,
+    supportsFooter: true,
+    requiresCalendar: false,
+    usesWeekStart: false,
+    wordingKeys: ["toDo"],
+    repeats: ["repeated-sheet", "once", "count"],
+    defaultRepeat: "repeated-sheet",
+  },
+  // Header 0.9" + at least 3 checklist rows; checkbox + gap + a 1" writing line.
+  fit: minimumAreaFit(1.5, 2.5, "To-do list"),
   solve(ctx): SolvedPage[] {
-    const frame = pageFrame(ctx, 0, {
-      headerH: STUDIO_NOTEPAD.header.valueIn,
-      footer: ctx.options.showFooter,
-      footerText: ctx.wording.productTitle,
-    });
+    const frame = pageFrame(ctx, 0, { headerH: STUDIO_NOTEPAD.header.valueIn });
     const list = checklistRows("todo", frame.body, ctx);
     return [
       {

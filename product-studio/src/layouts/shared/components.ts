@@ -28,8 +28,12 @@ export type FrameResult = {
 export function pageFrame(
   ctx: LayoutContext,
   pageIndex: number,
-  opts: { headerH: number; footer: boolean; footerText?: string },
+  opts: { headerH: number; forceFooter?: boolean },
 ): FrameResult {
+  // Footer zone exists when the user turned on page numbers or the footer
+  // (or the layout requires one); both options are honored by every layout.
+  const footerOn = !!opts.forceFooter || ctx.options.showFooter || ctx.options.showPageNumbers;
+  const footerText = ctx.options.showFooter ? ctx.wording.productTitle : undefined;
   const g = ctx.pages[pageIndex];
   const s = ctx.spacing;
   const area: Rect = {
@@ -38,24 +42,24 @@ export function pageFrame(
     w: g.safeRect.w - 2 * s.page,
     h: g.safeRect.h - 2 * s.page,
   };
-  const footerH = opts.footer ? lineBoxIn(ctx.typography, "footer") : 0;
+  const footerH = footerOn ? lineBoxIn(ctx.typography, "footer") : 0;
   const modules: StackModule[] = [
     { id: "header", kind: "fixed", size: opts.headerH },
     { id: "headerGap", kind: "fixed", size: opts.headerH > 0 ? s.headerGap : 0 },
     { id: "body", kind: "elastic", min: 0 },
-    { id: "footerGap", kind: "fixed", size: opts.footer ? s.footerGap : 0 },
+    { id: "footerGap", kind: "fixed", size: footerOn ? s.footerGap : 0 },
     { id: "footer", kind: "fixed", size: footerH },
   ];
   const st = solveStack(area.y, area.h, modules, 0);
   const header = { x: area.x, y: st.byId.header.start, w: area.w, h: st.byId.header.size };
   const body = { x: area.x, y: st.byId.body.start, w: area.w, h: st.byId.body.size };
-  const footer = opts.footer ? { x: area.x, y: st.byId.footer.start, w: area.w, h: footerH } : null;
+  const footer = footerOn ? { x: area.x, y: st.byId.footer.start, w: area.w, h: footerH } : null;
 
   const nodes: LayoutNode[] = [group(`p${pageIndex}-header`, "PageHeader", header)];
   if (footer) {
     nodes.push(group(`p${pageIndex}-footer`, "PageFooter", footer));
     const pn = ctx.options.showPageNumbers ? String(ctx.pageNumbers[pageIndex] ?? "") : "";
-    const label = [opts.footerText, pn].filter(Boolean).join("  ·  ");
+    const label = [footerText, pn].filter(Boolean).join("  ·  ");
     if (label) nodes.push(text(`p${pageIndex}-footer-text`, footer, label, "footer", { component: "PageFooter" }));
   }
   return { header, body, footer, nodes, diagnostics: stackDiagnostic(st, `p${pageIndex}-frame`, "Header + footer") };
@@ -121,13 +125,26 @@ export function checklistRows(
   };
 }
 
+/** Patterns a sectioned writing area can take (margin rules belong to full pages). */
+export const SECTION_PATTERNS = ["ruled", "dot-grid", "graph-grid", "blank"] as const;
+
+/**
+ * A writing area filled with the project's functional pattern. This is the
+ * ONE place sectioned layouts turn the writing-surface setting into nodes, so
+ * Dot grid / Graph / Blank reach every supported writing area.
+ */
+export function writingSurface(id: string, rect: Rect, ctx: LayoutContext): LayoutNode[] {
+  const kind = (SECTION_PATTERNS as readonly string[]).includes(ctx.pattern.kind) ? ctx.pattern.kind : "ruled";
+  return fillWritingRegion(id, rect, { ...ctx.pattern, kind: kind as typeof ctx.pattern.kind });
+}
+
 /** Section: heading label + content (lines / checklist / pattern / blank). */
 export function section(
   id: string,
   rect: Rect,
   title: string,
   ctx: LayoutContext,
-  content: "lines" | "checklist" | "pattern" | "blank",
+  content: "surface" | "checklist" | "blank",
   opts: { boxed?: boolean; titleRole?: "sectionHeading" | "subheading" | "label" } = {},
 ): { nodes: LayoutNode[]; diagnostics: LayoutDiagnostic[] } {
   const s = ctx.spacing;
@@ -143,10 +160,8 @@ export function section(
   if (opts.boxed) nodes.push(box(`${id}-box`, rect, { component: "Section", strokePt: STUDIO_STROKES.boxRulePt }));
   if (title) nodes.push(text(`${id}-title`, { x: inner.x, y: st.byId.title.start, w: inner.w, h: titleH }, title, titleRole, { component: "SectionHeader" }));
   const contentRect: Rect = { x: inner.x, y: st.byId.content.start, w: inner.w, h: st.byId.content.size };
-  if (content === "lines") {
-    nodes.push(...fillWritingRegion(`${id}-lines`, contentRect, { ...ctx.pattern, kind: "ruled" }));
-  } else if (content === "pattern") {
-    nodes.push(...fillWritingRegion(`${id}-pattern`, contentRect, ctx.pattern));
+  if (content === "surface") {
+    nodes.push(...writingSurface(`${id}-surface`, contentRect, ctx));
   } else if (content === "checklist") {
     nodes.push(...checklistRows(`${id}-list`, contentRect, ctx).nodes);
   } else {
@@ -171,11 +186,12 @@ export function calendarGrid(
   rect: Rect,
   month: CalendarMonth,
   ctx: LayoutContext,
+  dateRole: "date" | "number" | "label" = "date",
 ): { nodes: LayoutNode[]; metrics: LayoutMetric[] } {
   const s = ctx.spacing;
   const cols = distributeEqual(rect.x, rect.w, 7, s.column);
   const rows = distributeEqual(rect.y, rect.h, month.rows, s.row);
-  const dateH = lineBoxIn(ctx.typography, "date");
+  const dateH = lineBoxIn(ctx.typography, dateRole);
   const align = PLACEMENT_ALIGN[ctx.options.datePlacement];
   const nodes: LayoutNode[] = [group(id, "Grid", rect, { columnEdges: cols.edges, rowEdges: rows.edges })];
   month.grid.forEach((week, r) =>
@@ -189,7 +205,7 @@ export function calendarGrid(
             `${cid}-date`,
             { x: cellRect.x + s.boxPadding, y: cellRect.y + s.boxPadding, w: cellRect.w - 2 * s.boxPadding, h: dateH },
             String(cell.day.day),
-            "date",
+            dateRole,
             { component: "CalendarCell", align, vAlign: "top" },
           ),
         );
@@ -210,12 +226,13 @@ export function calendarGrid(
 }
 
 /** Weekday labels over equal columns. */
-export function weekdayHeader(id: string, rect: Rect, labels: string[], ctx: LayoutContext): LayoutNode[] {
+export function weekdayHeader(id: string, rect: Rect, labels: string[], ctx: LayoutContext, role: "subheading" | "label" = "subheading"): LayoutNode[] {
+  // Same column math as the grid below, so every label is centred on its solved column.
   const cols = distributeEqual(rect.x, rect.w, labels.length, ctx.spacing.column);
   return [
     group(id, "Grid", rect, { columnEdges: cols.edges }),
     ...labels.map((l, i) =>
-      text(`${id}-${i}`, { x: cols.starts[i], y: rect.y, w: cols.size, h: rect.h }, l, "subheading", { align: "center", component: "SectionHeader" }),
+      text(`${id}-${i}`, { x: cols.starts[i], y: rect.y, w: cols.size, h: rect.h }, l, role, { align: "center", component: "SectionHeader" }),
     ),
   ];
 }

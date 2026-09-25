@@ -34,34 +34,28 @@ export type FunctionalPattern = {
 };
 
 // ─── Decorative theme (never affects functional geometry) ──────────────────
-export type DecorativeStyle =
-  | "none"
-  | "solid"
-  | "marble"
-  | "watercolor"
-  | "floral"
-  | "geometric"
-  | "abstract"
-  | "stripes"
-  | "dots"
-  | "minimal"
-  | "image";
+/**
+ * Every style maps to real artwork: solid fill, the Journal Color Studio
+ * marble / floral / line-art snapshots (design-library), or the JCS
+ * watercolor bloom layout.
+ */
+export type DecorativeStyle = "none" | "solid" | "marble" | "watercolor" | "floral" | "accent";
 
 export type DecorativePlacement = "full-page" | "header-band" | "border-frame" | "corners";
 
 export type DecorativeTheme = {
   style: DecorativeStyle;
+  /** design-library asset id (marble / floral / accent styles). */
+  assetId?: string;
   placement: DecorativePlacement;
-  /** Pattern scale multiplier. */
+  /** Size of accent / floral corner art relative to the default, or marble zoom. */
   scale: number;
   opacity: number;
-  /** Deterministic seed for procedural styles (marble/watercolor/abstract). */
-  seed: number;
+  /** Role colors: base (stone / leaves / accent ink), veins, highlights. */
   colorA: ColorToken;
   colorB: ColorToken;
-  imageUrl?: string;
-  imageFit: "cover" | "contain" | "repeat";
-  /** Apply decoration on writing surfaces (off by default on writable pads). */
+  colorC: ColorToken;
+  /** Full-page decoration may extend under writing areas (off keeps them clean). */
   applyToInterior: boolean;
 };
 

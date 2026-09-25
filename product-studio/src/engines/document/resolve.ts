@@ -9,8 +9,8 @@
  * Colors, font families and decorative themes are applied at render time
  * only, so changing them never re-solves geometry or dates.
  */
-import { getLayout, FILLER_LAYOUT_ID } from "../../layouts/registry";
-import type { LayoutContext } from "../../layouts/shared/types";
+import { getLayout, FILLER_LAYOUT_ID, LAYOUTS } from "../../layouts/registry";
+import type { FitResult, LayoutContext, LayoutDefinition } from "../../layouts/shared/types";
 import { getBindingProfile } from "../../presets/bindingProfiles/bindingProfiles";
 import { getPrintProfile } from "../../presets/printProfiles/printProfiles";
 import { PRODUCT_RECOMMENDED_MARGINS, PRODUCT_TYPES } from "../../presets/products/productTypes";
@@ -32,6 +32,8 @@ import { getCalendar } from "../calendar/calendar";
 import { resolveTrim, type ResolvedTrim } from "../geometry/dimensions";
 import { computePageGeometry } from "../geometry/pageGeometry";
 import { expandRecipe, type ExpandedRecipe } from "../recipe/recipe";
+import { normalizeDecoration } from "../../themes/decorationPlan";
+import { DEFAULT_DECORATIVE } from "../../presets/products/projectFactory";
 
 // ─── Small keyed cache ─────────────────────────────────────────────────────
 class KeyedCache<T> {
@@ -136,7 +138,9 @@ export function resolveDocument(input: ProductProject): ResolvedDocument {
     typography: resolveTypography(project.typography.fonts, project.typography.roleOverrides),
     colors: resolveColors(project.colors.paletteId, project.colors.overrides),
     wording: resolveWording(project.wording),
-    decorative: project.decorativeTheme,
+    // Projects saved before the design-library snapshot may carry retired
+    // styles (geometric, abstract, …) or lack role colors: normalize them.
+    decorative: normalizeDecoration({ ...DEFAULT_DECORATIVE, ...project.decorativeTheme }),
     duplex,
   };
 }
@@ -174,7 +178,10 @@ export function solvePage(doc: ResolvedDocument, index: number): SolvedPage {
   const layout = getLayout(group[0].layoutId);
   const geometries = group.map((p) => geometryFor(doc, p));
   const typeSizes = Object.fromEntries(Object.entries(doc.typography.roles).map(([k, r]) => [k, [r.sizePt, r.lineHeight]]));
+  // The layout id is part of the key: two recipe steps (or one step whose
+  // layout changed) can share a page key, and must never share solved output.
   const key = JSON.stringify([
+    layout.id,
     group.map((p) => p.key + p.pageNumber),
     geometries.map((g) => [g.trimWidthIn, g.trimHeightIn, g.safe, g.side]),
     doc.spacing,
@@ -209,4 +216,39 @@ export function solvePage(doc: ResolvedDocument, index: number): SolvedPage {
     }
   });
   return solved[group.indexOf(doc.recipe.pages[index])];
+}
+
+// ─── Layout availability (drives the editor's layout / option controls) ────
+export type LayoutAvailability = {
+  layoutId: string;
+  label: string;
+  /** Offered for this product type at all. */
+  supportedType: boolean;
+  fit: FitResult;
+};
+
+/** Representative page for fit checks: the first recto (inside margin on the left). */
+export function representativeGeometry(doc: ResolvedDocument): PageGeometry {
+  const first = doc.recipe.pages.find((p) => !p.filler) ?? { side: "recto" as const };
+  return geometryFor(doc, { side: first.side === "single" ? "single" : "recto" });
+}
+
+export function layoutAvailability(doc: ResolvedDocument): LayoutAvailability[] {
+  const page = representativeGeometry(doc);
+  return LAYOUTS.map((l) => ({
+    layoutId: l.id,
+    label: l.label,
+    supportedType: l.capability.supportedProductTypes.includes(doc.project.productType),
+    fit: l.fit({ page, spacing: doc.spacing, typography: doc.typography, options: doc.project.layoutOptions }),
+  }));
+}
+
+/** Layouts actually used by the recipe, with their fit on this page size. */
+export function recipeLayouts(doc: ResolvedDocument): { layout: LayoutDefinition; fit: FitResult }[] {
+  const page = representativeGeometry(doc);
+  const ids = [...new Set(doc.project.recipe.items.map((i) => i.layoutId))];
+  return ids.map((id) => {
+    const layout = getLayout(id);
+    return { layout, fit: layout.fit({ page, spacing: doc.spacing, typography: doc.typography, options: doc.project.layoutOptions }) };
+  });
 }

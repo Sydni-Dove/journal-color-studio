@@ -557,3 +557,7 @@ h2 {
 .modal h2 {
   margin: 0;
 }
+.choice:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

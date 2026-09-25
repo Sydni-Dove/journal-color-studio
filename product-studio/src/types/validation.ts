@@ -18,7 +18,12 @@ export type ValidationRule =
   | "layout-solver"
   | "page-count"
   | "printer-profile"
-  | "decoration";
+  | "decoration"
+  | "text-collision"
+  | "layout-incompatible"
+  | "min-cell"
+  | "min-writing-area"
+  | "sidebar-balance";
 
 export type ValidationIssue = {
   severity: ValidationSeverity;

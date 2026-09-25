@@ -10,13 +10,28 @@ import { STUDIO_JOURNAL } from "../../presets/studioDefaults";
 import type { LayoutMetric, LayoutNode, SolvedPage } from "../../types/layout";
 import { pageFrame } from "../shared/components";
 import { lineBoxIn, text } from "../shared/nodes";
-import type { LayoutContext, LayoutDefinition } from "../shared/types";
+import { minimumAreaFit, type LayoutCapability, type LayoutContext, type LayoutDefinition } from "../shared/types";
+
+const WRITING_PAGE: Omit<LayoutCapability, "wordingKeys" | "supportedProductTypes"> = {
+  supportsPatterns: ["ruled", "margin-ruled", "dot-grid", "graph-grid", "blank"],
+  supportsLineStyle: true,
+  supportsSidebar: false,
+  supportsDatePlacement: false,
+  supportsSectionsPerDay: false,
+  supportsWritingRows: false,
+  supportsPageNumbers: true,
+  supportsFooter: true,
+  requiresCalendar: false,
+  usesWeekStart: false,
+  repeats: ["count", "once", "repeated-sheet"],
+  defaultRepeat: "count",
+};
 
 function writingPage(ctx: LayoutContext, heading: string | null): SolvedPage {
   const g = ctx.pages[0];
   // The heading zone ends where the first writing row begins (J-B1/J-B4: 0.5" zone).
   const headerH = STUDIO_JOURNAL.headingZone.valueIn - ctx.spacing.headerGap;
-  const frame = pageFrame(ctx, 0, { headerH, footer: true });
+  const frame = pageFrame(ctx, 0, { headerH });
   const nodes: LayoutNode[] = [...frame.nodes];
   if (heading) {
     const h = lineBoxIn(ctx.typography, "label");
@@ -48,6 +63,8 @@ export const linedJournal: LayoutDefinition = {
   description: "Full-page writing surface using the project ruling (or dot/graph pattern).",
   pages: 1,
   period: "none",
+  capability: { ...WRITING_PAGE, supportedProductTypes: ["journal", "notebook", "planner", "insert", "worksheet", "custom"], wordingKeys: ["date"] },
+  fit: minimumAreaFit(1.5, 2, "Writing page"),
   solve: (ctx) => [writingPage(ctx, ctx.wording.date)],
 };
 
@@ -58,5 +75,7 @@ export const notesPage: LayoutDefinition = {
   description: "Notes heading + writing surface. Also used as the spread filler page.",
   pages: 1,
   period: "none",
+  capability: { ...WRITING_PAGE, supportedProductTypes: ["journal", "notebook", "planner", "insert", "notepad", "worksheet", "tracker", "custom"], wordingKeys: ["notes"] },
+  fit: minimumAreaFit(1.5, 2, "Notes page"),
   solve: (ctx) => [writingPage(ctx, ctx.wording.notes)],
 };

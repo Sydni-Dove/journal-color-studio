@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ResolvedDocument } from "../../engines/document/resolve";
 import { planPrint } from "../../engines/print/printPlan";
+import { geometryFor } from "../../engines/document/resolve";
+import { rasterRequests } from "../../themes/decorationPlan";
+import { prepareRasters } from "../../themes/recolor";
 import { createCanvasMeasurer, heuristicMeasurer } from "../../engines/typography/textMeasure";
 import { validateProject } from "../../engines/validation/validate";
 import type { ExportSettings } from "../../types/project";
@@ -20,7 +23,7 @@ export function IssueList({ issues, onGoTo }: { issues: ValidationIssue[]; onGoT
               <>
                 {" · "}
                 {onGoTo ? (
-                  <button className="btn btn--ghost" style={{ minHeight: 28, padding: "0 6px" }} onClick={() => onGoTo(i.page!)}>
+                  <button className="btn btn--ghost" style={{ minHeight: 44, padding: "0 10px" }} onClick={() => onGoTo(i.page!)}>
                     page {i.page}
                   </button>
                 ) : (
@@ -54,6 +57,24 @@ type Props = {
 export function ExportDialog({ doc, currentIndex, fontsReady, onClose, onGoTo, onSettings }: Props) {
   const settings = doc.project.exportSettings;
   const [printing, setPrinting] = useState(false);
+  const [preparing, setPreparing] = useState(false);
+  const [prepError, setPrepError] = useState<string | null>(null);
+
+  // Recolored decoration must be fully rendered before the print tree mounts —
+  // print never captures a placeholder.
+  const startPrint = async () => {
+    setPreparing(true);
+    setPrepError(null);
+    try {
+      const geos = [...new Set(plan.sequence)].map((i) => geometryFor(doc, doc.recipe.pages[i]));
+      await prepareRasters(rasterRequests(geos, doc.decorative, doc.colors));
+      setPrinting(true);
+    } catch (e) {
+      setPrepError(`Decoration could not be prepared: ${(e as Error).message}`);
+    } finally {
+      setPreparing(false);
+    }
+  };
   const plan = useMemo(() => planPrint(doc, settings, currentIndex), [doc, settings, currentIndex]);
   const pageIndices = useMemo(() => [...new Set(plan.sequence)], [plan]);
 
@@ -135,11 +156,12 @@ export function ExportDialog({ doc, currentIndex, fontsReady, onClose, onGoTo, o
             onClose();
           }}
         />
+        {prepError && <div className="issue issue--error">{prepError}</div>}
         {!report.exportAllowed && <p className="hint">Export is blocked until every error is fixed. Nothing is exported silently.</p>}
         <div className="row" style={{ justifyContent: "flex-end" }}>
           <button className="btn" onClick={onClose}>Close</button>
-          <button className="btn btn--primary" disabled={blocked || printing} onClick={() => setPrinting(true)}>
-            {printing ? "Preparing…" : "Print / Save PDF"}
+          <button className="btn btn--primary" disabled={blocked || printing || preparing} onClick={startPrint}>
+            {printing || preparing ? "Preparing…" : "Print / Save PDF"}
           </button>
         </div>
       </div>

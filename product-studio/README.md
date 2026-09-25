@@ -18,7 +18,7 @@ Journal Color Studio file, and Journal Color Studio does not depend on it.
 cd product-studio
 npm install
 npm run dev        # editor at http://localhost:5173
-npm test           # 116 automated tests
+npm test           # automated tests (engine, layouts, controls, print parity)
 npm run build      # typecheck + production build → dist/
 ```
 
@@ -43,7 +43,8 @@ src/
     document/        Staged, cached resolver: project → geometry → solved pages
   layouts/           Pure layout solvers → positioned nodes (inches)
   primitives/        PrintablePage + node primitives (WritingLines, DotGrid, Checkbox, …)
-  themes/            Decorative layer (procedural, recolorable SVG)
+  design-library/    One-way snapshot of Journal Color Studio artwork + palettes (see SNAPSHOT.md)
+  themes/            Decoration planner, raster recolor engine, decorative layer
   components/        Editor, wizard, preview, debug overlay, geometry info, export
   persistence/       localStorage project store (structured JSON only)
 ```
@@ -75,6 +76,30 @@ CSS `scale()`. The tests assert identical markup in editor and print modes.
 1 Background · 2 Decorative theme · 3 Functional pattern · 4 Layout structure ·
 5 Text · 6 User content (reserved) · plus the debug overlay, which is
 editor-only and never printed.
+
+## Layout compatibility
+
+Each layout declares `capability` (supported product types, patterns,
+options, repeats) and a `fit()` check on the solved page geometry:
+
+- **Monthly calendar:** full / compact / micro, with a minimum cell size for
+  each. Franklin Compact uses compact, Filofax Personal uses micro, and
+  Filofax Pocket is reported incompatible.
+- **Weekly spread:** vertical day columns, or horizontal day rows on narrow
+  inserts.
+
+The editor offers only layouts made for the product type, disables layouts
+that don't fit the size, and shows only controls that something on the page
+consumes. See `docs/control-audit.md`.
+
+## Decoration
+
+Decoration styles come from Journal Color Studio snapshots: marble (veined,
+bold gold, gold leaf, white), floral (bouquet, corners, header sprigs), line
+art (topo, flowing, arcs, ribbon, dots, stripes) and watercolor. Everything
+recolors with the palette. Decoration never enters the safe (writing) area
+unless you choose "full page" and turn on "extend under writing areas". Print
+waits until every recolored raster is ready.
 
 ## Milestone 1 — geometry proof (done)
 

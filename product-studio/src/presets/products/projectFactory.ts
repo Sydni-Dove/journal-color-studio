@@ -25,13 +25,12 @@ export const DEFAULT_LAYOUT_OPTIONS: LayoutOptions = {
 
 export const DEFAULT_DECORATIVE: DecorativeTheme = {
   style: "none",
-  placement: "header-band",
+  placement: "full-page",
   scale: 1,
-  opacity: 0.35,
-  seed: 7,
-  colorA: "decorativeAccent",
-  colorB: "primary",
-  imageFit: "cover",
+  opacity: 1,
+  colorA: "decorBase",
+  colorB: "decorativeAccent",
+  colorC: "decorHighlight",
   applyToInterior: false,
 };
 

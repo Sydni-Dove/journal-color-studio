@@ -35,6 +35,12 @@ export const DEFAULT_WORDING: Wording = {
   mealPlan: "Meal Plan",
   meetingNotes: "Meeting Notes",
   dailyPlan: "Daily Plan",
+  produce: "Produce",
+  dairy: "Dairy",
+  protein: "Meat & Seafood",
+  pantry: "Pantry",
+  frozen: "Frozen",
+  household: "Household",
 };
 
 export const WORDING_LABELS: Partial<Record<WordingKey, string>> = {

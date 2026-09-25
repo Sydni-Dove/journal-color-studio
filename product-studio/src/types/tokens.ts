@@ -89,7 +89,11 @@ export type ColorToken =
   | "mutedText"
   | "line"
   | "border"
-  | "decorativeAccent";
+  | "decorativeAccent"
+  /** Decoration base (marble stone, floral leaves, watercolor wash). */
+  | "decorBase"
+  /** Decoration highlight (marble highlights, soft flowers). */
+  | "decorHighlight";
 
 export type ColorTokens = Record<ColorToken, string> & {
   /** Opacity applied to `line` for functional writing lines/grids (0–1). */
@@ -101,6 +105,8 @@ export type ColorPalette = {
   label: string;
   /** False when a palette uses colors outside the approved Dove brand palette. */
   brandPalette: boolean;
+  /** Where the palette came from (e.g. "journal-color-studio snapshot"). */
+  source?: string;
   colors: ColorTokens;
   note?: string;
 };
@@ -136,6 +142,12 @@ export type WordingKey =
   | "groceryList"
   | "mealPlan"
   | "meetingNotes"
-  | "dailyPlan";
+  | "dailyPlan"
+  | "produce"
+  | "dairy"
+  | "protein"
+  | "pantry"
+  | "frozen"
+  | "household";
 
 export type Wording = Record<WordingKey, string>;

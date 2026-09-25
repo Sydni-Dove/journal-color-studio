@@ -74,6 +74,62 @@ export const STUDIO_PLANNER = {
   deskPadLineSpacing: studio(0.3, "ruled lines every 0.30\" (blueprint B6)"),
 } as const;
 
+/**
+ * Size-aware monthly calendar variants. Full = the B1 planner structure.
+ * Compact / micro are designed for small inserts (Franklin Compact,
+ * Filofax Personal, A6) — they are distinct structures, not a squashed B1.
+ * Minimum cell geometry is what keeps dates legible and writable:
+ *   full    ≥ 0.50" × 0.60"  (B1 variant B produces 0.54" columns)
+ *   compact ≥ 0.34" × 0.45"  (9 pt numerals + 2 × cell padding)
+ *   micro   ≥ 0.26" × 0.32"  (7 pt numerals, weekday initials)
+ */
+export const STUDIO_MONTHLY_VARIANTS = {
+  full: {
+    titleH: studio(0.8, "monthly title 0.8\" (research 1.4 / B1)"),
+    weekdayH: studio(0.35, "weekday header 0.35\" (research 1.4)"),
+    minCellW: studio(0.5, "full monthly minimum cell width"),
+    minCellH: studio(0.6, "full monthly minimum cell height"),
+  },
+  compact: {
+    titleH: studio(0.6, "compact insert title 0.6\" (bottom of observed 0.6–0.9\" range)"),
+    weekdayH: studio(0.3, "compact weekday header 0.3\" (bottom of observed 0.3–0.4\" range)"),
+    minCellW: studio(0.34, "compact minimum cell width (9 pt numerals + padding)"),
+    minCellH: studio(0.45, "compact minimum cell height"),
+  },
+  micro: {
+    titleH: studio(0.5, "micro insert title 0.5\" (below planner range; pocket inserts)"),
+    weekdayH: studio(0.25, "micro weekday header 0.25\" (weekday initials)"),
+    minCellW: studio(0.26, "micro minimum cell width (7 pt numerals)"),
+    minCellH: studio(0.32, "micro minimum cell height"),
+  },
+  /** Sidebar may take at most this share of the usable width (sidebar/grid balance). */
+  maxSidebarShare: 0.35,
+} as const;
+
+/**
+ * Weekly variants. Vertical = B2-style day columns (8 slots / spread).
+ * Horizontal = day rows, for inserts too narrow for columns.
+ */
+export const STUDIO_WEEKLY_VARIANTS = {
+  vertical: {
+    minSlotW: studio(0.95, "vertical weekly minimum day-column width"),
+    minSectionH: studio(0.7, "vertical weekly minimum section height"),
+  },
+  horizontal: {
+    dayLabelW: studio(0.55, "horizontal weekly day-label column"),
+    minRowH: studio(0.8, "horizontal weekly minimum day-row height"),
+    minWritingW: studio(1.5, "horizontal weekly minimum writing width"),
+  },
+} as const;
+
+/** Grocery list pad (research 3.2.3: header 0.7, category subheads 0.35, row 0.35, checkbox 0.16). */
+export const STUDIO_GROCERY = {
+  header: studio(0.7, "grocery header 0.7\" (research 3.2.3)"),
+  categoryHead: studio(0.35, "category subhead 0.35\" (research 3.2.3)"),
+  row: studio(0.35, "grocery row 0.35\" (research 3.2.3)"),
+  twoColumnMinWidth: studio(3.6, "two grocery columns need ≥ 3.6\" usable width"),
+} as const;
+
 export const STUDIO_JOURNAL = {
   /** 3.4: first line 1.0" from top, last line 0.75" from bottom. */
   firstLineFromTop: studio(1.0, "first ruled line 1.0\" from top (research 3.4)"),

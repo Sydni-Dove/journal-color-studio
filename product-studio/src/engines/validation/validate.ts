@@ -158,9 +158,24 @@ export function validatePage(doc: ResolvedDocument, index: number, measure: Text
   if (g.usableWidthIn <= EPS || g.usableHeightIn <= EPS) {
     push("negative-geometry", "page", `Safe area is ${g.usableWidthIn.toFixed(3)}" × ${g.usableHeightIn.toFixed(3)}" — margins exceed the trim.`, { actual: Math.min(g.usableWidthIn, g.usableHeightIn), limit: 0, unit: "in" });
   }
+  const DIAGNOSTIC_RULES: Record<string, ValidationRule> = {
+    "equal-columns": "grid-overflow",
+    "layout-incompatible": "layout-incompatible",
+    "min-cell": "min-cell",
+    "min-writing-area": "min-writing-area",
+    "sidebar-balance": "sidebar-balance",
+  };
   for (const d of s.diagnostics) {
-    const rule: ValidationRule = d.rule === "equal-columns" ? "grid-overflow" : "layout-solver";
+    const rule: ValidationRule = DIAGNOSTIC_RULES[d.rule] ?? "layout-solver";
     push(rule, d.componentId, d.message, d.measurement ? { actual: d.measurement.actualIn, limit: d.measurement.limitIn, unit: "in" } : undefined, d.severity);
+  }
+
+  // Visual usability, not just containment: rendered text must not collide.
+  for (const c of textCollisions(s, doc, measure)) push("text-collision", c.a, c.message, c.measurement);
+  for (const n of s.nodes) {
+    if (n.type === "lines" && n.component === "WritingLines" && n.positions.length === 0 && n.rect.h > 0) {
+      push("min-writing-area", n.id, `Writing area ${n.rect.h.toFixed(2)}" tall holds no lines at this spacing.`, { actual: n.rect.h, limit: 0, unit: "in" }, "warning");
+    }
   }
 
   const footers = s.nodes.filter((n) => n.component === "PageFooter" && n.type === "text");
@@ -182,6 +197,43 @@ export function validatePage(doc: ResolvedDocument, index: number, measure: Text
     }
   }
   return issues;
+}
+
+/** Where a text node's ink actually sits: measured width, aligned inside its box. */
+export function inkBox(node: Extract<LayoutNode, { type: "text" }>, doc: ResolvedDocument, measure: TextMeasurer) {
+  const role = doc.typography.roles[node.role];
+  const lineH = ptToIn(role.sizePt * role.lineHeight);
+  const width = Math.min(measure(node.text, styleForRole(doc.typography, node.role)), node.wrap ? node.rect.w : Infinity);
+  const align = node.align ?? role.align;
+  const x = align === "left" ? node.rect.x : align === "right" ? node.rect.x + node.rect.w - width : node.rect.x + (node.rect.w - width) / 2;
+  const lines = node.wrap ? Math.max(1, Math.ceil(measure(node.text, styleForRole(doc.typography, node.role)) / Math.max(node.rect.w, EPS))) : 1;
+  const h = lineH * lines;
+  const y = node.vAlign === "top" ? node.rect.y : node.vAlign === "bottom" ? node.rect.y + node.rect.h - h : node.rect.y + (node.rect.h - h) / 2;
+  return { x, y, w: width, h };
+}
+
+/** Collision tolerance: glyph boxes include line-height padding, so allow a hairline of overlap. */
+const COLLISION_TOLERANCE_IN = 0.01;
+
+export function textCollisions(s: SolvedPage, doc: ResolvedDocument, measure: TextMeasurer) {
+  const texts = s.nodes.filter((n): n is Extract<LayoutNode, { type: "text" }> => n.type === "text" && !!n.text);
+  const boxes = texts.map((t) => ({ t, b: inkBox(t, doc, measure) }));
+  const out: { a: string; message: string; measurement: ValidationIssue["measurement"] }[] = [];
+  for (let i = 0; i < boxes.length; i++) {
+    for (let j = i + 1; j < boxes.length; j++) {
+      const A = boxes[i].b, B = boxes[j].b;
+      const ox = Math.min(A.x + A.w, B.x + B.w) - Math.max(A.x, B.x);
+      const oy = Math.min(A.y + A.h, B.y + B.h) - Math.max(A.y, B.y);
+      if (ox > COLLISION_TOLERANCE_IN && oy > COLLISION_TOLERANCE_IN) {
+        out.push({
+          a: boxes[i].t.id,
+          message: `"${boxes[i].t.text}" overlaps "${boxes[j].t.text}" by ${ox.toFixed(3)}" × ${oy.toFixed(3)}".`,
+          measurement: { actual: Math.min(ox, oy), limit: COLLISION_TOLERANCE_IN, unit: "in" },
+        });
+      }
+    }
+  }
+  return out;
 }
 
 export type ValidateOptions = { pageIndices?: number[] };

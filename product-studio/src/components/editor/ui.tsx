@@ -100,3 +100,26 @@ export function Segmented<T extends string>({ value, options, onChange, label }:
     </div>
   );
 }
+
+/** Navigation the panels use to show where a page-scoped control takes effect. */
+export type EditorNav = {
+  currentLayoutId: string;
+  goToLayout: (layoutId: string) => void;
+  goToItem: (recipeItemId: string) => void;
+  goToSide: (side: "recto" | "verso") => void;
+  goToMonth: (monthKey: string) => void;
+  layoutLabel: (layoutId: string) => string;
+};
+
+/** "Applies to Weekly Spread pages · Show" when the visible page doesn't use a control. */
+export function AppliesTo({ ids, nav }: { ids: string[]; nav: EditorNav }) {
+  if (!ids.length || ids.includes(nav.currentLayoutId)) return null;
+  return (
+    <p className="hint">
+      Applies to {ids.map(nav.layoutLabel).join(", ")} pages ·{" "}
+      <button type="button" className="btn btn--ghost" style={{ minHeight: 44, padding: "0 10px" }} onClick={() => nav.goToLayout(ids[0])}>
+        Show
+      </button>
+    </p>
+  );
+}

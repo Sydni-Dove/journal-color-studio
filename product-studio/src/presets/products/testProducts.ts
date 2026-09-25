@@ -3,7 +3,7 @@
  * the full template library is built only after they validate.
  */
 import type { ProductProject } from "../../types/project";
-import { STUDIO_PAD } from "../studioDefaults";
+import { STUDIO_PAD, STUDIO_PLANNER } from "../studioDefaults";
 import { createProject } from "./projectFactory";
 
 export type ProductTemplate = {
@@ -81,7 +81,8 @@ export const TEST_PRODUCTS: ProductTemplate[] = [
         dimensions: { sizePresetId: "11x17", orientation: "landscape" },
         production: { bindingType: "glued-pad", boundEdge: "top", printProfileId: "notepad-top-glued", includeBleed: false, duplex: false, sheetsPerPad: STUDIO_PAD.deskPadSheets },
         recipe: { items: [{ id: "sheet", layoutId: "deskpad-weekly", repeat: { kind: "repeated-sheet", sheets: STUDIO_PAD.deskPadSheets } }], ordering: "sequential" },
-        functionalPattern: { kind: "ruled" },
+        // B6 rules desk-pad rows every 0.30".
+        functionalPattern: { kind: "ruled", rulingPreset: "custom", customLineSpacingIn: STUDIO_PLANNER.deskPadLineSpacing.valueIn },
         layoutOptions: { showSidebar: true, sidebarContent: "priorities", sidebarWidthIn: 2.5, writingRowsPerDay: 4 },
       }),
   },

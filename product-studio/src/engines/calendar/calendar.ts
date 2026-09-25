@@ -230,6 +230,15 @@ export function formatWeekRange(week: CalendarWeek): string {
   return a.year === b.year ? `${left} – ${right}, ${b.year}` : `${left}, ${a.year} – ${right}, ${b.year}`;
 }
 
+/** Compact range for small inserts: "Dec 27 – Jan 2". */
+export function formatWeekRangeShort(week: CalendarWeek): string {
+  const a = parseIso(week.startIso);
+  const b = parseIso(week.endIso);
+  const left = `${MONTH_NAMES[a.month - 1].slice(0, 3)} ${a.day}`;
+  const right = a.month === b.month ? `${b.day}` : `${MONTH_NAMES[b.month - 1].slice(0, 3)} ${b.day}`;
+  return `${left} – ${right}`;
+}
+
 export function formatLongDate(iso: string): string {
   const { year, month, day } = parseIso(iso);
   return `${WEEKDAY_NAMES[weekdayOf(iso)]}, ${MONTH_NAMES[month - 1]} ${day}, ${year}`;

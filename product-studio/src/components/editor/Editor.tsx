@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { geometryFor, resolveDocument, solvePage, type ResolvedDocument } from "../../engines/document/resolve";
+import { computeUsage } from "../../engines/document/usage";
 import { createCanvasMeasurer, heuristicMeasurer } from "../../engines/typography/textMeasure";
 import { finalizeReport, validatePage, validateProductLevel } from "../../engines/validation/validate";
 import type { ProductProject } from "../../types/project";
@@ -10,7 +11,8 @@ import { ExportDialog, IssueList } from "../export/ExportDialog";
 import { PagePreview, visibleIndices } from "../preview/PagePreview";
 import { ColorPanel, DecorationPanel, LayoutPanel, PatternPanel, SpacingPanel, TypographyPanel, VariantsPanel, WordingPanel } from "./DesignPanels";
 import { PagesPanel, ProductPanel, ProductionPanel } from "./ProductionPanels";
-import { Section } from "./ui";
+import { Section, type EditorNav } from "./ui";
+import { getLayout } from "../../layouts/registry";
 
 type Props = {
   project: ProductProject;
@@ -28,7 +30,14 @@ function tryResolve(p: ProductProject): { doc: ResolvedDocument | null; error: s
 }
 
 export function Editor({ project, onChange, onBack, saveStatus }: Props) {
-  const [index, setIndex] = useState(0);
+  // Open on the first real page (spread products start with a filler page).
+  const [index, setIndex] = useState(() => {
+    try {
+      return Math.max(0, resolveDocument(project).recipe.pages.findIndex((p) => !p.filler));
+    } catch {
+      return 0;
+    }
+  });
   const [debug, setDebug] = useState<DebugFlags>(DEBUG_OFF);
   const [exporting, setExporting] = useState(false);
   const fontsReady = useFontLoader(project.typography.fonts);
@@ -39,6 +48,7 @@ export function Editor({ project, onChange, onBack, saveStatus }: Props) {
   );
 
   const { doc, error } = useMemo(() => tryResolve(project), [project]);
+  const usage = useMemo(() => (doc ? computeUsage(doc) : null), [doc]);
 
   // Live check of the visible page(s) with real font metrics once fonts load.
   const check = useMemo(() => {
@@ -53,6 +63,14 @@ export function Editor({ project, onChange, onBack, saveStatus }: Props) {
   const issueIds = useMemo(() => new Set((check?.issues ?? []).map((i) => i.componentId ?? "").filter(Boolean)), [check]);
 
   const current = doc && doc.recipe.pages.length ? Math.min(index, doc.recipe.pages.length - 1) : 0;
+  const nav: EditorNav = {
+    currentLayoutId: doc?.recipe.pages[current]?.layoutId ?? "",
+    goToLayout: (id) => doc && setIndex(Math.max(0, doc.recipe.pages.findIndex((p) => p.layoutId === id && !p.filler))),
+    goToItem: (id) => doc && setIndex(Math.max(0, doc.recipe.pages.findIndex((p) => p.recipeItemId === id && !p.filler))),
+    goToSide: (side) => doc && setIndex(Math.max(0, doc.recipe.pages.findIndex((p) => p.side === side && !p.filler))),
+    goToMonth: (key) => doc && setIndex(Math.max(0, doc.recipe.pages.findIndex((p) => p.period.kind === "month" && p.period.key === key))),
+    layoutLabel: (id) => getLayout(id).label,
+  };
   const goToPage = (n: number) => doc && setIndex(Math.max(0, doc.recipe.pages.findIndex((p) => p.pageNumber === n)));
 
   return (
@@ -77,16 +95,20 @@ export function Editor({ project, onChange, onBack, saveStatus }: Props) {
       <div className="editor">
         <aside className="panel" aria-label="Product controls">
           <ProductPanel project={project} update={update} />
-          <ProductionPanel project={project} update={update} />
-          <PagesPanel project={project} update={update} pageCount={doc?.recipe.pageCount ?? 0} />
-          <LayoutPanel project={project} update={update} />
-          <PatternPanel project={project} update={update} />
-          <SpacingPanel project={project} update={update} />
-          <TypographyPanel project={project} update={update} />
-          <ColorPanel project={project} update={update} />
-          <WordingPanel project={project} update={update} />
-          <DecorationPanel project={project} update={update} />
-          <VariantsPanel project={project} update={update} />
+          <ProductionPanel project={project} update={update} doc={doc} nav={doc ? nav : null} />
+          {doc && usage && (
+            <>
+              <PagesPanel nav={nav} project={project} update={update} doc={doc} usage={usage} />
+              <LayoutPanel nav={nav} project={project} update={update} usage={usage} />
+              <PatternPanel nav={nav} project={project} update={update} usage={usage} />
+              <SpacingPanel nav={nav} project={project} update={update} usage={usage} />
+              <TypographyPanel nav={nav} project={project} update={update} usage={usage} />
+              <ColorPanel nav={nav} project={project} update={update} usage={usage} />
+              <WordingPanel nav={nav} project={project} update={update} usage={usage} />
+              <DecorationPanel nav={nav} project={project} update={update} usage={usage} />
+              <VariantsPanel nav={nav} project={project} update={update} usage={usage} />
+            </>
+          )}
 
           <Section title={`Page check${check ? ` · ${check.errorCount}E ${check.warningCount}W` : ""}`}>
             {check ? <IssueList issues={check.issues} onGoTo={goToPage} /> : <p className="hint">—</p>}

@@ -22,6 +22,7 @@ import type { ProductProject } from "../../types/project";
 import type { SpacingDensity } from "../../types/tokens";
 import type { WeekStart } from "../../types/calendar";
 import { Field, NumberField } from "../editor/ui";
+import { layoutAvailability, resolveDocument } from "../../engines/document/resolve";
 
 function Choices<T extends string>({ value, options, onChange }: { value: T; options: { value: T; label: string }[]; onChange: (v: T) => void }) {
   return (
@@ -85,6 +86,28 @@ export function NewProductWizard({ onCreate, onCancel }: { onCreate: (p: Product
   };
 
   const isPad = getBindingProfile(binding.bindingType).sheetCountIsMetadata;
+
+  // Which layouts fit the chosen size + binding (same fit() the editor uses).
+  const fitById = useMemo(() => {
+    try {
+      const b = getBindingProfile(binding.bindingType);
+      const probe = createProject(type, {
+        dimensions: { sizePresetId: sizeId, custom: sizeId === CUSTOM_SIZE_ID ? custom : undefined, orientation },
+        production: { bindingType: binding.bindingType, boundEdge: binding.boundEdge ?? b.defaultBoundEdge ?? undefined, printProfileId: profileId, duplex: b.boundEdgeMode === "book-spine" },
+        spacing: { density, overrides: {} },
+        layoutOptions: recipe.layoutOptions,
+      });
+      return new Map(layoutAvailability(resolveDocument(probe)).map((a) => [a.layoutId, a.fit]));
+    } catch {
+      return new Map();
+    }
+  }, [type, sizeId, custom, orientation, binding, profileId, density, recipe]);
+  const recipeFit = (r: (typeof recipes)[number]) => {
+    const ids = r.build({ count: 1, sheets: 1 }).items.map((i) => i.layoutId);
+    const bad = ids.map((id) => fitById.get(id)).find((f) => f && !f.ok);
+    return bad && !bad.ok ? bad.reason : null;
+  };
+  const recipeProblem = recipeFit(recipe);
   const needsCount = recipe.id === "journal-lined" || recipe.id === "planner-monthly-weekly";
 
   const generate = () => {
@@ -180,7 +203,18 @@ export function NewProductWizard({ onCreate, onCancel }: { onCreate: (p: Product
 
         <section className="step">
           <h3>4 · Layout</h3>
-          <Choices value={recipeId} options={recipes.map((r) => ({ value: r.id, label: r.label }))} onChange={setRecipeId} />
+          <div className="choice-row" role="group">
+            {recipes.map((r) => {
+              const problem = recipeFit(r);
+              return (
+                <button key={r.id} type="button" className="choice" aria-pressed={r.id === recipeId} disabled={!!problem} title={problem ?? undefined} onClick={() => setRecipeId(r.id)}>
+                  {r.label}
+                  {problem ? " (doesn't fit this size)" : ""}
+                </button>
+              );
+            })}
+          </div>
+          {recipeProblem && <div className="issue issue--error">{recipeProblem}</div>}
           {recipe.needsCalendar && (
             <div className="row">
               <NumberField label="Year" step={1} value={year} onChange={(y) => setYear(Math.round(y))} />
@@ -228,7 +262,7 @@ export function NewProductWizard({ onCreate, onCancel }: { onCreate: (p: Product
           <Field label="Project name (optional)">
             <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Prayer Journal — Burgundy" />
           </Field>
-          <button className="btn btn--primary" onClick={generate} style={{ justifySelf: "start" }}>
+          <button className="btn btn--primary" onClick={generate} disabled={!!recipeProblem} style={{ justifySelf: "start" }}>
             Generate
           </button>
         </section>
