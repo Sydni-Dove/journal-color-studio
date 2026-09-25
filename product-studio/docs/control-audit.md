@@ -205,3 +205,76 @@ checks both pages of each and asserts:
 Chromium DOM check across all 10 pages found: 0 card rects, `rx = 0`,
 3 shared rules, 0 px track-width spread, no doubled lines. Every page of
 all six scenarios validates with 0 errors and 0 warnings.
+
+## Follow-up — iPhone horizontal overflow + remaining weekly cards (2026-09-25)
+
+### Mobile horizontal overflow
+
+**Cause.** The preview draws the physical page at real size in CSS inches
+and shrinks it with `transform: scale()` on `.preview-scaler`. A transform
+changes only the painted size, not the layout box. At 393px wide:
+
+| | Layout box | Right edge (layout) | Right edge (painted) |
+|---|---|---|---|
+| One 7×9 page | 672px | 688px | 377px |
+| Spread | 1344px | 1360px | 377px |
+
+Nothing clipped that box:
+- `.preview-canvas` was sized to the scaled footprint but had no overflow
+  clipping;
+- its parent `.preview-viewport` was an `overflow-x: auto` scroller.
+
+iOS WebKit counts the untransformed box as scrollable overflow, so a
+horizontal scrollbar appeared along the bottom of the preview. Blink
+ignores it, which is why desktop Chromium reported
+`scrollWidth === clientWidth`. No control-panel element exceeded the
+viewport; this was checked with every section expanded.
+
+**Fix (rendering only).** Geometry, PageGeometry, margins, grids, trim and
+print are untouched; the page is still 7" × 9" in CSS inches.
+
+- `.preview-canvas` clips (`overflow: hidden` / `clip`) to the scaled
+  footprint (naturalW × scale). The page shadow moved onto the canvas.
+- `.preview-viewport` is `overflow-x: hidden` / `clip` in Fit page and
+  Fit width. Only a manual zoom larger than the column sets
+  `data-pan="true"`, which pans inside the preview with
+  `overscroll-behavior-x: contain`. The page itself never moves sideways.
+- The sizing math lives in the pure function `previewFrame()`.
+
+**Tests.**
+- `tests/mobile-preview.test.tsx` (unit): the scaled footprint fits 375,
+  393, 430 and 768px for single pages and spreads in both fit modes.
+- `tests/browser/mobile-overflow.browser.ts` (`npm run test:mobile`,
+  Chromium via playwright-core) covers 375, 393, 430 and 820px with touch
+  emulation. Products: 7×9 weekly, Half Letter weekly, Franklin Compact
+  weekly and 7×9 monthly, in single and spread, Fit page and Fit width.
+  It asserts:
+  - zero document, body, editor, toolbar and preview overflow;
+  - computed containment styles;
+  - toolbar touch targets of at least 44px;
+  - weekly pages drawing one grid border and no card rects;
+  - that no layout box extends past the viewport without a clipping
+    ancestor. This is the WebKit criterion: it fails 54 of 68 cases on
+    the pre-fix CSS and passes 68 of 68 after.
+  - A zoom-at-100% case checks that panning stays inside the preview.
+
+### Weekly cards that remained
+
+The weekly spread had been converted in `5bd2452`. The **weekly desk pad**
+still drew each of its 7 × N cells as its own bordered `box`, separated by
+the `column` and `row` spacing tokens (blueprint B6's 0.08" column gap). It
+now uses the shared `connectedGrid()`, the 2-D form of `connectedTracks`:
+- zero gap;
+- one border;
+- 6 vertical and N − 1 horizontal shared rules;
+- cells are geometry-only groups;
+- weekday labels use the same zero-gap columns.
+
+The Priorities strip stays a separate boxed panel (the B6 side-strip
+option), outside the day grid.
+
+`tests/weekly-grid.test.tsx` now also inspects the rendered SVG of both
+spread pages: the only rect is the grid border (plus checkboxes), and the 3
+shared rules sit at 3 distinct positions. It adds a desk-pad suite
+covering contiguity, shared rules on boundaries, weekday alignment, and
+rendered markup with no per-cell rects.

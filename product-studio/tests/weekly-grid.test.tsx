@@ -96,13 +96,70 @@ describe("weekly spread = one connected planner grid", () => {
         });
       });
 
-      it("rendered markup has one grid border rect and no section/day card rects", () => {
-        const html = renderToStaticMarkup(
-          <PrintablePage geometry={geometryFor(doc, doc.recipe.pages[first])} solved={solvePage(doc, first)} colors={doc.colors} typography={doc.typography} decorative={doc.decorative} mode="print" />,
-        );
-        expect(html.match(/<rect[^>]*data-node="wk0-grid-border"/g)).toHaveLength(1);
-        expect(html).not.toMatch(/data-node="wk0-[^"]*-box"/);
+      [0, 1].forEach((p) => {
+        it(`${p === 0 ? "left" : "right"} page, rendered SVG: one border, shared rules once, no card rects`, () => {
+          const html = renderToStaticMarkup(
+            <PrintablePage geometry={geometryFor(doc, doc.recipe.pages[first + p])} solved={solvePage(doc, first + p)} colors={doc.colors} typography={doc.typography} decorative={doc.decorative} mode="print" />,
+          );
+          // Every stroked rectangle drawn is either the grid border or a checklist checkbox.
+          const rects = [...html.matchAll(/<rect[^>]*data-node="([^"]+)"/g)].map((m) => m[1]);
+          expect(rects.filter((id) => !/-cb\d+$/.test(id))).toEqual([`wk${p}-grid-border`]);
+          expect(html).not.toMatch(/rx="[1-9]/);
+          // Exactly 3 shared slot rules in the markup, at 3 distinct positions.
+          const shared = [...html.matchAll(new RegExp(`<line[^>]*data-node="wk${p}-grid-[vh]\\d"[^>]*>`, "g"))].map((m) => m[0]);
+          expect(shared).toHaveLength(3);
+          const pos = shared.map((l) => l.match(horizontal ? /y1="([^"]+)"/ : /x1="([^"]+)"/)![1]);
+          expect(new Set(pos).size).toBe(3);
+        });
       });
     });
   }
+});
+
+describe("weekly desk pad = one connected 7-day grid", () => {
+  const project = TEST_PRODUCTS[4].build();
+  const doc = resolveDocument(project);
+  const nodes = solvePage(doc, 0).nodes;
+  const grid = nodes.find((n) => n.id === "dp-grid")!;
+  const rowsN = project.layoutOptions.writingRowsPerDay;
+  const cells = nodes.filter((n) => n.component === "GridCell");
+
+  it("cells are geometry only and tile the grid with zero gap", () => {
+    expect(cells).toHaveLength(7 * rowsN);
+    expect(cells.every((c) => c.type === "group")).toBe(true);
+    for (let c = 0; c < 7; c++) {
+      const col = cells.filter((n) => n.id.startsWith(`dp-c${c}r`)).sort((a, b) => a.rect.y - b.rect.y);
+      if (c === 0) expect(col[0].rect.x).toBeCloseTo(grid.rect.x, 9);
+      if (c === 6) expect(col[0].rect.x + col[0].rect.w).toBeCloseTo(grid.rect.x + grid.rect.w, 9);
+      if (c < 6) expect(col[0].rect.x + col[0].rect.w).toBeCloseTo(cells.find((n) => n.id === `dp-c${c + 1}r0`)!.rect.x, 9);
+      for (let r = 0; r < rowsN - 1; r++) expect(col[r].rect.y + col[r].rect.h).toBeCloseTo(col[r + 1].rect.y, 9);
+      expect(col[rowsN - 1].rect.y + col[rowsN - 1].rect.h).toBeCloseTo(grid.rect.y + grid.rect.h, 9);
+    }
+  });
+  it("shared rules: 6 vertical + (rows − 1) horizontal, each drawn once on a boundary", () => {
+    const v = ruleNodes(nodes, /^dp-grid-v\d$/);
+    const h = ruleNodes(nodes, /^dp-grid-h\d$/);
+    expect(v).toHaveLength(6);
+    expect(h).toHaveLength(rowsN - 1);
+    v.forEach((r, i) => expect(r.x1).toBeCloseTo(cells.find((n) => n.id === `dp-c${i + 1}r0`)!.rect.x, 9));
+    h.forEach((r, i) => expect(r.y1).toBeCloseTo(cells.find((n) => n.id === `dp-c0r${i + 1}`)!.rect.y, 9));
+  });
+  it("weekday labels sit on exactly the grid columns", () => {
+    const labels = nodes.filter((n) => /^dp-weekdays-\d$/.test(n.id));
+    expect(labels).toHaveLength(7);
+    labels.forEach((l, c) => {
+      const cell = cells.find((n) => n.id === `dp-c${c}r0`)!;
+      expect(l.rect.x).toBeCloseTo(cell.rect.x, 9);
+      expect(l.rect.w).toBeCloseTo(cell.rect.w, 9);
+    });
+  });
+  it("rendered SVG: no per-cell rects; only the grid border (+ the separate priorities panel)", () => {
+    const html = renderToStaticMarkup(
+      <PrintablePage geometry={geometryFor(doc, doc.recipe.pages[0])} solved={solvePage(doc, 0)} colors={doc.colors} typography={doc.typography} decorative={doc.decorative} mode="print" />,
+    );
+    const rects = [...html.matchAll(/<rect[^>]*data-node="([^"]+)"/g)].map((m) => m[1]).filter((id) => !/-cb\d+$/.test(id));
+    expect(rects.sort()).toEqual(project.layoutOptions.showSidebar ? ["dp-grid-border", "dp-priorities-box"] : ["dp-grid-border"]);
+    expect(html).not.toMatch(/<rect[^>]*data-node="dp-c\d+r\d+"/);
+    expect(solvePage(doc, 0).diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+  });
 });

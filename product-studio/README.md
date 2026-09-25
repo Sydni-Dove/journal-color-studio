@@ -19,6 +19,7 @@ cd product-studio
 npm install
 npm run dev        # editor at http://localhost:5173
 npm test           # automated tests (engine, layouts, controls, print parity)
+npm run test:mobile  # real-browser mobile overflow suite (Chromium; set CHROMIUM_PATH if needed)
 npm run build      # typecheck + production build → dist/
 ```
 

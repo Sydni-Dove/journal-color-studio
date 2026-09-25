@@ -325,21 +325,37 @@ input[type="color"] {
   border: 1px solid var(--ui-line);
   border-radius: 8px;
 }
+/*
+ * Physical pages keep their real size in CSS inches; the preview only scales
+ * them visually. A transform does not shrink the layout box, so the scaler
+ * stays naturalW wide (672px for one 7" page, 1344px for a spread). The
+ * canvas is sized to the SCALED footprint and clips the unscaled layout box,
+ * so nothing can widen the page. (Blink ignores that box for scroll overflow;
+ * iOS WebKit does not.)
+ */
 .preview-viewport {
   padding: 24px 16px;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
+  overflow-x: hidden;
+  overflow-x: clip;
   touch-action: pan-x pan-y pinch-zoom;
+}
+/* Manual zoom larger than the column: pan inside the preview, never the page. */
+.preview-viewport[data-pan="true"] {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
 }
 .preview-canvas {
   margin: 0 auto;
   position: relative;
+  overflow: hidden;
+  overflow: clip;
+  box-shadow: 0 10px 30px rgba(60, 20, 10, 0.14);
 }
 .preview-scaler {
   transform-origin: 0 0;
   display: flex;
   gap: 0;
-  box-shadow: 0 10px 30px rgba(60, 20, 10, 0.14);
 }
 .preview-caption {
   text-align: center;

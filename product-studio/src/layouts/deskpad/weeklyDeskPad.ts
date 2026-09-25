@@ -1,17 +1,22 @@
 /**
  * Weekly desk pad (Test Product 5) — undated, landscape, glued.
  * Blueprint reference B6 (11 × 17): glue zone 0.75, header 0.8, weekday
- * header 0.4, 7 day columns (gap 0.08), 4 writing rows, ruled every 0.30.
+ * header 0.4, 7 day columns, 4 writing rows, ruled every 0.30.
  * Optional priorities strip on the right (B6 option: 2.5" + gap).
+ *
+ * The 7 × N week is ONE connected grid (connectedGrid, zero gap): B6's 0.08"
+ * column gap is a card-style convention, not a mechanical requirement, and
+ * is replaced by shared rules drawn once. The priorities strip stays a
+ * separate boxed panel (B6 option), outside the day grid.
  */
 import { WEEKDAY_NAMES, weekdayOrder } from "../../engines/calendar/calendar";
-import { distributeEqual, fitCount, solveStack } from "../../engines/layout/math";
+import { fitCount, solveStack } from "../../engines/layout/math";
 import { gridPitchIn, lineSpacingIn } from "../../engines/patterns/patterns";
 import { STUDIO_PLANNER, STUDIO_STROKES } from "../../presets/studioDefaults";
 import type { Rect } from "../../types/geometry";
 import type { LayoutMetric, LayoutNode, SolvedPage } from "../../types/layout";
-import { pageFrame, section, weekdayHeader, writingSurface } from "../shared/components";
-import { box, group, lineBoxIn, rule, stackDiagnostic, text } from "../shared/nodes";
+import { connectedGrid, pageFrame, PLANNER_GRID_GAP_IN, section, weekdayHeader, writingSurface } from "../shared/components";
+import { group, lineBoxIn, rule, stackDiagnostic, text } from "../shared/nodes";
 import { minimumAreaFit, type LayoutDefinition } from "../shared/types";
 
 /** Desk pads are large-format products; a 10" × 6" usable area is the smallest that holds 7 writable day columns. */
@@ -81,17 +86,17 @@ export const weeklyDeskPad: LayoutDefinition = {
     const weekdayRect = { ...gridArea, y: v.byId.weekdays.start, h: v.byId.weekdays.size };
     const gridRect = { ...gridArea, y: v.byId.grid.start, h: v.byId.grid.size };
     const names = weekdayOrder(ctx.weekStart).map((d) => WEEKDAY_NAMES[d]);
-    nodes.push(...weekdayHeader("dp-weekdays", weekdayRect, names, ctx));
+    nodes.push(...weekdayHeader("dp-weekdays", weekdayRect, names, ctx, "subheading", PLANNER_GRID_GAP_IN));
 
-    const cols = distributeEqual(gridRect.x, gridRect.w, 7, s.column);
     const rowsN = Math.max(1, ctx.options.writingRowsPerDay);
-    const rows = distributeEqual(gridRect.y, gridRect.h, rowsN, s.row);
-    nodes.push(group("dp-grid", "Grid", gridRect, { columnEdges: cols.edges, rowEdges: rows.edges }));
+    const grid = connectedGrid("dp-grid", gridRect, 7, rowsN);
+    const { cols, rows } = grid;
+    nodes.push(...grid.nodes);
     cols.starts.forEach((x, c) =>
       rows.starts.forEach((y, r) => {
         const cell = { x, y, w: cols.size, h: rows.size };
         const inner = { x: x + s.boxPadding, y: y + s.boxPadding, w: cols.size - 2 * s.boxPadding, h: rows.size - 2 * s.boxPadding };
-        nodes.push(box(`dp-c${c}r${r}`, cell, { component: "GridCell", strokePt: STUDIO_STROKES.gridRulePt }));
+        nodes.push(group(`dp-c${c}r${r}`, "GridCell", cell));
         nodes.push(...writingSurface(`dp-c${c}r${r}-surface`, inner, ctx));
       }),
     );
@@ -109,8 +114,8 @@ export const weeklyDeskPad: LayoutDefinition = {
     const metrics: LayoutMetric[] = [
       { label: "Header", value: STUDIO_PLANNER.deskPadHeader.valueIn, unit: "in", provenance: STUDIO_PLANNER.deskPadHeader.provenance },
       { label: "Weekday header", value: STUDIO_PLANNER.deskPadWeekdayHeader.valueIn, unit: "in", provenance: STUDIO_PLANNER.deskPadWeekdayHeader.provenance },
-      { label: "Day column = (W − 6·gap) / 7", value: cols.size, unit: "in", provenance: { geometryClass: "user-design", basis: `(${gridRect.w.toFixed(3)} − 6 × ${s.column}) / 7` } },
-      { label: "Writing row height", value: rows.size, unit: "in", provenance: { geometryClass: "user-design", basis: `(${gridRect.h.toFixed(3)} − ${rowsN - 1} × ${s.row}) / ${rowsN}` } },
+      { label: "Day column = W / 7 (connected grid)", value: cols.size, unit: "in", provenance: { geometryClass: "user-design", basis: `${gridRect.w.toFixed(3)} / 7, zero internal gap` } },
+      { label: "Writing row height = H / n (connected grid)", value: rows.size, unit: "in", provenance: { geometryClass: "user-design", basis: `${gridRect.h.toFixed(3)} / ${rowsN}, zero internal gap` } },
       ctx.pattern.kind === "dot-grid" || ctx.pattern.kind === "graph-grid"
         ? { label: "Grid cells per row (height)", value: fitCount(rows.size - 2 * s.boxPadding, gridPitchIn(ctx.pattern)), unit: "count", provenance: { geometryClass: "user-design", basis: `floor(row inner ÷ ${gridPitchIn(ctx.pattern).toFixed(4)})` } }
         : { label: "Ruled lines per row", value: fitCount(rows.size - 2 * s.boxPadding, lineSpacingIn(ctx.pattern)), unit: "count", provenance: { geometryClass: "user-design", basis: `floor(row inner ÷ ${lineSpacingIn(ctx.pattern).toFixed(4)})` } },

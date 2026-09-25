@@ -9,7 +9,7 @@ import { CSS_PX_PER_IN } from "../../engines/units/units";
 import { PrintablePage } from "../../primitives/PrintablePage";
 import { DebugOverlay, type DebugFlags } from "../debug/DebugOverlay";
 
-type FitMode = "page" | "width" | "zoom";
+export type FitMode = "page" | "width" | "zoom";
 
 /** Vertical space reserved for the sticky bars when fitting a page (px). */
 const CHROME_PX = 190;
@@ -22,6 +22,18 @@ export function visibleIndices(doc: ResolvedDocument, index: number, spread: boo
   const p = pages[index];
   if (p.side === "verso") return index + 1 < pages.length ? [index, index + 1] : [index];
   return index > 0 && pages[index - 1].side === "verso" ? [index - 1, index] : [index];
+}
+
+/**
+ * Screen footprint of the preview. The page keeps its physical size; only the
+ * visual scale changes. In "page"/"width" modes the scaled footprint always
+ * fits `avail`; only a manual zoom can exceed it, and then the preview pans
+ * internally (never the page).
+ */
+export function previewFrame(natural: { w: number; h: number }, avail: { w: number; h: number }, fit: FitMode, zoom: number) {
+  const scale = fit === "page" ? Math.min(avail.w / natural.w, avail.h / natural.h) : fit === "width" ? avail.w / natural.w : zoom;
+  const width = natural.w * scale;
+  return { scale, width, height: natural.h * scale, pan: fit === "zoom" && width > avail.w + 0.5 };
 }
 
 type Props = {
@@ -65,7 +77,8 @@ export function PagePreview({ doc, index, onIndex, debug, issueIds }: Props) {
   const maxHIn = Math.max(...geos.map((g) => g.mediaHeightIn), 1);
   const naturalW = totalWIn * CSS_PX_PER_IN + SPREAD_GAP_PX * (geos.length - 1);
   const naturalH = maxHIn * CSS_PX_PER_IN;
-  const scale = fit === "page" ? Math.min(avail.w / naturalW, avail.h / naturalH) : fit === "width" ? avail.w / naturalW : zoom;
+  const frame = previewFrame({ w: naturalW, h: naturalH }, avail, fit, zoom);
+  const scale = frame.scale;
 
   const step = (d: number) => {
     const next = Math.min(pages.length - 1, Math.max(0, index + d * (spread && paged ? 2 : 1)));
@@ -122,8 +135,8 @@ export function PagePreview({ doc, index, onIndex, debug, issueIds }: Props) {
           </label>
         )}
       </div>
-      <div className="preview-viewport" ref={viewportRef}>
-        <div className="preview-canvas" style={{ width: naturalW * scale, height: naturalH * scale }}>
+      <div className="preview-viewport" ref={viewportRef} data-pan={frame.pan}>
+        <div className="preview-canvas" style={{ width: frame.width, height: frame.height }}>
           <div className="preview-scaler" style={{ transform: `scale(${scale})`, width: naturalW, gap: SPREAD_GAP_PX }}>
             {shown.map((i, k) => {
               const solved = solvePage(doc, i);

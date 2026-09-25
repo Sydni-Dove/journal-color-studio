@@ -288,6 +288,27 @@ export function connectedTracks(
   return { tracks, trackRects, nodes };
 }
 
+/**
+ * Connected 2-D planner grid (columns × rows), zero gap in both directions:
+ * one outer border + one shared rule per interior column and row boundary.
+ * Cells are geometry only — callers must not stroke them.
+ */
+export function connectedGrid(
+  id: string,
+  rect: Rect,
+  columns: number,
+  rows: number,
+  strokePt: number = STUDIO_STROKES.gridRulePt,
+): { cols: ReturnType<typeof distributeEqual>; rows: ReturnType<typeof distributeEqual>; nodes: LayoutNode[] } {
+  const c = connectedTracks(id, rect, columns, "columns", strokePt);
+  const r = distributeEqual(rect.y, rect.h, rows, PLANNER_GRID_GAP_IN);
+  const grid = c.nodes[0];
+  if (grid.type === "group") grid.rowEdges = r.edges;
+  const nodes = [...c.nodes];
+  for (let i = 1; i < rows; i++) nodes.push(rule(`${id}-h${i}`, rect.x, r.starts[i], rect.x + rect.w, r.starts[i], { strokePt, component: "Grid" }));
+  return { cols: c.tracks, rows: r, nodes };
+}
+
 /** Group consecutive indices where `pred` holds into [first, last] runs. */
 export function runsOf(count: number, pred: (i: number) => boolean): Array<[number, number]> {
   const runs: Array<[number, number]> = [];
