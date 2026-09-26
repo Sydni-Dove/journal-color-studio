@@ -3143,10 +3143,11 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
         return y;
       };
       // Measure first so the card on art backgrounds ends just below the questions and the artwork shows beneath.
-      const sx = W * .6, contentEnd = questions(sx + W * .03, W - sx - W * .06, false);
+      // The questions column stops 1/8 in short of the sidebar's usual text edge so the page's outer safe margin holds.
+      const sx = W * .6, edge = W * BIND_SHIFT_PT / TRIM_W, contentEnd = questions(sx + W * .03, W - sx - W * .06 - edge, false);
       sidebarPage(ctx, W, H, s, 'brainstormTitle', (x, w) => {
         ctx.fillStyle = s._card ? inkColor(p) : bodyInk(s, p.title);
-        questions(x, w, true);
+        questions(x, w - edge, true);
       }, contentEnd + H * .03 - H * .018);
     },
     brainstorm: linedPage('brainstormTitle', 'rule'),
@@ -3546,6 +3547,10 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     box(0); label(2); label(0); box(1); label(1);
     drawLetter(ctx, W, H, s, 'pink-journaling'); drawLetter(ctx, W, H, s, 'pink-suggestions');
   }
+  // Writing lines on the prayer journals stop at the inside-page safe area (Canva px on the 816 × 1056 trim): 3/8 in from
+  // each side edge (the 1/8 in binding shift turns that into 1/2 in at the binding and 1/4 in outside) and 1/4 in from the
+  // bottom.
+  const SAFE_X0 = 36, SAFE_X1 = 780, SAFE_Y1 = 1032;
   function pinkLetter(ctx, W, H, s) {
     const p = s.palette;
     ctx.fillStyle = p.paper; ctx.fillRect(0, 0, W, H);
@@ -3553,10 +3558,11 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     prRect(ctx, W, H, [-27.46, -75.41, 870.93, 204], p.paper);                 // paper band that keeps the header clear
     drawPr(ctx, W, H, s, PINK.letterB);
     drawLetter(ctx, W, H, s, 'pink-dear'); prLine(ctx, W, H, 132.16, 84.26, 299.96, 84.26, p.line, 1.79);
-    drawLetter(ctx, W, H, s, 'pink-date'); prLine(ctx, W, H, 684.36, 83.68, 784.44, 83.68, p.line, 2);
+    drawLetter(ctx, W, H, s, 'pink-date'); prLine(ctx, W, H, 684.36, 83.68, SAFE_X1, 83.68, p.line, 2);
     drawPr(ctx, W, H, s, PINK.letterC);
-    prText(ctx, W, H, s, T(s, 'letterFooter'), { l: 57.1, t: 998.16, w: 701.8, size: 17.54, color: p.plate, italic: true, lh: 1.2, maxLines: 2, id: 'letterFooter' });
-    for (const y of PINK_LINES) prLine(ctx, W, H, 0, y + .68, 924, y + .68, p.line, 1.35);
+    // Footer scripture raised 6 pt (8 px) so it clears the 1/4 in bottom margin.
+    prText(ctx, W, H, s, T(s, 'letterFooter'), { l: 57.1, t: 990.16, w: 701.8, size: 17.54, color: p.plate, italic: true, lh: 1.2, maxLines: 2, id: 'letterFooter' });
+    for (const y of PINK_LINES) prLine(ctx, W, H, SAFE_X0, y + .68, SAFE_X1, y + .68, p.line, 1.35);
   }
 
   // --- Prayer Warrior Journal ---
@@ -3589,7 +3595,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   function pwLined(ctx, W, H, s, side) {
     const p = s.palette;
     ctx.fillStyle = p.paper; ctx.fillRect(0, 0, W, H);
-    PW_LINES.forEach((y, i) => prLine(ctx, W, H, i < 2 ? [-48.07, -30.12][i] : -11.37, y + .5, 865, y + .5, p.line, 1, .27));
+    PW_LINES.filter((y) => y <= SAFE_Y1).forEach((y) => prLine(ctx, W, H, SAFE_X0, y + .5, SAFE_X1, y + .5, p.line, 1, .27));
     if (side === 'L') { prRect(ctx, W, H, [-195.14, -41.33, 244.8, 1124.08], p.stone); drawPr(ctx, W, H, s, [PW.stripL]); }
     else drawPr(ctx, W, H, s, [PW.stripR]);
     drawLetter(ctx, W, H, s, 'pw-date');
@@ -3670,7 +3676,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     },
     // palette = the design's own colors (its "recommended" palette); each journal remembers its own look.
     prayer: { name: 'Prayer Journal', palette: 'Pink Prayer', front: ['pinkSug1'], cycle: ['pinkLetter'] },
-    warrior: { name: 'Prayer Warrior Journal', palette: 'Prayer Warrior', front: ['pwBelongs', 'pwGuide'], cycle: ['pwLinedL', 'pwLinedR'] },
+    warrior: { name: 'Prayer Warrior Journal', palette: 'Prayer Warrior', front: ['pwBelongs', 'pwGuide'], cycle: ['pwLinedR', 'pwLinedL'] },     // page 3 is odd (a right-hand page)
     // Only the cover exists in Canva so far; its interior uses the Prayer Warrior pages in the Warring Woman colors.
     warring: { name: 'Warring Woman Journal', palette: 'Warring Woman', front: ['pwBelongs'], cycle: ['pwLinedL', 'pwLinedR'] },
   };
