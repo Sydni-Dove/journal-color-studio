@@ -627,3 +627,23 @@ h2 {
 .decor-status--off {
   color: var(--ui-warn);
 }
+
+/* ── Book structure (composite recipe) ── */
+.book-list { display: grid; gap: 8px; min-width: 0; }
+.book-section { border: 1px solid var(--ui-line); border-radius: 10px; padding: 8px 10px 10px; margin: 0; display: grid; gap: 8px; min-width: 0; }
+.book-section legend { font-weight: 700; padding: 0 6px; }
+.book-step { display: block; }
+.book-step[open] { display: grid; gap: 8px; }
+.book-step__title { overflow-wrap: anywhere; cursor: pointer; min-height: 32px; padding: 4px 0; }
+.book-step textarea { width: 100%; box-sizing: border-box; border: 1px solid var(--ui-line); border-radius: 8px; padding: 8px 10px; font: inherit; }
+.book-outline { list-style: none; margin: 0; padding: 0; max-height: 420px; overflow: auto; display: grid; gap: 2px; }
+.book-outline__heading { font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 8px; }
+.book-outline button { width: 100%; min-height: 44px; text-align: left; background: none; border: 0; border-radius: 8px; padding: 6px 8px; cursor: pointer; font: inherit; color: inherit; overflow-wrap: anywhere; }
+.book-outline button:hover { background: rgba(0, 0, 0, 0.04); }
+.book-outline__current button { background: rgba(99, 0, 0, 0.08); font-weight: 600; }
+.book-outline__filler button { font-style: italic; opacity: 0.8; }
+.book-outline__pages { display: inline-block; min-width: 3.2em; font-variant-numeric: tabular-nums; }
+.book-section__settings > summary { cursor: pointer; font-size: 13px; min-height: 32px; padding: 6px 0; }
+.book-section__settings[open] { display: grid; gap: 8px; }
+.book-outline__detail { display: block; padding-left: 3.2em; }
+.book-step__title .hint { display: block; }

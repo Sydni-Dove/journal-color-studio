@@ -8,6 +8,7 @@ import { rectContains, rectsIntersect } from "../layout/math";
 import { geometryFor, resolveDocument, solvePage, type ResolvedDocument } from "../document/resolve";
 import { inkBoxFor } from "../typography/ink";
 import { compositionChecks } from "./composition";
+import { validateBook } from "./book";
 import { applyTransform, styleForNode, styleForRole, type TextMeasurer } from "../typography/textMeasure";
 import { GEOMETRY_EPSILON_IN, ptToIn } from "../units/units";
 import { MIN_PRINT_FONT_PT } from "../../presets/typography/typography";
@@ -60,9 +61,8 @@ export function validateProductLevel(doc: ResolvedDocument): ValidationIssue[] {
     }
   }
 
-  for (const d of recipe.diagnostics) {
-    add(d.severity, "page-count", d.message);
-  }
+  // Book structure: engine diagnostics + an independent check of the expanded pages.
+  issues.push(...validateBook(doc));
 
   // Studio/user geometry must never go below required geometry.
   const g = geometryFor(doc, { side: recipe.pages[0]?.side ?? "single" });

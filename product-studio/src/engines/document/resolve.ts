@@ -34,7 +34,7 @@ import { getCalendar } from "../calendar/calendar";
 import { getLayoutMeasurer } from "../typography/textMeasure";
 import { resolveTrim, type ResolvedTrim } from "../geometry/dimensions";
 import { computePageGeometry } from "../geometry/pageGeometry";
-import { expandRecipe, type ExpandedRecipe } from "../recipe/recipe";
+import { expandRecipe, recipeSteps, type ExpandedRecipe } from "../recipe/recipe";
 import { normalizeDecoration } from "../../themes/decorationPlan";
 import { resolveComposition } from "../composition/composition";
 import type { Composition } from "../../types/composition";
@@ -127,6 +127,8 @@ export function resolveDocument(input: ProductProject): ResolvedDocument {
       paged,
       fillerLayoutId: FILLER_LAYOUT_ID,
       pagesPerInstance: (id) => getLayout(id).pages,
+      layoutPeriod: (id) => getLayout(id).period,
+      layoutLabel: (id) => getLayout(id).label,
     }),
   );
 
@@ -188,6 +190,7 @@ export function solvePage(doc: ResolvedDocument, index: number): SolvedPage {
   const key = JSON.stringify([
     layout.id,
     group.map((p) => p.key + p.pageNumber),
+    group[0].module ?? null,
     geometries.map((g) => [g.trimWidthIn, g.trimHeightIn, g.safe, g.side]),
     doc.spacing,
     typeSizes,
@@ -211,6 +214,7 @@ export function solvePage(doc: ResolvedDocument, index: number): SolvedPage {
       calendar: doc.calendar,
       weekStart: doc.weekStart,
       period: group[0].period,
+      module: group[0].module,
     };
     try {
       return layout.solve(ctx);
@@ -253,7 +257,7 @@ export function layoutAvailability(doc: ResolvedDocument): LayoutAvailability[] 
 /** Layouts actually used by the recipe, with their fit on this page size. */
 export function recipeLayouts(doc: ResolvedDocument): { layout: LayoutDefinition; fit: FitResult }[] {
   const page = representativeGeometry(doc);
-  const ids = [...new Set(doc.project.recipe.items.map((i) => i.layoutId))];
+  const ids = [...new Set(recipeSteps(doc.project.recipe).map((i) => i.layoutId))];
   return ids.map((id) => {
     const layout = getLayout(id);
     return { layout, fit: layout.fit({ page, spacing: doc.spacing, typography: doc.typography, options: doc.project.layoutOptions }) };

@@ -41,6 +41,9 @@ export const DEFAULT_WORDING: Wording = {
   pantry: "Pantry",
   frozen: "Frozen",
   household: "Household",
+  meetingWithGod: "Meeting With God",
+  whatGodSaid: "What did God say?",
+  responseAction: "Response / action steps",
 };
 
 export const WORDING_LABELS: Partial<Record<WordingKey, string>> = {

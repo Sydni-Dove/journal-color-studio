@@ -5,6 +5,7 @@
  * control is a placebo. Usage comes from layout capabilities AND from the
  * solved output (which text roles and color tokens really appear).
  */
+import { recipeSteps } from "../recipe/recipe";
 import type { FitResult, LayoutDefinition } from "../../layouts/shared/types";
 import type { FunctionalPatternKind } from "../../types/theme";
 import type { ColorToken, FontGroup, TypographyRole, WordingKey } from "../../types/tokens";
@@ -61,7 +62,7 @@ export function computeUsage(doc: ResolvedDocument): ProjectUsage {
   const semantic = new Map<SemanticTextKey, ProjectUsage["semanticText"][number]>();
   const anchors = new Set<CompositionAnchor>();
   const regionSets: Partial<Record<CompositionAnchor, { x: number; y: number; w: number; h: number }>>[] = [];
-  doc.project.recipe.items.forEach((item) => {
+  recipeSteps(doc.project.recipe).forEach((item) => {
     const index = doc.recipe.pages.findIndex((p) => p.recipeItemId === item.id && !p.filler);
     if (index < 0) return;
     const solved = solvePage(doc, index);

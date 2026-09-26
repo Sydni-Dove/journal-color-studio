@@ -4,6 +4,7 @@
  *   Type → Size → Orientation → Binding → Printer → Layout → Spacing →
  *   Theme → Fonts → Dates / sheets / pages → Generate
  */
+import { recipeSteps } from "../../engines/recipe/recipe";
 import { useMemo, useState } from "react";
 import { BINDING_CHOICES, getBindingProfile } from "../../presets/bindingProfiles/bindingProfiles";
 import { PRINT_PROFILES } from "../../presets/printProfiles/printProfiles";
@@ -103,7 +104,7 @@ export function NewProductWizard({ onCreate, onCancel }: { onCreate: (p: Product
     }
   }, [type, sizeId, custom, orientation, binding, profileId, density, recipe]);
   const recipeFit = (r: (typeof recipes)[number]) => {
-    const ids = r.build({ count: 1, sheets: 1 }).items.map((i) => i.layoutId);
+    const ids = recipeSteps(r.build({ count: 1, sheets: 1 })).map((i) => i.layoutId);
     const bad = ids.map((id) => fitById.get(id)).find((f) => f && !f.ok);
     return bad && !bad.ok ? bad.reason : null;
   };

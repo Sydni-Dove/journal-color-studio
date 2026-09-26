@@ -172,6 +172,9 @@ export type WordingKey =
   | "protein"
   | "pantry"
   | "frozen"
-  | "household";
+  | "household"
+  | "meetingWithGod"
+  | "whatGodSaid"
+  | "responseAction";
 
 export type Wording = Record<WordingKey, string>;

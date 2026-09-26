@@ -1,6 +1,7 @@
 import type { ProductType } from "../../types/product";
 import type { ProductRecipe } from "../../types/recipe";
 import type { LayoutOptions } from "../../types/project";
+import { BOOK_PRESETS, meetingsWithGodBook } from "../bookRecipes";
 
 /** Layout / page-recipe choices offered by the New Product flow per product type. */
 export type RecipePreset = {
@@ -74,6 +75,22 @@ export const RECIPE_PRESETS: RecipePreset[] = [
       ordering: "chronological",
     }),
     layoutOptions: { showSidebar: true, sidebarContent: "weeklyFocus" },
+  },
+  {
+    id: "book-meetings-with-god",
+    label: "Book: Meetings With God planner (plan + journal)",
+    productTypes: ["planner", "journal"],
+    needsCalendar: true,
+    build: () => ({ items: [], ordering: "chronological", structure: meetingsWithGodBook() }),
+    layoutOptions: { showPageNumbers: true },
+  },
+  {
+    id: "book-planner-journal",
+    label: "Book: Monthly + weekly planner with journal pages",
+    productTypes: ["planner", "journal"],
+    needsCalendar: true,
+    build: () => ({ items: [], ordering: "chronological", structure: BOOK_PRESETS.find((b) => b.id === "planner-journal")!.build() }),
+    layoutOptions: { showPageNumbers: true },
   },
   {
     id: "deskpad-weekly",

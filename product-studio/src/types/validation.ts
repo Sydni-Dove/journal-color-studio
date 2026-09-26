@@ -10,6 +10,7 @@ export type ValidationRule =
   | "component-bounds"
   | "text-overflow"
   | "heading-fit"
+  | "book-structure"
   | "text-too-small"
   | "line-overflow"
   | "grid-overflow"

@@ -66,7 +66,8 @@ export const linedJournal: LayoutDefinition = {
   period: "none",
   capability: { ...WRITING_PAGE, supportedProductTypes: ["journal", "notebook", "planner", "insert", "worksheet", "custom"], wordingKeys: ["date"] },
   fit: minimumAreaFit(1.5, 2, "Writing page"),
-  solve: (ctx) => [writingPage(ctx, ctx.wording.date)],
+  // A purpose that uses the plain journal design (e.g. Meeting With God) titles the page with its purpose.
+  solve: (ctx) => [writingPage(ctx, ctx.module && ctx.module.type !== "lined-journal" ? ctx.module.title : ctx.wording.date)],
 };
 
 export const notesPage: LayoutDefinition = {

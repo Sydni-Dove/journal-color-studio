@@ -488,3 +488,28 @@ Changes:
     writing regions.
   - `decoration-clipped` is reserved for contained art. Intentional bleed is
     never flagged.
+
+## Composite book recipes (planner inside a journal)
+
+Earlier recipe limits: the recipe was one flat list of steps, each with a repeat rule, interleaved by a
+single global chronological sort. It had no sections or nesting, no "after page X" and no "end of
+month / quarter", and no start-side rules beyond "spreads open on a verso". A page's purpose was fixed
+by its layout.
+
+New layers:
+- **Purpose (module)** — `presets/modules.ts`. Each purpose (Meeting With God, Vision, Goals, Review, …)
+  lists the layouts that can realise it, plus period-aware titles and prompts.
+- **Structure (book recipe)** — `ProductRecipe.structure`: nested `BookGroup`s ("Every Month", "Every
+  Week", or plain sections such as Front Matter) and `BookStep`s. Each step has a module, a layout, a
+  cadence, copies and a start rule.
+- **Expansion** — `engines/recipe/bookRecipe.ts`.
+  - Cadence is relative to its section.
+  - Periodic items interleave by date: period openers → weeks / days → end of month → end of quarter →
+    end of year.
+  - "After" steps follow each occurrence of their target.
+  - Start rules add one labelled notes page when needed.
+- **Validation** — `engines/validation/book.ts` re-checks the expanded book: spreads, sides,
+  duplicates, filler intent, numbering, layout fit and cadence / date errors.
+
+Projects without `structure` expand exactly as before; the flat list converts to an equivalent
+structure on request.

@@ -12,6 +12,7 @@ import { ExportDialog, IssueList } from "../export/ExportDialog";
 import { PagePreview, visibleIndices } from "../preview/PagePreview";
 import { ColorPanel, DecorationPanel, LayoutPanel, PatternPanel, SpacingPanel, TextPlacementPanel, TypographyPanel, VariantsPanel, WordingPanel } from "./DesignPanels";
 import { PagesPanel, ProductPanel, ProductionPanel } from "./ProductionPanels";
+import { BookOutlinePanel, BookStructurePanel } from "./BookPanels";
 import { Section, type EditorNav } from "./ui";
 import { getLayout } from "../../layouts/registry";
 
@@ -114,6 +115,8 @@ export function Editor({ project, onChange, onBack, saveStatus }: Props) {
           {doc && usage && (
             <>
               <PagesPanel nav={nav} project={project} update={update} doc={doc} usage={usage} />
+              {!doc.binding.sheetCountIsMetadata && <BookStructurePanel project={project} update={update} doc={doc} goToStep={nav.goToItem} />}
+              {doc.recipe.pageCount > 1 && <BookOutlinePanel doc={doc} current={current} goTo={setIndex} />}
               <LayoutPanel nav={nav} project={project} update={update} usage={usage} />
               <PatternPanel nav={nav} project={project} update={update} usage={usage} />
               <SpacingPanel nav={nav} project={project} update={update} usage={usage} />

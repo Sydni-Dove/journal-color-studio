@@ -10,6 +10,7 @@
 import type { CalendarData } from "../../types/calendar";
 import type { PageSide } from "../../types/geometry";
 import type { PageInstance, PeriodRef, ProductRecipe, RecipeItem } from "../../types/recipe";
+import { bookSteps, expandBook } from "./bookRecipe";
 
 export type RecipeContext = {
   calendar: CalendarData | null;
@@ -19,6 +20,9 @@ export type RecipeContext = {
   paged: boolean;
   /** Layout used for inserted filler pages. */
   fillerLayoutId: string;
+  /** Composite books: the period a layout needs, and its label (for diagnostics). */
+  layoutPeriod?: (layoutId: string) => "none" | "month" | "week" | "day";
+  layoutLabel?: (layoutId: string) => string;
 };
 
 export type RecipeDiagnostic = { severity: "error" | "warning" | "info"; itemId: string; message: string };
@@ -145,7 +149,14 @@ export function orderUnits(recipe: ProductRecipe, ctx: RecipeContext, diags: Rec
   return [...front, ...middle, ...back];
 }
 
+/** The steps a recipe is made of (flat items, or every step of a book structure), for usage / availability. */
+export function recipeSteps(recipe: ProductRecipe): { id: string; layoutId: string }[] {
+  return recipe.structure ? bookSteps(recipe.structure).map(({ step }) => ({ id: step.id, layoutId: step.layoutId })) : recipe.items;
+}
+
 export function expandRecipe(recipe: ProductRecipe, ctx: RecipeContext): ExpandedRecipe {
+  // Composite book structure: nested sections + cadence (engines/recipe/bookRecipe).
+  if (recipe.structure) return expandBook(recipe.structure, { ...ctx, layoutPeriod: ctx.layoutPeriod ?? (() => "none"), layoutLabel: ctx.layoutLabel ?? ((id) => id) });
   const diagnostics: RecipeDiagnostic[] = [];
   const units = orderUnits(recipe, ctx, diagnostics);
   const pages: PageInstance[] = [];

@@ -189,7 +189,8 @@ export function PagesPanel({ project, update, doc, usage, nav }: PanelProps & { 
 
   return (
     <Section title={`Pages${isPad ? "" : ` · ${doc.recipe.pageCount} page${doc.recipe.pageCount === 1 ? "" : "s"}`}`} open>
-      {items.map((it, i) => {
+      {project.recipe.structure && <p className="hint">This product uses a book structure (below). Its date range and week start are set here.</p>}
+      {!project.recipe.structure && items.map((it, i) => {
         const a = avail.find((x) => x.layoutId === it.layoutId);
         const kinds = repeatsFor(it.layoutId, isPad);
         return (
@@ -227,10 +228,10 @@ export function PagesPanel({ project, update, doc, usage, nav }: PanelProps & { 
           </div>
         );
       })}
-      {!isPad && (
+      {!isPad && !project.recipe.structure && (
         <button className="btn" onClick={() => setItems([...items, { id: newId("r"), layoutId: "notes-page", repeat: { kind: "count", count: 1 } }])}>Add page step</button>
       )}
-      {!isPad && items.length > 1 && usage.calendar && (
+      {!isPad && !project.recipe.structure && items.length > 1 && usage.calendar && (
         <Segmented
           label="Page order"
           value={project.recipe.ordering}

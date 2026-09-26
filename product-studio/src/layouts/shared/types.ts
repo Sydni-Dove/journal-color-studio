@@ -3,7 +3,7 @@ import type { PageGeometry } from "../../types/geometry";
 import type { SolvedPage } from "../../types/layout";
 import type { ProductType } from "../../types/product";
 import type { LayoutOptions } from "../../types/project";
-import type { PeriodRef, RepeatRule } from "../../types/recipe";
+import type { PageModuleContent, PeriodRef, RepeatRule } from "../../types/recipe";
 import type { FunctionalPattern, FunctionalPatternKind } from "../../types/theme";
 import type { SpacingTokens, TypographySettings, Wording, WordingKey } from "../../types/tokens";
 import type { WeekStart } from "../../types/calendar";
@@ -26,6 +26,8 @@ export type LayoutContext = {
   calendar: CalendarData | null;
   weekStart: WeekStart;
   period: PeriodRef;
+  /** Composite books: the page's module (purpose title + prompts). Layouts may use it or ignore it. */
+  module?: PageModuleContent;
 };
 
 /** Inputs a layout needs to decide whether (and how) it fits a page. */
