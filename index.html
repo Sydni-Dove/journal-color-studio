@@ -52,8 +52,19 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
 .head-btn:disabled { cursor: default; }
 body.prayer-mode .dream-only { display: none !important; }
 body:not(.prayer-mode) .prayer-only { display: none !important; }
-.palettes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.palettes button { border: 1px solid var(--line); border-radius: 10px; padding: 6px; background: var(--panel); cursor: pointer; color: var(--ink); font: inherit; }
+.pal-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.pal-group { font-size: 11px; color: var(--muted); margin: 14px 0 6px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; display: flex; justify-content: space-between; gap: 8px; }
+.pal-group:first-child { margin-top: 4px; }
+.pal-group small { text-transform: none; letter-spacing: 0; font-weight: 400; }
+.palettes button { border: 1px solid var(--line); border-radius: 10px; padding: 6px; background: var(--panel); cursor: pointer; color: var(--ink); font: inherit; text-align: left; }
+.palettes .swatch-row { height: 30px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }
+.palettes .swatch-row i + i, .pal-detail .swatch-row i + i { box-shadow: inset 1px 0 rgba(0,0,0,.07); }
+.pal-detail { display: flex; gap: 12px; align-items: center; padding: 10px; border: 1px solid var(--line); border-radius: 12px; margin-bottom: 4px; }
+.pal-detail canvas { width: 84px; height: auto; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,.18); flex: 0 0 auto; }
+.pal-detail strong { display: block; font-size: 14px; }
+.pal-detail small { display: block; color: var(--muted); font-size: 12px; margin-bottom: 6px; }
+.pal-detail .swatch-row { height: 24px; margin: 0; }
+.mode-bar, .m-pager { display: none; }
 .palettes button.selected { border-color: var(--brand); box-shadow: inset 0 0 0 1px var(--brand); }
 .swatch-row { display: flex; height: 22px; border-radius: 6px; overflow: hidden; margin-bottom: 4px; }
 .swatch-row i { flex: 1; }
@@ -73,7 +84,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
 .page-strip canvas { display: block; width: 100%; height: auto; border-radius: 3px; margin-bottom: 3px; box-shadow: 0 2px 8px rgba(0,0,0,.18); }
 .palettes button { position: relative; }
 .palettes .del { position: absolute; top: 2px; right: 2px; width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--line); background: var(--panel); color: var(--ink); font-size: 12px; line-height: 16px; padding: 0; cursor: pointer; }
-.palettes span { font-size: 11px; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.palettes span { font-size: 12px; display: block; line-height: 1.25; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .group-label { font-size: 11px; color: var(--muted); margin: 12px 0 6px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
 .group-label:first-child { margin-top: 0; }
 .role { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px dashed var(--line); }
@@ -134,6 +145,58 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   .page-strip { padding: 6px 10px 8px; gap: 8px; }
   .page-strip button { width: 64px; font-size: 10px; }
 }
+@media (max-width: 400px) { header > div:nth-child(2) { display: none; } }
+/* ---------- Phones: one mode at a time (Preview / Edit), switched by the bar at the bottom ---------- */
+@media (max-width: 700px) {
+  body { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
+  header { padding: 8px 12px; gap: 8px; }
+  header strong { font-size: 17px; white-space: nowrap; }
+  header small { display: none; }
+  .brand-mark { width: 30px; height: 30px; }
+  .head-btn { margin-left: 0; padding: 0 10px; min-height: 44px; white-space: nowrap; }
+  .intro { display: none; }
+  .m-long { display: none; }
+  .layout { padding: 12px; gap: 12px; grid-template-columns: minmax(0, 1fr); }
+  aside, aside .card { min-width: 0; }
+  .field select, .field input:not([type=color]):not([type=checkbox]) { width: 100%; min-width: 0; }
+  .mode-bar { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); background: var(--panel); border-top: 1px solid var(--line); box-shadow: 0 -6px 20px rgba(0,0,0,.08); }
+  .mode-bar button { min-height: 48px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); font: inherit; font-weight: 700; font-size: 15px; }
+  .mode-bar button.active { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .m-pager { display: flex; gap: 6px; }
+  .m-pager .btn { min-width: 44px; min-height: 44px; font-size: 20px; text-align: center; padding: 0; }
+  .workbar { padding: 8px 10px; flex-wrap: nowrap; }
+  .workbar > div:first-child { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #compare { min-height: 44px; padding: 0 10px; font-size: 13px; white-space: nowrap; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
+  /* Preview mode: the page large, every page thumbnail in a grid below it (vertical scrolling only). */
+  body.m-preview aside { display: none; }
+  body.m-preview .workspace { position: static; order: -1; }
+  body.m-preview .layout { padding: 8px; }
+  body.m-preview .preview { padding: 6px; }
+  body.m-preview .preview canvas { max-height: calc(100dvh - 200px); }
+  body.m-preview .page-strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); overflow: visible; padding: 10px; }
+  body.m-preview .page-strip button { width: auto; min-height: 44px; font-size: 11px; }
+  /* Edit mode: settings take the screen under a small live preview that stays in view (in the page flow, so it never covers a control). */
+  body.m-edit .workspace { position: sticky; top: 0; z-index: 4; order: -1; border-radius: 0 0 14px 14px; margin: -12px -12px 0; }
+  body.m-edit .page-strip { display: none; }
+  body.m-edit .preview { padding: 6px; }
+  body.m-edit .preview canvas { max-height: min(22vh, 180px); box-shadow: 0 6px 16px rgba(0,0,0,.2); }
+  body.m-edit .workbar { display: none; }
+  body.m-edit .workspace .m-pager { display: none; }
+  /* Touch targets: at least 44px. */
+  .btn, .seg button, .field select, .field input, .text-slot input, .palettes button, .accent-tiles button, .upload-item button, .pager .btn, #recommendColors { min-height: 44px; }
+  .field select, .field input { font-size: 16px; }
+  .role { min-height: 44px; }
+  .role label { min-height: 44px; }
+  .role input[type=checkbox] { width: 22px; height: 22px; }
+  .role input[type=color], .field input[type=color] { width: 44px; height: 44px; }
+  .slider input { height: 44px; }
+  .text-slot .reset { min-height: 44px; padding: 0 12px; }
+  .palettes .del { width: 44px; height: 44px; top: 0; right: 0; border-radius: 0 10px 0 10px; font-size: 18px; }
+  .pal-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .palettes .swatch-row { height: 34px; }
+  .pal-detail canvas { width: 72px; }
+  .toast { bottom: calc(84px + env(safe-area-inset-bottom)); }
+}
 </style>
 </head>
 <body>
@@ -148,7 +211,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
 
 <div class="layout">
   <aside>
-    <div class="card">
+    <div class="card intro">
       <h1>Your journal, your colors.</h1>
       <p class="lead">Choose a journal, then swap the marble, colors and elements. Every page of the book changes together, so you never rebuild a layout.</p>
     </div>
@@ -267,6 +330,8 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
 
     <div class="card">
       <h2>Palette <span id="paletteName"></span></h2>
+      <div class="pal-detail hidden" id="paletteDetail"><canvas id="paletteCover" aria-hidden="true"></canvas>
+        <div style="min-width:0;flex:1"><strong id="paletteDetailName"></strong><small id="paletteDetailVar"></small><div class="swatch-row" id="paletteRoles"></div></div></div>
       <div class="palettes" id="palettes"></div>
       <button class="btn" id="savePalette" type="button" style="margin-top:10px;width:100%;text-align:center">+ Save current colors as my palette</button>
       <p class="hint" style="margin:6px 0 0">Change any color under Layers, then save it here. Your palettes appear in this list and are kept on this computer.</p>
@@ -444,7 +509,8 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   <article class="workspace">
     <div class="workbar">
       <div><strong id="viewLabel">Front cover</strong></div>
-      <button class="btn" id="compare">Hold to compare original</button>
+      <div class="m-pager"><button class="btn" id="mPrev" type="button" aria-label="Previous page">‹</button><button class="btn" id="mNext" type="button" aria-label="Next page">›</button></div>
+      <button class="btn" id="compare">Hold to compare<span class="m-long"> original</span></button>
     </div>
     <div class="preview"><canvas id="canvas" width="760" height="974"></canvas>
       <div class="loading" id="loading"><strong>Loading your journal…</strong><small>Preparing the design pieces</small></div>
@@ -454,6 +520,10 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
 </div>
 <div class="toast hidden" id="toast"></div>
 
+<nav class="mode-bar" id="modeBar" aria-label="Phone view">
+  <button type="button" data-mode="preview">Preview</button>
+  <button type="button" data-mode="edit">Edit</button>
+</nav>
 <script>
 (() => {
   // Print spec: 8.5 × 11 in trim with 1/8 in bleed on every side, so an exported page is 8.75 × 11.25 in (630 × 810 pt).
@@ -3985,15 +4055,45 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     return palettesFor(state.journal).find((pl) => ROLES.every((r) => (pl[r.key] || '').toLowerCase() === (state.palette[r.key] || '').toLowerCase()));
   }
 
+  // ---------- Design-aware palette organisation ----------
+  // What each built-in palette was made for (its As-designed roles were chosen for that kind of design). Prayer-journal
+  // palettes are made for their journal's watercolor ('wash'). Anything else is ranked by the variation engine itself:
+  // how many of its per-design arrangements (RECIPES / pattern arrangements) pass that design's contrast guards.
+  // Ranking only: the engine, its role mapping per design type, As designed and repeat-click stay exactly as they are.
+  const MARBLE_HOME = ['Your Canva Cover', 'Gold Leaf', 'White Marble', 'Original Black + Gold', 'Dove Signature', 'White Carrara', 'Emerald + Gold',
+    'Midnight Blue', 'Plum', 'Blush Rose', 'Teal + Coral', 'Rose Marble', 'Burgundy Blush Marble', 'Black Ember Marble', 'Peach Marble', 'Terracotta'];
+  const PALETTE_HOME = {
+    ...Object.fromEntries(MARBLE_HOME.map((n) => [n, ['marble']])),
+    'Blush Watercolor': ['watercolor'], 'Abstract Watercolor': ['watercolor'], 'Floral Garden': ['floral'],
+    ...Object.fromEntries(['Orange Light', 'Halloween Orange', 'Ultra Orange', 'Pure Orange', 'Amber Orange', 'Orange Spectrum', 'Tropical Sunrise', 'Peach Cloud', 'Tiger Amber & Blues']
+      .map((n) => [n, ['pattern']])),
+  };
+  const DESIGN_NAMES = { marble: 'marble', floral: 'floral', watercolor: 'watercolor', pattern: 'pattern', geometric: 'stripes', decor: 'photo background', wash: 'this journal’s art' };
+  function paletteFit(pl, design) {
+    const home = (PALETTE_HOME[pl.name] || (pl.journal ? ['wash'] : [])).includes(design);
+    const valid = paletteVariations(pl, design).filter((v) => v._label !== 'As designed' && !/closest/.test(v._label)).length;
+    return { home, valid, grade: home ? 'made for it' : valid >= 3 ? 'strong' : valid >= 2 ? 'good' : valid ? 'limited' : 'weak' };
+  }
+  // "Recommended for this design": the background's own palette, then palettes made for this kind of design, then the
+  // ones the engine arranges best here (at most 8; your own palettes stay in their own group).
+  function recommendedPalettes(list, design) {
+    const own = paletteByName(recommendedName()), pool = list.filter((pl) => !customPals().includes(pl));
+    const scored = pool.map((pl, i) => ({ pl, i, ...paletteFit(pl, design) })).filter((x) => x.home || x.valid >= 2);
+    scored.sort((a, b) => (b.pl === own) - (a.pl === own) || b.home - a.home || b.valid - a.valid || a.i - b.i);
+    return scored.slice(0, 8).map((x) => x.pl);
+  }
+
+  // Palette cards: a crisp swatch strip and the name (no tiny cover renders). The selected palette gets a larger detail
+  // (its cover, arrangement and the colors actually applied) above the list.
   function buildPalettes() {
     const box = $('palettes'); box.innerHTML = '';
-    const match = paletteMatch();
-    palettesFor(state.journal).forEach((pl) => {
+    const match = paletteMatch(), design = designType(state), list = palettesFor(state.journal);
+    const card = (pl) => {
       const b = document.createElement('button'), mine = state.customPalettes.includes(pl);
       const av = activeVariation(pl);
       if (av || (!state.paletteVar && match && match.name === pl.name)) b.className = 'selected';
-      b.title = pl.name;
-      b.innerHTML = `<canvas class="thumb" data-palette="${pl.name}"></canvas><div class="swatch-row">${(pl.swatch || pl.swatches || ['stone', 'vein', 'highlight', 'plate', 'trim'].map((k) => pl[k])).map((c) => `<i style="background:${c}"></i>`).join('')}</div><span>${mine ? '★ ' : ''}${pl.name}${av && av.count > 1 ? ` <small class="pal-var" title="${av.label} — click again for the next arrangement">${av.index + 1}/${av.count}</small>` : ''}</span>`;
+      b.title = pl.name; b.dataset.palette = pl.name;
+      b.innerHTML = `<div class="swatch-row">${(pl.swatch || pl.swatches || ['stone', 'vein', 'highlight', 'plate', 'trim'].map((k) => pl[k])).map((c) => `<i style="background:${c}"></i>`).join('')}</div><span>${mine ? '★ ' : ''}${pl.name}${av && av.count > 1 ? ` <small class="pal-var" title="${av.label} — click again for the next arrangement">${av.index + 1}/${av.count}</small>` : ''}</span>`;
       // Colors only: background, plate, lettering and header design stay exactly as they are.
       b.onclick = () => applyPaletteClick(pl);
       if (mine) {
@@ -4001,10 +4101,29 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
         del.onclick = (e) => { e.stopPropagation(); if (confirm(`Delete your palette “${pl.name}”?`)) { state.customPalettes = state.customPalettes.filter((x) => x !== pl); commit(); } };
         b.appendChild(del);
       }
-      box.appendChild(b);
-    });
-    const cur = state.paletteVar && palettesFor(state.journal).find((pl) => activeVariation(pl));
+      return b;
+    };
+    const group = (label, items, note = '') => {
+      if (!items.length) return;
+      const h = document.createElement('div'); h.className = 'pal-group'; h.innerHTML = `<span>${label}</span>${note ? `<small>${note}</small>` : ''}`;
+      const g = document.createElement('div'); g.className = 'pal-grid'; items.forEach((pl) => g.appendChild(card(pl)));
+      box.append(h, g);
+    };
+    const rec = recommendedPalettes(list, design), rest = list.filter((pl) => !rec.includes(pl));
+    group('Recommended for this design', rec, DESIGN_NAMES[design] || '');
+    group(state.journal === 'dream' ? 'More palettes' : 'More for this journal', rest.filter((pl) => !FAMILY_PALETTES.includes(pl) && !customPals().includes(pl)));
+    group('Color families', rest.filter((pl) => FAMILY_PALETTES.includes(pl)));
+    group('Your palettes', rest.filter((pl) => customPals().includes(pl)));
+    const cur = state.paletteVar && list.find((pl) => activeVariation(pl));
     $('paletteName').textContent = cur ? `${cur.name}${state.paletteVar.count > 1 ? ` · ${state.paletteVar.label} ${state.paletteVar.index + 1}/${state.paletteVar.count}` : ''}` : match ? match.name : 'Custom version';
+    // Selected detail: what is applied right now.
+    const sel = cur || match;
+    $('paletteDetail').classList.remove('hidden');
+    $('paletteDetailName').textContent = sel ? sel.name : 'Your own colors';
+    $('paletteDetailVar').textContent = cur ? `${state.paletteVar.label}${state.paletteVar.count > 1 ? ` · ${state.paletteVar.index + 1} of ${state.paletteVar.count} — tap again for the next` : ''}` : sel ? 'As designed' : 'Edited under Layers';
+    const p = state.palette;
+    $('paletteRoles').innerHTML = [['stone', 'Background'], ['vein', 'Veins / second color'], ['highlight', 'Highlight'], ['plate', 'Plate'], ['trim', 'Trim'], ['paper', 'Page']]
+      .filter(([k]) => p[k]).map(([k, n]) => `<i title="${n}" style="background:${p[k]}"></i>`).join('');
   }
 
   // Background/title-plate buttons are generated from the registry's approved slot list for this
@@ -4422,12 +4541,9 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       const base = { ...state, accentOpacity: Math.max(state.accentOpacity, 60) };
       // Each palette previewed as a mini cover with the current marble, plate, lettering and accent — only the colors differ.
       // Prayer journals preview their own cover, recolored exactly as picking that palette would.
-      const cover = COVERS[state.journal] || renderCover, rec = recommendedName();
-      document.querySelectorAll('#palettes canvas[data-palette]').forEach((c) => {
-        const pal = paletteByName(c.dataset.palette), av = activeVariation(pal), v = paletteVariations(pal, designType(state))[av ? av.index : 0];
-        const { _label, ...roles } = v, isOrig = pal.name === rec && !pal.family && !(av && av.index);
-        cover(c, 96, { ...base, palette: { ...roles }, prayerArt: isOrig ? 'original' : 'palette', bgArt: isOrig ? state.bgArt : 'palette' });
-      });
+      const cover = COVERS[state.journal] || renderCover;
+      // The selected palette's detail: the cover as it is now, rendered at 2× its display size so it stays crisp.
+      cover($('paletteCover'), 180, base);
       // Each background previewed in the current colors.
       document.querySelectorAll('#marbleSeg button').forEach((b) => {
         let c = b.querySelector('canvas');
@@ -4631,6 +4747,25 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     refreshThumbs();
   }
 
+  // ---------- Phone workspace: Preview / Edit ----------
+  // Phones show one mode at a time: Preview (the page large, every page thumbnail, compare) or Edit (the settings under a
+  // small live preview that redraws with each change). Switching only changes the view; the journal's state is untouched,
+  // and Edit returns to where you were in the settings.
+  let phoneMode = 'preview', editScroll = 0;
+  try { phoneMode = localStorage.getItem('dove-studio-phone-mode') === 'edit' ? 'edit' : 'preview'; } catch {}
+  function setPhoneMode(m) {
+    if (m === phoneMode && document.body.classList.contains(`m-${m}`)) return;
+    if (phoneMode === 'edit' && document.body.classList.contains('m-edit')) editScroll = window.scrollY;
+    phoneMode = m;
+    document.body.classList.toggle('m-preview', m === 'preview'); document.body.classList.toggle('m-edit', m === 'edit');
+    document.querySelectorAll('#modeBar button').forEach((b) => { b.classList.toggle('active', b.dataset.mode === m); b.setAttribute('aria-pressed', b.dataset.mode === m); });
+    try { localStorage.setItem('dove-studio-phone-mode', m); } catch {}
+    window.scrollTo(0, m === 'edit' ? editScroll : 0);
+  }
+  document.querySelectorAll('#modeBar button').forEach((b) => b.onclick = () => setPhoneMode(b.dataset.mode));
+  setPhoneMode(phoneMode);
+  $('mPrev').onclick = () => $('prevPage').click();
+  $('mNext').onclick = () => $('nextPage').click();
   $('prevPage').onclick = () => { state.page = Math.max(0, state.page - 1); commit(false); };
   $('nextPage').onclick = () => { state.page = Math.min(pageList(state).length - 1, state.page + 1); commit(false); };
   document.addEventListener('keydown', (e) => {
@@ -4877,7 +5012,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   $('showGuides').onchange = (e) => { state.showGuides = e.target.checked; commit(false, false); };
 
   // ?debug exposes the renderers for visual QA (preview vs. export comparisons); off in normal use.
-  if (new URLSearchParams(location.search).has('debug')) window.__studio = { renderCover, renderPage, renderDesign, pageList, insideNumber, bindingSide, titleContrast, get state() { return state; }, commit, TITLE_PLATE_STYLES };
+  if (new URLSearchParams(location.search).has('debug')) window.__studio = { palettesFor, paletteVariations, designType, paletteFit, recommendedPalettes, PALETTE_HOME, renderCover, renderPage, renderDesign, pageList, insideNumber, bindingSide, titleContrast, get state() { return state; }, commit, TITLE_PLATE_STYLES };
   if (location.protocol === 'file:') { showBlocked(); return; }
   // Controls that only apply to the Dream Journal's modular cover/interior are hidden for the prayer journals.
   // Title plate, lettering, accents and decorations work on every journal; the Dream-only pieces (its preset designs,
