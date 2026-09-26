@@ -61,7 +61,9 @@ describe("placements attach to their targets", () => {
     expect(r.id).toBe("rule-right");
     const t = trim(r.rect!), rule = comp.headerRule!;
     expect(t.x + t.w).toBeCloseTo(rule.x + rule.w, 9);
-    expect(t.y + t.h).toBeCloseTo(rule.y - comp.gaps.toRule, 9);
+    // Grounded: the lowest ink stands on the rule (no hovering gap), the hanging end at the rule's end.
+    expect(t.y + t.h).toBeCloseTo(rule.y, 9);
+    expect(plan.pieces[0].kind === "raster" && plan.pieces[0].transform?.flipX).toBe(true);
     // Larger than a sprig: a real ornament, not a speck.
     const sprig = planFor(MONTHLY, { style: "floral", assetId: "jcs-floral-sprig", placement: "title-accent" }).plan.reports[0];
     expect(r.rect!.h).toBeGreaterThan(sprig.rect!.h);

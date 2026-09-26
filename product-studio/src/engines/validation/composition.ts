@@ -108,6 +108,11 @@ export function compositionChecks(doc: ResolvedDocument, g: PageGeometry, s: Sol
         for (const n of s.nodes) {
           if (n.type !== "rule" || !n.functional) continue;
           const t = ptToIn(n.strokePt) / 2;
+          if (r.attachedTo.includes(n.id)) {
+            // Standing ON its rule is the design; sinking through it is not.
+            if (cells.some((c) => c.x < n.rect.x + n.rect.w && c.x + c.w > n.rect.x && c.y + c.h > n.rect.y + t + TOL_IN)) push("decoration-overlap", id, `Decoration (${r.id}) sinks through the rule it should rest on (${n.id}).`, undefined, "warning");
+            continue;
+          }
           const rr = { x: n.rect.x - t, y: n.rect.y - t, w: n.rect.w + 2 * t, h: n.rect.h + 2 * t };
           if (cells.some((c) => overlaps(c, rr))) push("decoration-overlap", id, `Decoration (${r.id}) crosses the rule ${n.id}.`, undefined, "warning");
         }

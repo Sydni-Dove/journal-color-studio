@@ -127,6 +127,8 @@ export function fitObject(spec: ObjectSpec, comp: Composition): FitResult {
   if (spec.attach === "inside" && spec.fit === "cover") w0 = Math.max(R.w, R.h * ar);
   if (!(w0 > 0)) return none("no size available");
   const out = spec.bleedOut ?? 0;
+  const ink = inkCells(spec.assetId);
+  const inkBottom = ink.length ? Math.max(...ink.map((c) => (spec.transform.flipY ? 1 - c.v0 : c.v1))) : 1;
   const ax = spec.attachX ?? spec.attach, ay = spec.attachY ?? spec.attach;
   const gap = spec.gapIn ?? comp.clearanceIn;
 
@@ -137,7 +139,8 @@ export function fitObject(spec: ObjectSpec, comp: Composition): FitResult {
     else x = spec.alignX === "start" ? R.x : spec.alignX === "end" ? R.x + R.w - w : R.x + (R.w - w) / 2;
     if (ay === "outside") y = spec.alignY === "start" ? R.y - gap - h : spec.alignY === "end" ? R.y + R.h + gap : R.y + (R.h - h) / 2;
     else y = spec.alignY === "start" ? R.y : spec.alignY === "end" ? R.y + R.h - h : R.y + (R.h - h) / 2;
-    if (spec.restOnY !== undefined) y = spec.alignY === "end" ? spec.restOnY - h : spec.restOnY - h / 2;
+    // Resting on a line: the artwork's LOWEST INK (not its image box) touches the line.
+    if (spec.restOnY !== undefined) y = spec.alignY === "end" ? spec.restOnY - h * inkBottom : spec.restOnY - h / 2;
     // Pieces aligned to a page edge run to the bleed edge — or, in bleed mode, deliberately past it.
     if (ax === "inside" && !spec.bounds) {
       // Never push more than 45% of the art off the page: the rest must still read.

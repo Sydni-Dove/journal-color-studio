@@ -151,19 +151,20 @@ describe("B · 7×9 Monthly · Floral header sprigs attach to the title / title 
     expect(titlePositionsFor("jcs-floral-corner")).toEqual([]);
   });
 
-  it("right of title: titleAccentGap after the title's ink, vertically centred on it", () => {
+  it("right of title: titleAccentGap after the title's ink, standing on the title rule (grounded)", () => {
     const { plan, comp, trim } = planFor(build(MONTHLY), sprig("title-right"));
     const t = trim(plan.reports[0].rect!), title = comp.regions.title!;
     expect(t.x).toBeCloseTo(title.x + title.w + comp.gaps.titleAccent, 9);
-    expect(center(t).y).toBeCloseTo(center(title).y, 9);
-    expect(plan.reports[0].attachedTo).toEqual([comp.titleId]);
+    expect(t.y + t.h).toBeCloseTo(comp.headerRule!.y, 9);
+    expect(plan.reports[0].attachedTo).toEqual([comp.titleId, comp.headerRuleId]);
   });
 
-  it("left of title (centred title): titleAccentGap before the title's ink, mirrored", () => {
+  it("left of title (centred title): titleAccentGap before the title's ink, standing on the rule, mirrored", () => {
     const { plan, comp, trim } = planFor(centerTitle(build(MONTHLY)), sprig("title-left"));
     const t = trim(plan.reports[0].rect!), title = comp.regions.title!;
     expect(t.x + t.w).toBeCloseTo(title.x - comp.gaps.titleAccent, 9);
-    expect(center(t).y).toBeCloseTo(center(title).y, 9);
+    expect(t.y + t.h).toBeCloseTo(comp.headerRule!.y, 9);
+    // The sprig's grounded (low) end is on its left: mirrored so that end sits next to the title.
     expect(plan.pieces[0].kind === "raster" && plan.pieces[0].transform?.flipX).toBe(true);
   });
 
@@ -173,20 +174,23 @@ describe("B · 7×9 Monthly · Floral header sprigs attach to the title / title 
     expect(r.reason).toBeTruthy();
   });
 
-  it("title-rule centre: rests decorationToRuleGap above the rule, centred on it", () => {
+  it("title-rule centre: rests ON the rule (lowest ink touches the line), centred on it", () => {
     const { plan, comp, trim } = planFor(build(MONTHLY), sprig("rule-center"));
     const t = trim(plan.reports[0].rect!), rule = comp.headerRule!;
-    expect(t.y + t.h).toBeCloseTo(rule.y - comp.gaps.toRule, 9);
+    expect(t.y + t.h).toBeCloseTo(rule.y, 9);
     expect(center(t).x).toBeCloseTo(center(rule).x, 9);
   });
 
-  it("both rule ends (centred title): one sprig at each end of the rule, facing inward", () => {
+  it("both rule ends (centred title): one sprig standing on each end, grounded end outward, arch lifting inward", () => {
     const { plan, comp, trim } = planFor(centerTitle(build(MONTHLY)), sprig("rule-both"));
     const rule = comp.headerRule!;
     const [l, r] = ["rule-left", "rule-right"].map((id) => plan.reports.find((x) => x.id === id)!);
     expect(trim(l.rect!).x).toBeCloseTo(rule.x, 9);
     expect(trim(r.rect!).x + r.rect!.w).toBeCloseTo(rule.x + rule.w, 9);
-    for (const x of [l, r]) expect(trim(x.rect!).y + x.rect!.h).toBeCloseTo(rule.y - comp.gaps.toRule, 9);
+    for (const x of [l, r]) expect(trim(x.rect!).y + x.rect!.h).toBeCloseTo(rule.y, 9);
+    const flips = plan.pieces.map((p) => (p.kind === "raster" ? !!p.transform?.flipX : null));
+    // The art hangs low on its left: unmirrored at the left end, mirrored at the right end.
+    expect(flips).toEqual([false, true]);
   });
 
   it("each case validates clean and renders differently; Automatic balances the title", () => {
@@ -300,7 +304,7 @@ describe("composition validation: placement rules", () => {
   it("a rule accent nudged down across the rule is flagged (unintended rule overlap)", () => {
     const p = build(MONTHLY);
     p.decorativeTheme = { ...p.decorativeTheme, style: "floral", assetId: "jcs-floral-sprig", placement: "title-accent", titlePosition: "rule-right", layout: { offsetYIn: 0.12 } };
-    expect(issuesFor(p).some((i) => i.rule === "decoration-overlap" && /crosses the rule/.test(i.message))).toBe(true);
+    expect(issuesFor(p).some((i) => i.rule === "decoration-overlap" && /sinks through the rule/.test(i.message))).toBe(true);
   });
   it("bleed that no longer reaches the edge is flagged as incorrectly contained", () => {
     const p = build(4);

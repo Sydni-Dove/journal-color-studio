@@ -32,10 +32,12 @@ import {
   DECORATION_CAPABILITIES,
   FLORAL_CORNER_OF_SHORT_SIDE,
   FLORAL_FLANK,
+  groundedSide,
   TITLE_ACCENT_EM,
   LINE_FLOURISH_OF_PAGE,
 } from "../design-library/placement";
 import { inflate, union } from "../engines/composition/composition";
+import { OCCUPANCY } from "../design-library/occupancy";
 import { fitObject, MIN_LONG_SIDE_IN, type ArtTransform, type ObjectSpec } from "../engines/composition/fit";
 import type { Composition, CompositionAnchor, Corner, DecorationPlacement, ProtectedRect } from "../types/composition";
 import type { PageGeometry, Rect } from "../types/geometry";
@@ -311,23 +313,32 @@ function cornerSpecs(comp: Composition, set: CornerSet, kind: "floral" | "accent
 const sameRule = (p: ProtectedRect, rule: Rect) => p.kind === "rule" && Math.abs(p.rect.y + p.rect.h / 2 - (rule.y + rule.h / 2)) < 1e-6 && p.rect.x <= rule.x + 1e-6;
 
 /** Title-accent pieces: attached to the title's ink or to its rule, at the semantic gap tokens. */
-function titleAccentSpecs(comp: Composition, pos: TitleAccentPosition, preferredW: number): Spec[] {
+function titleAccentSpecs(comp: Composition, pos: TitleAccentPosition, preferredW: number, assetId: string): Spec[] {
   const g = comp.gaps;
   const contained = containedBounds(comp);
   const title = comp.titleId;
   const rule = comp.headerRule;
+  const ruleId = comp.headerRuleId;
   const onTitle = (p: ProtectedRect) => p.id === title;
   const common = { mode: "contained" as const, preferredW, bounds: contained };
+  // Florals are GROUNDED: the lowest ink rests on the title rule (no gap), and each piece is mirrored so its
+  // hanging end lands on the line while the arch lifts away from it — never a spray hovering in the air.
+  const low = groundedSide(OCCUPANCY[assetId]);
+  const lowAt = (side: "left" | "right"): ArtTransform => ({ flipX: low !== side });
+  const onLine = (p: ProtectedRect) => !!rule && (sameRule(p, rule) || p.rect.y + g.toContent >= rule.y - 1e-6);
   const beside = (side: "start" | "end"): Spec => ({
-    ...base({ anchor: "title", attach: "outside", alignX: side, alignY: "center", fit: "natural", allowBleed: false }),
+    ...base({ anchor: "title", attach: "outside", alignX: side, alignY: rule ? "end" : "center", fit: "natural", allowBleed: false }),
     ...common,
     id: side === "start" ? "title-left" : "title-right",
     attachY: "inside",
     gapIn: g.titleAccent,
-    ignore: onTitle,
-    attachedTo: title ? [title] : [],
+    // With a rule: stands on it beside the title. Without one: rests on the title's own baseline.
+    restOnY: rule ? rule.y : comp.regions.title ? comp.regions.title.y + comp.regions.title.h : undefined,
+    ignore: (p) => onTitle(p) || onLine(p),
+    attachedTo: [...(title ? [title] : []), ...(ruleId ? [ruleId] : [])],
     targetGapIn: g.titleAccent,
-    transform: { flipX: side === "start" },
+    // The grounded end sits next to the title; the arch lifts away from it.
+    transform: lowAt(side === "end" ? "left" : "right"),
   });
   const aboveBelow = (y: "start" | "end", x: "start" | "center" | "end", id: string): Spec => ({
     ...base({ anchor: "title", attach: "outside", alignX: x, alignY: y, fit: "natural", allowBleed: false }),
@@ -344,12 +355,13 @@ function titleAccentSpecs(comp: Composition, pos: TitleAccentPosition, preferred
     ...base({ anchor: "titleRule", attach: "inside", alignX: x, alignY: "end", fit: "natural", allowBleed: false }),
     ...common,
     id,
-    // Sits ON the title rule, a decorationToRuleGap above it; content beyond the rule is separated by the rule.
-    restOnY: rule ? rule.y - g.toRule : undefined,
-    ignore: (p) => !!rule && (sameRule(p, rule) || p.rect.y + g.toContent >= rule.y - 1e-6),
-    attachedTo: [],
-    targetGapIn: g.toRule,
-    transform: { flipX: x === "start" },
+    // Rests ON the title rule; content beyond the rule is separated by the rule itself.
+    restOnY: rule ? rule.y : undefined,
+    ignore: onLine,
+    attachedTo: ruleId ? [ruleId] : [],
+    targetGapIn: 0,
+    // At an end of the rule the grounded end lands on that end and the arch lifts inward (toward the title).
+    transform: x === "center" ? {} : lowAt(x === "end" ? "right" : "left"),
   });
   const titleAlign = comp.titleAlign;
   switch (pos) {
@@ -566,12 +578,12 @@ export function planDecoration(g: PageGeometry, input: DecorativeTheme, colors: 
       // JCS floralFlank sizing: the sprig is 1.5 title em tall; the bouquet, a larger rule ornament, 2.2 — never below the minimum ornament.
       const h = comp.titleEmIn * (TITLE_ACCENT_EM[asset.id] ?? FLORAL_FLANK.heightPerTitleEm) * theme.scale;
       const preferredW = Math.max(h * ar, ar >= 1 ? MIN_LONG_SIDE_IN : MIN_LONG_SIDE_IN * ar);
-      if (theme.titlePosition) specs = titleAccentSpecs(comp, theme.titlePosition, preferredW);
+      if (theme.titlePosition) specs = titleAccentSpecs(comp, theme.titlePosition, preferredW, asset.id);
       else {
         // Automatic: the balancing default, else the first position where the whole accent fits.
         const order = [defaultTitlePosition(comp), ...AUTO_TITLE_ORDER].filter((p) => titlePositionsFor(asset.id).includes(p));
-        const pick = order.find((p) => run(titleAccentSpecs(comp, p, preferredW)).reports.every((r) => r.rect)) ?? order[0];
-        specs = titleAccentSpecs(comp, pick, preferredW);
+        const pick = order.find((p) => run(titleAccentSpecs(comp, p, preferredW, asset.id)).reports.every((r) => r.rect)) ?? order[0];
+        specs = titleAccentSpecs(comp, pick, preferredW, asset.id);
       }
     } else if (theme.placement === "top-bottom" || theme.placement === "footer-flourish") {
       // Edge flourishes ENTER from the page edge (run edgeBleedAmount past the trim, on purpose) and shrink clear

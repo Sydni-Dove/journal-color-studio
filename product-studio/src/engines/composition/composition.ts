@@ -152,6 +152,7 @@ export function resolveComposition(
     protected: prot,
     content: union(raw),
     headerRule: rule ? rule.rect : null,
+    headerRuleId: rule ? rule.id : null,
     titleId: title?.id ?? null,
     titleAlign: align === "center" ? "center" : align === "right" ? "end" : "start",
     corners: cornerRegions(W, H, inset, clearance),

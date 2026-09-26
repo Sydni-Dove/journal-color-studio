@@ -86,8 +86,9 @@ export type Composition = {
   protected: ProtectedRect[];
   /** Bounding box of all functional content (not inflated). */
   content: Rect | null;
-  /** The rule under the page title, when the header has one. */
+  /** The rule under the page title, when the header has one (and its node id). */
   headerRule: Rect | null;
+  headerRuleId: string | null;
   /** The page title node (its protected rect id) and how it is aligned. */
   titleId: string | null;
   titleAlign: "start" | "center" | "end";

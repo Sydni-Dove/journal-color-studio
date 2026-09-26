@@ -148,3 +148,19 @@ export const LINE_FLOURISH_OF_PAGE = 0.3;
 
 /** Title / rule ornament height in title em, per artwork (default: FLORAL_FLANK.heightPerTitleEm). */
 export const TITLE_ACCENT_EM: Record<string, number> = { "jcs-floral-bouquet": 2.2 };
+
+/**
+ * The side of an artwork whose ink hangs lowest — its grounded end. A spray
+ * that lifts up on one side must land on a line with the OTHER side: the
+ * layout orients it so this end rests on the rule. Read from the artwork's
+ * real alpha footprint (bottom rows of the occupancy grid).
+ */
+export function groundedSide(rows: string[] | undefined): "left" | "right" {
+  if (!rows?.length) return "left";
+  const n = rows.length;
+  let sum = 0, count = 0;
+  for (const row of rows.slice(Math.floor(n * 0.8))) {
+    for (let x = 0; x < row.length; x++) if (row[x] === "1") (sum += x / (row.length - 1)), count++;
+  }
+  return count && sum / count > 0.5 ? "right" : "left";
+}
