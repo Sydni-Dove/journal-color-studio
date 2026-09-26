@@ -278,6 +278,36 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       <div id="textFields"></div>
     </div>
 
+    <div class="card hidden" id="readingPanelCard">
+      <h2>Reading panel <span id="readingPanelWhere"></span></h2>
+      <label class="field"><span>Show panel</span>
+        <select id="readingPanelShow">
+          <option value="auto">Automatic</option>
+          <option value="on">Always show on this page</option>
+          <option value="off">Hide on this page</option>
+        </select></label>
+      <p class="hint" style="margin:6px 0 0" id="readingPanelMode"></p>
+      <div class="row2" id="readingPanelColorRow">
+        <div class="field"><span>Panel color</span>
+          <select id="readingPanelColor">
+            <option value="paper">Paper (palette)</option>
+            <option value="white">White</option>
+            <option value="cream">Cream</option>
+            <option value="neutral">Palette neutral</option>
+            <option value="custom">Custom color</option>
+          </select>
+        </div>
+        <div class="field"><span>Custom</span><input type="color" id="readingPanelCustom" aria-label="Custom reading panel color" style="height:36px;width:100%"></div>
+      </div>
+      <label class="slider" id="readingPanelOpacityRow"><span>Panel opacity <b id="readingPanelOpacityVal"></b></span><input type="range" id="readingPanelOpacity" min="0" max="100"></label>
+      <div class="seg" id="readingPanelPad" style="margin-top:8px">
+        <button data-pad="tight"><strong>Tight</strong><small>Close to the text</small></button>
+        <button data-pad="normal"><strong>Normal</strong></button>
+        <button data-pad="generous"><strong>Generous</strong><small>Covers more</small></button>
+      </div>
+      <span class="hint">Sits on top of the background, behind the text. The text and page layout don’t move.</span>
+    </div>
+
     <div class="card">
       <h2>Typography <span>cover, headings, body</span></h2>
       <div class="group-label">Cover title <span class="hint" id="coverFontNote"></span></div>
@@ -875,6 +905,10 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     text: {},                            // edited wording per journal: { [journal]: { [slotId]: string } } (see TEXT_SLOTS)
     // Title box fill behind the cover title (off by default). color: a palette role, 'neutral', 'white', 'black' or 'custom'.
     titleFill: { on: false, color: 'paper', custom: '#FFFFFF', opacity: 85, pad: 'normal' },
+    // Reading panels behind text set on a textured area, per page type (see READING_PANEL_PAGES).
+    // mode: 'auto' (the background decides), 'on' or 'off'. color: 'paper', 'white', 'cream', 'neutral' or 'custom'.
+    readingPanels: { brainstormQ: { mode: 'auto', color: 'paper', custom: '#FFFFFF', opacity: 90, pad: 'normal' },
+      contents: { mode: 'auto', color: 'paper', custom: '#FFFFFF', opacity: 90, pad: 'normal' } },
   };
   const STORE_KEY = 'dove-marble-studio';
   let state = structuredClone(DEFAULTS);
@@ -931,6 +965,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     if (state.journal === 'dream' && state.marble === 'journal') state.marble = DEFAULTS.marble;
     if (!state.text || typeof state.text !== 'object') state.text = {};
     state.titleFill = { ...DEFAULTS.titleFill, ...(state.titleFill && typeof state.titleFill === 'object' ? state.titleFill : {}) };
+    state.readingPanels = Object.fromEntries(Object.entries(DEFAULTS.readingPanels).map(([k, d]) => [k, { ...d, ...(state.readingPanels?.[k] || {}) }]));
     state.customPalettes = Array.isArray(state.customPalettes) ? state.customPalettes : [];          // the procedural watercolor was retired
     state.decor = Object.fromEntries(Object.entries(DEFAULTS.decor).map(([k, d]) => [k, { ...d, ...(state.decor?.[k] || {}) }]));
   } catch {}
@@ -2770,6 +2805,38 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
 
   // Dark sidebar used on the first Dream and first Brainstorm page of each cycle.
   // cardH: height of the paper card behind sidebar content on art backgrounds (default: full height).
+  // ---------- Reading panels (text set on a textured area) ----------
+  // Render stack: background / texture → READING PANEL → text. Pages with the control (READING_PANEL_PAGES), each with
+  // its own setting in state.readingPanels[page] (per journal):
+  //   brainstormQ – the Questions to Consider sidebar. Automatic (the original behavior): on for Abstract watercolor and
+  //                 the Canva photo/image backgrounds (img:*), unless the header fill is a solid stone color.
+  //   contents    – the Table of Contents legend strip. Automatic: off (as before).
+  // The user can force a page's panel on or off and choose its color, opacity and padding. Dream + legend stays automatic.
+  const READING_PANEL_PAGES = { brainstormQ: 'behind Questions to Consider', contents: 'behind the contents legend strip' };
+  const readingPanelAuto = (s, type = 'brainstormQ') => type === 'brainstormQ' && !floralDesign(s) && s.headerFill !== 'solid' && (s.marble === 'abstract' || s.marble.startsWith('img:'));
+  const RP_PAD = { tight: -1, normal: 0, generous: 1 };
+  // A page's panel: null, or { hex, alpha, lvl }.
+  function pagePanel(s, type) {
+    const r = s.readingPanels?.[type] || DEFAULTS.readingPanels[type];
+    const on = r.mode === 'on' || (r.mode !== 'off' && readingPanelAuto(s, type));
+    return on && r.opacity > 0 ? { hex: readingPanelColor(s, r), alpha: r.opacity / 100, lvl: RP_PAD[r.pad] ?? 0 } : null;
+  }
+  function readingPanelColor(s, r) {
+    const p = s.palette;
+    return r.color === 'custom' ? r.custom : r.color === 'white' ? '#FFFFFF' : r.color === 'cream' ? '#F4EFE6'
+      : r.color === 'neutral' ? blendHex(p.paper, '#7F7A78', .13) : p.paper;
+  }
+  // The panel to draw on this sidebar page: null, or { hex, alpha, lvl }.
+  function sidebarPanel(s) {
+    if (s._type === 'brainstormQ') return pagePanel(s, 'brainstormQ');
+    return readingPanelAuto(s) ? { hex: s.palette.paper, alpha: .9, lvl: 0 } : null;
+  }
+  // Text on a panel: the palette ink, unless the chosen panel color needs a more readable tone of the lettering.
+  function panelInk(s, hex = s._card.hex) {
+    const ink = inkColor(s.palette);
+    return contrast(ink, hex) >= 4.5 ? ink : bodyInk(s, s.palette.title, hex);
+  }
+
   function sidebarPage(ctx, W, H, s, id, fillSidebar, cardH = H * .964) {
     ctx.fillStyle = s.palette.paper; ctx.fillRect(0, 0, W, H);
     if (s.accent !== 'none' && s.accentLined) drawAccent(ctx, W, H, s, true);
@@ -2778,10 +2845,12 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     writingLines(ctx, W, H, s, W * .045, sx - W * .03, top, H * .965);
     if (floralDesign(s)) { const [r, g, b] = hexRgb(s.palette.paper); ctx.fillStyle = `rgb(${r * .945},${g * .945},${b * .945})`; ctx.fillRect(sx, 0, W - sx, H); }
     else stoneBar(ctx, sx, 0, W - sx, H, s);
-    // Art backgrounds (Canva watercolor/photos) are busy: sidebar content sits on a soft paper card.
-    if (!floralDesign(s) && s.headerFill !== 'solid' && (s.marble === 'abstract' || s.marble.startsWith('img:'))) {
-      ctx.fillStyle = rgba(s.palette.paper, .9); roundRect(ctx, sx + W * .018, H * .018, W - sx - W * .036, cardH, W * .02); ctx.fill();
-      s._card = true;
+    // Busy backgrounds: sidebar content sits on a soft reading panel (automatic on art backgrounds; see sidebarPanel).
+    const panel = sidebarPanel(s);
+    if (panel) {
+      const dx = panel.lvl * W * .006, dy = panel.lvl * H * .006;
+      ctx.fillStyle = rgba(panel.hex, panel.alpha); roundRect(ctx, sx + W * .018 - dx, H * .018 - dy, W - sx - W * .036 + 2 * dx, cardH + 2 * dy, W * .02); ctx.fill();
+      s._card = panel;
     }
     fillSidebar(sx + W * .03, W - sx - W * .06);
   }
@@ -3043,7 +3112,14 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       }
       const ly = H * .055, lh = H * .04;
       stoneBar(ctx, 0, ly, W, lh, s);
-      ctx.fillStyle = textOnPanel(s, p.title, p.stone); ctx.font = font(H * .015, { italic: true }); ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+      // Optional reading panel behind the legend (off unless the user turns it on); its lettering then reads on the panel.
+      const panel = pagePanel(s, 'contents');
+      if (panel) {
+        // Edge to edge (bleeds off both sides like the strip); padding sets how much of the strip's height it covers.
+        const iy = [lh * .16, lh * .08, 0][panel.lvl + 1];
+        ctx.fillStyle = rgba(panel.hex, panel.alpha); ctx.fillRect(0, ly + iy, W, lh - 2 * iy);
+      }
+      ctx.fillStyle = panel ? panelInk(s, panel.hex) : textOnPanel(s, p.title, p.stone); ctx.font = font(H * .015, { italic: true }); ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
       [['Status', .1], ['N = Not Interpreted', .3], ['I = Interpreted', .6], ['A = Application', .8]].forEach(([t, f]) => ctx.fillText(t, W * f, ly + lh / 2));
       ctx.fillRect(W * .175, ly + lh * .2, Math.max(1, W * .002), lh * .6);
       ctx.fillStyle = ink; ctx.font = font(H * .045); fillFit(ctx, s, 'contentsTitle', T(s, 'contentsTitle'), W / 2, H * .135, W * .88);
@@ -3130,12 +3206,12 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
         QUESTIONS.forEach((q) => { y = wrapText(ctx, q, x, y + H * .02, w, H * .0235, 'center', draw); });
         return y;
       };
-      // Measure first so the card on art backgrounds ends just below the questions and the artwork shows beneath.
+      // The panel runs from the top to near the bottom of the sidebar (further only if very long wording needs it).
       const sx = W * .6, contentEnd = questions(sx + W * .03, W - sx - W * .06, false);
       sidebarPage(ctx, W, H, s, 'brainstormTitle', (x, w) => {
-        ctx.fillStyle = s._card ? inkColor(p) : bodyInk(s, p.title);
+        ctx.fillStyle = s._card ? panelInk(s) : bodyInk(s, p.title);
         questions(x, w, true);
-      }, contentEnd + H * .03 - H * .018);
+      }, Math.max(H * .964, contentEnd + H * .03 - H * .018));
     },
     brainstorm: linedPage('brainstormTitle', 'rule'),
     keys(ctx, W, H, s) {
@@ -4188,6 +4264,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       ? 'This bouquet artwork has its original “Dream Journal” lettering printed in, so with no plate that lettering is the title. Pick a plate to set your own title.'
       : 'The plate is sized to cover the lettering printed in this bouquet artwork.';
     syncTitleFill();
+    syncReadingPanel();
     $('coverFontNote').textContent = state.titleStyle === 'custom' ? '' : '(used when Cover lettering = Custom font)';
     $('shadowVal').textContent = state.titleShadow + '%';
     $('accentVal').textContent = state.accentOpacity + '%';
@@ -4366,6 +4443,33 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   $('titleFillCustom').oninput = (e) => setTitleFill({ custom: e.target.value, color: 'custom' });
   $('titleFillOpacity').oninput = (e) => setTitleFill({ opacity: Number(e.target.value) });
   document.querySelectorAll('#titleFillPad button').forEach((b) => b.onclick = () => setTitleFill({ pad: b.dataset.pad }));
+
+  // ---------- Reading panel controls (Brainstorm + questions) ----------
+  let panelPage = 'brainstormQ';
+  function syncReadingPanel() {
+    const type = currentType(), show = type in READING_PANEL_PAGES && !floralDesign(state);
+    $('readingPanelCard').classList.toggle('hidden', !show);
+    if (!show) return;
+    panelPage = type;
+    const r = state.readingPanels[type], auto = readingPanelAuto(state, type);
+    $('readingPanelWhere').textContent = READING_PANEL_PAGES[type];
+    const shown = r.mode === 'on' || (r.mode !== 'off' && auto);
+    $('readingPanelShow').value = r.mode;
+    $('readingPanelMode').textContent = r.mode !== 'auto' ? 'Applies on this page whatever the background.'
+      : type === 'brainstormQ' ? `Automatic is ${auto ? 'on' : 'off'} for this background (on for Abstract watercolor and the photo/image backgrounds).`
+      : 'Automatic is off for this strip.';
+    $('readingPanelColor').value = r.color; $('readingPanelCustom').value = r.custom; $('readingPanelOpacity').value = r.opacity;
+    $('readingPanelOpacityVal').textContent = r.opacity + '%';
+    for (const id of ['readingPanelColorRow', 'readingPanelOpacityRow', 'readingPanelPad']) $(id).classList.toggle('hidden', !shown);
+    $('readingPanelCustom').closest('.field').classList.toggle('hidden', r.color !== 'custom');
+    document.querySelectorAll('#readingPanelPad button').forEach((b) => b.classList.toggle('active', b.dataset.pad === r.pad));
+  }
+  const setReadingPanel = (patch) => { state.readingPanels = { ...state.readingPanels, [panelPage]: { ...state.readingPanels[panelPage], ...patch } }; commit(false); };
+  $('readingPanelShow').onchange = (e) => setReadingPanel({ mode: e.target.value });
+  $('readingPanelColor').onchange = (e) => setReadingPanel({ color: e.target.value });
+  $('readingPanelCustom').oninput = (e) => setReadingPanel({ custom: e.target.value, color: 'custom' });
+  $('readingPanelOpacity').oninput = (e) => setReadingPanel({ opacity: Number(e.target.value) });
+  document.querySelectorAll('#readingPanelPad button').forEach((b) => b.onclick = () => setReadingPanel({ pad: b.dataset.pad }));
   // Shown when more than a third of what sits behind the title is under 3:1 contrast with the title color.
   function showContrastWarning(probe) {
     const warn = $('contrastWarn'), low = probe && probe.share > .35;
@@ -4471,11 +4575,11 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   // Each journal keeps its own look (colors + lettering + fonts); a journal opened for the first time starts from its Canva design.
   const LOOK_KEYS = ['marble', 'bgArt', 'palette', 'prayerArt', 'titleStyle', 'coverFont', 'coverFontColorAuto', 'coverFontColor', 'headingFont', 'bodyFont', 'plateStyle', 'showPlate',
     'showFrame', 'showTrim', 'plateOpacity', 'decor', 'accent', 'accentPlace', 'accentOpacity', 'accentScale', 'accentLined', 'titleShadow',
-    'figureColor', 'prHide', 'prCardOpacity', 'prGlow', 'titleFill'];
+    'figureColor', 'prHide', 'prCardOpacity', 'prGlow', 'titleFill', 'readingPanels'];
   function journalDefaultLook(j) {
     const pal = JOURNALS[j]?.palette && paletteByName(JOURNALS[j].palette);
     return pal ? { palette: { ...pal }, prayerArt: 'original', titleStyle: 'serif', coverFont: 'Cinzel', coverFontColorAuto: true, headingFont: 'Cormorant Garamond', bodyFont: 'Cormorant Garamond',
-      plateStyle: 'none', showPlate: true, showFrame: true, showTrim: true, accent: 'none', decor: structuredClone(DEFAULTS.decor), marble: 'journal', bgArt: 'original', figureColor: null, prHide: {}, prCardOpacity: 85, prGlow: 100, titleFill: structuredClone(DEFAULTS.titleFill) } : null;
+      plateStyle: 'none', showPlate: true, showFrame: true, showTrim: true, accent: 'none', decor: structuredClone(DEFAULTS.decor), marble: 'journal', bgArt: 'original', figureColor: null, prHide: {}, prCardOpacity: 85, prGlow: 100, titleFill: structuredClone(DEFAULTS.titleFill), readingPanels: structuredClone(DEFAULTS.readingPanels) } : null;
   }
   function applyLook(look, j = state.journal) {
     if (!look) return;
@@ -4489,6 +4593,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     applyLook(state.looks[state.journal] || journalDefaultLook(state.journal));
     // Title box fill is per journal: its own saved setting, or off (never carried over from the journal just left).
     state.titleFill = structuredClone(state.looks[state.journal]?.titleFill || DEFAULTS.titleFill);
+    state.readingPanels = structuredClone(state.looks[state.journal]?.readingPanels || DEFAULTS.readingPanels);
     commit(true);
   };
 
