@@ -145,9 +145,9 @@ describe("B · 7×9 Monthly · Floral header sprigs attach to the title / title 
   const sprig = (titlePosition?: TitleAccentPosition) => ({ style: "floral", assetId: "jcs-floral-sprig", placement: "title-accent", titlePosition }) as const;
   const center = (r: Rect) => ({ x: r.x + r.w / 2, y: r.y + r.h / 2 });
 
-  it("offers exactly the sprig's declared positions (10) as a title accent", () => {
+  it("offers only positions ATTACHED to the title or its rule (no floating above / below the title)", () => {
     expect(placementsFor({ style: "floral", assetId: "jcs-floral-sprig" })).toEqual(["title-accent"]);
-    expect(titlePositionsFor("jcs-floral-sprig")).toEqual(["title-left", "title-right", "title-above", "title-above-center", "title-below", "title-below-center", "rule-left", "rule-center", "rule-right", "rule-both"]);
+    expect(titlePositionsFor("jcs-floral-sprig")).toEqual(["title-left", "title-right", "rule-left", "rule-center", "rule-right", "rule-both"]);
     expect(titlePositionsFor("jcs-floral-corner")).toEqual([]);
   });
 
@@ -173,13 +173,6 @@ describe("B · 7×9 Monthly · Floral header sprigs attach to the title / title 
     expect(r.reason).toBeTruthy();
   });
 
-  it("centred above title: decorationToTitleGap above the ink, centred on it", () => {
-    const { plan, comp, trim } = planFor(build(MONTHLY), sprig("title-above-center"));
-    const t = trim(plan.reports[0].rect!), title = comp.regions.title!;
-    expect(t.y + t.h).toBeCloseTo(title.y - comp.gaps.toTitle, 9);
-    expect(center(t).x).toBeCloseTo(center(title).x, 9);
-  });
-
   it("title-rule centre: rests decorationToRuleGap above the rule, centred on it", () => {
     const { plan, comp, trim } = planFor(build(MONTHLY), sprig("rule-center"));
     const t = trim(plan.reports[0].rect!), rule = comp.headerRule!;
@@ -197,7 +190,7 @@ describe("B · 7×9 Monthly · Floral header sprigs attach to the title / title 
   });
 
   it("each case validates clean and renders differently; Automatic balances the title", () => {
-    const cases: [boolean, TitleAccentPosition][] = [[false, "title-right"], [true, "title-left"], [false, "title-above-center"], [false, "rule-center"], [true, "rule-both"]];
+    const cases: [boolean, TitleAccentPosition][] = [[false, "title-right"], [true, "title-left"], [false, "rule-right"], [false, "rule-center"], [true, "rule-both"]];
     const renders = new Set<string>();
     for (const [centred, pos] of cases) {
       const p = build(MONTHLY);
@@ -211,7 +204,7 @@ describe("B · 7×9 Monthly · Floral header sprigs attach to the title / title 
     expect(defaultTitlePosition(left.comp)).toBe("rule-right");
     expect(left.plan.reports.map((r) => r.id)).toEqual(["rule-right"]);
     const mid = planFor(centerTitle(build(MONTHLY)), sprig());
-    expect(defaultTitlePosition(mid.comp)).toBe("title-above-center");
+    expect(defaultTitlePosition(mid.comp)).toBe("rule-both");
   });
 
   it("old 'title-flank' / floral header-band settings migrate to the title accent", () => {

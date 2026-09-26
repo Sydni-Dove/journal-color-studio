@@ -2,6 +2,8 @@
  * Design controls. Every control here is gated by ProjectUsage: it appears
  * only when the current product consumes it, so none is a placebo.
  */
+import { ROLE_LABEL, rolesFor } from "../../design-library/placement";
+import { findAsset } from "../../design-library/library";
 import { applyVariant } from "../../engines/document/resolve";
 import type { ProjectUsage } from "../../engines/document/usage";
 import { GRID_PRESETS, RULING_PRESETS } from "../../engines/patterns/patterns";
@@ -289,16 +291,18 @@ const DESIGN_CHOICES: { value: string; label: string; style: DecorativeTheme["st
   ...DESIGN_ASSETS.map((a) => ({ value: a.id, label: `${a.type === "marble" ? "Marble" : a.type === "floral" ? "Floral" : "Line art"} — ${a.label}`, style: a.type, assetId: a.id })),
 ];
 const PLACEMENT_LABEL: Record<DecorativePlacement, string> = {
-  "full-page": "Full page (behind content, soft)",
-  "header-band": "Header band (above the title)",
+  "full-page": "Full background (behind content, soft)",
+  "header-band": "Header band",
+  "footer-band": "Footer band",
+  "edge-strip": "Edge strip (outer edge)",
   "border-frame": "Margin frame (around content)",
-  corners: "Corner accent",
-  "title-accent": "Title accent",
-  "top-bottom": "Top + bottom edges",
+  corners: "Corner flourish",
+  "title-accent": "Title & rule ornament",
+  "top-bottom": "Top + bottom edge flourish",
   "behind-title": "Behind the title (subtle)",
-  "edge-accent": "Edge accent (runs off the side edge)",
+  "edge-accent": "Edge flourish (enters from the side)",
   "header-flourish": "Header flourish (on the title rule)",
-  "footer-flourish": "Footer flourish (below the content)",
+  "footer-flourish": "Footer flourish",
 };
 const CORNER_LABEL: Record<CornerSet, string> = {
   "opposite-tl-br": "Upper-left + lower-right",
@@ -367,6 +371,7 @@ export function DecorationPanel({ project, update, usage, decor }: PanelProps & 
   const setLayout = (patch: Partial<DecorationPlacementOverrides>) => set({ layout: { ...(d.layout ?? {}), ...patch } });
   const choice = d.style === "marble" || d.style === "floral" || d.style === "accent" ? d.assetId! : d.style;
   const placements = placementsFor(d);
+  const designRoles = d.style === "solid" || d.style === "watercolor" ? rolesFor(["header-band", "footer-band", "edge-strip", "margin-frame", "background"]) : d.style === "none" ? [] : rolesFor(findAsset(d.assetId)?.capabilities ?? []);
   const roles = ROLE_NAMES[d.style] ?? ["", "", ""];
   const size = sizeControl(d);
   const cap = opacityCap(d);
@@ -388,9 +393,12 @@ export function DecorationPanel({ project, update, usage, decor }: PanelProps & 
         options={DESIGN_CHOICES.map((c) => ({ value: c.value, label: c.label }))}
         onChange={(v) => {
           const c = DESIGN_CHOICES.find((x) => x.value === v)!;
-          set(normalizeDecoration({ ...d, style: c.style, assetId: c.assetId, layout: undefined }));
+          // A new design starts from its strongest composition (its first role-appropriate placement), not the old one.
+          const placement = placementsFor({ style: c.style, assetId: c.assetId })[0] ?? d.placement;
+          set(normalizeDecoration({ ...d, style: c.style, assetId: c.assetId, placement, corners: undefined, edge: undefined, titlePosition: undefined, layout: undefined }));
         }}
       />
+      {designRoles.length > 0 && <p className="hint decor-roles">Designed for: {designRoles.map((r) => ROLE_LABEL[r]).join(" · ")}</p>}
       {d.style !== "none" && (
         <>
           {placements.length > 1 && <Select label="Placement" value={d.placement} options={placements.map((p) => ({ value: p, label: PLACEMENT_LABEL[p] }))} onChange={(placement) => set(normalizeDecoration({ ...d, placement, layout: undefined }))} />}

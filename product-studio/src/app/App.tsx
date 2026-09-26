@@ -1,12 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Editor } from "../components/editor/Editor";
-import { ProjectList } from "../components/projects/ProjectList";
+import { ProjectList, type ProjectMeta } from "../components/projects/ProjectList";
+import { resolveDocument } from "../engines/document/resolve";
+import type { WizardStart } from "../presets/products/productFamilies";
 import { NewProductWizard } from "../components/wizard/NewProductWizard";
 import { resolveColors } from "../presets/themes/palettes";
 import { addVariantFromCurrent, duplicateProject, localProjectStore, type ProjectSummary } from "../persistence/projectStore";
 import type { ProductProject } from "../types/project";
 
-type View = { kind: "list" } | { kind: "new" } | { kind: "edit"; project: ProductProject };
+type View = { kind: "list" } | { kind: "new"; start?: WizardStart } | { kind: "edit"; project: ProductProject };
+
+/** Page count / pad sheets / book flag for the home screen (expansion only — no page is solved). */
+function projectMeta(id: string): ProjectMeta {
+  const p = localProjectStore.load(id);
+  if (!p) return null;
+  try {
+    const doc = resolveDocument(p);
+    return { pages: doc.recipe.pageCount, pad: doc.binding.sheetCountIsMetadata, sheets: p.production.sheetsPerPad, book: !!p.recipe.structure };
+  } catch {
+    return null;
+  }
+}
 
 /** Autosave debounce — long enough to batch typing, short enough to feel instant. */
 const AUTOSAVE_MS = 600;
@@ -51,7 +65,7 @@ export function App() {
     return () => window.removeEventListener("beforeunload", flush);
   }, [view, saveStatus, persist]);
 
-  if (view.kind === "new") return <NewProductWizard onCreate={open} onCancel={() => setView({ kind: "list" })} />;
+  if (view.kind === "new") return <NewProductWizard start={view.start} onCreate={open} onCancel={() => setView({ kind: "list" })} />;
   if (view.kind === "edit") {
     return (
       <Editor
@@ -69,7 +83,8 @@ export function App() {
   return (
     <ProjectList
       projects={projects}
-      onNew={() => setView({ kind: "new" })}
+      meta={projectMeta}
+      onStart={(start) => setView({ kind: "new", start })}
       onOpen={(id) => {
         const p = store.load(id);
         if (p) setView({ kind: "edit", project: p });

@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, type CSSProperties } from "react";
+import { PanelResizer, usePanelWidth } from "./PanelResizer";
 import { compositionFor, geometryFor, resolveDocument, solvePage, type ResolvedDocument } from "../../engines/document/resolve";
 import { planDecoration } from "../../themes/decorationPlan";
 import { computeUsage } from "../../engines/document/usage";
@@ -42,6 +43,7 @@ export function Editor({ project, onChange, onBack, saveStatus }: Props) {
   });
   const [debug, setDebug] = useState<DebugFlags>(DEBUG_OFF);
   const [exporting, setExporting] = useState(false);
+  const panel = usePanelWidth();
   const fontsReady = useFontLoader(project.typography.fonts);
 
   const update = useCallback(
@@ -108,7 +110,7 @@ export function Editor({ project, onChange, onBack, saveStatus }: Props) {
         </button>
       </header>
 
-      <div className="editor">
+      <div className="editor" style={{ "--ui-panel-w": `${panel.width}px` } as CSSProperties}>
         <aside className="panel" aria-label="Product controls">
           <ProductPanel project={project} update={update} />
           <ProductionPanel project={project} update={update} doc={doc} nav={doc ? nav : null} />
@@ -155,6 +157,7 @@ export function Editor({ project, onChange, onBack, saveStatus }: Props) {
           )}
         </aside>
 
+        <PanelResizer width={panel.width} onChange={panel.set} onReset={panel.reset} />
         <main className="stage">
           {doc ? (
             <PagePreview doc={doc} index={current} onIndex={setIndex} debug={debug} issueIds={issueIds} />

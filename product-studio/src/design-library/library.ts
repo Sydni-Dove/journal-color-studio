@@ -125,8 +125,8 @@ export const WATERCOLOR_BLOOMS: { cx: number; cy: number; r: number; role: "base
   { cx: 0.9, cy: 0.5, r: 0.14, role: "vein", alpha: 0.45 },
   { cx: 0.2, cy: 0.95, r: 0.15, role: "vein", alpha: 0.4 },
 ];
-export const WATERCOLOR_PLACEMENTS: DecorativePlacement[] = ["full-page", "header-band", "border-frame"];
-export const SOLID_PLACEMENTS: DecorativePlacement[] = ["full-page", "header-band", "border-frame"];
+export const WATERCOLOR_PLACEMENTS: DecorativePlacement[] = ["header-band", "border-frame", "footer-band", "edge-strip", "full-page"];
+export const SOLID_PLACEMENTS: DecorativePlacement[] = ["header-band", "footer-band", "edge-strip", "border-frame", "full-page"];
 
 export function findAsset(id: string | undefined): DesignAsset | undefined {
   return DESIGN_ASSETS.find((a) => a.id === id);

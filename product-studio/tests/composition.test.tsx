@@ -167,10 +167,10 @@ describe("fields are composed around the content", () => {
       expect(t.tile.h).toBeLessThan(t.region.h * 2);
     }
   });
-  it("the retired lettered cover is gone: the bouquet is transparent artwork used top + bottom", () => {
+  it("the retired lettered cover is gone: the bouquet is transparent artwork used as a rule / edge ornament", () => {
     const a = findAsset("jcs-floral-bouquet")!;
     expect(a.sourceFile).toBe("floral-bouquet.png");
-    expect(placementsFor({ style: "floral", assetId: a.id })).toEqual(["top-bottom"]);
+    expect(placementsFor({ style: "floral", assetId: a.id })).toEqual(["title-accent", "footer-flourish", "top-bottom"]);
   });
 });
 

@@ -5,7 +5,8 @@
  *   Theme → Fonts → Dates / sheets / pages → Generate
  */
 import { recipeSteps } from "../../engines/recipe/recipe";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { WizardStart } from "../../presets/products/productFamilies";
 import { BINDING_CHOICES, getBindingProfile } from "../../presets/bindingProfiles/bindingProfiles";
 import { PRINT_PROFILES } from "../../presets/printProfiles/printProfiles";
 import { PRODUCT_TYPES } from "../../presets/products/productTypes";
@@ -40,8 +41,8 @@ function Choices<T extends string>({ value, options, onChange }: { value: T; opt
 const PRODUCT_ORDER: ProductType[] = ["notepad", "journal", "planner", "deskpad", "notebook", "insert", "worksheet", "tracker"];
 const nextYear = new Date().getFullYear() + 1;
 
-export function NewProductWizard({ onCreate, onCancel }: { onCreate: (p: ProductProject) => void; onCancel: () => void }) {
-  const [type, setType] = useState<ProductType>("notepad");
+export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: ProductProject) => void; onCancel: () => void; start?: WizardStart }) {
+  const [type, setType] = useState<ProductType>(start?.type ?? "notepad");
   const def = PRODUCT_TYPES[type];
   const sizes = useMemo(() => sizePresetsFor(type), [type]);
   const [sizeId, setSizeId] = useState(def.suggestedSizes[0]);
@@ -53,7 +54,7 @@ export function NewProductWizard({ onCreate, onCancel }: { onCreate: (p: Product
   const profiles = PRINT_PROFILES.filter((p) => p.bindingRules.supported.includes(binding.bindingType));
   const [profileId, setProfileId] = useState(def.defaultPrintProfile);
   const recipes = recipePresetsFor(type);
-  const [recipeId, setRecipeId] = useState(recipes[0].id);
+  const [recipeId, setRecipeId] = useState(start?.recipeId && recipes.some((r) => r.id === start.recipeId) ? start.recipeId : recipes[0].id);
   const recipe = recipes.find((r) => r.id === recipeId) ?? recipes[0];
   const [density, setDensity] = useState<SpacingDensity>("balanced");
   const [paletteId, setPaletteId] = useState(PALETTES[0].id);
@@ -77,6 +78,16 @@ export function NewProductWizard({ onCreate, onCancel }: { onCreate: (p: Product
     setRecipeId(recipePresetsFor(t)[0].id);
     setSheets(t === "deskpad" ? STUDIO_PAD.deskPadSheets : STUDIO_PAD.defaultSheets);
   };
+
+  // Arriving from a product family / quick action: apply its type's defaults, its page structure, and scroll to the step.
+  useEffect(() => {
+    if (start?.type) {
+      pickType(start.type);
+      if (start.recipeId) setRecipeId(start.recipeId);
+    }
+    const target = start?.section === "templates" ? "wizard-templates" : start?.section === "build" ? "wizard-build" : null;
+    if (target) document.getElementById(target)?.scrollIntoView({ block: "start" });
+  }, []);
 
   const pickBinding = (id: string) => {
     setBindingChoice(id);
@@ -143,7 +154,7 @@ export function NewProductWizard({ onCreate, onCancel }: { onCreate: (p: Product
       </div>
       <p className="lede">You decide the product. Product Studio solves the geometry.</p>
 
-      <h2>Quick start — milestone test products</h2>
+      <h2 id="wizard-templates">Starter templates</h2>
       <div className="card-grid">
         {TEST_PRODUCTS.map((t) => (
           <button key={t.id} className="card card--pick" onClick={() => onCreate(t.build())}>
@@ -153,7 +164,7 @@ export function NewProductWizard({ onCreate, onCancel }: { onCreate: (p: Product
         ))}
       </div>
 
-      <h2>Build your own</h2>
+      <h2 id="wizard-build">Build your own</h2>
       <div className="wizard">
         <section className="step">
           <h3>1 · Product</h3>

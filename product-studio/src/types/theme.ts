@@ -55,7 +55,9 @@ export type DecorativeStyle = "none" | "solid" | "marble" | "watercolor" | "flor
  *   behind-title     object behind the title at subtle strength (intentional overlap)
  *   edge-accent      art along the outer side edge, running off it (intentional crop)
  *   header-flourish  art in the header, resting on the title rule, opposite the title
- *   footer-flourish  art centred in the footer space below the content
+ *   footer-flourish  art centred in the footer space below the content (florals: entering from the bottom edge)
+ *   footer-band      field from just below the content to the bottom edge
+ *   edge-strip       field along the outer side edge, up to the content
  */
 export type DecorativePlacement =
   | "full-page"
@@ -67,7 +69,9 @@ export type DecorativePlacement =
   | "behind-title"
   | "edge-accent"
   | "header-flourish"
-  | "footer-flourish";
+  | "footer-flourish"
+  | "footer-band"
+  | "edge-strip";
 
 /** Which corners a "corners" placement uses. */
 export type CornerSet = "opposite-tl-br" | "opposite-tr-bl" | "all" | "top" | "bottom" | "tl" | "tr" | "bl" | "br";
@@ -112,9 +116,29 @@ export type DecorationCapability =
   | "header-band"
   | "header-flourish"
   | "footer-flourish"
+  | "footer-band"
+  | "edge-strip"
   | "top-bottom"
   | "behind-title"
   | "background";
+
+/**
+ * An artwork's visual JOB — what it is designed to decorate. Roles decide
+ * which placements an asset offers; placements attach the art to a target
+ * (page edge, title rule, header, footer, content boundary), never to
+ * leftover empty space.
+ */
+export type DecorationRole =
+  | "background"
+  | "frame"
+  | "band"
+  | "edge"
+  | "corner"
+  | "divider"
+  | "rule-accent"
+  | "heading-accent"
+  | "header-flourish"
+  | "footer-flourish";
 
 export type DecorativeTheme = {
   style: DecorativeStyle;

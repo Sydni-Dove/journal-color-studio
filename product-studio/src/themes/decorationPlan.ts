@@ -32,6 +32,7 @@ import {
   DECORATION_CAPABILITIES,
   FLORAL_CORNER_OF_SHORT_SIDE,
   FLORAL_FLANK,
+  TITLE_ACCENT_EM,
   LINE_FLOURISH_OF_PAGE,
 } from "../design-library/placement";
 import { inflate, union } from "../engines/composition/composition";
@@ -136,7 +137,7 @@ export function titlePositionsFor(assetId: string | undefined): TitleAccentPosit
  * end, a centred one centred above it.
  */
 export function defaultTitlePosition(comp: Pick<Composition, "titleAlign" | "headerRule">): TitleAccentPosition {
-  if (comp.titleAlign === "center") return "title-above-center";
+  if (comp.titleAlign === "center") return comp.headerRule ? "rule-both" : "title-right";
   if (!comp.headerRule) return comp.titleAlign === "end" ? "title-left" : "title-right";
   return comp.titleAlign === "end" ? "rule-left" : "rule-right";
 }
@@ -376,7 +377,7 @@ function titleAccentSpecs(comp: Composition, pos: TitleAccentPosition, preferred
 }
 
 /** Fallback order for the automatic title accent. */
-const AUTO_TITLE_ORDER: TitleAccentPosition[] = ["rule-right", "title-right", "title-above-center", "title-above", "rule-left", "title-left", "rule-center"];
+const AUTO_TITLE_ORDER: TitleAccentPosition[] = ["rule-right", "rule-both", "title-right", "rule-left", "title-left", "rule-center"];
 
 /** Apply the user's advanced overrides; an overridden anchor turns a mirrored set into one piece there. */
 function withOverrides(specs: Spec[], theme: DecorativeTheme, comp: Composition): Spec[] {
@@ -393,6 +394,8 @@ function withOverrides(specs: Spec[], theme: DecorativeTheme, comp: Composition)
       next.region = undefined;
       next.bleedOut = undefined;
       next.ignore = undefined;
+      // Re-anchored art fits its new region (an edge flourish's natural size belongs to the page edge, not the region).
+      next.fit = "contain";
       if (next.mode === "contained") next.bounds = containedBounds(comp);
     }
     if (o.alignX) next.alignX = o.alignX;
@@ -487,6 +490,16 @@ export function planDecoration(g: PageGeometry, input: DecorativeTheme, colors: 
   // Band: top (bleed) edge → just above the content. Frame hole: content + clearance.
   const band: Rect = { x: 0, y: 0, w: W, h: oy + (content ? Math.max(0, content.y - clr) : g.safeRect.y) };
   const frameHole = [toMedia(content ? inflate(content, clr) : g.safeRect)];
+  // Footer band: just below the content to the bottom (bleed) edge. Edge strip: the OUTER side (away from the binding) up to the content.
+  const below = oy + (content ? content.y + content.h + clr : g.safeRect.y + g.safeRect.h);
+  const footerBand: Rect = { x: 0, y: below, w: W, h: Math.max(0, H - below) };
+  const outerLeft = g.boundEdge === "right";
+  const edgeStrip: Rect = outerLeft
+    ? { x: 0, y: 0, w: Math.max(0, ox + (content ? content.x - clr : g.safeRect.x)), h: H }
+    : (() => {
+        const x0 = ox + (content ? content.x + content.w + clr : g.safeRect.x + g.safeRect.w);
+        return { x: x0, y: 0, w: Math.max(0, W - x0), h: H };
+      })();
   const fieldReport = (rect: Rect, overlap: boolean): PieceReport => ({
     id: "field",
     assetId: theme.assetId ?? theme.style,
@@ -510,7 +523,8 @@ export function planDecoration(g: PageGeometry, input: DecorativeTheme, colors: 
 
   // ── Fields: solid, watercolor, marble ──
   if (theme.style === "solid" || theme.style === "watercolor" || theme.style === "marble") {
-    const region = theme.placement === "header-band" ? band : media;
+    // Surfaces attach to the page's structure: the header, the footer, the outer edge or the margins around the content.
+    const region = theme.placement === "header-band" ? band : theme.placement === "footer-band" ? footerBand : theme.placement === "edge-strip" ? edgeStrip : media;
     const knock = theme.placement === "border-frame" ? frameHole : [];
     const feather = theme.style === "watercolor" && theme.placement === "border-frame" ? clr * WATERCOLOR_FEATHER_OF_CLEARANCE : 0;
     const reports = [fieldReport(region, theme.placement === "full-page")];
@@ -549,8 +563,8 @@ export function planDecoration(g: PageGeometry, input: DecorativeTheme, colors: 
         specs = specsFor(best);
       }
     } else if (theme.placement === "title-accent") {
-      // JCS floralFlank sizing: the cluster is 1.5 title em tall — never smaller than the minimum ornament.
-      const h = comp.titleEmIn * FLORAL_FLANK.heightPerTitleEm * theme.scale;
+      // JCS floralFlank sizing: the sprig is 1.5 title em tall; the bouquet, a larger rule ornament, 2.2 — never below the minimum ornament.
+      const h = comp.titleEmIn * (TITLE_ACCENT_EM[asset.id] ?? FLORAL_FLANK.heightPerTitleEm) * theme.scale;
       const preferredW = Math.max(h * ar, ar >= 1 ? MIN_LONG_SIDE_IN : MIN_LONG_SIDE_IN * ar);
       if (theme.titlePosition) specs = titleAccentSpecs(comp, theme.titlePosition, preferredW);
       else {
@@ -559,12 +573,19 @@ export function planDecoration(g: PageGeometry, input: DecorativeTheme, colors: 
         const pick = order.find((p) => run(titleAccentSpecs(comp, p, preferredW)).reports.every((r) => r.rect)) ?? order[0];
         specs = titleAccentSpecs(comp, pick, preferredW);
       }
-    } else if (theme.placement === "top-bottom") {
+    } else if (theme.placement === "top-bottom" || theme.placement === "footer-flourish") {
+      // Edge flourishes ENTER from the page edge (run edgeBleedAmount past the trim, on purpose) and shrink clear
+      // of the content — never a bouquet floating in the header margin.
       const preferredW = trimW * BOUQUET_WIDTH_OF_PAGE * theme.scale;
-      specs = [
-        { ...base({ anchor: "page", alignX: "center", alignY: "start" }), id: "top", mode: "bleed", preferredW, transform: { flipY: true } },
-        { ...base({ anchor: "page", alignX: "center", alignY: "end" }), id: "bottom", mode: "bleed", preferredW, transform: {} },
-      ];
+      const piece = (id: "top" | "bottom"): Spec => ({
+        ...base({ anchor: "page", alignX: "center", alignY: id === "top" ? "start" : "end", fit: "natural" }),
+        id,
+        mode: "bleed",
+        preferredW,
+        bleedOut: comp.gaps.edgeBleed,
+        transform: id === "top" ? { flipY: true } : {},
+      });
+      specs = theme.placement === "top-bottom" ? [piece("top"), piece("bottom")] : [piece("bottom")];
     }
     const r = run(specs);
     return plan(r.pieces, [], r.reports);
