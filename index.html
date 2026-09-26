@@ -280,8 +280,13 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
 
     <div class="card hidden" id="readingPanelCard">
       <h2>Reading panel <span id="readingPanelWhere"></span></h2>
-      <div class="role"><label><input type="checkbox" id="readingPanelOn"> Show panel behind text</label></div>
-      <p class="hint" style="margin:6px 0 0"><span id="readingPanelMode"></span> <button class="btn hidden" id="readingPanelAuto" type="button" style="padding:2px 8px;font-size:11px">Use automatic</button></p>
+      <label class="field"><span>Show panel</span>
+        <select id="readingPanelShow">
+          <option value="auto">Automatic</option>
+          <option value="on">Always show on this page</option>
+          <option value="off">Hide on this page</option>
+        </select></label>
+      <p class="hint" style="margin:6px 0 0" id="readingPanelMode"></p>
       <div class="row2" id="readingPanelColorRow">
         <div class="field"><span>Panel color</span>
           <select id="readingPanelColor">
@@ -298,9 +303,9 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       <div class="seg" id="readingPanelPad" style="margin-top:8px">
         <button data-pad="tight"><strong>Tight</strong><small>Close to the text</small></button>
         <button data-pad="normal"><strong>Normal</strong></button>
-        <button data-pad="generous"><strong>Generous</strong><small>More background covered</small></button>
+        <button data-pad="generous"><strong>Generous</strong><small>Covers more</small></button>
       </div>
-      <span class="hint">Sits behind the questions, on top of the background. The text and page layout don’t move.</span>
+      <span class="hint">Sits on top of the background, behind the text. The text and page layout don’t move.</span>
     </div>
 
     <div class="card">
@@ -3110,8 +3115,9 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       // Optional reading panel behind the legend (off unless the user turns it on); its lettering then reads on the panel.
       const panel = pagePanel(s, 'contents');
       if (panel) {
-        const ix = [W * .04, W * .025, W * .012][panel.lvl + 1], iy = [lh * .16, lh * .08, 0][panel.lvl + 1];
-        ctx.fillStyle = rgba(panel.hex, panel.alpha); roundRect(ctx, ix, ly + iy, W - 2 * ix, lh - 2 * iy, (lh - 2 * iy) * .3); ctx.fill();
+        // Edge to edge (bleeds off both sides like the strip); padding sets how much of the strip's height it covers.
+        const iy = [lh * .16, lh * .08, 0][panel.lvl + 1];
+        ctx.fillStyle = rgba(panel.hex, panel.alpha); ctx.fillRect(0, ly + iy, W, lh - 2 * iy);
       }
       ctx.fillStyle = panel ? panelInk(s, panel.hex) : textOnPanel(s, p.title, p.stone); ctx.font = font(H * .015, { italic: true }); ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
       [['Status', .1], ['N = Not Interpreted', .3], ['I = Interpreted', .6], ['A = Application', .8]].forEach(([t, f]) => ctx.fillText(t, W * f, ly + lh / 2));
@@ -3200,12 +3206,12 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
         QUESTIONS.forEach((q) => { y = wrapText(ctx, q, x, y + H * .02, w, H * .0235, 'center', draw); });
         return y;
       };
-      // Measure first so the card on art backgrounds ends just below the questions and the artwork shows beneath.
+      // The panel runs from the top to near the bottom of the sidebar (further only if very long wording needs it).
       const sx = W * .6, contentEnd = questions(sx + W * .03, W - sx - W * .06, false);
       sidebarPage(ctx, W, H, s, 'brainstormTitle', (x, w) => {
         ctx.fillStyle = s._card ? panelInk(s) : bodyInk(s, p.title);
         questions(x, w, true);
-      }, contentEnd + H * .03 - H * .018);
+      }, Math.max(H * .964, contentEnd + H * .03 - H * .018));
     },
     brainstorm: linedPage('brainstormTitle', 'rule'),
     keys(ctx, W, H, s) {
@@ -4447,20 +4453,19 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     panelPage = type;
     const r = state.readingPanels[type], auto = readingPanelAuto(state, type);
     $('readingPanelWhere').textContent = READING_PANEL_PAGES[type];
-    $('readingPanelOn').checked = r.mode === 'on' || (r.mode !== 'off' && auto);
-    $('readingPanelMode').textContent = r.mode !== 'auto' ? `Your setting: always ${r.mode} on this page, whatever the background.`
-      : type === 'brainstormQ' ? `Automatic: ${auto ? 'on' : 'off'} for this background (on for Abstract watercolor and the photo/image backgrounds).`
-      : 'Automatic: off.';
-    $('readingPanelAuto').classList.toggle('hidden', r.mode === 'auto');
+    const shown = r.mode === 'on' || (r.mode !== 'off' && auto);
+    $('readingPanelShow').value = r.mode;
+    $('readingPanelMode').textContent = r.mode !== 'auto' ? 'Applies on this page whatever the background.'
+      : type === 'brainstormQ' ? `Automatic is ${auto ? 'on' : 'off'} for this background (on for Abstract watercolor and the photo/image backgrounds).`
+      : 'Automatic is off for this strip.';
     $('readingPanelColor').value = r.color; $('readingPanelCustom').value = r.custom; $('readingPanelOpacity').value = r.opacity;
     $('readingPanelOpacityVal').textContent = r.opacity + '%';
-    for (const id of ['readingPanelColorRow', 'readingPanelOpacityRow', 'readingPanelPad']) $(id).classList.toggle('hidden', !$('readingPanelOn').checked);
+    for (const id of ['readingPanelColorRow', 'readingPanelOpacityRow', 'readingPanelPad']) $(id).classList.toggle('hidden', !shown);
     $('readingPanelCustom').closest('.field').classList.toggle('hidden', r.color !== 'custom');
     document.querySelectorAll('#readingPanelPad button').forEach((b) => b.classList.toggle('active', b.dataset.pad === r.pad));
   }
   const setReadingPanel = (patch) => { state.readingPanels = { ...state.readingPanels, [panelPage]: { ...state.readingPanels[panelPage], ...patch } }; commit(false); };
-  $('readingPanelOn').onchange = (e) => setReadingPanel({ mode: e.target.checked ? 'on' : 'off' });
-  $('readingPanelAuto').onclick = () => setReadingPanel({ mode: 'auto' });
+  $('readingPanelShow').onchange = (e) => setReadingPanel({ mode: e.target.value });
   $('readingPanelColor').onchange = (e) => setReadingPanel({ color: e.target.value });
   $('readingPanelCustom').oninput = (e) => setReadingPanel({ custom: e.target.value, color: 'custom' });
   $('readingPanelOpacity').oninput = (e) => setReadingPanel({ opacity: Number(e.target.value) });
