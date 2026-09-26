@@ -410,7 +410,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       <div class="field"><span>Line spacing</span>
         <select id="lineSpacing">
           <option value="25">Master (25 pt)</option>
-          <option value="22">College (22 pt)</option>
+          <option value="20.25">College (20.25 pt · 9/32 in)</option>
           <option value="30">Wide (30 pt)</option>
         </select>
       </div>
@@ -418,7 +418,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     </div>
 
     <div class="card">
-      <h2>Export <span>8.885 × 11.385 in</span></h2>
+      <h2>Export <span>8.5 × 11 in + 1/8 in bleed</span></h2>
       <div class="seg" id="qualitySeg">
         <button data-q="proof" class="active"><strong>Quick proof</strong><small>150 DPI</small></button>
         <button data-q="print"><strong>Print quality</strong><small>300 DPI</small></button>
@@ -428,12 +428,15 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
         <div class="field"><span>Front cover</span><select id="includeCover"><option value="yes">Include</option><option value="no">Leave out</option></select></div>
       </div>
       <div class="field"><span>Back cover</span><select id="includeBack"><option value="yes">Include</option><option value="no">Leave out</option></select></div>
+      <div class="role" style="margin-top:8px"><label><input type="checkbox" id="showGuides"> Show trim and safe area</label></div>
+      <span class="hint">Inside pages export as their own PDF: page 1 is the first inside page (odd pages bind on the left, even on the right). The covers are a separate file.</span>
       <div class="actions" style="margin-top:12px">
-        <button class="btn primary" id="exportPdf">Export full journal PDF</button>
+        <button class="btn primary" id="exportPdf">Export interior PDF</button>
         <div class="row2">
+          <button class="btn" id="exportCoverPdf">Cover PDF</button>
           <button class="btn" id="exportCover">Cover PNG</button>
-          <button class="btn" id="exportLined">This page PNG</button>
         </div>
+        <button class="btn" id="exportLined">This page PNG</button>
       </div>
     </div>
   </aside>
@@ -453,8 +456,16 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
 
 <script>
 (() => {
-  // Page size matches the Alibaba production master (639.75 × 819.75 pt).
-  const PAGE_W = 639.75, PAGE_H = 819.75;
+  // Print spec: 8.5 × 11 in trim with 1/8 in bleed on every side, so an exported page is 8.75 × 11.25 in (630 × 810 pt).
+  // Every design is laid out on the trim (TRIM_W × TRIM_H: the same 8.5 × 11 as the Canva masters); renderPage places
+  // it inside the bleed page and carries its edges out into the bleed (composeBleed).
+  const TRIM_W = 612, TRIM_H = 792, BLEED_PT = 9;
+  const PAGE_W = TRIM_W + 2 * BLEED_PT, PAGE_H = TRIM_H + 2 * BLEED_PT;       // 630 × 810 pt
+  // Inside-page safe zone (printer spec): 1/2 in on the binding side, 1/4 in on the other three. Odd inside pages are
+  // fronts and bind on the left; even inside pages are backs and bind on the right. Covers are separate files with
+  // their own spec and no binding margin. Layouts keep 3/8 in or more at each side of the trim, so moving the whole
+  // design 1/8 in away from the binding edge gives 1/2 in there and still leaves 1/4 in at the outer edge.
+  const SAFE_BIND_PT = 36, SAFE_EDGE_PT = 18, BIND_SHIFT_PT = (SAFE_BIND_PT - SAFE_EDGE_PT) / 2;
   // Marble layer maps: R = stone detail (or vein shading), G = gold veins, B = cream highlights.
   // The "canva" marble comes from Sydni's Canva cover: flat stone, so the gold carries its own light-to-dark shading.
   const TEXTURES = {
@@ -964,6 +975,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     }
     if (state.journal === 'dream' && state.marble === 'journal') state.marble = DEFAULTS.marble;
     if (!state.text || typeof state.text !== 'object') state.text = {};
+    if (String(state.lineSpacing) === '22') state.lineSpacing = '20.25';        // College is true 9/32 in college rule
     state.titleFill = { ...DEFAULTS.titleFill, ...(state.titleFill && typeof state.titleFill === 'object' ? state.titleFill : {}) };
     state.readingPanels = Object.fromEntries(Object.entries(DEFAULTS.readingPanels).map(([k, d]) => [k, { ...d, ...(state.readingPanels?.[k] || {}) }]));
     state.customPalettes = Array.isArray(state.customPalettes) ? state.customPalettes : [];          // the procedural watercolor was retired
@@ -1376,7 +1388,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       // Full-bleed areas (covers) show the artwork; thin header/footer bars use the stone color.
       if (h <= w * .9 && !s._thumb) { ctx.fillStyle = s.palette.stone; ctx.fillRect(x, y, w, h); return; }
       // A partial tall area (e.g. the sidebar) shows ITS slice of the full-page artwork — never a squashed miniature.
-      const PW = s._W && !s._thumb ? s._W : w, PH = s._W && !s._thumb ? Math.round(s._W * PAGE_H / PAGE_W) : h, part = PW !== w || PH !== h;
+      const PW = s._W && !s._thumb ? s._W : w, PH = s._W && !s._thumb ? Math.round(s._W * TRIM_H / TRIM_W) : h, part = PW !== w || PH !== h;
       const [ax, ay] = part ? [0, 0] : [x, y];
       ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
       if (s.marble === 'abstract') paintAbstract(ctx, ax, ay, PW, PH, s);
@@ -1646,7 +1658,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   const SIDE_BAND = { stripes: true, topo: true, waves: true };
   // One repeat tile's width (page-width fraction) at Pattern size 100%.
   const REPEAT_TILE = { dots: .34, arcs: .26, topo: .5, waves: .5 };
-  const BLEED = .125 * 72 / PAGE_W;   // 1/8 in past the trim, as a page-width fraction
+  const BLEED = BLEED_PT / TRIM_W;   // 1/8 in past the trim, as a fraction of the trim width (the design's W)
   // Prayer journals carry a central figure (and the Warring archer fills the left side), which whole-page and side
   // layouts would run across; only the title plate is clipped out, so they keep the edge-and-corner layouts.
   const PRAYER_LAYOUTS = [...CORNERS, ...SAFE, 'top', 'bottom'];
@@ -2420,7 +2432,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   }
 
   function renderCover(canvas, width, s) {
-    canvas.width = width; canvas.height = Math.round(width * PAGE_H / PAGE_W);
+    canvas.width = width; canvas.height = Math.round(width * TRIM_H / TRIM_W);
     const ctx = canvas.getContext('2d'), W = canvas.width, H = canvas.height;
     ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';      // default 'low' makes scaled artwork jaggy
     paintMarble(ctx, 0, 0, W, H, s);
@@ -2776,7 +2788,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   }
 
   function writingLines(ctx, W, H, s, x0, x1, top, bottom) {
-    const p = s.palette, pt = H / PAGE_H, spacing = Number(s.lineSpacing) * pt;
+    const p = s.palette, pt = H / TRIM_H, spacing = Number(s.lineSpacing) * pt;
     const first = top + spacing * .9;
     if (s.lineStyle === 'hand' && ASSETS.handLines) {
       // Cycle through the 11 hand-drawn strokes so neighbouring lines never repeat.
@@ -3705,7 +3717,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
 
   // Journal-specific cover and back-cover renderers.
   const coverOf = (fn) => (canvas, width, s) => {
-    canvas.width = width; canvas.height = Math.round(width * PAGE_H / PAGE_W);
+    canvas.width = width; canvas.height = Math.round(width * TRIM_H / TRIM_W);
     const ctx = canvas.getContext('2d'); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
     fn(ctx, canvas.width, canvas.height, s);
   };
@@ -3755,9 +3767,42 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     return [...new Set(['cover', ...j.front, ...j.cycle, 'back'])];
   }
 
-  function renderPage(canvas, width, s, type) {
+  // The finished print page: the design (on the 8.5 × 11 trim) inside the 1/8 in bleed. Inside pages sit 1/8 in away
+  // from their binding edge (side: 'left' for odd inside pages, 'right' for even); covers stay centred.
+  function renderPage(canvas, width, s, type, side = 'left') {
+    const W = width, H = Math.round(width * PAGE_H / PAGE_W), trim = document.createElement('canvas');
+    renderDesign(trim, Math.round(W * TRIM_W / PAGE_W), s, type);
+    canvas.width = W; canvas.height = H;
+    const cover = type === 'cover' || type === 'back';
+    const shift = cover ? 0 : Math.round(W * BIND_SHIFT_PT / PAGE_W) * (side === 'right' ? -1 : 1);
+    composeBleed(canvas.getContext('2d'), trim, Math.round((W - trim.width) / 2) + shift, Math.round((H - trim.height) / 2));
+  }
+  // Draws the design at (x0, y0) and fills the bleed around it by mirroring the design's own edges outward, so marble,
+  // bars and background art run seamlessly past the trim (and past the binding gap left by the shift).
+  function composeBleed(ctx, img, x0, y0) {
+    const W = ctx.canvas.width, H = ctx.canvas.height, w = img.width, h = img.height;
+    const L = Math.min(x0, w), R = Math.min(W - x0 - w, w), T = Math.min(y0, h), B = Math.min(H - y0 - h, h);
+    const row = document.createElement('canvas'); row.width = W; row.height = h;
+    const r = row.getContext('2d');
+    r.drawImage(img, x0, 0);
+    if (L > 0) { r.save(); r.translate(x0, 0); r.scale(-1, 1); r.drawImage(img, 0, 0, L, h, 0, 0, L, h); r.restore(); }
+    if (R > 0) { r.save(); r.translate(x0 + w, 0); r.scale(-1, 1); r.drawImage(img, w - R, 0, R, h, -R, 0, R, h); r.restore(); }
+    ctx.drawImage(row, 0, y0);
+    if (T > 0) { ctx.save(); ctx.translate(0, y0); ctx.scale(1, -1); ctx.drawImage(row, 0, 0, W, T, 0, 0, W, T); ctx.restore(); }
+    if (B > 0) { ctx.save(); ctx.translate(0, y0 + h); ctx.scale(1, -1); ctx.drawImage(row, 0, h - B, W, B, 0, -B, W, B); ctx.restore(); }
+  }
+  // Inside-page number of pageList(s)[index] (covers are their own files and never count), and its binding side.
+  function insideNumber(s, index) {
+    const list = pageList(s); let n = 0;
+    for (let i = 0; i <= index && i < list.length; i++) if (list[i] !== 'cover' && list[i] !== 'back') n++;
+    return n;
+  }
+  const bindingSide = (n) => (n % 2 ? 'left' : 'right');
+
+  // One design on the 8.5 × 11 trim (no bleed): the journal's cover, back or an interior template.
+  function renderDesign(canvas, width, s, type) {
     if (type === 'cover') return (COVERS[s.journal] || renderCover)(canvas, width, s);
-    canvas.width = width; canvas.height = Math.round(width * PAGE_H / PAGE_W);
+    canvas.width = width; canvas.height = Math.round(width * TRIM_H / TRIM_W);
     const ctx = canvas.getContext('2d');
     ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
     if (type === 'back' && BACKS[s.journal]) return BACKS[s.journal](ctx, canvas.width, canvas.height, { ...s, _W: canvas.width });
@@ -4313,7 +4358,9 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     const type = currentType(), total = pageList(state).length;
     $('viewLabel').textContent = PAGE_LABELS[type];
     $('pageName').textContent = PAGE_LABELS[type];
-    $('pageNum').textContent = `Page ${state.page + 1} of ${total}`;
+    const inside = type !== 'cover' && type !== 'back' ? insideNumber(state, state.page) : 0;
+    $('pageNum').textContent = inside ? `Inside page ${inside} · binds ${bindingSide(inside)}` : `${type === 'cover' ? 'Front' : 'Back'} cover (separate file)`;
+    $('showGuides').checked = !!state.showGuides;
   }
 
   let raf = 0;
@@ -4329,11 +4376,30 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       // "auto" in CSS) — never set canvas.style.width/height here, or the browser can't shrink both
       // dimensions together under max-height and the page distorts.
       const dpr = Math.min(2, window.devicePixelRatio || 1);
-      try { renderPage(canvas, Math.round(760 * dpr), s, currentType()); }
+      const type = currentType(), side = bindingSide(insideNumber(state, state.page));
+      try { renderPage(canvas, Math.round(760 * dpr), s, type, side); if (state.showGuides) drawGuides(canvas, type, side); }
       catch (e) { console.error(e); showBlocked(e); }
       showTextWarnings(s._warn);
       if (!comparing && currentType() === 'cover') showContrastWarning(s._probe);
     });
+  }
+
+  // Preview-only print guides (never exported): bleed shaded, trim line, and on inside pages the safe area
+  // (1/2 in at the binding edge, 1/4 in elsewhere) with the binding edge marked.
+  function drawGuides(c, type, side) {
+    const ctx = c.getContext('2d'), k = c.width / PAGE_W, b = BLEED_PT * k, W = c.width, H = c.height;
+    ctx.save();
+    ctx.fillStyle = 'rgba(230,40,90,.18)';
+    ctx.fillRect(0, 0, W, b); ctx.fillRect(0, H - b, W, b); ctx.fillRect(0, b, b, H - 2 * b); ctx.fillRect(W - b, b, b, H - 2 * b);
+    ctx.lineWidth = Math.max(1, k * .75); ctx.strokeStyle = 'rgba(230,40,90,.9)'; ctx.strokeRect(b, b, W - 2 * b, H - 2 * b);
+    if (type !== 'cover' && type !== 'back') {
+      const l = (side === 'left' ? SAFE_BIND_PT : SAFE_EDGE_PT) * k, r = (side === 'left' ? SAFE_EDGE_PT : SAFE_BIND_PT) * k, e = SAFE_EDGE_PT * k;
+      ctx.setLineDash([6 * k, 4 * k]); ctx.strokeStyle = 'rgba(20,110,220,.9)';
+      ctx.strokeRect(b + l, b + e, W - 2 * b - l - r, H - 2 * b - 2 * e);
+      ctx.setLineDash([]); ctx.fillStyle = 'rgba(20,110,220,.14)';
+      ctx.fillRect(side === 'left' ? b : W - b - SAFE_BIND_PT * k, b, SAFE_BIND_PT * k, H - 2 * b);
+    }
+    ctx.restore();
   }
 
   // ---------- Previews of every choice ----------
@@ -4749,53 +4815,69 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
 
   function setBusy(on, label) {
     busy = on;
-    for (const id of ['exportPdf', 'exportCover', 'exportLined']) $(id).disabled = on;
-    $('exportPdf').textContent = on ? label : 'Export full journal PDF';
+    for (const id of ['exportPdf', 'exportCoverPdf', 'exportCover', 'exportLined']) $(id).disabled = on;
+    $('exportPdf').textContent = on ? label : 'Export interior PDF';
   }
 
   $('exportCover').onclick = async () => {
     if (busy) return; setBusy(true, 'Preparing cover…');
     // Through renderPage, like the preview and the PDF: it picks the selected journal's own cover renderer.
-    try { const c = document.createElement('canvas'); renderPage(c, 2666, state, 'cover'); download(await toBlob(c, 'image/png'), `marble-journal-cover-${slug()}.png`); toast('Production-size cover downloaded'); }
+    try { const c = document.createElement('canvas'); renderPage(c, Math.round(PAGE_W / 72 * 300), state, 'cover'); download(await toBlob(c, 'image/png'), `marble-journal-cover-${slug()}.png`); toast('Production-size cover downloaded'); }
     catch { toast('Cover export stopped. Please try again.'); } finally { setBusy(false); }
   };
   $('exportLined').onclick = async () => {
     if (busy) return; setBusy(true, 'Preparing page…');
     try {
       const c = document.createElement('canvas'), type = currentType();
-      renderPage(c, pxWidth(), state, type);
+      renderPage(c, pxWidth(), state, type, bindingSide(insideNumber(state, state.page)));
       download(await toBlob(c, 'image/png'), `journal-page-${state.page + 1}-${type}-${slug()}.png`); toast('Page downloaded');
     }
     catch { toast('Page export stopped. Please try again.'); } finally { setBusy(false); }
   };
+  // Builds a PDF of [type, side] pages at the print page size (8.75 × 11.25 in with bleed).
+  async function buildPdf(pages, name, progress) {
+    const pdf = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'pt', format: [PAGE_W, PAGE_H], compress: true });
+    const q = state.quality === 'print' ? .94 : .88;
+    const c = document.createElement('canvas'), cache = new Map();
+    // Repeated pages (every Dream, Notes… on the same side) render once; the PDF reuses the same image by name.
+    for (let i = 0; i < pages.length; i++) {
+      const [type, side] = pages[i], key = `${type}-${side}`;
+      if (!cache.has(key)) {
+        renderPage(c, pxWidth(), state, type, side);
+        cache.set(key, new Uint8Array(await (await toBlob(c, 'image/jpeg', q)).arrayBuffer()));
+      }
+      if (i) pdf.addPage([PAGE_W, PAGE_H], 'portrait');
+      pdf.addImage(cache.get(key), 'JPEG', 0, 0, PAGE_W, PAGE_H, `page-${key}`, 'FAST');
+      if (progress && i % 6 === 0) { setBusy(true, `Building ${Math.round(i / pages.length * 100)}%`); await new Promise(requestAnimationFrame); }
+    }
+    pdf.save(name);
+  }
+  const journalSlug = () => (JOURNALS[state.journal] || JOURNALS.dream).name.toLowerCase().replace(/\s+/g, '-');
+  // Inside pages only: page 1 is the first inside page, odd pages bind on the left and even pages on the right.
   $('exportPdf').onclick = async () => {
     if (busy) return;
     if (!window.jspdf) { toast('PDF library did not load. Check your connection and refresh.'); return; }
-    const list = pageList(state);
+    const pages = pageList(state).filter((t) => t !== 'cover' && t !== 'back').map((t, i) => [t, bindingSide(i + 1)]);
     setBusy(true, 'Building…');
-    try {
-      const pdf = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'pt', format: [PAGE_W, PAGE_H], compress: true });
-      const q = state.quality === 'print' ? .94 : .88;
-      const c = document.createElement('canvas'), cache = new Map();
-      // Repeated page types (every Dream, Notes…) render once; the PDF reuses the same image by name.
-      for (let i = 0; i < list.length; i++) {
-        const type = list[i];
-        if (!cache.has(type)) {
-          renderPage(c, pxWidth(), state, type);
-          cache.set(type, new Uint8Array(await (await toBlob(c, 'image/jpeg', q)).arrayBuffer()));
-        }
-        if (i) pdf.addPage([PAGE_W, PAGE_H], 'portrait');
-        pdf.addImage(cache.get(type), 'JPEG', 0, 0, PAGE_W, PAGE_H, `page-${type}`, 'FAST');
-        if (i % 6 === 0) { setBusy(true, `Building ${Math.round(i / list.length * 100)}%`); await new Promise(requestAnimationFrame); }
-      }
-      pdf.save(`${(JOURNALS[state.journal] || JOURNALS.dream).name.toLowerCase().replace(/\s+/g, '-')}-${slug()}.pdf`);
-      toast(`Complete journal downloaded (${list.length} pages)`);
-    } catch (e) { console.error(e); toast('Export stopped. Please try again.'); }
+    try { await buildPdf(pages, `${journalSlug()}-interior-${slug()}.pdf`, true); toast(`Interior downloaded (${pages.length} pages)`); }
+    catch (e) { console.error(e); toast('Export stopped. Please try again.'); }
     finally { setBusy(false); }
   };
+  // The covers as their own file (front, then back), centred in the bleed with no binding margin.
+  $('exportCoverPdf').onclick = async () => {
+    if (busy) return;
+    if (!window.jspdf) { toast('PDF library did not load. Check your connection and refresh.'); return; }
+    const pages = [...(state.includeCover === 'yes' ? [['cover', null]] : []), ...(state.includeBack === 'yes' ? [['back', null]] : [])];
+    if (!pages.length) { toast('Both covers are set to Leave out.'); return; }
+    setBusy(true, 'Preparing covers…');
+    try { await buildPdf(pages, `${journalSlug()}-cover-${slug()}.pdf`, false); toast('Cover PDF downloaded'); }
+    catch (e) { console.error(e); toast('Cover export stopped. Please try again.'); }
+    finally { setBusy(false); }
+  };
+  $('showGuides').onchange = (e) => { state.showGuides = e.target.checked; commit(false, false); };
 
   // ?debug exposes the renderers for visual QA (preview vs. export comparisons); off in normal use.
-  if (new URLSearchParams(location.search).has('debug')) window.__studio = { renderCover, renderPage, titleContrast, get state() { return state; }, commit, TITLE_PLATE_STYLES };
+  if (new URLSearchParams(location.search).has('debug')) window.__studio = { renderCover, renderPage, renderDesign, pageList, insideNumber, bindingSide, titleContrast, get state() { return state; }, commit, TITLE_PLATE_STYLES };
   if (location.protocol === 'file:') { showBlocked(); return; }
   // Controls that only apply to the Dream Journal's modular cover/interior are hidden for the prayer journals.
   // Title plate, lettering, accents and decorations work on every journal; the Dream-only pieces (its preset designs,
