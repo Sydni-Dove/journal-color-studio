@@ -78,6 +78,7 @@ export function newSection(label: string, period?: BookGroup["period"]): BookGro
 
 const MODULE_FOR_LAYOUT: Record<string, BookStep["module"]> = {
   "planner-monthly": "monthly-calendar",
+  "planner-daily": "daily-planner",
   "planner-weekly-spread": "weekly-planner",
   "weekly-plan-mwg-spread": "weekly-planner",
   "journal-lined": "lined-journal",

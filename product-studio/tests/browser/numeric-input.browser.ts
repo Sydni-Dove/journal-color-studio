@@ -54,7 +54,10 @@ async function open(product: ProductProject) {
 /** Put the caret at the end of the field's current text (like tapping after the last digit). */
 async function caretToEnd(field: Locator) {
   await field.click();
-  await field.press("End");
+  // Focus selects the text. ArrowRight collapses that selection at its end
+  // on every OS; macOS End scrolls rather than reliably moving this caret.
+  await field.press("ArrowRight");
+  await expect.poll(() => field.evaluate((e) => (e as HTMLInputElement).selectionStart)).toBe((await field.inputValue()).length);
 }
 
 /** 33 → Backspace → Backspace → 120, checking every intermediate state. */

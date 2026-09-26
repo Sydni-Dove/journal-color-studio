@@ -68,6 +68,13 @@ export function LayoutPanel({ project, update, usage, nav }: PanelProps) {
       {usage.sectionsPerDay && <AppliesTo ids={usage.consumers.sectionsPerDay} nav={nav} />}
       {usage.sectionsPerDay && <NumberField label="Sections per day" step={1} min={1} max={6} value={o.sectionsPerDay} onChange={(v) => set({ sectionsPerDay: Math.max(1, Math.round(v)) })} />}
       {usage.writingRows && <NumberField label="Writing rows per day" step={1} min={1} max={8} value={o.writingRowsPerDay} onChange={(v) => set({ writingRowsPerDay: Math.max(1, Math.round(v)) })} />}
+      {usage.layouts.some(({ layout }) => layout.id === "planner-daily") && (
+        <>
+          <NumberField label="Daily schedule starts (24-hour)" step={1} min={0} max={23} value={o.hourStart} onChange={(v) => set({ hourStart: Math.max(0, Math.min(o.hourEnd, Math.round(v))) })} />
+          <NumberField label="Daily schedule ends (24-hour)" step={1} min={0} max={23} value={o.hourEnd} onChange={(v) => set({ hourEnd: Math.max(o.hourStart, Math.min(23, Math.round(v))) })} />
+          <Check label="Daily half-hour rows" checked={o.halfHours} onChange={(halfHours) => set({ halfHours })} />
+        </>
+      )}
       {usage.pageNumbers && <Check label="Page numbers" checked={o.showPageNumbers} onChange={(showPageNumbers) => set({ showPageNumbers })} />}
       {usage.footer && <Check label="Footer (product title)" checked={o.showFooter} onChange={(showFooter) => set({ showFooter })} />}
     </Section>

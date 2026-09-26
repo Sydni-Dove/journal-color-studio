@@ -8,7 +8,7 @@
  *   Weekly planner    → Weekly spread · Weekly plan + Meeting With God spread
  *
  * Only modules with a real layout are registered; the PageModuleType union
- * already reserves the rest (daily planner, tracker, …) for later layouts.
+ * already reserves the rest (tracker, …) for later layouts.
  */
 import type { PageModuleType, RecipeCadence, RecipePeriod } from "../types/recipe";
 
@@ -29,6 +29,7 @@ export type PageModuleDefinition = {
 const GUIDED = ["guided-page", "journal-lined"];
 
 export const PAGE_MODULES: PageModuleDefinition[] = [
+  { type: "daily-planner", label: "Daily planner", layouts: ["planner-daily"], defaultCadence: { type: "daily" }, titles: { none: "Daily Plan" }, prompts: { none: [] } },
   { type: "monthly-calendar", label: "Monthly calendar", layouts: ["planner-monthly"], defaultCadence: { type: "monthly" }, titles: { none: "Month" }, prompts: { none: [] } },
   {
     type: "weekly-planner",

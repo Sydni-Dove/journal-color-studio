@@ -19,7 +19,7 @@ export function section(label: string, children: BookNode[], period?: BookGroup[
 }
 
 /** Meetings With God planner — the motivating structure (not its old design). */
-export function meetingsWithGodBook(): BookNode[] {
+export function meetingsWithGodBook(includeDaily = false): BookNode[] {
   const spread = step("weekly-planner", { type: "once" }, { layoutId: "weekly-plan-mwg-spread" });
   return [
     section("Front Matter", [step("mission"), step("vision"), step("goals")]),
@@ -27,7 +27,7 @@ export function meetingsWithGodBook(): BookNode[] {
       "Every Month",
       [
         step("monthly-calendar", { type: "once" }),
-        section("Every Week", [spread, step("lined-journal", { type: "after-module", moduleId: spread.id }, { copies: 2 })], "week"),
+        section("Every Week", [spread, step("lined-journal", { type: "after-module", moduleId: spread.id }, { copies: 2 }), ...(includeDaily ? [step("daily-planner")] : [])], "week"),
         step("review", { type: "end-of-period", period: "month" }),
       ],
       "month",
@@ -38,6 +38,7 @@ export function meetingsWithGodBook(): BookNode[] {
 
 export const BOOK_PRESETS: { id: string; label: string; build: () => BookNode[] }[] = [
   { id: "meetings-with-god", label: "Meetings With God planner (plan + journal)", build: meetingsWithGodBook },
+  { id: "meetings-with-god-daily", label: "Meetings With God planner + daily pages", build: () => meetingsWithGodBook(true) },
   {
     id: "planner-journal",
     label: "Monthly + weekly planner with journal pages",

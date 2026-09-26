@@ -17,8 +17,6 @@ import { lineBoxIn, rule, text } from "../shared/nodes";
 import { minimumAreaFit, type LayoutContext, type LayoutDefinition } from "../shared/types";
 import { weightedStack } from "./guidedPage";
 
-/** Share of the verso body given to the seven day rows (the rest is priorities). */
-const DAYS_SHARE = 0.7;
 /** Recto writing blocks: open journal, What did God say?, Response / action steps. */
 const RECTO_WEIGHTS = [2, 1.2, 1];
 
@@ -51,7 +49,13 @@ function solveSpread(ctx: LayoutContext): SolvedPage[] {
   // Verso — plan.
   const f0 = pageFrame(ctx, 0, { headerH });
   const t0 = headerTitle("mw0-header", ctx, f0.zones, "weekOf", `${ctx.wording.weekOf} ${formatWeekRange(week)}`, "weekTitle", "header-left");
-  const [daysR, priR] = weightedStack(f0.body.y, f0.body.h, [DAYS_SHARE, 1 - DAYS_SHARE], s.section).map((r) => ({ x: f0.body.x, y: r.y, w: f0.body.w, h: r.h }));
+  // Priorities needs two usable checklist rows, not 30% of every page.
+  // Keep the old maximum share on small pages; give all recovered height
+  // to the connected day grid, without changing padding or ruling pitch.
+  const availableH = f0.body.h - s.section;
+  const prioritiesH = Math.min(availableH * 0.3, Math.max(STUDIO_PLANNER.prioritiesBoxMin.valueIn, lineBoxIn(ctx.typography, "sectionHeading") + s.headingToContentGap + 2 * s.listRow));
+  const daysR = { ...f0.body, h: availableH - prioritiesH };
+  const priR = { ...f0.body, y: daysR.y + daysR.h + s.section, h: prioritiesH };
   const pri = section("mw0-priorities", priR, ctx.wording.priorities, ctx, "checklist", { titleRole: "sectionHeading" });
   const verso: SolvedPage = {
     nodes: [...f0.nodes, ...t0.nodes, ...dayRows("mw0-days", daysR, ctx, ctx.calendar.weekdayShortNames, week.days.map((d) => d.day)), ...pri.nodes],
