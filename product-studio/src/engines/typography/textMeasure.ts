@@ -20,6 +20,12 @@ export function styleForRole(typography: TypographySettings, role: keyof Typogra
   return { family: typography.fonts[r.group], sizePt: r.sizePt, weight: r.weight, style: r.style, trackingEm: r.trackingEm, transform: r.transform };
 }
 
+/** A text node's measuring style: its role, at the fitted size when the layout fitted it. */
+export function styleForNode(typography: TypographySettings, node: { role: keyof TypographySettings["roles"]; fit?: { sizePt: number } }): TextStyle {
+  const s = styleForRole(typography, node.role);
+  return node.fit ? { ...s, sizePt: node.fit.sizePt } : s;
+}
+
 export function applyTransform(text: string, transform: TextStyle["transform"]): string {
   switch (transform) {
     case "uppercase":
@@ -55,6 +61,20 @@ export const heuristicMeasurer: TextMeasurer = (raw, style) => {
   width += Math.max(0, t.length - 1) * style.trackingEm * em;
   return width;
 };
+
+/**
+ * The measurer LAYOUTS fit text with (headings: fitHeading). Heuristic until
+ * the editor has loaded the real fonts, then the canvas measurer — the same
+ * metrics the live validator uses, so a heading the layout fitted is a heading
+ * the validator accepts. Its id is part of the layout cache key.
+ */
+let layoutMeasurer: { id: string; measure: TextMeasurer } = { id: "heuristic", measure: heuristicMeasurer };
+export function setLayoutMeasurer(id: string, measure: TextMeasurer): void {
+  layoutMeasurer = { id, measure };
+}
+export function getLayoutMeasurer(): { id: string; measure: TextMeasurer } {
+  return layoutMeasurer;
+}
 
 export function createCanvasMeasurer(): TextMeasurer | null {
   if (typeof document === "undefined") return null;

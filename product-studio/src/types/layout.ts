@@ -53,6 +53,9 @@ export type BoxNode = NodeBase & {
   radiusIn: number;
 };
 
+/** `failed`: the heading could not fit even at the minimum — it is reported (heading-fit) and kept inside its box. */
+export type TextFit = { sizePt: number; lineHeight: number; lines: string[]; failed?: boolean };
+
 export type TextNode = NodeBase & {
   type: "text";
   text: string;
@@ -62,6 +65,12 @@ export type TextNode = NodeBase & {
   vAlign: "top" | "middle" | "bottom";
   /** Single-line labels must not wrap; prompts may. */
   wrap: boolean;
+  /**
+   * Fitted heading (layouts/shared/components fitHeading): the size, leading and
+   * explicit line breaks the layout solved so the text fits its box. Renderer,
+   * ink measurement and validation all use it instead of the role's defaults.
+   */
+  fit?: TextFit;
   color?: ColorToken;
   /** Semantic element this text is (user-positionable page titles, headings, footer). */
   semantic?: SemanticTextKey;

@@ -8,7 +8,7 @@ import { rectContains, rectsIntersect } from "../layout/math";
 import { geometryFor, resolveDocument, solvePage, type ResolvedDocument } from "../document/resolve";
 import { inkBoxFor } from "../typography/ink";
 import { compositionChecks } from "./composition";
-import { styleForRole, type TextMeasurer } from "../typography/textMeasure";
+import { applyTransform, styleForNode, styleForRole, type TextMeasurer } from "../typography/textMeasure";
 import { GEOMETRY_EPSILON_IN, ptToIn } from "../units/units";
 import { MIN_PRINT_FONT_PT } from "../../presets/typography/typography";
 import type { PageGeometry } from "../../types/geometry";
@@ -122,12 +122,25 @@ function checkNode(node: LayoutNode, g: PageGeometry, push: (rule: ValidationRul
   }
 }
 
-function checkText(node: Extract<LayoutNode, { type: "text" }>, doc: ResolvedDocument, measure: TextMeasurer, push: Parameters<typeof checkNode>[2]) {
+function checkText(node: Extract<LayoutNode, { type: "text" }>, doc: ResolvedDocument, measure: TextMeasurer, push: Parameters<typeof checkNode>[2], reported: Set<string>) {
   const role = doc.typography.roles[node.role];
   if (role.sizePt < MIN_PRINT_FONT_PT) {
     push("text-too-small", node.id, `${node.role} is ${role.sizePt} pt — below the ${MIN_PRINT_FONT_PT} pt print minimum.`, { actual: role.sizePt, limit: MIN_PRINT_FONT_PT, unit: "pt" });
   }
   if (!node.text) return;
+  if (node.fit || node.component === "SectionHeader") {
+    // Headings (fitted by the layout's shared fitHeading): measure the lines actually drawn, at the drawn size,
+    // and say exactly how far the heading exceeds its width. The layout already reported a heading it could not fit.
+    if (reported.has(node.id)) return;
+    const st = styleForNode(doc.typography, node);
+    const lines = node.fit?.lines ?? [node.text];
+    const width = Math.max(...lines.map((l) => measure(l, st)));
+    if (width > node.rect.w + EPS) {
+      const kind = /sidebar/.test(node.id) ? "Sidebar" : /notes/.test(node.id) ? "Notes" : "Section";
+      push("heading-fit", node.id, `${kind} heading "${applyTransform(node.text, role.transform)}" exceeds the available heading width by ${(width - node.rect.w).toFixed(2)}" (${width.toFixed(2)}" needed, ${node.rect.w.toFixed(2)}" available).`, { actual: width, limit: node.rect.w, unit: "in" });
+    }
+    return;
+  }
   const lineH = ptToIn(role.sizePt * role.lineHeight);
   const width = measure(node.text, styleForRole(doc.typography, node.role));
   if (!node.wrap) {
@@ -171,7 +184,9 @@ export function validatePage(doc: ResolvedDocument, index: number, measure: Text
     "sidebar-balance": "sidebar-balance",
     "text-position": "text-region",
     "text-overflow": "text-overflow",
+    "heading-fit": "heading-fit",
   };
+  const headingFailures = new Set(s.diagnostics.filter((d) => d.rule === "heading-fit").map((d) => d.componentId));
   for (const d of s.diagnostics) {
     const rule: ValidationRule = DIAGNOSTIC_RULES[d.rule] ?? "layout-solver";
     push(rule, d.componentId, d.message, d.measurement ? { actual: d.measurement.actualIn, limit: d.measurement.limitIn, unit: "in" } : undefined, d.severity);
@@ -181,7 +196,8 @@ export function validatePage(doc: ResolvedDocument, index: number, measure: Text
   compositionChecks(doc, g, s, measure, push);
 
   // Visual usability, not just containment: rendered text must not collide.
-  for (const c of textCollisions(s, doc, measure)) push("text-collision", c.a, c.message, c.measurement);
+  // A heading that could not fit is reported specifically (heading-fit), not again as a generic collision.
+  for (const c of textCollisions(s, doc, measure)) if (!headingFailures.has(c.a) && !headingFailures.has(c.b)) push("text-collision", c.a, c.message, c.measurement);
   for (const n of s.nodes) {
     if (n.type === "lines" && n.component === "WritingLines" && n.positions.length === 0 && n.rect.h > 0) {
       push("min-writing-area", n.id, `Writing area ${n.rect.h.toFixed(2)}" tall holds no lines at this spacing.`, { actual: n.rect.h, limit: 0, unit: "in" }, "warning");
@@ -191,7 +207,7 @@ export function validatePage(doc: ResolvedDocument, index: number, measure: Text
   const footers = s.nodes.filter((n) => n.component === "PageFooter" && n.type === "text");
   for (const node of s.nodes) {
     checkNode(node, g, push);
-    if (node.type === "text") checkText(node, doc, measure, push);
+    if (node.type === "text") checkText(node, doc, measure, push, headingFailures);
     if (node.functional && node.component !== "PageFooter" && node.type !== "group") {
       for (const f of footers) {
         if (rectsIntersect(f.rect, node.rect)) {
@@ -221,7 +237,7 @@ const COLLISION_TOLERANCE_IN = 0.01;
 export function textCollisions(s: SolvedPage, doc: ResolvedDocument, measure: TextMeasurer) {
   const texts = s.nodes.filter((n): n is Extract<LayoutNode, { type: "text" }> => n.type === "text" && !!n.text);
   const boxes = texts.map((t) => ({ t, b: inkBox(t, doc, measure) }));
-  const out: { a: string; message: string; measurement: ValidationIssue["measurement"] }[] = [];
+  const out: { a: string; b: string; message: string; measurement: ValidationIssue["measurement"] }[] = [];
   for (let i = 0; i < boxes.length; i++) {
     for (let j = i + 1; j < boxes.length; j++) {
       const A = boxes[i].b, B = boxes[j].b;
@@ -230,6 +246,7 @@ export function textCollisions(s: SolvedPage, doc: ResolvedDocument, measure: Te
       if (ox > COLLISION_TOLERANCE_IN && oy > COLLISION_TOLERANCE_IN) {
         out.push({
           a: boxes[i].t.id,
+          b: boxes[j].t.id,
           message: `"${boxes[i].t.text}" overlaps "${boxes[j].t.text}" by ${ox.toFixed(3)}" × ${oy.toFixed(3)}".`,
           measurement: { actual: Math.min(ox, oy), limit: COLLISION_TOLERANCE_IN, unit: "in" },
         });

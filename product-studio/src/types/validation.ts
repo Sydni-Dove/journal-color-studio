@@ -9,6 +9,7 @@ export type ValidationRule =
   | "bleed"
   | "component-bounds"
   | "text-overflow"
+  | "heading-fit"
   | "text-too-small"
   | "line-overflow"
   | "grid-overflow"

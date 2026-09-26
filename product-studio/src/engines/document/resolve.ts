@@ -5,9 +5,11 @@
  *   calendar  ← calendar settings                      (colors/fonts never touch it)
  *   recipe    ← recipe + calendar + binding paging      (fonts never touch it)
  *   geometry  ← trim + production + page count + side  (theme never touches it)
- *   layout    ← geometry + spacing + type sizes + wording + pattern + options + period
- * Colors, font families and decorative themes are applied at render time
- * only, so changing them never re-solves geometry or dates.
+ *   layout    ← geometry + spacing + type styles + wording + pattern + options + period
+ *               + the layout text measurer (headings are fitted to measured text,
+ *               so the fonts and their metrics are part of the key)
+ * Colors and decorative themes are applied at render time only, so changing
+ * them never re-solves geometry or dates.
  */
 import { getLayout, FILLER_LAYOUT_ID, LAYOUTS } from "../../layouts/registry";
 import type { FitResult, LayoutContext, LayoutDefinition } from "../../layouts/shared/types";
@@ -29,6 +31,7 @@ import type { PageInstance } from "../../types/recipe";
 import type { DecorativeTheme } from "../../types/theme";
 import type { ColorTokens, SpacingTokens, TypographySettings, Wording } from "../../types/tokens";
 import { getCalendar } from "../calendar/calendar";
+import { getLayoutMeasurer } from "../typography/textMeasure";
 import { resolveTrim, type ResolvedTrim } from "../geometry/dimensions";
 import { computePageGeometry } from "../geometry/pageGeometry";
 import { expandRecipe, type ExpandedRecipe } from "../recipe/recipe";
@@ -179,7 +182,7 @@ export function solvePage(doc: ResolvedDocument, index: number): SolvedPage {
   const group = instancePages(doc, index);
   const layout = getLayout(group[0].layoutId);
   const geometries = group.map((p) => geometryFor(doc, p));
-  const typeSizes = Object.fromEntries(Object.entries(doc.typography.roles).map(([k, r]) => [k, [r.sizePt, r.lineHeight]]));
+  const typeSizes = Object.fromEntries(Object.entries(doc.typography.roles).map(([k, r]) => [k, [r.sizePt, r.lineHeight, r.group, r.weight, r.style, r.trackingEm, r.transform]]));
   // The layout id is part of the key: two recipe steps (or one step whose
   // layout changed) can share a page key, and must never share solved output.
   const key = JSON.stringify([
@@ -188,6 +191,8 @@ export function solvePage(doc: ResolvedDocument, index: number): SolvedPage {
     geometries.map((g) => [g.trimWidthIn, g.trimHeightIn, g.safe, g.side]),
     doc.spacing,
     typeSizes,
+    doc.typography.fonts,
+    getLayoutMeasurer().id,
     doc.wording,
     doc.project.functionalPattern,
     doc.project.layoutOptions,

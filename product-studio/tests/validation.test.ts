@@ -26,13 +26,14 @@ describe("validation engine", () => {
     expect(r.exportAllowed).toBe(false);
   });
 
-  it("detects heading collisions from long wording instead of shrinking type", () => {
+  it("reports a heading that cannot fit even after the bounded fit (never shrinks below the minimum)", () => {
     const p = TEST_PRODUCTS[3].build();
     p.wording = { morning: "Morning Devotion, Worship and Intercession Time" };
     const r = validateProject(p, heuristicMeasurer, { pageIndices: [1] });
-    const overflow = r.issues.find((i) => i.rule === "text-overflow");
+    const overflow = r.issues.find((i) => i.rule === "heading-fit");
     expect(overflow?.measurement?.unit).toBe("in");
     expect(overflow!.page).toBe(2);
+    expect(overflow!.message).toMatch(/exceeds the available heading width by \d\.\d\d"/);
   });
 
   it("rejects type below the 6 pt print minimum", () => {

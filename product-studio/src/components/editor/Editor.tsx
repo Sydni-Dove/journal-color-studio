@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { compositionFor, geometryFor, resolveDocument, solvePage, type ResolvedDocument } from "../../engines/document/resolve";
 import { planDecoration } from "../../themes/decorationPlan";
 import { computeUsage } from "../../engines/document/usage";
-import { createCanvasMeasurer, heuristicMeasurer } from "../../engines/typography/textMeasure";
+import { createCanvasMeasurer, heuristicMeasurer, setLayoutMeasurer } from "../../engines/typography/textMeasure";
 import { finalizeReport, validatePage, validateProductLevel } from "../../engines/validation/validate";
 import type { ProductProject } from "../../types/project";
 import { useFontLoader } from "../../utils/useFontLoader";
@@ -48,7 +48,15 @@ export function Editor({ project, onChange, onBack, saveStatus }: Props) {
     [project, onChange],
   );
 
-  const { doc, error } = useMemo(() => tryResolve(project), [project]);
+  // Layouts fit headings with the same real glyph metrics the live check uses, once the fonts have loaded.
+  const layoutMeasure = useMemo(() => {
+    const canvas = fontsReady ? createCanvasMeasurer() : null;
+    const id = canvas ? `canvas:${JSON.stringify(project.typography.fonts)}` : "heuristic";
+    setLayoutMeasurer(id, canvas ?? heuristicMeasurer);
+    return id;
+  }, [fontsReady, project.typography.fonts]);
+  // Re-resolve when the layout measurer changes (solve keys include it).
+  const { doc, error } = useMemo(() => (void layoutMeasure, tryResolve(project)), [project, layoutMeasure]);
   const usage = useMemo(() => (doc ? computeUsage(doc) : null), [doc]);
 
   // Live check of the visible page(s) with real font metrics once fonts load.

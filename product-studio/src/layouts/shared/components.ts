@@ -5,12 +5,13 @@
 import { distributeEqual, fitCount, solveStack, type StackModule } from "../../engines/layout/math";
 import { fillWritingRegion, lineSpacingIn } from "../../engines/patterns/patterns";
 import { STUDIO_STROKES } from "../../presets/studioDefaults";
+import { ptToIn } from "../../engines/units/units";
 import type { CalendarMonth } from "../../types/calendar";
 import type { Rect } from "../../types/geometry";
-import type { ElementPosition, LayoutDiagnostic, LayoutMetric, LayoutNode, SemanticTextKey, TextAnchor, TextNode } from "../../types/layout";
+import type { ElementPosition, LayoutDiagnostic, LayoutMetric, LayoutNode, SemanticTextKey, TextAnchor, TextFit, TextNode } from "../../types/layout";
 import type { LayoutPlacement } from "../../types/project";
 import type { TextAlign, TypographyRole } from "../../types/tokens";
-import { heuristicMeasurer, styleForRole } from "../../engines/typography/textMeasure";
+import { applyTransform, getLayoutMeasurer, heuristicMeasurer, styleForRole, type TextMeasurer } from "../../engines/typography/textMeasure";
 import type { LayoutContext } from "./types";
 import { box, checkbox, group, lineBoxIn, rule, stackDiagnostic, text } from "./nodes";
 
@@ -255,6 +256,81 @@ export function writingSurface(id: string, rect: Rect, ctx: LayoutContext): Layo
   return fillWritingRegion(id, rect, { ...ctx.pattern, kind: kind as typeof ctx.pattern.kind });
 }
 
+
+/**
+ * HEADING FIT — shared by every section / sidebar heading, so user-entered
+ * wording of any length fits cleanly instead of overflowing its border.
+ *
+ * Ordered strategy (first that fits wins; widths keep the heading inset on
+ * both sides, heights stay inside the heading area):
+ *   1. the role's normal size on one line
+ *   2. the normal size on two balanced lines, when the area is tall enough
+ *   3. 0.5 pt steps down to HEADING_MIN_PT — one line, then two, at each size
+ *   4. otherwise report exactly how much the heading is too wide (never
+ *      endless shrinking, never silent clipping)
+ * Multi-line capitals use a tight 1.0 leading (no descenders to collide);
+ * mixed case uses 1.1.
+ */
+export const HEADING_MIN_PT = 7;
+const HEADING_STEP_PT = 0.5;
+
+export type HeadingFit = TextFit & { ok: boolean; heightIn: number; widthIn: number; excessIn: number };
+
+export function fitHeading(value: string, role: TypographyRole, area: { w: number; h: number }, ctx: Pick<LayoutContext, "typography">, measure: TextMeasurer = getLayoutMeasurer().measure): HeadingFit {
+  const r = ctx.typography.roles[role];
+  const base = styleForRole(ctx.typography, role);
+  const caps = r.transform === "uppercase" || r.transform === "small-caps";
+  const multiLead = caps ? 1.0 : 1.1;
+  const words = value.trim().split(/\s+/).filter(Boolean);
+  const minPt = Math.min(r.sizePt, HEADING_MIN_PT);
+  const widthAt = (t: string, pt: number) => measure(t, { ...base, sizePt: pt });
+  // The two-line split whose longer line is shortest.
+  const split = (pt: number): string[] | null => {
+    if (words.length < 2) return null;
+    let best: string[] | null = null, bestW = Infinity;
+    for (let k = 1; k < words.length; k++) {
+      const a = words.slice(0, k).join(" "), b = words.slice(k).join(" ");
+      const w = Math.max(widthAt(a, pt), widthAt(b, pt));
+      if (w < bestW) (bestW = w), (best = [a, b]);
+    }
+    return best;
+  };
+  const tryAt = (pt: number, lines: string[], lead: number) => {
+    const widthIn = Math.max(...lines.map((l) => widthAt(l, pt)));
+    const heightIn = ptToIn(pt * lead) * lines.length;
+    return { sizePt: pt, lineHeight: lead, lines, widthIn, heightIn, fitsW: widthIn <= area.w + 1e-9, fitsH: heightIn <= area.h + 1e-9 };
+  };
+  for (let pt = r.sizePt; pt >= minPt - 1e-9; pt -= HEADING_STEP_PT) {
+    const one = tryAt(pt, [value], r.lineHeight);
+    if (one.fitsW && one.fitsH) return { ...one, ok: true, excessIn: 0 };
+    const two = split(pt);
+    if (two) {
+      const t = tryAt(pt, two, multiLead);
+      if (t.fitsW && t.fitsH) return { ...t, ok: true, excessIn: 0 };
+    }
+  }
+  // Nothing fits: draw at the minimum (the best split if two lines fit the height) and report the excess width.
+  const two = split(minPt);
+  const tTwo = two ? tryAt(minPt, two, multiLead) : null;
+  const f = tTwo && tTwo.fitsH ? tTwo : tryAt(minPt, [value], r.lineHeight);
+  return { ...f, ok: false, excessIn: Math.max(0, f.widthIn - area.w) };
+}
+
+/** The layout diagnostic for a heading that cannot fit (page + element come with the issue). */
+export function headingFitDiagnostic(id: string, kind: string, value: string, role: TypographyRole, area: { w: number; h: number }, f: HeadingFit, ctx: Pick<LayoutContext, "typography">): LayoutDiagnostic {
+  const shown = applyTransform(value, ctx.typography.roles[role].transform);
+  const byW = f.excessIn > 0;
+  return {
+    severity: "error",
+    rule: "heading-fit",
+    componentId: id,
+    message: byW
+      ? `${kind} heading "${shown}" exceeds the available heading width by ${f.excessIn.toFixed(2)}" (${f.widthIn.toFixed(2)}" needed, ${area.w.toFixed(2)}" available) even at the ${f.sizePt} pt minimum${f.lines.length > 1 ? " on two lines" : ""}. Shorten the wording.`
+      : `${kind} heading "${shown}" needs ${f.heightIn.toFixed(2)}" of height but its heading area is ${area.h.toFixed(2)}" at the ${f.sizePt} pt minimum. Shorten the wording.`,
+    measurement: byW ? { actualIn: f.widthIn, limitIn: area.w } : { actualIn: f.heightIn, limitIn: area.h },
+  };
+}
+
 /** Section: heading label + content (lines / checklist / pattern / blank). */
 export function section(
   id: string,
@@ -268,7 +344,7 @@ export function section(
    *          that live inside a connected grid whose rules are drawn once by
    *          the grid itself.
    */
-  opts: { boxed?: boolean; padded?: boolean; titleRole?: "sectionHeading" | "subheading" | "label"; semantic?: "sectionHeading" } = {},
+  opts: { boxed?: boolean; padded?: boolean; titleRole?: "sectionHeading" | "subheading" | "label"; semantic?: "sectionHeading"; headingKind?: string } = {},
 ): { nodes: LayoutNode[]; diagnostics: LayoutDiagnostic[] } {
   const s = ctx.spacing;
   const titleRole = opts.titleRole ?? "sectionHeading";
@@ -277,7 +353,10 @@ export function section(
   const hin = opts.boxed || opts.padded ? s.sectionHeadingInset : 0;
   const inner: Rect = { x: rect.x + pad, y: rect.y + pad, w: rect.w - 2 * pad, h: rect.h - 2 * pad };
   const headRect: Rect = { x: rect.x + hin, y: rect.y + hin, w: rect.w - 2 * hin, h: rect.h - 2 * hin };
-  const titleH = title ? lineBoxIn(ctx.typography, titleRole) : 0;
+  // Headings fit their width (one line, two lines, then down to HEADING_MIN_PT); two lines take room from the content.
+  const headArea = { w: headRect.w, h: 2 * lineBoxIn(ctx.typography, titleRole) };
+  const fitted = title ? fitHeading(title, titleRole, headArea, ctx) : null;
+  const titleH = fitted ? fitted.heightIn : 0;
   const top = title ? headRect.y : inner.y;
   const st = solveStack(top, rect.y + rect.h - pad - top, [
     { id: "title", kind: "fixed", size: titleH },
@@ -294,7 +373,7 @@ export function section(
       const want = ctx.options.textPositions?.[opts.semantic];
       const anchor = want && SECTION_TEXT_ANCHORS.includes(want.anchor) ? want.anchor : "above-content-left";
       align = alignOf(anchor);
-      const inkW = Math.min(headRect.w, heuristicMeasurer(title, styleForRole(ctx.typography, titleRole)));
+      const inkW = Math.min(headRect.w, fitted!.widthIn);
       const baseX = align === "left" ? headRect.x : align === "right" ? headRect.x + headRect.w - inkW : headRect.x + (headRect.w - inkW) / 2;
       const x = Math.min(Math.max(baseX + (want?.offsetXIn ?? 0), headRect.x), headRect.x + headRect.w - inkW);
       const y = Math.min(Math.max(tRect.y + (want?.offsetYIn ?? 0), headRect.y), st.byId.content.start - titleH);
@@ -304,6 +383,8 @@ export function section(
       tRect = align === "left" ? { x, y, w: headRect.x + headRect.w - x, h: titleH } : align === "right" ? { x: headRect.x, y, w: x + inkW - headRect.x, h: titleH } : { x: x + inkW / 2 - Math.min(x + inkW / 2 - headRect.x, headRect.x + headRect.w - x - inkW / 2), y, w: 2 * Math.min(x + inkW / 2 - headRect.x, headRect.x + headRect.w - x - inkW / 2), h: titleH };
     }
     const t = text(`${id}-title`, tRect, title, titleRole, { component: "SectionHeader", align, semantic: opts.semantic });
+    if (fitted && (fitted.lines.length > 1 || fitted.sizePt !== ctx.typography.roles[titleRole].sizePt || !fitted.ok)) t.fit = { sizePt: fitted.sizePt, lineHeight: fitted.lineHeight, lines: fitted.lines, ...(fitted.ok ? {} : { failed: true }) };
+    if (fitted && !fitted.ok) diagnostics.push(headingFitDiagnostic(t.id, opts.headingKind ?? "Section", title, titleRole, headArea, fitted, ctx));
     if (opts.semantic) {
       const want = ctx.options.textPositions?.[opts.semantic];
       t.placement = { anchor: want && SECTION_TEXT_ANCHORS.includes(want.anchor) ? want.anchor : "above-content-left", defaultAnchor: "above-content-left" };

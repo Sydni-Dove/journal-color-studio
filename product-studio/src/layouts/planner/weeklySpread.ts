@@ -23,9 +23,9 @@ import { STUDIO_PLANNER, STUDIO_STROKES, STUDIO_WEEKLY_VARIANTS } from "../../pr
 import type { CalendarDay } from "../../types/calendar";
 import type { LayoutRegions } from "../../types/composition";
 import type { Rect } from "../../types/geometry";
-import type { LayoutDiagnostic, LayoutMetric, LayoutNode, SolvedPage } from "../../types/layout";
+import type { LayoutDiagnostic, LayoutMetric, LayoutNode, SolvedPage, TextNode } from "../../types/layout";
 import type { WordingKey } from "../../types/tokens";
-import { connectedTracks, headerTitle, pageFrame, PLANNER_GRID_GAP_IN, runsOf, SECTION_TEXT_ANCHORS, section, writingSurface } from "../shared/components";
+import { connectedTracks, fitHeading, headerTitle, headingFitDiagnostic, pageFrame, PLANNER_GRID_GAP_IN, runsOf, SECTION_TEXT_ANCHORS, section, writingSurface } from "../shared/components";
 import { group, lineBoxIn, rule, text } from "../shared/nodes";
 import type { FitContext, FitResult, LayoutContext, LayoutDefinition } from "../shared/types";
 
@@ -70,7 +70,7 @@ export function fitWeekly(ctx: FitContext): FitResult {
  * sidebar heading) is the positionable "sectionHeading": left / centre / right
  * within its slot plus offsets kept inside the slot's header band.
  */
-function headerLabels(id: string, head: Rect, label: string, date: string | null, ctx: LayoutContext): LayoutNode[] {
+function headerLabels(id: string, head: Rect, label: string, date: string | null, ctx: LayoutContext, kind = "Section"): { nodes: LayoutNode[]; diagnostics: LayoutDiagnostic[] } {
   const labelH = lineBoxIn(ctx.typography, "subheading");
   const dateH = lineBoxIn(ctx.typography, "date");
   const pad = ctx.spacing.labelToBorderInset;
@@ -79,15 +79,23 @@ function headerLabels(id: string, head: Rect, label: string, date: string | null
     const want = ctx.options.textPositions?.sectionHeading;
     const anchor = want && SECTION_TEXT_ANCHORS.includes(want.anchor) ? want.anchor : "above-content-left";
     const align = anchor.endsWith("left") ? "left" : anchor.endsWith("right") ? "right" : "center";
-    const inner: Rect = { x: head.x + pad, y: head.y + pad, w: head.w - 2 * pad, h: head.h - 2 * pad };
+    // A slot heading keeps the section-heading inset from the slot's side rules and the grid's top edge, and
+    // sits on the day names' baseline (labelToBorderInset above the header rule). Its wording is user-editable:
+    // it is fitted to that area (shared fitHeading) instead of assuming a short word.
+    const hin = ctx.spacing.sectionHeadingInset;
+    const inner: Rect = { x: head.x + hin, y: head.y + hin, w: head.w - 2 * hin, h: bottom - (head.y + hin) };
+    const f = fitHeading(label, "subheading", inner, ctx);
+    const h = Math.max(labelH, f.heightIn);
     const dx = Math.max(-inner.w, Math.min(inner.w, want?.offsetXIn ?? 0));
-    const y = Math.min(Math.max(bottom - labelH + (want?.offsetYIn ?? 0), inner.y), bottom - labelH);
-    return [{ ...text(`${id}-name`, { x: inner.x + dx, y, w: inner.w, h: labelH }, label, "subheading", { component: "SectionHeader", align, vAlign: "bottom", semantic: "sectionHeading" }), placement: { anchor, defaultAnchor: "above-content-left" } }];
+    const y = Math.min(Math.max(bottom - h + (want?.offsetYIn ?? 0), inner.y), bottom - h);
+    const node: TextNode = { ...text(`${id}-name`, { x: inner.x + dx, y, w: inner.w, h }, label, "subheading", { component: "SectionHeader", align, vAlign: "bottom", semantic: "sectionHeading" }), placement: { anchor, defaultAnchor: "above-content-left" } };
+    if (f.lines.length > 1 || f.sizePt !== ctx.typography.roles.subheading.sizePt || !f.ok) node.fit = { sizePt: f.sizePt, lineHeight: f.lineHeight, lines: f.lines, ...(f.ok ? {} : { failed: true }) };
+    return { nodes: [node], diagnostics: f.ok ? [] : [headingFitDiagnostic(node.id, kind, label, "subheading", inner, f, ctx)] };
   }
-  return [
+  return { nodes: [
     text(`${id}-name`, { x: head.x + pad, y: bottom - labelH, w: head.w * 0.62 - pad, h: labelH }, label, "subheading", { component: "SectionHeader", align: "left", vAlign: "bottom" }),
     text(`${id}-date`, { x: head.x + head.w * 0.62, y: bottom - dateH, w: head.w * 0.38 - pad, h: dateH }, date, "date", { component: "SectionHeader", align: "right", vAlign: "bottom" }),
-  ];
+  ], diagnostics: [] };
 }
 
 /**
@@ -98,7 +106,7 @@ function headerLabels(id: string, head: Rect, label: string, date: string | null
 function dayColumn(id: string, rect: Rect, day: CalendarDay, weekdayName: string, ctx: LayoutContext): { nodes: LayoutNode[]; diagnostics: LayoutDiagnostic[] } {
   const head = { ...rect, h: STUDIO_PLANNER.dayHeader.valueIn };
   const body = { ...rect, y: rect.y + head.h, h: rect.h - head.h };
-  const nodes: LayoutNode[] = [group(id, "Section", rect), ...headerLabels(id, head, weekdayName, String(day.day), ctx)];
+  const nodes: LayoutNode[] = [group(id, "Section", rect), ...headerLabels(id, head, weekdayName, String(day.day), ctx).nodes];
   const n = Math.max(1, ctx.options.sectionsPerDay);
   const rows = distributeEqual(body.y, body.h, n, PLANNER_GRID_GAP_IN);
   const diagnostics: LayoutDiagnostic[] = [];
@@ -212,15 +220,16 @@ export const weeklySpread: LayoutDefinition = {
         const content = sidebar ? "checklist" : "surface";
         if (sidebar) nodes.push(group(`wk${p}-sidebar-bounds`, "Sidebar", r));
         if (horizontal) {
-          const sec = section(sid, r, title, ctx, content, { padded: true, titleRole: "subheading", semantic: "sectionHeading" });
+          const sec = section(sid, r, title, ctx, content, { padded: true, titleRole: "subheading", semantic: "sectionHeading", headingKind: sidebar ? "Sidebar" : "Notes" });
           nodes.push(...sec.nodes);
           diagnostics.push(...sec.diagnostics);
         } else {
           // Title sits in the shared header row, content below the header rule.
           const head = { ...r, h: headH };
           const sec = section(sid, { ...r, y: r.y + headH, h: r.h - headH }, "", ctx, content, { padded: true });
-          nodes.push(...headerLabels(sid, head, title, null, ctx), ...sec.nodes);
-          diagnostics.push(...sec.diagnostics);
+          const heading = headerLabels(sid, head, title, null, ctx, sidebar ? "Sidebar" : "Notes");
+          nodes.push(...heading.nodes, ...sec.nodes);
+          diagnostics.push(...heading.diagnostics, ...sec.diagnostics);
         }
       });
       const b = frame.body;
