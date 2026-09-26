@@ -92,6 +92,8 @@ export type PieceReport = {
   attachedTo: string[];
   /** The gap the piece is designed to keep from its attached target (inches). */
   targetGapIn: number | null;
+  /** How it meets its rule: standing on it, or worn across it. */
+  ruleMode?: "rest" | "straddle";
 };
 
 export type DecorPlan = {
@@ -223,6 +225,9 @@ type Spec = Omit<ObjectSpec, "assetId" | "aspect"> & {
   id: string;
   mode: "contained" | "bleed";
   corner?: Corner;
+  restMode?: "rest" | "straddle";
+  /** Content under this piece is masked away by the caller (e.g. a table it is tucked behind). */
+  maskedInside?: boolean;
   attachedTo?: string[];
   targetGapIn?: number | null;
 };
@@ -275,6 +280,11 @@ function cornersOf(set: CornerSet, kind: "floral" | "accent") {
   return CORNERS_OF[set].map((k) => ({ ...CORNER_DEF[k], corner: k, transform: t(k) }));
 }
 
+/** The page's table: the calendar / planner grid, else the notes box, else the writing area. */
+function tableOf(comp: Composition): Rect | null {
+  return comp.regions.calendar ?? comp.regions.notes ?? comp.regions.writingArea ?? null;
+}
+
 /** Base object placement before user overrides. */
 function base(p: Partial<DecorationPlacement>): DecorationPlacement {
   return { anchor: "page", attach: "inside", alignX: "center", alignY: "center", fit: "contain", offsetXIn: 0, offsetYIn: 0, allowContentOverlap: false, allowBleed: true, allowClipping: false, ...p };
@@ -313,7 +323,7 @@ function cornerSpecs(comp: Composition, set: CornerSet, kind: "floral" | "accent
 const sameRule = (p: ProtectedRect, rule: Rect) => p.kind === "rule" && Math.abs(p.rect.y + p.rect.h / 2 - (rule.y + rule.h / 2)) < 1e-6 && p.rect.x <= rule.x + 1e-6;
 
 /** Title-accent pieces: attached to the title's ink or to its rule, at the semantic gap tokens. */
-function titleAccentSpecs(comp: Composition, pos: TitleAccentPosition, preferredW: number, assetId: string): Spec[] {
+function titleAccentSpecs(comp: Composition, pos: TitleAccentPosition, preferredW: number, assetId: string, straddle = true): Spec[] {
   const g = comp.gaps;
   const contained = containedBounds(comp);
   const title = comp.titleId;
@@ -351,18 +361,35 @@ function titleAccentSpecs(comp: Composition, pos: TitleAccentPosition, preferred
     targetGapIn: g.toTitle,
     transform: {},
   });
-  const onRule = (x: "start" | "center" | "end", id: string): Spec => ({
-    ...base({ anchor: "titleRule", attach: "inside", alignX: x, alignY: "end", fit: "natural", allowBleed: false }),
-    ...common,
-    id,
-    // Rests ON the title rule; content beyond the rule is separated by the rule itself.
-    restOnY: rule ? rule.y : undefined,
-    ignore: onLine,
-    attachedTo: ruleId ? [ruleId] : [],
-    targetGapIn: 0,
-    // At an end of the rule the grounded end lands on that end and the arch lifts inward (toward the title).
-    transform: x === "center" ? {} : lowAt(x === "end" ? "right" : "left"),
-  });
+  // Worn ON the rule (Dove Expressions usage): the rule runs through the cluster's centre of ink mass, each cluster
+  // centred on its end of the rule, the artwork as designed. Only the rule itself is exempt — content below keeps
+  // its clearance. Where the header is too tight for that ("rest" fallback), the cluster stands on the rule instead:
+  // lowest ink on the line, its hanging end at the rule's end and the arch lifting inward.
+  const onRule = (x: "start" | "center" | "end", id: string): Spec =>
+    straddle
+      ? {
+          ...base({ anchor: "titleRule", attach: "inside", alignX: x, alignY: "center", fit: "natural", allowBleed: false }),
+          ...common,
+          id,
+          restOnY: rule ? rule.y : undefined,
+          restMode: "straddle",
+          hangOut: x === "center" ? 0 : 0.45,
+          ignore: (p) => !!rule && sameRule(p, rule),
+          attachedTo: ruleId ? [ruleId] : [],
+          targetGapIn: null,
+          transform: {},
+        }
+      : {
+          ...base({ anchor: "titleRule", attach: "inside", alignX: x, alignY: "end", fit: "natural", allowBleed: false }),
+          ...common,
+          id,
+          restOnY: rule ? rule.y : undefined,
+          restMode: "rest",
+          ignore: onLine,
+          attachedTo: ruleId ? [ruleId] : [],
+          targetGapIn: 0,
+          transform: x === "center" ? {} : lowAt(x === "end" ? "right" : "left"),
+        };
   const titleAlign = comp.titleAlign;
   switch (pos) {
     case "title-left":
@@ -433,6 +460,10 @@ const CORNER_NAME: Record<Corner, string> = { tl: "upper-left", tr: "upper-right
 
 /** Say WHY an object was not placed, in page terms. */
 function noRoomReason(comp: Composition, s: Spec, fallback = "no room"): string {
+  if (s.id.startsWith("table-")) {
+    const k = s.id.slice(6) as Corner;
+    return `the table's ${CORNER_NAME[k]} corner is crowded by nearby content (labels, notes, the header rule or a binding zone) — try other corners or a smaller size`;
+  }
   const c = comp.content;
   if (s.corner && c && !fallback.startsWith("this page has no")) {
     const left = s.corner === "tl" || s.corner === "bl", top = s.corner === "tl" || s.corner === "tr";
@@ -458,7 +489,7 @@ function placeObjects(c: Ctx, asset: Exclude<DesignAsset, { type: "marble" }>, s
   let knockout = false;
   for (const s of specs) {
     const fit = fitObject({ ...s, assetId: asset.id, aspect: ar }, c.comp);
-    const knocks = s.avoid === "knockout" && !s.allowContentOverlap;
+    const knocks = (s.avoid === "knockout" || !!s.maskedInside) && !s.allowContentOverlap;
     reports.push({
       id: s.id,
       assetId: asset.id,
@@ -478,6 +509,7 @@ function placeObjects(c: Ctx, asset: Exclude<DesignAsset, { type: "marble" }>, s
       knockout: knocks,
       attachedTo: s.attachedTo ?? [],
       targetGapIn: s.targetGapIn ?? null,
+      ruleMode: s.restMode,
     });
     if (!fit.rect) continue;
     const rect = c.toMedia(fit.rect);
@@ -578,12 +610,45 @@ export function planDecoration(g: PageGeometry, input: DecorativeTheme, colors: 
       // JCS floralFlank sizing: the sprig is 1.5 title em tall; the bouquet, a larger rule ornament, 2.2 — never below the minimum ornament.
       const h = comp.titleEmIn * (TITLE_ACCENT_EM[asset.id] ?? FLORAL_FLANK.heightPerTitleEm) * theme.scale;
       const preferredW = Math.max(h * ar, ar >= 1 ? MIN_LONG_SIDE_IN : MIN_LONG_SIDE_IN * ar);
-      if (theme.titlePosition) specs = titleAccentSpecs(comp, theme.titlePosition, preferredW, asset.id);
+      // Worn across the rule when the whole cluster fits (at ≥ 75% of its size); otherwise standing on it.
+      const composed = (pos: TitleAccentPosition) => {
+        const across = titleAccentSpecs(comp, pos, preferredW, asset.id, true);
+        const r = run(across).reports;
+        return r.every((x) => x.rect && x.scale >= 0.75) ? across : titleAccentSpecs(comp, pos, preferredW, asset.id, false);
+      };
+      if (theme.titlePosition) specs = composed(theme.titlePosition);
       else {
         // Automatic: the balancing default, else the first position where the whole accent fits.
         const order = [defaultTitlePosition(comp), ...AUTO_TITLE_ORDER].filter((p) => titlePositionsFor(asset.id).includes(p));
-        const pick = order.find((p) => run(titleAccentSpecs(comp, p, preferredW, asset.id)).reports.every((r) => r.rect)) ?? order[0];
-        specs = titleAccentSpecs(comp, pick, preferredW, asset.id);
+        const pick = order.find((p) => run(composed(p)).reports.every((r) => r.rect)) ?? order[0];
+        specs = composed(pick);
+      }
+    } else if (theme.placement === "table-corner") {
+      // On a table: the arch sits on the CORNER of the table's lines. The cluster's centre of ink mass is pinned to
+      // the corner; the part inside the table is masked away, so it reads as tucked behind the table.
+      const t = tableOf(comp);
+      if (t) {
+        const set = theme.corners ?? "opposite-tr-bl";
+        const pref = Math.max(comp.titleEmIn * 2.4 * theme.scale * ar, MIN_LONG_SIDE_IN);
+        const inside = (p: ProtectedRect) => p.rect.x >= t.x - comp.clearanceIn - 1e-6 && p.rect.y >= t.y - comp.clearanceIn - 1e-6 && p.rect.x + p.rect.w <= t.x + t.w + comp.clearanceIn + 1e-6 && p.rect.y + p.rect.h <= t.y + t.h + comp.clearanceIn + 1e-6;
+        specs = CORNERS_OF[set].map((k) => {
+          const left = k === "tl" || k === "bl", top = k === "tl" || k === "tr";
+          return {
+            ...base({ anchor: "page", alignX: left ? "start" : "end", alignY: top ? "start" : "end", fit: "natural", allowBleed: false }),
+            id: `table-${k}`,
+            mode: "contained" as const,
+            preferredW: pref,
+            bounds: containedBounds(comp),
+            // Landing on the corner, leaning outward: most of the cluster sits beyond the table.
+            pinInk: { x: (left ? t.x : t.x + t.w) + (left ? -1 : 1) * pref * 0.2, y: (top ? t.y : t.y + t.h) + (top ? -1 : 1) * (pref / ar) * 0.2 },
+            ignore: inside,
+            maskedInside: true,
+            // Foliage sweeps outward, away from the table.
+            transform: groundedSide(OCCUPANCY[asset.id]) === (left ? "left" : "right") ? { flipX: true } : {},
+          };
+        });
+        const r = run(specs);
+        return plan(r.pieces, r.knockout ? [toMedia(t)] : [], r.reports);
       }
     } else if (theme.placement === "top-bottom" || theme.placement === "footer-flourish") {
       // Edge flourishes ENTER from the page edge (run edgeBleedAmount past the trim, on purpose) and shrink clear

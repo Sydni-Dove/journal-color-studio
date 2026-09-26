@@ -71,7 +71,8 @@ export type DecorativePlacement =
   | "header-flourish"
   | "footer-flourish"
   | "footer-band"
-  | "edge-strip";
+  | "edge-strip"
+  | "table-corner";
 
 /** Which corners a "corners" placement uses. */
 export type CornerSet = "opposite-tl-br" | "opposite-tr-bl" | "all" | "top" | "bottom" | "tl" | "tr" | "bl" | "br";
@@ -118,6 +119,7 @@ export type DecorationCapability =
   | "footer-flourish"
   | "footer-band"
   | "edge-strip"
+  | "table-corner"
   | "top-bottom"
   | "behind-title"
   | "background";
@@ -134,6 +136,7 @@ export type DecorationRole =
   | "band"
   | "edge"
   | "corner"
+  | "table-corner"
   | "divider"
   | "rule-accent"
   | "heading-accent"

@@ -146,7 +146,7 @@ describe("B · 7×9 Monthly · Floral header sprigs attach to the title / title 
   const center = (r: Rect) => ({ x: r.x + r.w / 2, y: r.y + r.h / 2 });
 
   it("offers only positions ATTACHED to the title or its rule (no floating above / below the title)", () => {
-    expect(placementsFor({ style: "floral", assetId: "jcs-floral-sprig" })).toEqual(["title-accent"]);
+    expect(placementsFor({ style: "floral", assetId: "jcs-floral-sprig" })).toEqual(["title-accent", "table-corner"]);
     expect(titlePositionsFor("jcs-floral-sprig")).toEqual(["title-left", "title-right", "rule-left", "rule-center", "rule-right", "rule-both"]);
     expect(titlePositionsFor("jcs-floral-corner")).toEqual([]);
   });
@@ -274,7 +274,7 @@ describe("placement capabilities and decoration spacing tokens", () => {
       expect(a.capabilities.length, id).toBeGreaterThan(0);
       expect(placementsFor({ style: a.type, assetId: id })).toEqual(a.placements);
     }
-    expect(placementsFor({ style: "floral", assetId: "jcs-floral-corner" })).toEqual(["corners"]);
+    expect(placementsFor({ style: "floral", assetId: "jcs-floral-corner" })).toEqual(["corners", "table-corner"]);
     expect(placementsFor({ style: "accent", assetId: "jcs-accent-dots" })).not.toContain("edge-accent");
   });
   it("decoration tokens are physical inches that grow with density", () => {

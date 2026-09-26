@@ -297,6 +297,7 @@ const PLACEMENT_LABEL: Record<DecorativePlacement, string> = {
   "edge-strip": "Edge strip (outer edge)",
   "border-frame": "Margin frame (around content)",
   corners: "Corner flourish",
+  "table-corner": "Table corner — needs space around the table",
   "title-accent": "Title & rule ornament",
   "top-bottom": "Top + bottom edge flourish",
   "behind-title": "Behind the title (subtle)",
@@ -402,7 +403,7 @@ export function DecorationPanel({ project, update, usage, decor }: PanelProps & 
       {d.style !== "none" && (
         <>
           {placements.length > 1 && <Select label="Placement" value={d.placement} options={placements.map((p) => ({ value: p, label: PLACEMENT_LABEL[p] }))} onChange={(placement) => set(normalizeDecoration({ ...d, placement, layout: undefined }))} />}
-          {d.placement === "corners" && (
+          {(d.placement === "corners" || d.placement === "table-corner") && (
             <Select
               label="Corners"
               value={d.corners ?? "__auto"}

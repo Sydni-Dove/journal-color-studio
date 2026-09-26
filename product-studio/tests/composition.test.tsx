@@ -86,8 +86,8 @@ describe("decoration anchors to composition regions", () => {
     expect(html(pa)).not.toBe(html(pb));
   });
   it("offsets move the artwork (and are still bound by the page rules)", () => {
-    const a = planFor(build(2), { style: "floral", assetId: "jcs-floral-sprig", placement: "title-accent" }).plan.reports.find((r) => r.rect)!;
-    const b = planFor(build(2), { style: "floral", assetId: "jcs-floral-sprig", placement: "title-accent", layout: { offsetXIn: 0.3 } }).plan.reports.find((r) => r.rect)!;
+    const a = planFor(build(2), { style: "floral", assetId: "jcs-floral-sprig", placement: "title-accent", titlePosition: "title-right" }).plan.reports.find((r) => r.rect)!;
+    const b = planFor(build(2), { style: "floral", assetId: "jcs-floral-sprig", placement: "title-accent", titlePosition: "title-right", layout: { offsetXIn: 0.3 } }).plan.reports.find((r) => r.rect)!;
     expect(b.rect!.x).toBeCloseTo(a.rect!.x + 0.3, 6);
   });
 });
@@ -116,11 +116,13 @@ describe("with overlap disabled, decoration never intersects protected content",
       const { plan, comp, g } = planFor(p, deco);
       // A rule accent rests ON the title rule by design: the rule and what lies beyond it are exempt.
       // A title accent is attached to the title at titleAccentGap / decorationToTitleGap (< clearance): the title is exempt.
-      const onRule = plan.reports.some((r) => r.rect && r.id.startsWith("rule-"));
+      // Standing on the rule: nothing below the line. Worn across it: only the rule itself is exempt.
+      const onRule = plan.reports.some((r) => r.rect && r.id.startsWith("rule-") && r.ruleMode === "rest");
+      const across = plan.reports.some((r) => r.rect && r.ruleMode === "straddle");
       const rest = onRule ? comp.headerRule!.y : undefined;
       const attached = new Set(plan.reports.flatMap((r) => r.attachedTo));
       const guarded = comp.protected.filter(
-        (q) => !attached.has(q.id) && (rest === undefined || (q.rect.y + comp.clearanceIn < rest - 1e-6 && !(q.kind === "rule" && Math.abs(q.rect.y + q.rect.h / 2 - (comp.headerRule!.y + comp.headerRule!.h / 2)) < 1e-6))),
+        (q) => !attached.has(q.id) && !(across && q.kind === "rule" && Math.abs(q.rect.y + q.rect.h / 2 - (comp.headerRule!.y + comp.headerRule!.h / 2)) < 1e-6) && (rest === undefined || (q.rect.y + comp.clearanceIn < rest - 1e-6 && !(q.kind === "rule" && Math.abs(q.rect.y + q.rect.h / 2 - (comp.headerRule!.y + comp.headerRule!.h / 2)) < 1e-6))),
       );
       for (const cell of inkCells(plan, g)) {
         for (const q of guarded) expect(overlaps(cell, q.rect), `${q.id}`).toBe(false);
@@ -170,7 +172,7 @@ describe("fields are composed around the content", () => {
   it("the retired lettered cover is gone: the bouquet is transparent artwork used as a rule / edge ornament", () => {
     const a = findAsset("jcs-floral-bouquet")!;
     expect(a.sourceFile).toBe("floral-bouquet.png");
-    expect(placementsFor({ style: "floral", assetId: a.id })).toEqual(["title-accent", "footer-flourish", "top-bottom"]);
+    expect(placementsFor({ style: "floral", assetId: a.id })).toEqual(["title-accent", "table-corner", "footer-flourish", "top-bottom"]);
   });
 });
 

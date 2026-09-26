@@ -48,6 +48,12 @@ export type ObjectSpec = DecorationPlacement & {
   gapIn?: number;
   /** Vertical centre (or resting line, with alignY "end") that overrides the region's own, e.g. a header rule. */
   restOnY?: number;
+  /** "straddle": the line at restOnY runs through the artwork's centre of ink mass (a sprig worn on a rule). */
+  restMode?: "rest" | "straddle";
+  /** Share of the width hanging past the aligned edge of the region (a cluster centred on a rule's end ≈ 0.45). */
+  hangOut?: number;
+  /** Pin the artwork's centre of ink mass to this point (e.g. the corner of a table). */
+  pinInk?: { x: number; y: number };
   /** Protected content this object is designed to sit on (e.g. the header rule under a flank). */
   ignore?: (p: ProtectedRect) => boolean;
   /** "knockout" = never shrink; content is masked away instead (line-art textures). */
@@ -129,6 +135,10 @@ export function fitObject(spec: ObjectSpec, comp: Composition): FitResult {
   const out = spec.bleedOut ?? 0;
   const ink = inkCells(spec.assetId);
   const inkBottom = ink.length ? Math.max(...ink.map((c) => (spec.transform.flipY ? 1 - c.v0 : c.v1))) : 1;
+  const midV = ink.length ? ink.reduce((s, c) => s + (c.v0 + c.v1) / 2, 0) / ink.length : 0.5;
+  const inkMid = spec.transform.flipY ? 1 - midV : midV;
+  const midU = ink.length ? ink.reduce((s, c) => s + (c.u0 + c.u1) / 2, 0) / ink.length : 0.5;
+  const inkMidU = spec.transform.flipX ? 1 - midU : midU;
   const ax = spec.attachX ?? spec.attach, ay = spec.attachY ?? spec.attach;
   const gap = spec.gapIn ?? comp.clearanceIn;
 
@@ -140,7 +150,12 @@ export function fitObject(spec: ObjectSpec, comp: Composition): FitResult {
     if (ay === "outside") y = spec.alignY === "start" ? R.y - gap - h : spec.alignY === "end" ? R.y + R.h + gap : R.y + (R.h - h) / 2;
     else y = spec.alignY === "start" ? R.y : spec.alignY === "end" ? R.y + R.h - h : R.y + (R.h - h) / 2;
     // Resting on a line: the artwork's LOWEST INK (not its image box) touches the line.
-    if (spec.restOnY !== undefined) y = spec.alignY === "end" ? spec.restOnY - h * inkBottom : spec.restOnY - h / 2;
+    if (spec.restOnY !== undefined) y = spec.restMode === "straddle" ? spec.restOnY - h * inkMid : spec.alignY === "end" ? spec.restOnY - h * inkBottom : spec.restOnY - h / 2;
+    if (spec.hangOut) x += spec.alignX === "start" ? -spec.hangOut * w : spec.alignX === "end" ? spec.hangOut * w : 0;
+    if (spec.pinInk) {
+      x = spec.pinInk.x - w * inkMidU;
+      y = spec.pinInk.y - h * inkMid;
+    }
     // Pieces aligned to a page edge run to the bleed edge — or, in bleed mode, deliberately past it.
     if (ax === "inside" && !spec.bounds) {
       // Never push more than 45% of the art off the page: the rest must still read.
