@@ -2197,10 +2197,19 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     const hex = f.color === 'custom' ? f.custom : f.color === 'white' ? '#FFFFFF' : f.color === 'black' ? '#000000' : f.color === 'neutral' ? '#F4EFE6' : (p[f.color] || p.paper);
     return { hex, css: rgba(hex, f.opacity / 100) };
   }
-  // Prayer journals with no plate: each cover's own title region, in Canva px on the 816×1056 page.
+  // Journal-specific title regions in Canva px on the 816×1056 page. Pink Prayer is independent of its plate.
   const PR_TITLE_REGION = {
-    // Inside the gold frame's inner edge (measured from prayer-cover-gold.png); tight = the title band inside it.
-    prayer: (lvl) => (lvl === 2 ? { rect: [205.9, 311.4, 439.4, 439.7] } : lvl === 1 ? { rect: [215.9, 321.4, 419.4, 419.7] } : { rect: [215.9, 406.7, 419.4, 257.6] }),
+    // Measured Canva lettering bounds (including all nontransparent pixels):
+    // PRAYER [145.67, 422.67, 574, 145.67], JOURNAL [229, 563.63, 408, 86.67].
+    // Their union is wider than the gold frame interior [205.9, 311.4, 439.4, 439.7].
+    // Tight/Normal pad BOTH words by 12/24 px. Generous also reaches the full frame height.
+    // This reading surface is independent of the decorative plate; neither word may be clipped to it.
+    prayer: (lvl) => {
+      const pad = [12, 24, 36][lvl], x = 145.67 - pad, right = 719.67 + pad;
+      const top = lvl === 2 ? 311.4 : 422.67 - pad;
+      const bottom = lvl === 2 ? 751.1 : 650.3 + pad;
+      return { rect: [x, top, right - x, bottom - top] };
+    },
     // Around the title, inside the white card and clear of the figure (her head starts at y 363).
     warrior: (lvl) => { const pad = [10, 20, 32][lvl], t = PR_TITLE_BOX.warrior;
       const x0 = Math.max(68, t[0] - pad), y0 = Math.max(72, t[1] - pad), x1 = Math.min(748, t[0] + t[2] + pad), y1 = Math.min(350, t[1] + t[3] + pad);
@@ -2212,6 +2221,12 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   function titleFillPath(ctx, W, H, s, L) {
     const lvl = FILL_PAD[s.titleFill?.pad] ?? 1;
     const rr = (x, y, w, h, r) => { if (r > 0) roundRect(ctx, x, y, w, h, Math.min(r, w / 2, h / 2)); else { ctx.beginPath(); ctx.rect(x, y, w, h); } };
+    // Pink Prayer always uses its measured full-title surface, even with an optional plate.
+    if (s.journal === 'prayer') {
+      const { k, ox, oy } = prFit(W, H), [l, t, w, h] = PR_TITLE_REGION.prayer(lvl).rect;
+      rr(ox + l * k, oy + t * k, w * k, h * k, 0);
+      return;
+    }
     if (L.kind === 'rect' || L.kind === 'ellipse') {
       const st = L.style, r = (st.radius || 0) * W, inner = (st.trimInset + st.trim) * W;             // inside the trim line
       let hw = L.hw - inner, hh = L.hh - inner;
@@ -2244,7 +2259,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     if (!c) return;
     ctx.save(); titleFillPath(ctx, W, H, s, L); ctx.fillStyle = c.css; ctx.fill(); ctx.restore();
     // The Prayer cover's gold frame, glitter swipe and dots stay above the fill: its gold layer is drawn again, clipped to the fill.
-    if (s.journal === 'prayer' && L.kind === 'none') {
+    if (s.journal === 'prayer') {
       ctx.save(); titleFillPath(ctx, W, H, s, L); ctx.clip();
       drawPr(ctx, W, H, s, [['coverGold', ...PINK.cover.find((r) => r[0] === 'coverWash').slice(1)]]);
       ctx.restore();
