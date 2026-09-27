@@ -57,6 +57,11 @@ export type LayoutOptions = {
   showFooter: boolean;
   /** Daily layout: ordered section keys. */
   dailySections: WordingKey[];
+  /**
+   * Daily schedules: print the hours (6 AM, 7 AM …) or leave the time column
+   * blank for the writer to fill in. Absent = printed.
+   */
+  scheduleTimes?: "printed" | "blank";
   /** Journal prompt text (guided pages). */
   promptText: string;
   /** User placement of semantic text (Week of, month title, Notes…). Absent = layout default. */

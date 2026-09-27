@@ -187,7 +187,7 @@ function dailyFrame(body: Rect, sp: SpacingTokens, ty: TypographySettings, optio
   // Schedule rows: the chosen hour range (and half hours), trimmed from the evening only if a row would drop below its minimum.
   const sched = rects.find((r) => r.key === "schedule");
   const head = lineBoxIn(ty, "sectionHeading") + sp.headingToContentGap;
-  const perHour = options.halfHours ? 2 : 1;
+  const perHour = options.halfHours && options.scheduleTimes !== "blank" ? 2 : 1;
   const wanted = Math.max(1, (options.hourEnd - options.hourStart + 1) * perHour);
   const minRow = hourRowMin(sp, ty);
   let rows = wanted, hourCols = 1;
@@ -222,12 +222,13 @@ function scheduleNodes(rect: Rect, f: Frame, ctx: LayoutContext): { nodes: Layou
   const titleH = lineBoxIn(ctx.typography, "sectionHeading");
   const head = section("dy-schedule", { ...rect, h: titleH + s.headingToContentGap }, ctx.wording.schedule, ctx, "blank", { titleRole: "sectionHeading" });
   const grid: Rect = { x: rect.x, y: rect.y + titleH + s.headingToContentGap, w: rect.w, h: rect.h - titleH - s.headingToContentGap };
-  const perHour = o.halfHours ? 2 : 1;
+  const perHour = o.halfHours && o.scheduleTimes !== "blank" ? 2 : 1;
   const labels = Array.from({ length: f.hours }, (_, i) => hourLabel(o.hourStart + Math.floor(i / perHour), o.halfHours && i % 2 === 1));
   const diagnostics: LayoutDiagnostic[] = [...head.diagnostics];
   const wanted = (o.hourEnd - o.hourStart + 1) * perHour;
+  const blank = o.scheduleTimes === "blank";
   if (f.hours < wanted) {
-    diagnostics.push({ severity: "info", rule: "min-cell", componentId: "dy-schedule", message: `Schedule shows ${labels[0]} – ${labels[labels.length - 1]} so each row keeps a writable line.` });
+    diagnostics.push({ severity: "info", rule: "min-cell", componentId: "dy-schedule", message: blank ? `Schedule shows ${f.hours} of ${wanted} rows so each row keeps a writable line.` : `Schedule shows ${labels[0]} – ${labels[labels.length - 1]} so each row keeps a writable line.` });
   }
   const measure = getLayoutMeasurer().measure, style = styleForRole(ctx.typography, "time");
   const lh = lineBoxIn(ctx.typography, "time");
@@ -243,7 +244,8 @@ function scheduleNodes(rect: Rect, f: Frame, ctx: LayoutContext): { nodes: Layou
     const t = connectedTracks(id, g, part.length, "rows");
     const labelW = Math.min(g.w * 0.4, Math.max(STUDIO_PLANNER.timeColumn.valueIn * 0.7, Math.max(...labels.map((l) => measure(l, style))) + 2 * s.labelToBorderInset + 0.02));
     nodes.push(...t.nodes, rule(`${id}-label-rule`, g.x + labelW, g.y, g.x + labelW, g.y + g.h, { strokePt: STUDIO_STROKES.gridRulePt, component: "Grid" }));
-    t.trackRects.forEach((r, i) => {
+    // Blank schedules keep the (empty) time column for handwritten times.
+    if (!blank) t.trackRects.forEach((r, i) => {
       nodes.push(text(`dy-hour-${c * perCol + i}`, { x: r.x + s.labelToBorderInset, y: r.y + Math.max(0, (r.h - lh) / 2), w: labelW - 2 * s.labelToBorderInset, h: Math.min(lh, r.h) }, part[i], "time", { component: "SectionHeader", align: "left", vAlign: "middle" }));
     });
   }
@@ -324,6 +326,7 @@ const capability = (dated: boolean): LayoutDefinition["capability"] => ({
   supportsPageNumbers: true,
   supportsFooter: true,
   supportsDailySections: true,
+  supportsScheduleTimes: true,
   requiresCalendar: dated,
   usesWeekStart: false,
   wordingKeys: dated ? [] : ["dailyPlan", "date"],

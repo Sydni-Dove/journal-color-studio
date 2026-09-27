@@ -109,6 +109,15 @@ describe("Luxury Daily Execution (Meetings With God Luxury Planner daily page)",
     });
   }
 
+  it("schedule times can be left blank: the TIME column stays, the hours are not printed", () => {
+    const p = book([luxury()], { end: "2027-01-01" });
+    p.layoutOptions = { ...p.layoutOptions, scheduleTimes: "blank" };
+    const { s } = solveFirst(p);
+    expect(s.nodes.filter((n) => /^dl-hour-\d+$/.test(n.id))).toHaveLength(0);
+    expect(s.nodes.some((n) => n.id === "dl-col-time")).toBe(true);
+    expect(s.nodes.filter((n) => /^dl-hours-h\d+$/.test(n.id))).toHaveLength(15);
+  });
+
   it("labels and checklist items are semantic wording: renaming or removing items needs no layout change", () => {
     const p = book([luxury()], { end: "2027-01-01" });
     p.wording = { ...p.wording, dailyChecklistItems: "Scripture; Prayer walk; Water; Rest; Call Mom", topInstructions: "Kingdom Instructions", brandHeading: "Dove Expressions" };

@@ -25,6 +25,8 @@ export type ProjectUsage = {
   writingRows: boolean;
   /** A daily layout is in the product: its section list and schedule hours apply. */
   dailySections: boolean;
+  /** A daily schedule is in the product: printed or blank times apply. */
+  scheduleTimes: boolean;
   pageNumbers: boolean;
   footer: boolean;
   calendar: boolean;
@@ -135,6 +137,7 @@ export function computeUsage(doc: ResolvedDocument): ProjectUsage {
     sidebar: { supported: sidebarLayouts.length > 0, available: sidebarAvailable, reason: sidebarAvailable ? undefined : sidebarReason },
     datePlacement: any((c) => c.supportsDatePlacement),
     dailySections: daily,
+    scheduleTimes: any((c) => !!c.supportsScheduleTimes),
     sectionsPerDay: layouts.some((l) => l.layout.capability.supportsSectionsPerDay && l.fit.ok && l.fit.variant === "vertical"),
     writingRows: any((c) => c.supportsWritingRows),
     pageNumbers: any((c) => c.supportsPageNumbers),

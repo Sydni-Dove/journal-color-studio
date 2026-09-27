@@ -256,7 +256,8 @@ function solveDaily(ctx: LayoutContext): SolvedPage {
     text("dl-col-schedule", { x: tx + timeW + pad, y: ty, w: tw - timeW - 2 * pad, h: headH }, w.scheduleColumn, "label", { component: "SectionHeader", vAlign: "middle" }),
   );
   const bodyLine = lineBoxIn(ctx.typography, "body");
-  for (let i = 0; i < S.table.hours; i++) {
+  // "Blank" schedule times keep the empty TIME column for handwritten times.
+  if (ctx.options.scheduleTimes !== "blank") for (let i = 0; i < S.table.hours; i++) {
     const y = rowsTop + i * f.hourRowH;
     nodes.push(text(`dl-hour-${i}`, { x: tx + pad, y: y + (f.hourRowH - bodyLine) / 2, w: timeW - 2 * pad, h: bodyLine }, hourLabel(S.table.firstHour + i), "body", { component: "Text", vAlign: "middle" }));
   }
@@ -335,6 +336,7 @@ export const luxuryDailyExecution: LayoutDefinition = {
     supportsDatePlacement: false,
     supportsSectionsPerDay: false,
     supportsWritingRows: false,
+    supportsScheduleTimes: true,
     supportsPageNumbers: true,
     supportsFooter: true,
     requiresCalendar: true,

@@ -62,6 +62,8 @@ export type LayoutCapability = {
   supportsWritingRows: boolean;
   /** Daily pages: the section list / order and schedule hours (LayoutOptions dailySections, hourStart, hourEnd, halfHours). */
   supportsDailySections?: boolean;
+  /** Daily schedules: printed hours or a blank time column (LayoutOptions scheduleTimes). */
+  supportsScheduleTimes?: boolean;
   supportsPageNumbers: boolean;
   supportsFooter: boolean;
   requiresCalendar: boolean;

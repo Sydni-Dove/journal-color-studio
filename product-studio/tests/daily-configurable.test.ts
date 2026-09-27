@@ -77,6 +77,20 @@ describe("configurable daily page", () => {
     }
   });
 
+  it("schedule times can be left blank: same rows and time column, no printed hours", () => {
+    const printed = firstDaily(daily(LETTER));
+    const blank = firstDaily(daily(LETTER, undefined, "2027-01-02", { scheduleTimes: "blank" }));
+    expect(blank.nodes.filter((n) => /^dy-hour-\d+$/.test(n.id))).toHaveLength(0);
+    const rows = (s: typeof printed) => s.nodes.filter((n) => /^dy-hours-h\d+$/.test(n.id)).length;
+    expect(rows(blank)).toBe(rows(printed));
+    expect(blank.nodes.some((n) => n.id === "dy-hours-label-rule")).toBe(true);
+    // Half hours only apply to printed times.
+    const half = firstDaily(daily(LETTER, undefined, "2027-01-02", { scheduleTimes: "blank", halfHours: true }));
+    expect(rows(half)).toBe(rows(printed));
+    expect(problems(daily(LETTER, undefined, "2027-01-02", { scheduleTimes: "blank" }))).toEqual([]);
+    expect(computeUsage(resolveDocument(daily(LETTER))).scheduleTimes).toBe(true);
+  });
+
   const sizes: Size[] = [LETTER, ["7x9", "coil", "coil-generic"], ["6x9", "perfect-bound", "kdp"], ["5.5x8.5", "discbound", "disc-generic"], ["a5", "ring-6", "ring-insert"]];
   for (const size of sizes) {
     it(`${size[0]}: the default sections and five spiritual sections fit with no errors or warnings`, () => {
@@ -153,6 +167,12 @@ describe("daily notepads", () => {
       expect(headings(firstDaily(p).nodes)).toEqual(["Schedule", "Top Priorities", "To Do"]);
     });
   }
+  it("undated sheet with blank schedule times", () => {
+    const p = pad("5.5x8.5", "notepad-daily");
+    p.layoutOptions = { ...p.layoutOptions, scheduleTimes: "blank" };
+    expect(problems(p)).toEqual([]);
+    expect(firstDaily(p).nodes.filter((n) => /^dy-hour-\d+$/.test(n.id))).toHaveLength(0);
+  });
   it("small pads: the full daily sheet is reported as not fitting (the Daily To-Do is the small-pad design)", () => {
     expect(problems(pad("3x5", "notepad-daily")).some((x) => /Too many daily sections/.test(x.message))).toBe(true);
   });

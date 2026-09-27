@@ -35,7 +35,7 @@ const SIDEBAR_HEADINGS: WordingKey[] = ["notes", "priorities", "topPriorities", 
 export function LayoutPanel({ project, update, usage, nav }: PanelProps) {
   const o = project.layoutOptions;
   const set = (patch: Partial<ProductProject["layoutOptions"]>) => update((p) => ({ ...p, layoutOptions: { ...p.layoutOptions, ...patch } }));
-  const any = usage.datePlacement || usage.sidebar.supported || usage.sectionsPerDay || usage.writingRows || usage.dailySections || usage.pageNumbers || usage.footer;
+  const any = usage.datePlacement || usage.sidebar.supported || usage.sectionsPerDay || usage.writingRows || usage.dailySections || usage.scheduleTimes || usage.pageNumbers || usage.footer;
   if (!any) return null;
   return (
     <Section title="Layout options">
@@ -75,6 +75,14 @@ export function LayoutPanel({ project, update, usage, nav }: PanelProps) {
       {usage.sectionsPerDay && <NumberField label="Sections per day" step={1} min={1} max={6} value={o.sectionsPerDay} onChange={(v) => set({ sectionsPerDay: Math.max(1, Math.round(v)) })} />}
       {usage.writingRows && <NumberField label="Writing rows per day" step={1} min={1} max={8} value={o.writingRowsPerDay} onChange={(v) => set({ writingRowsPerDay: Math.max(1, Math.round(v)) })} />}
       {usage.dailySections && <DailySectionsControl project={project} set={set} />}
+      {usage.scheduleTimes && !usage.dailySections && (
+        <Segmented
+          label="Schedule times"
+          value={o.scheduleTimes ?? "printed"}
+          options={[{ value: "printed", label: "Printed hours" }, { value: "blank", label: "Blank — write your own" }]}
+          onChange={(scheduleTimes) => set({ scheduleTimes })}
+        />
+      )}
       {usage.pageNumbers && <Check label="Page numbers" checked={o.showPageNumbers} onChange={(showPageNumbers) => set({ showPageNumbers })} />}
       {usage.footer && <Check label="Footer (product title)" checked={o.showFooter} onChange={(showFooter) => set({ showFooter })} />}
     </Section>
@@ -122,12 +130,23 @@ function DailySectionsControl({ project, set }: { project: ProductProject; set: 
         ))}
       </ul>
       {chosen.includes("schedule") && (
+        <Segmented
+          label="Schedule times"
+          value={o.scheduleTimes ?? "printed"}
+          options={[{ value: "printed", label: "Printed hours" }, { value: "blank", label: "Blank — write your own" }]}
+          onChange={(scheduleTimes) => set({ scheduleTimes })}
+        />
+      )}
+      {chosen.includes("schedule") && o.scheduleTimes === "blank" && (
+        <NumberField label="Schedule rows" step={1} min={1} max={24} value={o.hourEnd - o.hourStart + 1} onChange={(v) => set({ hourEnd: Math.min(23, o.hourStart + Math.max(1, Math.round(v)) - 1) })} />
+      )}
+      {chosen.includes("schedule") && o.scheduleTimes !== "blank" && (
         <div className="row">
           <NumberField label="Schedule starts (hour, 0–23)" step={1} min={0} max={22} value={o.hourStart} onChange={(v) => set({ hourStart: Math.max(0, Math.min(Math.round(v), o.hourEnd)) })} />
           <NumberField label="Schedule ends (hour, 0–23)" step={1} min={1} max={23} value={o.hourEnd} onChange={(v) => set({ hourEnd: Math.min(23, Math.max(Math.round(v), o.hourStart)) })} />
         </div>
       )}
-      {chosen.includes("schedule") && <Check label="Half-hour rows" checked={o.halfHours} onChange={(halfHours) => set({ halfHours })} />}
+      {chosen.includes("schedule") && o.scheduleTimes !== "blank" && <Check label="Half-hour rows" checked={o.halfHours} onChange={(halfHours) => set({ halfHours })} />}
     </div>
   );
 }
