@@ -100,7 +100,20 @@ function fillIn(id: string, rect: Rect, zone: StationeryZone, ctx: LayoutContext
   return empty(nodes);
 }
 
-function scripture(id: string, rect: Rect, _z: StationeryZone, ctx: LayoutContext): SurfaceResult {
+function scripture(id: string, rect: Rect, z: StationeryZone, ctx: LayoutContext): SurfaceResult {
+  const treatment = z.treatment ?? "framed";
+  if (treatment === "open") return empty(lined(id, rect, ctx));
+  if (treatment === "callout") {
+    // One hairline quote bar in the quiet writing-line color; the lines start a padding in from it.
+    const p = ctx.spacing.boxPadding;
+    const lines = lined(id, { x: rect.x + p, y: rect.y, w: rect.w - p, h: rect.h }, ctx);
+    const ys = lines.flatMap((n) => (n.type === "lines" ? n.positions : []));
+    // The bar spans the writing lines: from three quarters of a line above the first line to the last line.
+    const pitch = ys.length > 1 ? ys[1] - ys[0] : rect.h;
+    const top = ys.length ? Math.min(...ys) - pitch * 0.75 : rect.y;
+    const bottom = ys.length ? Math.max(...ys) : rect.y + rect.h;
+    return empty([...lines, rule(`${id}-callout`, rect.x, Math.max(rect.y, top), rect.x, bottom, { strokePt: ctx.pattern.lineWeightPt, color: ctx.pattern.color, component: "WritingLines" })]);
+  }
   // A framed passage area: the verse is copied inside the frame, on its own ruled lines.
   const p = ctx.spacing.boxPadding;
   const inner = { x: rect.x + p, y: rect.y + p, w: rect.w - 2 * p, h: rect.h - 2 * p };

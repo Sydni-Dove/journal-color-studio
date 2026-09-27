@@ -50,6 +50,13 @@ export type StationeryZone = {
   fields?: string[];
   /** Table surfaces. */
   table?: TableSpec;
+  /**
+   * Scripture surfaces: framed (a bordered passage area — the default),
+   * open (the same open ruled lines as the other sections) or callout (open
+   * lines with one hairline quote bar). Composition, not theme: it is part of
+   * the recipe's design language.
+   */
+  treatment?: "framed" | "open" | "callout";
 };
 
 export type StationeryPageSpec = {
@@ -77,6 +84,13 @@ export type StationeryRecipe = {
    * devotional prompts). Zones that cannot keep it make the trim incompatible.
    */
   minResponseToPromptRatio?: number;
+  /**
+   * Page composition. lineSnap: every writing area holds whole writing lines
+   * at the page's ruling (no part-line strip left under the last line); the
+   * remainder is spread evenly between sections so the page reads top to
+   * bottom with even rhythm.
+   */
+  composition?: { lineSnap?: boolean };
   /** What the creator may change (semantic controls only). */
   customization: { rename: boolean; reorder: boolean; adjustSpace: boolean; editPrompts: boolean };
 };

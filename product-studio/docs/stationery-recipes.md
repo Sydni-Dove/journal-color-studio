@@ -39,6 +39,19 @@ stationery recipe            presets/stationery/catalog.ts        WHAT: sections
   squeezed. `supportedTrims` lists only trims where the full structure fits
   (tested).
 
+## Composition
+
+- Scripture surfaces take a `treatment`: `framed` (bordered passage area, the
+  default: SOAP, Verse Mapping), `open` (the same open ruled lines as every other
+  section) or `callout` (open lines with one hairline quote bar in the quiet
+  writing-line color). Daily Reflection uses open Scripture and a callout Stand
+  Out Verse, so the page has one writing language and no boxes.
+- `composition.lineSnap` (Daily Reflection): every writing area holds whole
+  lines at the page's ruling, and spare whole lines go to the sections furthest
+  below their weighted share. The part-line remainder is spread evenly between
+  sections, so there is no dead strip under a last line. Smaller trims get fewer
+  lines; the line spacing never shrinks. Minimum: 2 lines per section.
+
 ## Creator customization (semantic only)
 
 Stored per combo id in `layoutOptions.stationery`: rename, prompts, hide

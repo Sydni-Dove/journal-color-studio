@@ -9,7 +9,7 @@
  * trim-specific constants.
  */
 import { effectiveZones, resolveZones, type ZoneRequest } from "../../engines/stationery/geometry";
-import { DEFAULT_FUNCTIONAL_PATTERN } from "../../engines/patterns/patterns";
+import { DEFAULT_FUNCTIONAL_PATTERN, lineSpacingIn } from "../../engines/patterns/patterns";
 import { getLayoutMeasurer, styleForRole } from "../../engines/typography/textMeasure";
 import { findSizePreset } from "../../presets/sizes/sizePresets";
 import { STUDIO_PLANNER } from "../../presets/studioDefaults";
@@ -79,7 +79,9 @@ function solveRecipePage(recipe: StationeryRecipe, pageIndex: number, ctx: Layou
   });
   const reqs: ZoneRequest[] = measured.map((m) => (m.zone.surface === "fill-in" ? { zone: m.zone, overheadIn: 0, fixedIn: fillInIn(ctx) } : { zone: m.zone, overheadIn: m.overhead, promptTextIn: m.promptText }));
   // Each section carries its own heading, so sections sit a block gap apart (not a full section gap).
-  const res = resolveZones(reqs, body, s.block, recipe.minResponseToPromptRatio ?? 0);
+  // Line-snapped recipes hold whole lines at the page's ruling (the pattern owns the pitch; blank pages don't snap).
+  const pitch = recipe.composition?.lineSnap && ctx.pattern.kind !== "blank" ? lineSpacingIn(ctx.pattern) : 0;
+  const res = resolveZones(reqs, body, s.block, recipe.minResponseToPromptRatio ?? 0, pitch);
   diagnostics.push(...res.problems.map((message): LayoutDiagnostic => ({ severity: "error", rule: "stationery-fit", componentId: `st${pageIndex}`, message })));
 
   res.zones.forEach((z, i) => {

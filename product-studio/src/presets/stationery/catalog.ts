@@ -30,17 +30,20 @@ export const STATIONERY_RECIPES: StationeryRecipe[] = [
     supportedTrims: ["6x9", "7x9", "8x10", "8.5x11"],
     // Research: prompt : response ≈ 1 : 5 — a prompt label may never crowd its answer.
     minResponseToPromptRatio: 5,
+    composition: { lineSnap: true },
     pages: [
       {
         title: "Daily Reflection",
         zones: [
           { key: "date", label: "Date", surface: "fill-in", weight: 0, fields: ["Date", "Day"] },
-          { key: "scripture", label: "Scripture", surface: "scripture", weight: 2 },
+          // One writing language across the page: open ruled lines, no boxes. Reflection, Application and Prayer carry
+          // the most writing; Scripture and Stand Out Verse keep enough lines to copy a verse.
+          { key: "scripture", label: "Scripture", surface: "scripture", treatment: "open", weight: 1.75 },
           { key: "reflection", label: "Reflection", surface: "reflection", weight: 3 },
-          { key: "application", label: "Application", surface: "lined", weight: 2 },
-          { key: "standOutVerse", label: "Stand Out Verse", surface: "scripture", weight: 1.25, optional: true },
-          { key: "thankfulFor", label: "Thankful For", surface: "lined", weight: 1.25, optional: true },
-          { key: "prayer", label: "Prayer", surface: "prayer", weight: 2 },
+          { key: "application", label: "Application", surface: "lined", weight: 2.25 },
+          { key: "standOutVerse", label: "Stand Out Verse", surface: "scripture", treatment: "callout", weight: 1, optional: true },
+          { key: "thankfulFor", label: "Thankful For", surface: "lined", weight: 1, optional: true },
+          { key: "prayer", label: "Prayer", surface: "prayer", weight: 2.25 },
         ],
       },
     ],

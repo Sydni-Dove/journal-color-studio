@@ -127,7 +127,8 @@ describe("zones", () => {
     const more = writingHeights(pages(project("devotional-daily-reflection.stacked", "8.5x11", { space: { prayer: "more" } }))[0]);
     expect(more.Prayer).toBeGreaterThan(base.Prayer);
     const eq = Object.values(writingHeights(pages(project("devotional-daily-reflection.stacked", "8.5x11", { balance: "equal" }))[0]));
-    for (const v of eq) expect(v).toBeCloseTo(eq[0], 6);
+    // Line-snapped page: equal to within one writing line.
+    for (const v of eq) expect(Math.abs(v - eq[0])).toBeLessThanOrEqual(0.35);
     // Raw geometry: weights follow the recipe; minimums are honoured.
     expect(effectiveZones(getStationeryRecipe("devotional-soap.four-band")!.pages[0], 0, { space: { prayer: "less" } }).find((z) => z.key === "prayer")!.weight).toBeLessThan(1);
     expect(shareWithMinimums(10, [1, 1, 8], [2, 2, 0])).toEqual([2, 2, 6]);
@@ -215,5 +216,58 @@ describe("families + regression", () => {
     expect(recipePresetsFor("journal").map((r) => r.id)).not.toContain(expect.stringMatching(/^stationery:/));
     expect(recipePresetsFor("planner").map((r) => r.id)).not.toContain(expect.stringMatching(/^stationery:/));
     expect(recipePresetsFor("notepad").map((r) => r.id)).not.toContain(expect.stringMatching(/^stationery:/));
+  });
+});
+
+describe("Daily Reflection composition: one open-line writing language", () => {
+  const DR = "devotional-daily-reflection.stacked";
+  const lineCounts = (s: SolvedPage) =>
+    Object.fromEntries(s.nodes.filter((n): n is Extract<LayoutNode, { type: "lines" }> => n.type === "lines").map((n) => [n.id.split("-")[1], n.positions.length]));
+  it("no bordered boxes: Scripture is open ruled lines, Stand Out Verse a hairline callout in the quiet line color", () => {
+    for (const size of getStationeryRecipe(DR)!.supportedTrims) {
+      const s = pages(project(DR, size))[0];
+      expect(s.nodes.filter((n) => n.type === "box"), size).toEqual([]);
+      const bar = s.nodes.find((n) => n.id === "st0-standOutVerse-surface-callout");
+      expect(bar?.type).toBe("rule");
+      if (bar?.type === "rule") {
+        expect(bar.x1).toBe(bar.x2);
+        expect(bar.color).toBe("line");
+        const verse = s.nodes.find((n) => n.id === "st0-standOutVerse-surface")!.rect;
+        expect(Math.min(bar.y1, bar.y2)).toBeGreaterThanOrEqual(verse.y - 1e-6);
+        expect(Math.max(bar.y1, bar.y2)).toBeLessThanOrEqual(verse.y + verse.h + 1e-6);
+      }
+      expect(lineCounts(s).scripture, size).toBeGreaterThanOrEqual(2);
+    }
+  });
+  it("whole lines at the page's ruling, the remainder spread evenly between sections (no dead strips)", () => {
+    for (const size of getStationeryRecipe(DR)!.supportedTrims) {
+      const s = pages(project(DR, size))[0];
+      const lines = s.nodes.filter((n): n is Extract<LayoutNode, { type: "lines" }> => n.type === "lines");
+      const pitch = lines[0].positions[1] - lines[0].positions[0];
+      for (const l of lines) {
+        // The writing area ends exactly on its last line.
+        expect(l.rect.y + l.rect.h, `${size} ${l.id}`).toBeCloseTo(l.positions[l.positions.length - 1], 6);
+        expect(l.positions[1] - l.positions[0]).toBeCloseTo(pitch, 9);
+      }
+      const secs = s.nodes.filter((n): n is Group => n.type === "group" && /^st0-[A-Za-z]+$/.test(n.id));
+      const gaps = secs.slice(1).map((n, i) => n.rect.y - (secs[i].rect.y + secs[i].rect.h));
+      for (const g of gaps) expect(g, size).toBeCloseTo(gaps[0], 6);
+      const body = s.regions!.mainContent!;
+      const last = secs[secs.length - 1].rect;
+      expect(last.y + last.h, size).toBeCloseTo(body.y + body.h, 6);
+    }
+  });
+  it("Reflection, Application and Prayer carry the most writing; smaller trims get fewer lines at the same spacing", () => {
+    const letter = lineCounts(pages(project(DR, "8.5x11"))[0]);
+    const six = lineCounts(pages(project(DR, "6x9"))[0]);
+    for (const c of [letter, six]) {
+      for (const k of ["reflection", "application", "prayer"]) expect(c[k]).toBeGreaterThanOrEqual(Math.max(c.scripture, c.standOutVerse, c.thankfulFor));
+    }
+    const total = (c: Record<string, number>) => Object.values(c).reduce((a, b) => a + b, 0);
+    expect(total(six)).toBeLessThan(total(letter));
+  });
+  it("other devotional pages keep their framed Scripture (only Daily Reflection changed)", () => {
+    expect(pages(project("devotional-soap.four-band", "6x9"))[0].nodes.some((n) => n.id === "st0-scripture-surface-frame" && n.type === "box")).toBe(true);
+    expect(pages(project("devotional-verse-mapping.spread", "6x9"))[0].nodes.some((n) => n.id === "st0-verse-surface-frame" && n.type === "box")).toBe(true);
   });
 });

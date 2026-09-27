@@ -100,7 +100,31 @@ export type ZoneResolution = { zones: ResolvedZone[]; problems: string[] };
  *   - with a ratio (research: prompt : response ≈ 1 : 5) the page's writing
  *     space is at least `ratio` × the space its headings and prompts take.
  */
-export function resolveZones(reqs: ZoneRequest[], body: Rect, gapIn: number, ratio = 0): ZoneResolution {
+/** Line-snapped pages: the fewest writing lines a section may hold. */
+export const MIN_SNAPPED_LINES = 2;
+
+/**
+ * Whole writing lines per section: each section's share floored to whole
+ * lines at `pitch` (never below MIN_SNAPPED_LINES), then the spare whole lines
+ * handed back one at a time to the section furthest below its weighted share.
+ * Line counts therefore shrink proportionally on smaller trims while the line
+ * spacing itself never changes. Returns null when the minimums do not fit.
+ */
+export function snapToLines(total: number, shares: number[], pitch: number): number[] | null {
+  const lines = shares.map((s) => Math.max(MIN_SNAPPED_LINES, Math.floor(s / pitch + 1e-6)));
+  let spare = Math.floor((total - lines.reduce((a, n) => a + n * pitch, 0)) / pitch + 1e-6);
+  if (spare < 0) return null;
+  while (spare-- > 0) {
+    let best = 0;
+    shares.forEach((s, i) => {
+      if (s - lines[i] * pitch > shares[best] - lines[best] * pitch) best = i;
+    });
+    lines[best]++;
+  }
+  return lines;
+}
+
+export function resolveZones(reqs: ZoneRequest[], body: Rect, gapIn: number, ratio = 0, snapPitch = 0): ZoneResolution {
   const problems: string[] = [];
   const fixed = reqs.reduce((a, r) => a + (r.fixedIn ?? 0), 0);
   const overhead = reqs.reduce((a, r) => a + (r.fixedIn === undefined ? r.overheadIn : 0), 0);
@@ -111,19 +135,30 @@ export function resolveZones(reqs: ZoneRequest[], body: Rect, gapIn: number, rat
   const flexIdx = reqs.map((r, i) => (r.fixedIn === undefined ? i : -1)).filter((i) => i >= 0);
   const shares = shareWithMinimums(Math.max(0, writing), flexIdx.map((i) => reqs[i].zone.weight), flexIdx.map(() => MIN_RESPONSE_IN));
   const shareOf = new Map(flexIdx.map((i, k) => [i, shares ? shares[k] : (Math.max(0, writing) * reqs[i].zone.weight) / (flexIdx.reduce((a, j) => a + reqs[j].zone.weight, 0) || 1)]));
+  // Line-snapped composition: whole lines per section; the part-line remainder is spread evenly between sections.
+  let gap = gapIn;
+  if (snapPitch > 0 && writing > 0) {
+    const lines = snapToLines(writing, flexIdx.map((i) => shareOf.get(i)!), snapPitch);
+    if (!lines) problems.push(`The sections need at least ${MIN_SNAPPED_LINES} writing lines each; this page has room for ${Math.floor(writing / snapPitch)} lines in all.`);
+    else {
+      flexIdx.forEach((i, k) => shareOf.set(i, lines[k] * snapPitch));
+      const residual = writing - lines.reduce((a, n) => a + n * snapPitch, 0);
+      if (reqs.length > 1) gap = gapIn + residual / (reqs.length - 1);
+    }
+  }
   let y = body.y;
   const zones = reqs.map((r, idx): ResolvedZone => {
     if (r.fixedIn !== undefined) {
       const rect = { x: body.x, y, w: body.w, h: r.fixedIn };
-      y += r.fixedIn + gapIn;
+      y += r.fixedIn + gap;
       return { zone: r.zone, rect, head: null, response: rect };
     }
     const responseH = shareOf.get(idx) ?? 0;
     const rect = { x: body.x, y, w: body.w, h: r.overheadIn + responseH };
-    y += rect.h + gapIn;
+    y += rect.h + gap;
     const head = r.overheadIn > 0 ? { x: rect.x, y: rect.y, w: rect.w, h: r.overheadIn } : null;
     const response = { x: rect.x, y: rect.y + r.overheadIn, w: rect.w, h: responseH };
-    if (responseH + 1e-6 < MIN_RESPONSE_IN) problems.push(`"${r.zone.label || r.zone.key}" gets ${responseH.toFixed(2)}" of writing space; it needs at least ${MIN_RESPONSE_IN.toFixed(2)}".`);
+    if (!snapPitch && responseH + 1e-6 < MIN_RESPONSE_IN) problems.push(`"${r.zone.label || r.zone.key}" gets ${responseH.toFixed(2)}" of writing space; it needs at least ${MIN_RESPONSE_IN.toFixed(2)}".`);
     return { zone: r.zone, rect, head, response };
   });
   if (writing < 0) problems.push(`Headings and fixed rows need ${(fixed + gaps + overhead).toFixed(2)}" but the page body is ${body.h.toFixed(2)}".`);
