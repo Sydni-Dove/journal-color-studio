@@ -64,9 +64,14 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
 .pal-detail strong { display: block; font-size: 14px; }
 .pal-detail small { display: block; color: var(--muted); font-size: 12px; margin-bottom: 6px; }
 .pal-detail .swatch-row { height: 24px; margin: 0; }
-.mode-bar, .m-pager { display: none; }
+.mode-bar, .m-pager, .edit-tabs { display: none; }
 .typo-sec { border-top: 1px dashed var(--line); padding-top: 10px; margin-top: 10px; }
-.typo-sec .head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.typo-sec > summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.typo-sec > summary::-webkit-details-marker { display: none; }
+.typo-sec > summary::after { content: '▾'; color: var(--muted); font-size: 14px; transition: transform .15s; }
+.typo-sec:not([open]) > summary::after { transform: rotate(-90deg); }
+.typo-sec > summary small { display: block; color: var(--muted); font-size: 12px; font-weight: 400; }
+.typo-sec .head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; }
 .typo-sec .head strong { font-size: 13px; }
 .typo-sec .head .btn { font-size: 11px; padding: 4px 8px; text-align: center; }
 .typo-sec .head .btn:disabled { opacity: .4; cursor: default; }
@@ -187,7 +192,14 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   body.m-edit .workspace { position: sticky; top: 0; z-index: 4; order: -1; border-radius: 0 0 14px 14px; margin: -12px -12px 0; }
   body.m-edit .page-strip { display: none; }
   body.m-edit .preview { padding: 6px; }
-  body.m-edit .preview canvas { max-height: min(22vh, 180px); box-shadow: 0 6px 16px rgba(0,0,0,.2); }
+  body.m-edit .preview canvas { max-height: min(38vh, 340px); box-shadow: 0 6px 16px rgba(0,0,0,.2); }
+  body.m-edit .edit-tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; padding: 6px 8px 8px; border-top: 1px solid var(--line); background: var(--panel); }
+  .edit-tabs button { min-height: 44px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--ink); font: inherit; font-size: 13px; font-weight: 600; padding: 0 2px; }
+  .edit-tabs button.active { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+  body.m-edit[data-etab=page] aside .card:not([data-tab=page]), body.m-edit[data-etab=design] aside .card:not([data-tab=design]),
+  body.m-edit[data-etab=colors] aside .card:not([data-tab=colors]), body.m-edit[data-etab=type] aside .card:not([data-tab=type]),
+  body.m-edit[data-etab=book] aside .card:not([data-tab=book]) { display: none; }
+  .typo-sec > summary { min-height: 44px; }
   body.m-edit .workbar { display: none; }
   body.m-edit .workspace .m-pager { display: none; }
   /* Touch targets: at least 44px. */
@@ -224,7 +236,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       <p class="lead">Choose a journal, then swap the marble, colors and elements. Every page of the book changes together, so you never rebuild a layout.</p>
     </div>
 
-    <div class="card">
+    <div data-tab="page" class="card">
       <h2>Journal <span>layout</span></h2>
       <div class="field"><span>Which journal</span>
         <select id="journal">
@@ -241,20 +253,20 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       </div>
     </div>
 
-    <div class="card hidden" id="pageTypoCard">
+    <div data-tab="page" class="card hidden" id="pageTypoCard">
       <h2>Page settings <span id="pageTypoName"></span></h2>
       <p class="hint" style="margin:0" id="pageTypoNote">Fonts, colors and sizes for the text on this page only. Anything on “Journal default” follows Typography.</p>
       <div id="pageTypoFields"></div>
       <button class="btn" id="pageTypoReset" type="button" style="width:100%;text-align:center;margin-top:10px">Reset page typography</button>
     </div>
 
-    <div class="card" id="textCard">
+    <div data-tab="page" class="card" id="textCard">
       <h2>Text content <span>the wording on this page</span></h2>
       <p class="hint" style="margin:0">Change the words themselves. Fonts, sizes and colors stay under Typography.</p>
       <div id="textFields"></div>
     </div>
 
-    <div class="card hidden" id="readingPanelCard">
+    <div data-tab="page" class="card hidden" id="readingPanelCard">
       <h2>Reading panel <span id="readingPanelWhere"></span></h2>
       <label class="field"><span>Show panel</span>
         <select id="readingPanelShow">
@@ -285,7 +297,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     </div>
 
 
-    <div class="card">
+    <div data-tab="design" class="card">
       <h2>Design pieces <span>from your Canva elements</span></h2>
       <div class="field"><span>Start from a design</span>
         <div class="seg" id="presetSeg">
@@ -369,7 +381,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       <label class="slider" id="shadowRow"><span>Lettering shadow <b id="shadowVal"></b></span><input type="range" id="titleShadow" min="0" max="100"></label>
     </div>
 
-    <div class="card" id="decorCard">
+    <div data-tab="design" class="card" id="decorCard">
       <h2>Decorative elements <span>swap, recolor, hide</span></h2>
       <p class="hint" style="margin:0">Each element lives in a fixed zone of the cover, so swapping it never moves the title.</p>
       <div class="prayer-only" id="prElements"></div>
@@ -380,7 +392,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       <div id="uploadList"></div>
     </div>
 
-    <div class="card">
+    <div data-tab="colors" class="card">
       <h2>Palette <span id="paletteName"></span></h2>
       <div class="pal-detail hidden" id="paletteDetail"><canvas id="paletteCover" aria-hidden="true"></canvas>
         <div style="min-width:0;flex:1"><strong id="paletteDetailName"></strong><small id="paletteDetailVar"></small><div class="swatch-row" id="paletteRoles"></div></div></div>
@@ -389,7 +401,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       <p class="hint" style="margin:6px 0 0">Change any color under Layers, then save it here. Your palettes appear in this list and are kept on this computer.</p>
     </div>
 
-    <div class="card">
+    <div data-tab="type" class="card">
       <h2>Typography <span>cover, headings, body</span></h2>
       <div class="group-label">Cover title <span class="hint" id="coverFontNote"></span></div>
       <div class="field"><span>Cover font</span>
@@ -448,7 +460,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
         <input type="color" id="textColor" aria-label="Text color"></div>
     </div>
 
-    <div class="card">
+    <div data-tab="colors" class="card">
       <h2>Layers <span>toggle + recolor</span></h2>
       <div id="roles"></div>
       <label class="slider"><span>Stone texture <b id="textureVal"></b></span><input type="range" id="texture" min="0" max="100"></label>
@@ -456,7 +468,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       <label class="slider"><span>Title plate opacity <b id="plateVal"></b></span><input type="range" id="plateOpacity" min="0" max="100"></label>
     </div>
 
-    <div class="card" id="linedCard">
+    <div data-tab="book" class="card" id="linedCard">
       <h2>Interior pages</h2>
       <div class="field"><span>Header style</span>
         <select id="headerStyle">
@@ -498,7 +510,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       <div class="role" style="margin-top:10px"><label><input type="checkbox" id="marginLine"> Left margin rule</label></div>
     </div>
 
-    <div class="card">
+    <div data-tab="book" class="card">
       <h2>Export <span>8.5 × 11 in + 1/8 in bleed</span></h2>
       <div class="seg" id="qualitySeg">
         <button data-q="proof" class="active"><strong>Quick proof</strong><small>150 DPI</small></button>
@@ -532,6 +544,9 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       <div class="loading" id="loading"><strong>Loading your journal…</strong><small>Preparing the design pieces</small></div>
     </div>
     <div class="page-strip" id="pageStrip"></div>
+    <nav class="edit-tabs" id="editTabs" aria-label="Settings">
+      <button type="button" data-etab="page">Page</button><button type="button" data-etab="design">Design</button><button type="button" data-etab="colors">Colors</button><button type="button" data-etab="type">Type</button><button type="button" data-etab="book">Book</button>
+    </nav>
   </article>
 </div>
 <div class="toast hidden" id="toast"></div>
@@ -4715,6 +4730,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   const TYPO_COLORS = [['', 'Journal default'], ['palette:title', 'Palette · lettering'], ['palette:plate', 'Palette · plate'], ['palette:frame', 'Palette · frame'],
     ['palette:trim', 'Palette · gold / trim'], ['palette:stone', 'Palette · stone'], ['palette:highlight', 'Palette · highlight'], ['custom', 'Custom color']];
   let typoKeyShown = '';
+  const wideScreen = () => !window.matchMedia('(max-width: 700px)').matches;
   const typoPage = () => typoKey(currentType());
   const typoOf = (role) => state.typography?.[state.journal]?.[typoPage()]?.[role] || {};
   function setTypo(role, patch) {
@@ -4742,9 +4758,11 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     if (!roles) return;
     const fonts = [...$('bodyFont').options].map((o) => [o.value, o.textContent]);
     [['_page', 'All text on this page', 'page'], ...roles].forEach(([role, label, fam]) => {
-      const sec = document.createElement('div'); sec.className = 'typo-sec'; sec.dataset.role = role;
+      const sec = document.createElement('details'); sec.className = 'typo-sec'; sec.dataset.role = role;
+      sec.open = wideScreen() || Object.keys(typoOf(role)).length > 0;       // phones: collapsed unless already customized
       const def = fam === 'head' ? (state.headingFont || state.bodyFont) : fam === 'body' ? state.bodyFont : 'each section’s own';
-      sec.innerHTML = `<div class="head"><div><strong>${label}</strong>${role === '_page' ? '' : `<small class="hint" style="display:block">Default font: ${def}</small>`}</div><button class="btn reset" type="button">${role === '_page' ? 'Clear' : 'Use journal default'}</button></div>
+      sec.innerHTML = `<summary><span><strong>${label}</strong><small class="sum"></small></span></summary>
+        <div class="head"><small class="hint">${role === '_page' ? 'Applies under every section below' : `Default font: ${def}`}</small><button class="btn reset" type="button">${role === '_page' ? 'Clear' : 'Use journal default'}</button></div>
         <div class="row2"><label class="field"><span>Font</span><select data-k="font"><option value="">Journal default</option>${fonts.map(([v, n]) => `<option value="${v}">${n}</option>`).join('')}</select></label>
         <label class="field"><span>Color</span><select data-k="color">${TYPO_COLORS.map(([v, n]) => `<option value="${v}">${n}</option>`).join('')}</select></label></div>
         <label class="field custom-row"><span>Custom color</span><input type="color" data-k="hex"></label>
@@ -4772,6 +4790,8 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       sec.querySelector('.custom-row').classList.toggle('hidden', c?.mode !== 'custom');
       const sz = o.size ?? 100; sec.querySelector('[data-k=size]').value = sz; sec.querySelector('.slider b').textContent = `${sz}%`;
       sec.querySelector('.reset').disabled = !Object.keys(o).length;
+      const cn = !c ? '' : c.mode === 'custom' ? 'custom color' : (TYPO_COLORS.find(([v]) => v === `palette:${c.role}`)?.[1] || '').replace('Palette · ', '');
+      sec.querySelector('.sum').textContent = [o.font, cn, sz !== 100 ? `${sz}%` : ''].filter(Boolean).join(' · ') || 'Journal default';
     });
   }
   $('pageTypoReset').onclick = () => {
@@ -4951,6 +4971,15 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     window.scrollTo(0, m === 'edit' ? editScroll : 0);
   }
   document.querySelectorAll('#modeBar button').forEach((b) => b.onclick = () => setPhoneMode(b.dataset.mode));
+  // Edit mode shows one group of settings at a time; "Page" holds everything for the page on screen.
+  function setEditTab(tab) {
+    document.body.dataset.etab = tab;
+    document.querySelectorAll('#editTabs button').forEach((b) => { b.classList.toggle('active', b.dataset.etab === tab); b.setAttribute('aria-pressed', b.dataset.etab === tab); });
+    try { localStorage.setItem('dove-studio-edit-tab', tab); } catch {}
+  }
+  document.querySelectorAll('#editTabs button').forEach((b) => b.onclick = () => { setEditTab(b.dataset.etab); editScroll = 0; window.scrollTo(0, 0); });
+  let startTab = 'page'; try { startTab = localStorage.getItem('dove-studio-edit-tab') || 'page'; } catch {}
+  setEditTab(['page', 'design', 'colors', 'type', 'book'].includes(startTab) ? startTab : 'page');
   setPhoneMode(phoneMode);
   $('mPrev').onclick = () => $('prevPage').click();
   $('mNext').onclick = () => $('nextPage').click();
