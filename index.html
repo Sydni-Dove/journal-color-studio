@@ -499,6 +499,12 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
           <option value="plain">Title only</option>
         </select>
       </div>
+      <div class="field"><span>Header spacing</span>
+        <select id="headerSpacing">
+          <option value="snug">Snug (title close to its border and the lines)</option>
+          <option value="designed">As designed (original Canva spacing)</option>
+        </select>
+      </div>
       <div class="row2">
         <div class="field"><span>Dark bars + blocks</span>
           <select id="headerFill"><option value="marble">Marble</option><option value="solid">Solid stone color</option></select>
@@ -1017,7 +1023,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     accentX: .5, accentY: .5, accentRot: 0, accentTile: 100, accentSpacing: 0, showStripeBorder: false,
     showVeins: true, showHighlights: true, showPlate: true, showFrame: true, showTrim: true,
     texture: 60, veinStrength: 100, plateOpacity: 88,
-    headerStyle: 'mixed', lineSpacing: '25', footer: 'on', marginLine: false,
+    headerStyle: 'mixed', headerSpacing: 'snug', lineSpacing: '25', footer: 'on', marginLine: false,
     headerRule: 'line', lineStyle: 'printed', headerFill: 'marble',
     floralArt: 'cover',                  // floral interior artwork: 'cover' (match the cover), 'original' or 'palette'
     prayerArt: 'original',               // prayer journals: 'original' Canva colors, or 'palette' once colors are customized
@@ -1065,6 +1071,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       Object.assign(state.palette, stripes);
     }
     if (!['mixed', 'block', 'rule', 'bar', 'band', 'soft', 'plain'].includes(state.headerStyle)) state.headerStyle = 'mixed';
+    if (!['snug', 'designed'].includes(state.headerSpacing)) state.headerSpacing = 'snug';
     if (state.pageCount < 10) state.pageCount = DEFAULTS.pageCount;
     // Sept 24 single-corner names → the shared layout names.
     state.accentPlace = { cornerTopRight: 'tr', cornerBottomLeft: 'bl' }[state.accentPlace] || state.accentPlace;
@@ -2918,6 +2925,9 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   // Page header. "As designed" gives each page the style it has in the Canva master; any other choice applies everywhere.
   // Returns the y where writing space begins.
   // id / subId: the text slots the title and subtitle come from (for the too-long warning).
+  // Snug (default): the title sits closer to its top border and its rule/bar, and the first writing line or box follows
+  // the header sooner. 'designed' keeps the original Canva master spacing.
+  const snugHeader = (s) => s.headerSpacing !== 'designed' && !floralDesign(s);   // the floral pages keep their Canva placement
   function drawHeader(ctx, W, H, s, title, opts = {}) { return withRole(ctx, s, 'pageTitle', () => drawHeaderTitle(ctx, W, H, s, title, opts)); }
   function drawHeaderTitle(ctx, W, H, s, title, { sub = '', pref = 'rule', x0 = 0, x1 = W, id = null, subId = null } = {}) {
     const p = s.palette, w = x1 - x0, cx = x0 + w / 2, maxW = w * .9;
@@ -2934,9 +2944,10 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       headerRule(ctx, x0, hb, w, H * .011, s);
       bottom = hb + H * .011;
     } else if (style === 'bar') {                  // title on paper, thick dark bar beneath (Dream)
-      ctx.fillStyle = ink; ctx.font = headFont(H * .05); fillFit(ctx, s, id, title, cx, H * .07, maxW);
-      stoneBar(ctx, x0, H * .115, w, H * .028, s);
-      bottom = H * .143;
+      const [ty, by] = snugHeader(s) ? [.054, .087] : [.07, .115];
+      ctx.fillStyle = ink; ctx.font = headFont(H * .05); fillFit(ctx, s, id, title, cx, H * ty, maxW);
+      stoneBar(ctx, x0, H * by, w, H * .028, s);
+      bottom = H * (by + .028);
     } else if (style === 'band') {                 // marble band with the cover's title plate
       const band = H * .125;
       paintMarble(ctx, x0, 0, w, band, s);
@@ -2965,10 +2976,11 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     } else {                                       // 'rule': thin top bar, dark title, gold rule (Draw, Brainstorm, Keys, Notes)
       const isFloral = s.marble === 'floral';
       if (s.footer === 'on' && !isFloral) stoneBar(ctx, x0, 0, w, H * .022, s);
-      ctx.fillStyle = ink; ctx.font = headFont(H * .045); fillFit(ctx, s, id, title, cx, H * .068, maxW);
-      headerRule(ctx, x0, H * .105, w, H * .012, s);
-      if (isFloral) floralFlank(ctx, cx, H * .108 - H * .05, w * .07, H * .1, s);
-      bottom = H * .117;
+      const [ty, ry] = snugHeader(s) ? [.054, .083] : [.068, .105];
+      ctx.fillStyle = ink; ctx.font = headFont(H * .045); fillFit(ctx, s, id, title, cx, H * ty, maxW);
+      headerRule(ctx, x0, H * ry, w, H * .012, s);
+      if (isFloral) floralFlank(ctx, cx, H * (ry + .003) - H * .05, w * .07, H * .1, s);
+      bottom = H * (ry + .012);
     }
     if (sub) {
       ctx.fillStyle = ink; ctx.font = font(H * .026, { italic: true }); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -2989,7 +3001,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
 
   function writingLines(ctx, W, H, s, x0, x1, top, bottom) {
     const p = s.palette, pt = H / TRIM_H, spacing = Number(s.lineSpacing) * pt;
-    const first = top + spacing * .9;
+    const first = top + spacing * (snugHeader(s) ? .6 : .9);
     if (s.lineStyle === 'hand' && ASSETS.handLines) {
       // Cycle through the 11 hand-drawn strokes so neighbouring lines never repeat.
       const img = ASSETS.handLines, sh = img.naturalHeight / HAND_LINE_COUNT, lw = x1 - x0, dh = sh * lw / img.naturalWidth;
@@ -3440,7 +3452,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     keys(ctx, W, H, s) {
       const p = s.palette, isFloral = s.marble === 'floral';
       pageBase(ctx, W, H, s);
-      drawHeader(ctx, W, H, s, T(s, 'keysTitle'), { pref: 'rule', id: 'keysTitle' });
+      const hdr = drawHeader(ctx, W, H, s, T(s, 'keysTitle'), { pref: 'rule', id: 'keysTitle' });
       if (floralDesign(s)) {
         // Canva page 61: small peonies (drawn by the header) tucked behind four soft-filled boxes, labels inside the top.
         const { k } = canvaFit(W, H);
@@ -3451,8 +3463,10 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
         return;
       }
       const [r, g, b] = hexRgb(p.trim), soft = `rgb(${mix(r, 255, .72)},${mix(g, 255, .72)},${mix(b, 255, .72)})`, label = `rgb(${r * .7},${g * .7},${b * .7})`;
-      [['keyActions', .14, .148], ['keySymbols', .525, .148], ['keyEmotions', .14, .55], ['keyScriptures', .525, .55]].forEach(([id, fx, fy]) => {
-        const x = W * fx, y = H * fy, w = W * .335, h = H * .37;
+      // Snug: the boxes start just under the header and share the height it gives back (same bottom edge, same row gap).
+      const y1 = snugHeader(s) ? hdr + H * .022 : H * .148, bh = snugHeader(s) ? (H * .92 - y1 - H * .032) / 2 : H * .37, y2 = snugHeader(s) ? y1 + bh + H * .032 : H * .55;
+      [['keyActions', .14, y1], ['keySymbols', .525, y1], ['keyEmotions', .14, y2], ['keyScriptures', .525, y2]].forEach(([id, fx, y]) => {
+        const x = W * fx, w = W * .335, h = bh;
         if (isFloral) { ctx.fillStyle = readingSurface(p); roundRect(ctx, x, y, w, h, W * .012); ctx.fill(); ctx.strokeStyle = p.plate; ctx.lineWidth = Math.max(1.5, W * .0028); ctx.stroke(); }
         else { ctx.strokeStyle = soft; ctx.lineWidth = Math.max(1.5, W * .003); ctx.strokeRect(x, y, w, h); }
         ctx.fillStyle = isFloral ? p.plate : label; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; withRole(ctx, s, 'boxHeadings', () => { ctx.font = font(H * .024); fillFit(ctx, s, id, T(s, id), x + w / 2, y + H * .042, w * .9, { lines: 2 }); });
@@ -4619,7 +4633,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     $('textureVal').textContent = state.texture + '%';
     $('veinVal').textContent = state.veinStrength + '%';
     $('plateVal').textContent = state.plateOpacity + '%';
-    for (const id of ['journal', 'headerStyle', 'headerFill', 'lineSpacing', 'footer', 'pageCount', 'includeCover', 'includeBack', 'headerRule', 'lineStyle', 'floralArt']) $(id).value = state[id];
+    for (const id of ['journal', 'headerStyle', 'headerSpacing', 'headerFill', 'lineSpacing', 'footer', 'pageCount', 'includeCover', 'includeBack', 'headerRule', 'lineStyle', 'floralArt']) $(id).value = state[id];
     $('marginLine').checked = state.marginLine;
     $('coverFont').value = state.coverFont; $('coverFontScale').value = state.coverFontScale; $('coverFontScaleVal').textContent = state.coverFontScale + '%';
     $('coverFontColorAuto').checked = state.coverFontColorAuto; $('coverFontColor').value = shownCoverColor();
@@ -5210,7 +5224,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     canvas.addEventListener('pointercancel', end);
   })();
   for (const id of ['texture', 'veinStrength', 'plateOpacity', 'titleShadow', 'accentOpacity']) $(id).oninput = (e) => { state[id] = Number(e.target.value); commit(false); };
-  for (const id of ['headerStyle', 'headerFill', 'lineSpacing', 'footer', 'headerRule', 'lineStyle', 'floralArt']) $(id).onchange = (e) => { state[id] = e.target.value; toInterior(); commit(false); };
+  for (const id of ['headerStyle', 'headerSpacing', 'headerFill', 'lineSpacing', 'footer', 'headerRule', 'lineStyle', 'floralArt']) $(id).onchange = (e) => { state[id] = e.target.value; toInterior(); commit(false); };
   for (const id of ['includeCover', 'includeBack']) $(id).onchange = (e) => { const t = currentType(); state[id] = e.target.value; goTo(t); commit(false); };
   $('pageCount').onchange = (e) => { state.pageCount = Math.min(300, Math.max(10, Number(e.target.value) || 102)); commit(false); };
   $('marginLine').onchange = (e) => { state.marginLine = e.target.checked; toInterior(); commit(false); };
