@@ -65,6 +65,14 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
 .pal-detail small { display: block; color: var(--muted); font-size: 12px; margin-bottom: 6px; }
 .pal-detail .swatch-row { height: 24px; margin: 0; }
 .mode-bar, .m-pager { display: none; }
+.typo-sec { border-top: 1px dashed var(--line); padding-top: 10px; margin-top: 10px; }
+.typo-sec .head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.typo-sec .head strong { font-size: 13px; }
+.typo-sec .head .btn { font-size: 11px; padding: 4px 8px; text-align: center; }
+.typo-sec .head .btn:disabled { opacity: .4; cursor: default; }
+.typo-sec .field { margin-top: 6px; }
+.typo-sec .field select { min-width: 0; }
+.typo-sec input[type=color] { width: 100%; height: 36px; padding: 2px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
 .palettes button.selected { border-color: var(--brand); box-shadow: inset 0 0 0 1px var(--brand); }
 .swatch-row { display: flex; height: 22px; border-radius: 6px; overflow: hidden; margin-bottom: 4px; }
 .swatch-row i { flex: 1; }
@@ -233,6 +241,50 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       </div>
     </div>
 
+    <div class="card hidden" id="pageTypoCard">
+      <h2>Page settings <span id="pageTypoName"></span></h2>
+      <p class="hint" style="margin:0" id="pageTypoNote">Fonts, colors and sizes for the text on this page only. Anything on “Journal default” follows Typography.</p>
+      <div id="pageTypoFields"></div>
+      <button class="btn" id="pageTypoReset" type="button" style="width:100%;text-align:center;margin-top:10px">Reset page typography</button>
+    </div>
+
+    <div class="card" id="textCard">
+      <h2>Text content <span>the wording on this page</span></h2>
+      <p class="hint" style="margin:0">Change the words themselves. Fonts, sizes and colors stay under Typography.</p>
+      <div id="textFields"></div>
+    </div>
+
+    <div class="card hidden" id="readingPanelCard">
+      <h2>Reading panel <span id="readingPanelWhere"></span></h2>
+      <label class="field"><span>Show panel</span>
+        <select id="readingPanelShow">
+          <option value="auto">Automatic</option>
+          <option value="on">Always show on this page</option>
+          <option value="off">Hide on this page</option>
+        </select></label>
+      <p class="hint" style="margin:6px 0 0" id="readingPanelMode"></p>
+      <div class="row2" id="readingPanelColorRow">
+        <div class="field"><span>Panel color</span>
+          <select id="readingPanelColor">
+            <option value="paper">Paper (palette)</option>
+            <option value="white">White</option>
+            <option value="cream">Cream</option>
+            <option value="neutral">Palette neutral</option>
+            <option value="custom">Custom color</option>
+          </select>
+        </div>
+        <div class="field"><span>Custom</span><input type="color" id="readingPanelCustom" aria-label="Custom reading panel color" style="height:36px;width:100%"></div>
+      </div>
+      <label class="slider" id="readingPanelOpacityRow"><span>Panel opacity <b id="readingPanelOpacityVal"></b></span><input type="range" id="readingPanelOpacity" min="0" max="100"></label>
+      <div class="seg" id="readingPanelPad" style="margin-top:8px">
+        <button data-pad="tight"><strong>Tight</strong><small>Close to the text</small></button>
+        <button data-pad="normal"><strong>Normal</strong></button>
+        <button data-pad="generous"><strong>Generous</strong><small>Covers more</small></button>
+      </div>
+      <span class="hint">Sits on top of the background, behind the text. The text and page layout don’t move.</span>
+    </div>
+
+
     <div class="card">
       <h2>Design pieces <span>from your Canva elements</span></h2>
       <div class="field"><span>Start from a design</span>
@@ -335,42 +387,6 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       <div class="palettes" id="palettes"></div>
       <button class="btn" id="savePalette" type="button" style="margin-top:10px;width:100%;text-align:center">+ Save current colors as my palette</button>
       <p class="hint" style="margin:6px 0 0">Change any color under Layers, then save it here. Your palettes appear in this list and are kept on this computer.</p>
-    </div>
-
-    <div class="card" id="textCard">
-      <h2>Text content <span>the wording on this page</span></h2>
-      <p class="hint" style="margin:0">Change the words themselves. Fonts, sizes and colors stay under Typography.</p>
-      <div id="textFields"></div>
-    </div>
-
-    <div class="card hidden" id="readingPanelCard">
-      <h2>Reading panel <span id="readingPanelWhere"></span></h2>
-      <label class="field"><span>Show panel</span>
-        <select id="readingPanelShow">
-          <option value="auto">Automatic</option>
-          <option value="on">Always show on this page</option>
-          <option value="off">Hide on this page</option>
-        </select></label>
-      <p class="hint" style="margin:6px 0 0" id="readingPanelMode"></p>
-      <div class="row2" id="readingPanelColorRow">
-        <div class="field"><span>Panel color</span>
-          <select id="readingPanelColor">
-            <option value="paper">Paper (palette)</option>
-            <option value="white">White</option>
-            <option value="cream">Cream</option>
-            <option value="neutral">Palette neutral</option>
-            <option value="custom">Custom color</option>
-          </select>
-        </div>
-        <div class="field"><span>Custom</span><input type="color" id="readingPanelCustom" aria-label="Custom reading panel color" style="height:36px;width:100%"></div>
-      </div>
-      <label class="slider" id="readingPanelOpacityRow"><span>Panel opacity <b id="readingPanelOpacityVal"></b></span><input type="range" id="readingPanelOpacity" min="0" max="100"></label>
-      <div class="seg" id="readingPanelPad" style="margin-top:8px">
-        <button data-pad="tight"><strong>Tight</strong><small>Close to the text</small></button>
-        <button data-pad="normal"><strong>Normal</strong></button>
-        <button data-pad="generous"><strong>Generous</strong><small>Covers more</small></button>
-      </div>
-      <span class="hint">Sits on top of the background, behind the text. The text and page layout don’t move.</span>
     </div>
 
     <div class="card">
@@ -1047,6 +1063,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     if (!state.text || typeof state.text !== 'object') state.text = {};
     if (String(state.lineSpacing) === '22') state.lineSpacing = '20.25';        // College is true 9/32 in college rule
     state.titleFill = { ...DEFAULTS.titleFill, ...(state.titleFill && typeof state.titleFill === 'object' ? state.titleFill : {}) };
+    state.typography = state.typography && typeof state.typography === 'object' ? state.typography : {};
     state.readingPanels = Object.fromEntries(Object.entries(DEFAULTS.readingPanels).map(([k, d]) => [k, { ...d, ...(state.readingPanels?.[k] || {}) }]));
     state.customPalettes = Array.isArray(state.customPalettes) ? state.customPalettes : [];          // the procedural watercolor was retired
     state.decor = Object.fromEntries(Object.entries(DEFAULTS.decor).map(([k, d]) => [k, { ...d, ...(state.decor?.[k] || {}) }]));
@@ -2591,9 +2608,70 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   // boxes, writing lines, lettering), so one palette or element change flows through the whole journal.
   // Positions follow Sydni's Canva master ("Dream Journal – Final 28 Pages"), in page fractions.
 
-  const font = (px, { weight = 500, italic = false } = {}) => `${italic ? 'italic ' : ''}${weight} ${Math.round(px * (state.bodyFontScale / 100))}px "${state.bodyFont}", Georgia, serif`;
+  // ---------- Page / section typography ----------
+  // JOURNAL DEFAULT (the Typography card: heading/body fonts, sizes, text color) → PAGE OVERRIDE (all text on one page)
+  // → SECTION OVERRIDE (one semantic text role on that page). The most specific setting wins; anything left unset falls
+  // through, down to the original design. Stored per journal in state.typography[journal][pageKey][role | '_page'] as
+  // { font, size (% of the design size), color: { mode: 'palette', role } | { mode: 'custom', hex } } — overrides only.
+  // Roles are the renderer's own text sections (withRole scopes below); wording lives in state.text and never here.
+  const TYPO_PAGES = {
+    brainstormQ: [['pageTitle', 'Brainstorm title', 'head'], ['questionsHeading', 'Questions heading', 'body'], ['questionsBody', 'Questions body', 'body']],
+    contents: [['pageTitle', 'Page title', 'body'], ['legendText', 'Legend strip', 'body'], ['columnHeadings', 'Column headings', 'body']],
+    dreamLegend: [['pageTitle', 'Page title', 'head'], ['legendHeading', 'Legend heading', 'body'], ['legendBody', 'Legend entries', 'body'], ['brainstormBand', 'Brainstorm band', 'body']],
+    keys: [['pageTitle', 'Page title', 'head'], ['boxHeadings', 'Box headings', 'body']],
+    title: [['pageTitle', 'Dream title', 'body'], ['fieldLabels', 'Date / time / other labels', 'body'], ['dreamTypeHeading', 'Dream type heading', 'body'],
+      ['optionLabels', 'Choices (types + involvement)', 'body'], ['involvementHeading', 'Involvement heading', 'body']],
+    interp: [['pageTitle', 'Page title', 'head']],
+    app: [['pageTitle', 'Page title', 'head']],
+    pinkSug1: [['pageTitle', 'Page heading', 'head'], ['bodyText', 'Suggestions', 'body']],
+    pinkLetter: [['recurringLabels', 'Dear / Date labels', 'head'], ['footerText', 'Footer scripture', 'body']],
+    pwLined: [['recurringLabels', 'Date label', 'head']],
+  };
+  // Both lined pages (left / right) share one setting.
+  const typoKey = (type) => (type === 'pwLinedL' || type === 'pwLinedR' ? 'pwLined' : type);
+  // The resolved style for a role on the page being drawn (page override under section override), or null when nothing is set.
+  function sectionStyle(s, type, role) {
+    const pg = s.typography?.[s.journal]?.[typoKey(type)];
+    if (!pg) return null;
+    const a = pg._page || {}, b = (role && pg[role]) || {};
+    const c = b.color || a.color;
+    const color = !c ? null : c.mode === 'custom' ? c.hex : s.palette[c.role] || null;
+    const out = { font: b.font || a.font || '', size: b.size ?? a.size ?? 100, color };
+    return out.font || out.size !== 100 || out.color ? out : null;
+  }
+  // The section being drawn (null: nothing overridden, so every font/color/size below is exactly the design's).
+  let TY = null;
+  const tyScale = () => (TY ? TY.size / 100 : 1);
+  const tyFam = (fam) => (TY && TY.font ? TY.font : fam);
+  // Draws fn() as one semantic section. Fonts and sizes come from font()/headFont()/canvaText()/prText()/drawLetter()
+  // (they read TY before measuring, so fitting and wrapping stay proportional); a color override is applied to the text
+  // only (non-text fills keep their color). In the preview each section's text boxes are recorded for its contrast check.
+  function withRole(ctx, s, role, fn) {
+    const prev = TY, st = sectionStyle(s, s._type, role), probe = s._typoProbe;
+    TY = st;
+    const col = st && st.color, own = Object.prototype.hasOwnProperty.call(ctx, 'fillText') ? ctx.fillText : undefined;
+    if (col || (probe && role)) {
+      const draw = CanvasRenderingContext2D.prototype.fillText;
+      ctx.fillText = function (text, x, y, ...rest) {
+        const keep = this.fillStyle;
+        if (col) this.fillStyle = col;
+        if (probe && role && String(text).trim()) {
+          const m = this.measureText(text), T2 = this.getTransform();
+          const pts = [[x - m.actualBoundingBoxLeft, y - m.actualBoundingBoxAscent], [x + m.actualBoundingBoxRight, y + m.actualBoundingBoxDescent]]
+            .map(([px, py]) => [T2.a * px + T2.c * py + T2.e, T2.b * px + T2.d * py + T2.f]);
+          probe.boxes.push({ role, color: String(this.fillStyle), box: [pts[0][0], pts[0][1], pts[1][0], pts[1][1]] });
+        }
+        const r = draw.call(this, text, x, y, ...rest);
+        this.fillStyle = keep;
+        return r;
+      };
+    }
+    try { return fn(); } finally { if (own === undefined) delete ctx.fillText; else ctx.fillText = own; TY = prev; }
+  }
+
+  const font = (px, { weight = 500, italic = false } = {}) => `${italic ? 'italic ' : ''}${weight} ${Math.round(px * (state.bodyFontScale / 100) * tyScale())}px "${tyFam(state.bodyFont)}", Georgia, serif`;
   // Section-heading text (page titles drawn by drawHeader) can use its own typeface, independent of body text.
-  const headFont = (px, { weight = 500, italic = false } = {}) => `${italic ? 'italic ' : ''}${weight} ${Math.round(px * (state.headingFontScale / 100))}px "${state.headingFont || state.bodyFont}", Georgia, serif`;
+  const headFont = (px, { weight = 500, italic = false } = {}) => `${italic ? 'italic ' : ''}${weight} ${Math.round(px * (state.headingFontScale / 100) * tyScale())}px "${tyFam(state.headingFont || state.bodyFont)}", Georgia, serif`;
 
   // Draws text wrapped to maxW. Returns the y just below the last line.
   function wrapText(ctx, text, x, y, maxW, lineH, align = 'left', draw = true) {
@@ -2708,8 +2786,8 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     if (onBox) color = textOnPanel(s, color, surface);
     else color = family === 'body' ? bodyInk(s, color, surface) : textOn(color, surface, 3);
     const { k } = canvaFit(W, H), scale = family === 'head' ? s.headingFontScale : s.bodyFontScale;
-    const fam = family === 'head' ? (s.headingFont || s.bodyFont) : s.bodyFont;
-    let px = size * k * scale / 100;
+    const fam = tyFam(family === 'head' ? (s.headingFont || s.bodyFont) : s.bodyFont);
+    let px = size * k * scale / 100 * tyScale();
     ctx.save();
     ctx.font = `${italic ? 'italic ' : ''}${weight} ${px}px "${fam}", Georgia, serif`;
     const edited = id && textEdited(s, id), ref = edited ? (orig ?? textSlot(s.journal, id)?.text ?? text) : text;
@@ -2789,7 +2867,8 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   // Page header. "As designed" gives each page the style it has in the Canva master; any other choice applies everywhere.
   // Returns the y where writing space begins.
   // id / subId: the text slots the title and subtitle come from (for the too-long warning).
-  function drawHeader(ctx, W, H, s, title, { sub = '', pref = 'rule', x0 = 0, x1 = W, id = null, subId = null } = {}) {
+  function drawHeader(ctx, W, H, s, title, opts = {}) { return withRole(ctx, s, 'pageTitle', () => drawHeaderTitle(ctx, W, H, s, title, opts)); }
+  function drawHeaderTitle(ctx, W, H, s, title, { sub = '', pref = 'rule', x0 = 0, x1 = W, id = null, subId = null } = {}) {
     const p = s.palette, w = x1 - x0, cx = x0 + w / 2, maxW = w * .9;
     const style = s.headerStyle === 'mixed' ? pref : s.headerStyle;
     const ink = inkColor(p);
@@ -2942,25 +3021,26 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     const p = s.palette, { k } = canvaFit(W, H);
     ctx.fillStyle = p.paper; ctx.fillRect(0, 0, W, H);
     ctx.fillStyle = readingPanel(p, s); roundRect(ctx, cX(W, H, 500), cY(W, H, -33.7), 391.7 * k, 1123 * k, 20 * k); ctx.fill();
-    const top = floralHeader(ctx, W, H, { ...s, _type: 'dreamLegend' }, T(s, id), 0, cX(W, H, 500), id);
+    const top = withRole(ctx, s, 'pageTitle', () => floralHeader(ctx, W, H, { ...s, _type: 'dreamLegend' }, T(s, id), 0, cX(W, H, 500), id));
     writingLines(ctx, W, H, s, W * .045, cX(W, H, 500) - W * .03, top, H * .965);
     if (legend) {
       drawCanvaArt(ctx, W, H, s, FLORAL_CANVA.dreamLegend, ['legendBand', 'legendCard', 'legendFrame', 'legendPen', 'legendHiA', 'legendHiB', 'legendPaper']);
       const t = { family: 'body', color: '#3d3935', size: 13.7, h: 15.9, weight: 400, align: 'left', s };        // follows Text color via canvaText
-      canvaText(ctx, W, H, T(s, 'legendHeading'), { family: 'body', color: p.plate, cx: 649.5, top: 34.8, h: 36.4, size: 30.4, s, fitW: 150, id: 'legendHeading' });
-      canvaText(ctx, W, H, 'Repeat', { ...t, cx: 533.3, top: 71.3 });
-      canvaText(ctx, W, H, 'Key Words', { ...t, cx: 533.3, top: 91.1 });
-      canvaText(ctx, W, H, 'Play on Words', { ...t, cx: 533.3, top: 111.9 });
-      canvaText(ctx, W, H, 'Key Emotions', { ...t, cx: 534.8, top: 132.4 });
-      canvaText(ctx, W, H, 'Bold', { ...t, align: 'center', cx: 726.8, top: 71.3, weight: 700, color: p.trim });
-      canvaText(ctx, W, H, T(s, 'brainstormBand'), { family: 'body', color: p.plate, cx: 645.4, top: 174.9, h: 38.9, size: 32.4, s, fitW: 250, id: 'brainstormBand' });
+      withRole(ctx, s, 'legendHeading', () => canvaText(ctx, W, H, T(s, 'legendHeading'), { family: 'body', color: p.plate, cx: 649.5, top: 34.8, h: 36.4, size: 30.4, s, fitW: 150, id: 'legendHeading' }));
+      withRole(ctx, s, 'legendBody', () => {
+        canvaText(ctx, W, H, 'Repeat', { ...t, cx: 533.3, top: 71.3 });
+        canvaText(ctx, W, H, 'Key Words', { ...t, cx: 533.3, top: 91.1 });
+        canvaText(ctx, W, H, 'Play on Words', { ...t, cx: 533.3, top: 111.9 });
+        canvaText(ctx, W, H, 'Key Emotions', { ...t, cx: 534.8, top: 132.4 });
+        canvaText(ctx, W, H, 'Bold', { ...t, align: 'center', cx: 726.8, top: 71.3, weight: 700, color: p.trim });
+      });
+      withRole(ctx, s, 'brainstormBand', () => canvaText(ctx, W, H, T(s, 'brainstormBand'), { family: 'body', color: p.plate, cx: 645.4, top: 174.9, h: 38.9, size: 32.4, s, fitW: 250, id: 'brainstormBand' }));
     } else {
       // Questions to Consider in the same sidebar, set in the body font.
       const x = cX(W, H, 521), w = 247.6 * k;
-      ctx.fillStyle = bodyInk(s, p.plate); ctx.font = font(H * .028);
-      let y = wrapText(ctx, T(s, 'questionsHeading'), x, cY(W, H, 30), w, H * .036, 'center');
-      ctx.font = font(H * .0165);
-      QUESTIONS.forEach((q) => { y = wrapText(ctx, q, x, y + H * .018, w, H * .0225, 'center'); });
+      ctx.fillStyle = bodyInk(s, p.plate);
+      let y = withRole(ctx, s, 'questionsHeading', () => { ctx.font = font(H * .028); return wrapText(ctx, T(s, 'questionsHeading'), x, cY(W, H, 30), w, H * .036 * tyScale(), 'center'); });
+      withRole(ctx, s, 'questionsBody', () => { ctx.font = font(H * .0165); QUESTIONS.forEach((q) => { y = wrapText(ctx, q, x, y + H * .018 * tyScale(), w, H * .0225 * tyScale(), 'center'); }); });
     }
   }
 
@@ -3174,14 +3254,14 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
         ctx.fillStyle = `rgb(${r * .95},${g * .95},${b * .95})`; ctx.fillRect(0, 0, W, H);
         drawCanvaArt(ctx, W, H, s, FLORAL_CANVA.contents);
         const pill = (l, t) => { ctx.fillStyle = p.paper; roundRect(ctx, cX(W, H, l), cY(W, H, t), 700.2 * k, 59.6 * k, 29.8 * k); ctx.fill(); };
-        canvaText(ctx, W, H, 'Legend', { family: 'body', color: c, cx: 137.5, top: 39, h: 31.8, size: 27.1, s });
+        withRole(ctx, s, 'legendText', () => canvaText(ctx, W, H, 'Legend', { family: 'body', color: c, cx: 137.5, top: 39, h: 31.8, size: 27.1, s }));
         ctx.fillStyle = p.trim; ctx.fillRect(cX(W, H, 226), cY(W, H, 38.8), Math.max(1, .94 * k), 35.8 * k);
-        [['N = Not Interpreted', 348], ['I = Interpreted', 512.2], ['A = Application', 659.1]].forEach(([t, x]) => canvaText(ctx, W, H, t, { family: 'body', color: c, cx: x, top: 42.9, h: 24.1, size: 20.6, weight: 400, s }));
+        withRole(ctx, s, 'legendText', () => [['N = Not Interpreted', 348], ['I = Interpreted', 512.2], ['A = Application', 659.1]].forEach(([t, x]) => canvaText(ctx, W, H, t, { family: 'body', color: c, cx: x, top: 42.9, h: 24.1, size: 20.6, weight: 400, s })));
         pill(52.9, 93);
         // This design sets the title in capitals (display only).
-        canvaText(ctx, W, H, T(s, 'contentsTitle').toUpperCase(), { family: 'body', color: c, cx: 403.3, top: 99, h: 53.4, size: 45, fitW: 640, s, id: 'contentsTitle', orig: 'TABLE OF CONTENTS' });
+        withRole(ctx, s, 'pageTitle', () => canvaText(ctx, W, H, T(s, 'contentsTitle').toUpperCase(), { family: 'body', color: c, cx: 403.3, top: 99, h: 53.4, size: 45, fitW: 640, s, id: 'contentsTitle', orig: 'TABLE OF CONTENTS' }));
         pill(59.3, 184.9);
-        [['Date', 150.7], ['Name', 394], ['Status', 641]].forEach(([t, x]) => canvaText(ctx, W, H, t, { family: 'body', color: c, cx: x, top: 198.3, h: 46, size: 39.2, s }));
+        withRole(ctx, s, 'columnHeadings', () => [['Date', 150.7], ['Name', 394], ['Status', 641]].forEach(([t, x]) => canvaText(ctx, W, H, t, { family: 'body', color: c, cx: x, top: 198.3, h: 46, size: 39.2, s })));
         const box = ASSETS['el:checkbox']; if (!box) ensureAsset('el:checkbox').catch(() => {});
         for (let i = 0; i < 10; i++) {
           const t = 263.06 + i * 78.13; pill(i === 9 ? 62.8 : 59.3, t);
@@ -3201,13 +3281,12 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
         const iy = [lh * .16, lh * .08, 0][panel.lvl + 1];
         ctx.fillStyle = rgba(panel.hex, panel.alpha); ctx.fillRect(0, ly + iy, W, lh - 2 * iy);
       }
-      ctx.fillStyle = panel ? panelInk(s, panel.hex) : textOnPanel(s, p.title, p.stone); ctx.font = font(H * .015, { italic: true }); ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
-      [['Status', .1], ['N = Not Interpreted', .3], ['I = Interpreted', .6], ['A = Application', .8]].forEach(([t, f]) => ctx.fillText(t, W * f, ly + lh / 2));
+      ctx.fillStyle = panel ? panelInk(s, panel.hex) : textOnPanel(s, p.title, p.stone); ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+      withRole(ctx, s, 'legendText', () => { ctx.font = font(H * .015, { italic: true }); [['Status', .1], ['N = Not Interpreted', .3], ['I = Interpreted', .6], ['A = Application', .8]].forEach(([t, f]) => ctx.fillText(t, W * f, ly + lh / 2)); });
       ctx.fillRect(W * .175, ly + lh * .2, Math.max(1, W * .002), lh * .6);
-      ctx.fillStyle = ink; ctx.font = font(H * .045); fillFit(ctx, s, 'contentsTitle', T(s, 'contentsTitle'), W / 2, H * .135, W * .88);
+      ctx.fillStyle = ink; withRole(ctx, s, 'pageTitle', () => { ctx.font = font(H * .045); fillFit(ctx, s, 'contentsTitle', T(s, 'contentsTitle'), W / 2, H * .135, W * .88); });
       headerRule(ctx, 0, H * .17, W, H * .011, s);
-      ctx.fillStyle = ink; ctx.font = font(H * .028, { italic: true });
-      [['#', .07], ['Date', .23], ['Title', .44], ['Type', .66], ['Status', .87]].forEach(([t, f]) => ctx.fillText(t, W * f, H * .207));
+      ctx.fillStyle = ink; withRole(ctx, s, 'columnHeadings', () => { ctx.font = font(H * .028, { italic: true }); [['#', .07], ['Date', .23], ['Title', .44], ['Type', .66], ['Status', .87]].forEach(([t, f]) => ctx.fillText(t, W * f, H * .207)); });
       ctx.fillRect(0, H * .232, W, Math.max(2, H * .004));
     },
     title(ctx, W, H, s) {
@@ -3217,38 +3296,38 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
         // Canva page 60: three gold bars, bouquets flanking the title, burgundy labels at their Canva positions.
         drawCanvaArt(ctx, W, H, s, FLORAL_CANVA.title);
         const c = p.plate, body = { family: 'body', color: c, s };
-        canvaText(ctx, W, H, T(s, 'entryTitle'), { ...body, cx: 419.6, top: 77.3, h: 85.5, size: 71.5, fitW: 560, id: 'entryTitle' });
-        canvaText(ctx, W, H, T(s, 'dateLabel'), { ...body, cx: 225.3, top: 293.1, h: 44.5, size: 37.65, fitW: 300, id: 'dateLabel' });
-        canvaText(ctx, W, H, T(s, 'timeLabel'), { ...body, cx: 584.2, top: 293.1, h: 44.5, size: 37.65, fitW: 300, id: 'timeLabel' });
-        canvaText(ctx, W, H, T(s, 'dreamTypeHeading'), { ...body, cx: 408, top: 432.6, h: 54.3, size: 46, fitW: 640, id: 'dreamTypeHeading' });
+        withRole(ctx, s, 'pageTitle', () => canvaText(ctx, W, H, T(s, 'entryTitle'), { ...body, cx: 419.6, top: 77.3, h: 85.5, size: 71.5, fitW: 560, id: 'entryTitle' }));
+        withRole(ctx, s, 'fieldLabels', () => {
+          canvaText(ctx, W, H, T(s, 'dateLabel'), { ...body, cx: 225.3, top: 293.1, h: 44.5, size: 37.65, fitW: 300, id: 'dateLabel' });
+          canvaText(ctx, W, H, T(s, 'timeLabel'), { ...body, cx: 584.2, top: 293.1, h: 44.5, size: 37.65, fitW: 300, id: 'timeLabel' });
+        });
+        withRole(ctx, s, 'dreamTypeHeading', () => canvaText(ctx, W, H, T(s, 'dreamTypeHeading'), { ...body, cx: 408, top: 432.6, h: 54.3, size: 46, fitW: 640, id: 'dreamTypeHeading' }));
         const TYPE_POS = [[191.2, 529.2], [394.3, 529.2], [619.5, 529.2], [191.2, 586.5], [389.5, 590], [604.4, 590], [191.2, 650.5], [406.4, 650.5], [604.4, 650.5]];
-        DREAM_TYPES.flat().forEach((t, i) => canvaText(ctx, W, H, t, { ...body, cx: TYPE_POS[i][0], top: TYPE_POS[i][1], h: 30.9, size: 26.3, weight: 400 }));
-        canvaText(ctx, W, H, 'Other:', { ...body, cx: 266.5, top: 723.1, h: 34.7, size: 29.2 });
+        withRole(ctx, s, 'optionLabels', () => DREAM_TYPES.flat().forEach((t, i) => canvaText(ctx, W, H, t, { ...body, cx: TYPE_POS[i][0], top: TYPE_POS[i][1], h: 30.9, size: 26.3, weight: 400 })));
+        withRole(ctx, s, 'fieldLabels', () => canvaText(ctx, W, H, 'Other:', { ...body, cx: 266.5, top: 723.1, h: 34.7, size: 29.2 }));
         const { k } = canvaFit(W, H);
         ctx.strokeStyle = p.trim; ctx.lineWidth = Math.max(1, 1.1 * k);
         ctx.beginPath(); ctx.moveTo(cX(W, H, 313.3), cY(W, H, 750.7)); ctx.lineTo(cX(W, H, 599.3), cY(W, H, 750.7)); ctx.stroke();
-        canvaText(ctx, W, H, T(s, 'involvementHeading'), { ...body, cx: 408, top: 852.8, h: 44.5, size: 37.65, fitW: 640, id: 'involvementHeading' });
-        [['Participant', 218], ['Partial Participant', 414.4], ['Observer', 596.5]].forEach(([t, x]) => canvaText(ctx, W, H, t, { ...body, cx: x, top: 939.6, h: 28.4, size: 23.9 }));
+        withRole(ctx, s, 'involvementHeading', () => canvaText(ctx, W, H, T(s, 'involvementHeading'), { ...body, cx: 408, top: 852.8, h: 44.5, size: 37.65, fitW: 640, id: 'involvementHeading' }));
+        withRole(ctx, s, 'optionLabels', () => [['Participant', 218], ['Partial Participant', 414.4], ['Observer', 596.5]].forEach(([t, x]) => canvaText(ctx, W, H, t, { ...body, cx: x, top: 939.6, h: 28.4, size: 23.9 })));
         return;
       }
       const isFloral = s.marble === 'floral';
       if (!isFloral && s.footer === 'on') stoneBar(ctx, 0, 0, W, H * .038, s);
       ctx.fillStyle = ink; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.font = font(H * .06); fillFit(ctx, s, 'entryTitle', T(s, 'entryTitle'), W / 2, H * .135, W * .78);
+      withRole(ctx, s, 'pageTitle', () => { ctx.font = font(H * .06); fillFit(ctx, s, 'entryTitle', T(s, 'entryTitle'), W / 2, H * .135, W * .78); });
       headerRule(ctx, W * .1, H * .17, W * .8, H * .007, s);
       if (isFloral) floralFlank(ctx, W / 2, H * .17 - H * .045, W * .14, H * .09, s);
-      ctx.fillStyle = ink; ctx.font = font(H * .038); fillFit(ctx, s, 'dateLabel', T(s, 'dateLabel'), W * .24, H * .295, W * .4); fillFit(ctx, s, 'timeLabel', T(s, 'timeLabel'), W * .74, H * .295, W * .4);
+      ctx.fillStyle = ink; withRole(ctx, s, 'fieldLabels', () => { ctx.font = font(H * .038); fillFit(ctx, s, 'dateLabel', T(s, 'dateLabel'), W * .24, H * .295, W * .4); fillFit(ctx, s, 'timeLabel', T(s, 'timeLabel'), W * .74, H * .295, W * .4); });
       headerRule(ctx, W * .1, H * .385, W * .8, H * .011, s);
-      ctx.fillStyle = ink; ctx.font = font(H * .04); fillFit(ctx, s, 'dreamTypeHeading', T(s, 'dreamTypeHeading'), W / 2, H * .445, W * .78);
-      ctx.font = font(H * .024);
-      DREAM_TYPES.forEach((row, r) => row.forEach((t, c) => ctx.fillText(t, W * (.27 + c * .23), H * (.513 + r * .053))));
-      ctx.font = font(H * .026); ctx.fillText('Other:', W * .38, H * .675);
+      ctx.fillStyle = ink; withRole(ctx, s, 'dreamTypeHeading', () => { ctx.font = font(H * .04); fillFit(ctx, s, 'dreamTypeHeading', T(s, 'dreamTypeHeading'), W / 2, H * .445, W * .78); });
+      withRole(ctx, s, 'optionLabels', () => { ctx.font = font(H * .024); DREAM_TYPES.forEach((row, r) => row.forEach((t, c) => ctx.fillText(t, W * (.27 + c * .23), H * (.513 + r * .053)))); });
+      withRole(ctx, s, 'fieldLabels', () => { ctx.font = font(H * .026); ctx.fillText('Other:', W * .38, H * .675); });
       ctx.strokeStyle = s.palette.trim; ctx.lineWidth = Math.max(1, W * .0015);
       ctx.beginPath(); ctx.moveTo(W * .42, H * .685); ctx.lineTo(W * .72, H * .685); ctx.stroke();
       headerRule(ctx, W * .1, H * .717, W * .8, H * .011, s);
-      ctx.fillStyle = ink; ctx.font = font(H * .042); fillFit(ctx, s, 'involvementHeading', T(s, 'involvementHeading'), W / 2, H * .775, W * .78);
-      ctx.font = font(H * .026);
-      [['Participant', .245], ['Partial Participant', .5], ['Observer', .745]].forEach(([t, f]) => ctx.fillText(t, W * f, H * .845));
+      ctx.fillStyle = ink; withRole(ctx, s, 'involvementHeading', () => { ctx.font = font(H * .042); fillFit(ctx, s, 'involvementHeading', T(s, 'involvementHeading'), W / 2, H * .775, W * .78); });
+      withRole(ctx, s, 'optionLabels', () => { ctx.font = font(H * .026); [['Participant', .245], ['Partial Participant', .5], ['Observer', .745]].forEach(([t, f]) => ctx.fillText(t, W * f, H * .845)); });
     },
     draw(ctx, W, H, s) { pageBase(ctx, W, H, s); drawHeader(ctx, W, H, s, T(s, 'drawTitle'), { pref: 'rule', id: 'drawTitle' }); },
     dreamLegend(ctx, W, H, s) {
@@ -3260,20 +3339,21 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
         ctx.fillStyle = p.paper; ctx.fillRect(x, y, w, h);
         if (s.showTrim) goldRule(ctx, x, y, w, H * .006, p.trim);
         const ink = inkColor(p);
-        ctx.fillStyle = ink; ctx.font = font(H * .03); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; fillFit(ctx, s, 'legendHeading', T(s, 'legendHeading'), x + w * .6, y + H * .03, w * .76);
+        ctx.fillStyle = ink; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        withRole(ctx, s, 'legendHeading', () => { ctx.font = font(H * .03); fillFit(ctx, s, 'legendHeading', T(s, 'legendHeading'), x + w * .6, y + H * .03, w * .76); });
         ctx.font = font(H * .0135); ctx.textAlign = 'left';
         const rows = [['Repeat', 'bold'], ['Key Words', '#8BC34A'], ['Play on Words', '#F2D14B'], ['Key Emotions', 'line']];
-        rows.forEach(([label, mark], i) => {
+        withRole(ctx, s, 'legendBody', () => rows.forEach(([label, mark], i) => {
           const yy = y + H * (.06 + i * .024);
           ctx.fillStyle = ink; ctx.font = font(H * .0135); ctx.fillText(label, x + w * .06, yy);
           if (mark === 'bold') { ctx.fillStyle = p.trim; ctx.font = font(H * .0145, { weight: 700 }); ctx.textAlign = 'right'; ctx.fillText('Bold', x + w * .94, yy); ctx.textAlign = 'left'; }
           else if (mark === 'line') { ctx.fillStyle = ink; ctx.fillRect(x + w * .66, yy, w * .28, Math.max(1.5, H * .003)); }
           else { ctx.fillStyle = mark; roundRect(ctx, x + w * .74, yy - H * .006, w * .2, H * .012, H * .006); ctx.fill(); }
-        });
+        }));
         // Brainstorm bar and writing panel
         const by = y + h + H * .012, bh = H * .045;
         goldRule(ctx, x, by, w, bh, p.trim);
-        ctx.fillStyle = inkColor(p); ctx.font = font(H * .028); ctx.textAlign = 'center'; fillFit(ctx, s, 'brainstormBand', T(s, 'brainstormBand'), x + w / 2, by + bh / 2, w * .9);
+        ctx.fillStyle = inkColor(p); ctx.textAlign = 'center'; withRole(ctx, s, 'brainstormBand', () => { ctx.font = font(H * .028); fillFit(ctx, s, 'brainstormBand', T(s, 'brainstormBand'), x + w / 2, by + bh / 2, w * .9); });
         ctx.fillStyle = p.paper; ctx.fillRect(x, by + bh, w, H * .955 - by - bh);
       });
     },
@@ -3282,10 +3362,8 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       const p = s.palette;
       if (floralDesign(s)) { floralSidebarPage(ctx, W, H, s, 'brainstormTitle', false); return; }
       const questions = (x, w, draw) => {
-        ctx.font = font(H * .03);
-        let y = wrapText(ctx, T(s, 'questionsHeading'), x, H * .03, w, H * .038, 'center', draw);
-        ctx.font = font(H * .0175);
-        QUESTIONS.forEach((q) => { y = wrapText(ctx, q, x, y + H * .02, w, H * .0235, 'center', draw); });
+        let y = withRole(ctx, s, 'questionsHeading', () => { ctx.font = font(H * .03); return wrapText(ctx, T(s, 'questionsHeading'), x, H * .03, w, H * .038 * tyScale(), 'center', draw); });
+        withRole(ctx, s, 'questionsBody', () => { ctx.font = font(H * .0175); QUESTIONS.forEach((q) => { y = wrapText(ctx, q, x, y + H * .02 * tyScale(), w, H * .0235 * tyScale(), 'center', draw); }); });
         return y;
       };
       // The panel runs from the top to near the bottom of the sidebar (further only if very long wording needs it).
@@ -3305,7 +3383,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
         const { k } = canvaFit(W, H);
         [['keyActions', 112.27, 171.2, 249], ['keySymbols', 427.5, 171.2, 568.8], ['keyEmotions', 110.51, 597.9, 249.2], ['keyScriptures', 427.5, 597.9, 571]].forEach(([id, l, top, lx]) => {
           ctx.fillStyle = readingPanel(p, s); ctx.fillRect(cX(W, H, l), cY(W, H, top), 277.47 * k, 392.83 * k);
-          canvaText(ctx, W, H, T(s, id), { cx: lx, top: top + (id === 'keyEmotions' || id === 'keyScriptures' ? 21 : 0), h: 41.5, size: 35.17, color: p.plate, shadow: true, s, fitW: 260, id, lines: 2 });
+          withRole(ctx, s, 'boxHeadings', () => canvaText(ctx, W, H, T(s, id), { cx: lx, top: top + (id === 'keyEmotions' || id === 'keyScriptures' ? 21 : 0), h: 41.5, size: 35.17, color: p.plate, shadow: true, s, fitW: 260, id, lines: 2 }));
         });
         return;
       }
@@ -3314,7 +3392,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
         const x = W * fx, y = H * fy, w = W * .335, h = H * .37;
         if (isFloral) { ctx.fillStyle = readingSurface(p); roundRect(ctx, x, y, w, h, W * .012); ctx.fill(); ctx.strokeStyle = p.plate; ctx.lineWidth = Math.max(1.5, W * .0028); ctx.stroke(); }
         else { ctx.strokeStyle = soft; ctx.lineWidth = Math.max(1.5, W * .003); ctx.strokeRect(x, y, w, h); }
-        ctx.fillStyle = isFloral ? p.plate : label; ctx.font = font(H * .024); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; fillFit(ctx, s, id, T(s, id), x + w / 2, y + H * .042, w * .9, { lines: 2 });
+        ctx.fillStyle = isFloral ? p.plate : label; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; withRole(ctx, s, 'boxHeadings', () => { ctx.font = font(H * .024); fillFit(ctx, s, id, T(s, id), x + w / 2, y + H * .042, w * .9, { lines: 2 }); });
         // A single small sprig peeking from each box's right edge, sized to stay clear of the neighbouring box.
         if (isFloral && ASSETS.floralHeader) {
           const sw = w * .22, sh = sw * .9, sx = x + w - sw * .45, sy = y + h * .58 - sh / 2;
@@ -3520,20 +3598,21 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     // On a title plate the lettering takes the plate's lettering color, like the Dream cover.
     const role = LETTER_ROLE[name];
     const isTitle = !!LETTER_TEXT[name], customTitle = isTitle && s.coverFontColorAuto === false, customInk = role === 'ink' && s.textColorAuto === false;
-    const color = letterColor(s, name, onPlate);
+    const color = (TY && TY.color) || letterColor(s, name, onPlate);
     // Real type in the artwork's own box: cover titles in Custom font, and any lettering whose wording was edited (the
     // artwork can only say its original words). Titles use the cover font; labels and headings use the heading font.
     const slot = LETTER_SLOT[name];
-    if ((s.titleStyle === 'custom' && isTitle) || (slot && textEdited(s, slot))) {
+    const typed = TY && (TY.font || TY.size !== 100);           // a page/section font or size: set this lettering as type
+    if ((s.titleStyle === 'custom' && isTitle) || (slot && textEdited(s, slot)) || typed) {
       const text = slot ? T(s, slot) : LETTER_TEXT[name], orig = slot ? textSlot(s.journal, slot)?.text ?? text : text;
-      const fam = isTitle ? s.coverFont : (s.headingFont || s.bodyFont), scale = (isTitle ? s.coverFontScale : s.headingFontScale) / 100;
+      const fam = tyFam(isTitle ? s.coverFont : (s.headingFont || s.bodyFont)), scale = (isTitle ? s.coverFontScale : s.headingFontScale) / 100 * tyScale();
       typesetInBox(ctx, s, slot, text, ox + l * k, oy + t * k, w * k, h * k, fam, color, scale, { orig, growLeft: (LETTER_GROW[name]?.left || 0) * k, growUp: (LETTER_GROW[name]?.up || 0) * k, designLines: LETTER_GROW[name]?.lines || 1 });
       return;
     }
     const key = `lt:${name}`, img = ASSETS[key];
     if (!img) { ensureAsset(key).catch(() => {}); return; }
     // Recolor keeps each pixel's light/dark relative to the lettering (its soft shadow and any gradient stay), unlike a flat tint.
-    const src = s.prayerArt === 'palette' || onPlate || customTitle || customInk ? prRecolor(img, w * k, h * k, (i, a, b) => colorize(i, a, b, color)) : img;
+    const src = s.prayerArt === 'palette' || onPlate || customTitle || customInk || (TY && TY.color) ? prRecolor(img, w * k, h * k, (i, a, b) => colorize(i, a, b, color)) : img;
     ctx.drawImage(src, ox + l * k, oy + t * k, w * k, h * k);
   }
   // Live text in a Canva text box (Canva px), wrapped to its width. Returns nothing; used for editable copy.
@@ -3541,8 +3620,8 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   // maxLines: a wrapped block that must stay within that many lines at its designed size (shrinks, then is flagged).
   function prText(ctx, W, H, s, text, { l, t, w, size, color, italic = false, align = 'center', lh = 1.4, family = 'body', valign = null, fitW = 0, onBox = false, maxW = 0, maxLines = 0, id = null }) {
     if (family === 'body' && !onBox) color = bodyInk(s, color);
-    const { k, ox, oy } = prFit(W, H), scale = (family === 'head' ? s.headingFontScale : s.bodyFontScale) / 100;
-    const fam = family === 'head' ? (s.headingFont || s.bodyFont) : s.bodyFont;
+    const { k, ox, oy } = prFit(W, H), scale = (family === 'head' ? s.headingFontScale : s.bodyFontScale) / 100 * tyScale();
+    const fam = tyFam(family === 'head' ? (s.headingFont || s.bodyFont) : s.bodyFont);
     let px = size * k * scale;
     const setFont = () => { ctx.font = `${italic ? 'italic ' : ''}400 ${px}px "${fam}", Georgia, serif`; };
     ctx.save(); ctx.fillStyle = color; setFont();
@@ -3679,7 +3758,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     const box = (i) => {
       const b = PINK_SUG[i];
       if (!prOff(s, 'pills')) prRect(ctx, W, H, b.pill, p.plate, { alpha: .12, radius: PILL_R, stroke: p.plate, strokeW: 2 });
-      prText(ctx, W, H, s, tips[i], { l: b.text[0], t: b.text[1], w: b.text[2], size: 25.11, color: prInk(p), valign: labels ? [b.pill[1] + 36, b.pill[1] + b.pill[3] - 12] : null });
+      withRole(ctx, s, 'bodyText', () => prText(ctx, W, H, s, tips[i], { l: b.text[0], t: b.text[1], w: b.text[2], size: 25.11, color: prInk(p), valign: labels ? [b.pill[1] + 36, b.pill[1] + b.pill[3] - 12] : null }));
     };
     const label = (i) => {
       const [kind, l, t, w, h] = PINK_SUG[i].label;
@@ -3690,7 +3769,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     // Same stacking order as the Canva page.
     box(2); drawPr(ctx, W, H, s, PINK.sugWashes);
     box(0); label(2); label(0); box(1); label(1);
-    drawLetter(ctx, W, H, s, 'pink-journaling'); drawLetter(ctx, W, H, s, 'pink-suggestions');
+    withRole(ctx, s, 'pageTitle', () => { drawLetter(ctx, W, H, s, 'pink-journaling'); drawLetter(ctx, W, H, s, 'pink-suggestions'); });
   }
   function pinkLetter(ctx, W, H, s) {
     const p = s.palette;
@@ -3698,10 +3777,10 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     drawPr(ctx, W, H, s, PINK.letterA);
     prRect(ctx, W, H, [-27.46, -75.41, 870.93, 204], p.paper);                 // paper band that keeps the header clear
     drawPr(ctx, W, H, s, PINK.letterB);
-    drawLetter(ctx, W, H, s, 'pink-dear'); prLine(ctx, W, H, 132.16, 84.26, 299.96, 84.26, p.line, 1.79);
-    drawLetter(ctx, W, H, s, 'pink-date'); prLine(ctx, W, H, 684.36, 83.68, 784.44, 83.68, p.line, 2);
+    withRole(ctx, s, 'recurringLabels', () => drawLetter(ctx, W, H, s, 'pink-dear')); prLine(ctx, W, H, 132.16, 84.26, 299.96, 84.26, p.line, 1.79);
+    withRole(ctx, s, 'recurringLabels', () => drawLetter(ctx, W, H, s, 'pink-date')); prLine(ctx, W, H, 684.36, 83.68, 784.44, 83.68, p.line, 2);
     drawPr(ctx, W, H, s, PINK.letterC);
-    prText(ctx, W, H, s, T(s, 'letterFooter'), { l: 57.1, t: 998.16, w: 701.8, size: 17.54, color: p.plate, italic: true, lh: 1.2, maxLines: 2, id: 'letterFooter' });
+    withRole(ctx, s, 'footerText', () => prText(ctx, W, H, s, T(s, 'letterFooter'), { l: 57.1, t: 998.16, w: 701.8, size: 17.54, color: p.plate, italic: true, lh: 1.2, maxLines: 2, id: 'letterFooter' }));
     for (const y of PINK_LINES) prLine(ctx, W, H, 0, y + .68, 924, y + .68, p.line, 1.35);
   }
 
@@ -3738,7 +3817,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     PW_LINES.forEach((y, i) => prLine(ctx, W, H, i < 2 ? [-48.07, -30.12][i] : -11.37, y + .5, 865, y + .5, p.line, 1, .27));
     if (side === 'L') { prRect(ctx, W, H, [-195.14, -41.33, 244.8, 1124.08], p.stone); drawPr(ctx, W, H, s, [PW.stripL]); }
     else drawPr(ctx, W, H, s, [PW.stripR]);
-    drawLetter(ctx, W, H, s, 'pw-date');
+    withRole(ctx, s, 'recurringLabels', () => drawLetter(ctx, W, H, s, 'pw-date'));
   }
   function pwBelongs(ctx, W, H, s) {
     const p = s.palette;
@@ -3845,7 +3924,9 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     canvas.width = W; canvas.height = H;
     const cover = type === 'cover' || type === 'back';
     const shift = cover ? 0 : Math.round(W * BIND_SHIFT_PT / PAGE_W) * (side === 'right' ? -1 : 1);
-    composeBleed(canvas.getContext('2d'), trim, Math.round((W - trim.width) / 2) + shift, Math.round((H - trim.height) / 2));
+    const x0 = Math.round((W - trim.width) / 2) + shift, y0 = Math.round((H - trim.height) / 2);
+    if (s._typoProbe) s._typoProbe.offset = [x0, y0];
+    composeBleed(canvas.getContext('2d'), trim, x0, y0);
   }
   // Draws the design at (x0, y0) and fills the bleed around it by mirroring the design's own edges outward, so marble,
   // bars and background art run seamlessly past the trim (and past the binding gap left by the shift).
@@ -4076,11 +4157,14 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   }
   // "Recommended for this design": the background's own palette, then palettes made for this kind of design, then the
   // ones the engine arranges best here (at most 8; your own palettes stay in their own group).
+  // Sydni's picks: palettes that look right on this kind of design (listed right after the background's own palette).
+  const PALETTE_PICKS = { marble: ['Gold Leaf', 'Teal + Coral', 'Sage & Honey', 'Burgundy Cream', 'Blush Lavender'] };
   function recommendedPalettes(list, design) {
-    const own = paletteByName(recommendedName()), pool = list.filter((pl) => !customPals().includes(pl));
-    const scored = pool.map((pl, i) => ({ pl, i, ...paletteFit(pl, design) })).filter((x) => x.home || x.valid >= 2);
-    scored.sort((a, b) => (b.pl === own) - (a.pl === own) || b.home - a.home || b.valid - a.valid || a.i - b.i);
-    return scored.slice(0, 8).map((x) => x.pl);
+    const own = paletteByName(recommendedName()), pool = list.filter((pl) => !customPals().includes(pl)), picks = PALETTE_PICKS[design] || [];
+    const pick = (pl) => { const i = picks.indexOf(pl.name); return i < 0 ? 99 : i; };
+    const scored = pool.map((pl, i) => ({ pl, i, ...paletteFit(pl, design) })).filter((x) => x.home || x.valid >= 2 || pick(x.pl) < 99);
+    scored.sort((a, b) => (b.pl === own) - (a.pl === own) || pick(a.pl) - pick(b.pl) || b.home - a.home || b.valid - a.valid || a.i - b.i);
+    return scored.slice(0, 8 + Math.min(4, picks.length)).map((x) => x.pl);
   }
 
   // Palette cards: a crisp swatch strip and the name (no tiny cover renders). The selected palette gets a larger detail
@@ -4429,6 +4513,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       : 'The plate is sized to cover the lettering printed in this bouquet artwork.';
     syncTitleFill();
     syncReadingPanel();
+    syncPageTypo();
     $('coverFontNote').textContent = state.titleStyle === 'custom' ? '' : '(used when Cover lettering = Custom font)';
     $('shadowVal').textContent = state.titleShadow + '%';
     $('accentVal').textContent = state.accentOpacity + '%';
@@ -4487,8 +4572,8 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     if (!ready) return;
     cancelAnimationFrame(raf);
     raf = requestAnimationFrame(() => {
-      const base = comparing ? { ...state, palette: { ...(paletteByName(recommendedName()) || DEFAULTS.palette) }, prayerArt: 'original', bgArt: 'original' } : state;
-      const s = { ...base, _warn: new Set(), _probe: {} };  // text slots too long for their layout; title readability
+      const base = comparing ? { ...state, palette: { ...(paletteByName(recommendedName()) || DEFAULTS.palette) }, prayerArt: 'original', bgArt: 'original', typography: {} } : state;
+      const s = { ...base, _warn: new Set(), _probe: {}, _typoProbe: comparing ? null : { boxes: [], offset: [0, 0] } };  // text slots too long for their layout; title readability
       // Render at the screen's actual pixel density (capped at 2x) so photographic art like the
       // Floral cover stays crisp instead of being upscaled/blurred by the browser on retina displays.
       // The CSS box is governed purely by this width:height ratio plus max-width/max-height (both still
@@ -4496,7 +4581,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       // dimensions together under max-height and the page distorts.
       const dpr = Math.min(2, window.devicePixelRatio || 1);
       const type = currentType(), side = bindingSide(insideNumber(state, state.page));
-      try { renderPage(canvas, Math.round(760 * dpr), s, type, side); if (state.showGuides) drawGuides(canvas, type, side); }
+      try { renderPage(canvas, Math.round(760 * dpr), s, type, side); if (!comparing) showTypoWarnings(typoContrast(canvas, s._typoProbe)); if (state.showGuides) drawGuides(canvas, type, side); }
       catch (e) { console.error(e); showBlocked(e); }
       showTextWarnings(s._warn);
       if (!comparing && currentType() === 'cover') showContrastWarning(s._probe);
@@ -4625,6 +4710,109 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   $('titleFillCustom').oninput = (e) => setTitleFill({ custom: e.target.value, color: 'custom' });
   $('titleFillOpacity').oninput = (e) => setTitleFill({ opacity: Number(e.target.value) });
   document.querySelectorAll('#titleFillPad button').forEach((b) => b.onclick = () => setTitleFill({ pad: b.dataset.pad }));
+
+  // ---------- Page settings: per-page / per-section typography ----------
+  const TYPO_COLORS = [['', 'Journal default'], ['palette:title', 'Palette · lettering'], ['palette:plate', 'Palette · plate'], ['palette:frame', 'Palette · frame'],
+    ['palette:trim', 'Palette · gold / trim'], ['palette:stone', 'Palette · stone'], ['palette:highlight', 'Palette · highlight'], ['custom', 'Custom color']];
+  let typoKeyShown = '';
+  const typoPage = () => typoKey(currentType());
+  const typoOf = (role) => state.typography?.[state.journal]?.[typoPage()]?.[role] || {};
+  function setTypo(role, patch) {
+    const j = state.journal, pk = typoPage(), cur = { ...typoOf(role), ...patch };
+    if (!cur.font) delete cur.font;
+    if (!cur.color) delete cur.color;
+    if (cur.size == null || cur.size === 100) delete cur.size;
+    const jt = { ...(state.typography[j] || {}) }, pg = { ...(jt[pk] || {}) };
+    if (Object.keys(cur).length) pg[role] = cur; else delete pg[role];
+    if (Object.keys(pg).length) jt[pk] = pg; else delete jt[pk];
+    state.typography = { ...state.typography, [j]: jt };
+    if (cur.font) ensureFont(cur.font).then(() => scheduleRedraw());
+    commit(false);
+  }
+  function buildPageTypo() {
+    const type = currentType(), pk = typoKey(type), roles = TYPO_PAGES[pk], box = $('pageTypoFields');
+    typoKeyShown = `${state.journal}|${pk}`;
+    const guide = pk === 'pwGuide';
+    $('pageTypoCard').classList.toggle('hidden', !roles && !guide);
+    $('pageTypoName').textContent = PAGE_LABELS[type] || '';
+    box.innerHTML = '';
+    $('pageTypoReset').classList.toggle('hidden', !roles);
+    $('pageTypoNote').textContent = guide ? 'The wording on this page is part of its Canva artwork, so it has no separate text settings.'
+      : 'Fonts, colors and sizes for the text on this page only. Anything on “Journal default” follows Typography.';
+    if (!roles) return;
+    const fonts = [...$('bodyFont').options].map((o) => [o.value, o.textContent]);
+    [['_page', 'All text on this page', 'page'], ...roles].forEach(([role, label, fam]) => {
+      const sec = document.createElement('div'); sec.className = 'typo-sec'; sec.dataset.role = role;
+      const def = fam === 'head' ? (state.headingFont || state.bodyFont) : fam === 'body' ? state.bodyFont : 'each section’s own';
+      sec.innerHTML = `<div class="head"><div><strong>${label}</strong>${role === '_page' ? '' : `<small class="hint" style="display:block">Default font: ${def}</small>`}</div><button class="btn reset" type="button">${role === '_page' ? 'Clear' : 'Use journal default'}</button></div>
+        <div class="row2"><label class="field"><span>Font</span><select data-k="font"><option value="">Journal default</option>${fonts.map(([v, n]) => `<option value="${v}">${n}</option>`).join('')}</select></label>
+        <label class="field"><span>Color</span><select data-k="color">${TYPO_COLORS.map(([v, n]) => `<option value="${v}">${n}</option>`).join('')}</select></label></div>
+        <label class="field custom-row"><span>Custom color</span><input type="color" data-k="hex"></label>
+        <label class="slider"><span>Size <b></b></span><input type="range" min="60" max="160" step="5" data-k="size"></label>
+        <span class="hint warn hidden"></span>`;
+      sec.querySelector('.reset').onclick = () => { setTypo(role, { font: '', color: null, size: 100 }); };
+      sec.querySelector('[data-k=font]').onchange = (e) => setTypo(role, { font: e.target.value });
+      sec.querySelector('[data-k=color]').onchange = (e) => {
+        const v = e.target.value;
+        setTypo(role, { color: !v ? null : v === 'custom' ? { mode: 'custom', hex: typoOf(role).color?.hex || sec.querySelector('[data-k=hex]').value || '#2A1A18' } : { mode: 'palette', role: v.split(':')[1] } });
+      };
+      sec.querySelector('[data-k=hex]').oninput = (e) => setTypo(role, { color: { mode: 'custom', hex: e.target.value } });
+      sec.querySelector('[data-k=size]').oninput = (e) => { sec.querySelector('.slider b').textContent = `${e.target.value}%`; setTypo(role, { size: Number(e.target.value) }); };
+      box.appendChild(sec);
+    });
+    syncPageTypo();
+  }
+  function syncPageTypo() {
+    if (typoKeyShown !== `${state.journal}|${typoPage()}`) { buildPageTypo(); return; }
+    document.querySelectorAll('#pageTypoFields .typo-sec').forEach((sec) => {
+      const o = typoOf(sec.dataset.role), c = o.color;
+      sec.querySelector('[data-k=font]').value = o.font || '';
+      sec.querySelector('[data-k=color]').value = !c ? '' : c.mode === 'custom' ? 'custom' : `palette:${c.role}`;
+      sec.querySelector('[data-k=hex]').value = c?.mode === 'custom' ? c.hex : (c ? state.palette[c.role] : '#2A1A18') || '#2A1A18';
+      sec.querySelector('.custom-row').classList.toggle('hidden', c?.mode !== 'custom');
+      const sz = o.size ?? 100; sec.querySelector('[data-k=size]').value = sz; sec.querySelector('.slider b').textContent = `${sz}%`;
+      sec.querySelector('.reset').disabled = !Object.keys(o).length;
+    });
+  }
+  $('pageTypoReset').onclick = () => {
+    const j = state.journal, jt = { ...(state.typography[j] || {}) };
+    delete jt[typoPage()];
+    state.typography = { ...state.typography, [j]: jt };
+    commit(false);
+  };
+  // Section contrast: how much of what sits behind each section's lettering (sampled from the rendered preview) is
+  // under 3:1 (titles, headings, labels) or 4.5:1 (body text) against its color. Warning only — colors are never changed.
+  function typoContrast(c, probe) {
+    const out = {};
+    if (!probe || !probe.boxes.length) return out;
+    const ctx = c.getContext('2d'), [ox, oy] = probe.offset;
+    const lum = (r, g, b) => { const f = (v) => { v /= 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; }; return .2126 * f(r) + .7152 * f(g) + .0722 * f(b); };
+    const head = new Set((TYPO_PAGES[typoPage()] || []).filter(([, , f]) => f === 'head').map(([r]) => r).concat(['pageTitle', 'legendHeading', 'questionsHeading', 'dreamTypeHeading', 'involvementHeading', 'boxHeadings', 'recurringLabels', 'brainstormBand', 'fieldLabels', 'legendText', 'columnHeadings']));
+    for (const { role, color, box } of probe.boxes) {
+      const m = /^#([0-9a-f]{6})$/i.exec(color) || null, rgb = m ? [0, 2, 4].map((i) => parseInt(m[1].slice(i, i + 2), 16)) : (color.match(/\d+(\.\d+)?/g) || []).slice(0, 3).map(Number);
+      if (rgb.length < 3) continue;
+      // What sits behind the lettering: a ring just outside its box (inside the box it is mostly the letters themselves).
+      const pad = Math.max(2, (box[3] - box[1]) * .35);
+      const x = Math.max(0, Math.floor(box[0] + ox - pad)), y = Math.max(0, Math.floor(box[1] + oy - pad));
+      const w = Math.min(c.width - x, Math.ceil(box[2] - box[0] + 2 * pad)), h = Math.min(c.height - y, Math.ceil(box[3] - box[1] + 2 * pad));
+      if (w < 3 || h < 3) continue;
+      const d = ctx.getImageData(x, y, w, h).data, L = lum(...rgb), min = head.has(role) ? 3 : 4.5, o = out[role] ||= { bg: 0, low: 0 };
+      const ix0 = box[0] + ox - x, iy0 = box[1] + oy - y, ix1 = box[2] + ox - x, iy1 = box[3] + oy - y;
+      for (let py = 0; py < h; py += 2) for (let px = 0; px < w; px += 2) {
+        if (px >= ix0 && px <= ix1 && py >= iy0 && py <= iy1) continue;
+        const i = (py * w + px) * 4, l2 = lum(d[i], d[i + 1], d[i + 2]), cr = (Math.max(L, l2) + .05) / (Math.min(L, l2) + .05);
+        o.bg++; if (cr < min) o.low++;
+      }
+    }
+    return out;
+  }
+  function showTypoWarnings(res) {
+    document.querySelectorAll('#pageTypoFields .typo-sec').forEach((sec) => {
+      const r = res[sec.dataset.role], el = sec.querySelector('.warn'), low = r && r.bg > 40 && r.low / r.bg > .35;
+      el.classList.toggle('hidden', !low);
+      if (low) el.textContent = `Low contrast: ${Math.round(r.low / r.bg * 100)}% of what’s behind this text is hard to read against its color. Try a darker or lighter color, or a reading panel.`;
+    });
+  }
 
   // ---------- Reading panel controls (Brainstorm + questions) ----------
   let panelPage = 'brainstormQ';
@@ -4836,7 +5024,8 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     const name = (JOURNALS[state.journal] || JOURNALS.dream).name;
     if (!confirm(`Start over on the ${name}?\n\nColors, lettering, wording, fonts, pieces and page settings go back to the original design. Your saved palettes and uploaded elements are kept, and “Go back” can still undo this.`)) return;
     flushHistory();
-    const keep = { customPalettes: state.customPalettes, journal: state.journal, looks: { ...state.looks }, text: { ...state.text }, lookV2: true, lookV3: true };
+    const keep = { customPalettes: state.customPalettes, journal: state.journal, looks: { ...state.looks }, text: { ...state.text }, typography: { ...state.typography }, lookV2: true, lookV3: true };
+    delete keep.typography[state.journal];
     delete keep.looks[state.journal];
     delete keep.text[state.journal];
     state = { ...structuredClone(DEFAULTS), ...keep };
@@ -5012,7 +5201,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   $('showGuides').onchange = (e) => { state.showGuides = e.target.checked; commit(false, false); };
 
   // ?debug exposes the renderers for visual QA (preview vs. export comparisons); off in normal use.
-  if (new URLSearchParams(location.search).has('debug')) window.__studio = { palettesFor, paletteVariations, designType, paletteFit, recommendedPalettes, PALETTE_HOME, renderCover, renderPage, renderDesign, pageList, insideNumber, bindingSide, titleContrast, get state() { return state; }, commit, TITLE_PLATE_STYLES };
+  if (new URLSearchParams(location.search).has('debug')) window.__studio = { sectionStyle, TYPO_PAGES, palettesFor, paletteVariations, designType, paletteFit, recommendedPalettes, PALETTE_HOME, renderCover, renderPage, renderDesign, pageList, insideNumber, bindingSide, titleContrast, get state() { return state; }, commit, TITLE_PLATE_STYLES };
   if (location.protocol === 'file:') { showBlocked(); return; }
   // Controls that only apply to the Dream Journal's modular cover/interior are hidden for the prayer journals.
   // Title plate, lettering, accents and decorations work on every journal; the Dream-only pieces (its preset designs,
