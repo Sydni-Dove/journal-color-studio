@@ -52,10 +52,12 @@ describe("Studio home", () => {
       const page = await home([], vp);
       await expect(page.locator("h1").textContent()).resolves.toBe("Dove Expressions Product Studio");
       await expect(page.getByText("Your studio is ready").count()).resolves.toBe(1);
-      await expect(page.locator("button.family-card").count()).resolves.toBe(7);
+      await expect(page.locator("button.family-card").count()).resolves.toBe(9);
+      await expect(page.locator("button.family-card", { hasText: "Daily Planner" }).count()).resolves.toBe(1);
+      await expect(page.getByRole("button", { name: /Start a daily planner/ }).count()).resolves.toBe(1);
       // Families without a foundation are shown, never clickable.
       const next = page.locator(".family-card--next");
-      await expect(next.count()).resolves.toBe(3);
+      await expect(next.count()).resolves.toBe(1);
       await expect(next.evaluateAll((els) => els.every((e) => e.tagName !== "BUTTON" && !e.querySelector("button, a")))).resolves.toBe(true);
       await expect(page.getByText("Open your latest project").count()).resolves.toBe(0);
       expect(await overflow(page)).toBeLessThanOrEqual(0);
@@ -88,6 +90,25 @@ describe("Studio home", () => {
     await page.waitForSelector("#wizard-build");
     await expect(page.locator('button.choice[aria-pressed="true"]', { hasText: /Meetings With God/ }).count()).resolves.toBe(1);
     await expect(page.locator('button.choice[aria-pressed="true"]', { hasText: /^Planner$/ }).count()).resolves.toBe(1);
+    await page.context().close();
+  });
+
+  it("Devotional → SOAP → 6 × 9 → Generate: a print-ready page with no measuring, customizable by semantic controls", async () => {
+    const page = await home([], DESKTOP);
+    await page.locator("button.family-card", { hasText: "Devotional" }).click();
+    await page.waitForSelector("#wizard-build");
+    await expect(page.locator('button.choice[aria-pressed="true"]', { hasText: /^Devotional$/ }).count()).resolves.toBe(1);
+    await page.locator("label.field", { hasText: "Trim size" }).locator("select").selectOption("6x9");
+    await page.locator("button.choice", { hasText: /^SOAP$/ }).click();
+    await page.getByRole("button", { name: "Generate" }).click();
+    await page.waitForSelector(".ps-page--editor");
+    await expect(page.locator(".badge").first().textContent()).resolves.toBe("Page OK");
+    const sections = page.locator("details.section", { has: page.locator(":scope > summary", { hasText: /^Page sections$/ }) });
+    await expect(sections.locator('[data-section="prayer"]').count()).resolves.toBe(1);
+    // No raw measurements among the section controls.
+    await expect(sections.locator('input[type="number"]').count()).resolves.toBe(0);
+    await sections.locator('[data-section="prayer"]').getByRole("button", { name: "More" }).click();
+    await expect(page.locator(".badge").first().textContent()).resolves.toBe("Page OK");
     await page.context().close();
   });
 

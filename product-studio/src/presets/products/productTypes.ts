@@ -76,6 +76,16 @@ export const PRODUCT_TYPES: Record<ProductType, ProductTypeDefinition> = {
     defaultPrintProfile: "generic-commercial",
     suggestedSizes: ["8.5x11", "a4", "5.5x8.5"],
   },
+  devotional: {
+    id: "devotional",
+    label: "Devotional",
+    description: "Daily Reflection, SOAP and Verse Mapping pages — Scripture with room to respond.",
+    capabilities: { supportsCalendar: false, supportsBinding: true, supportsPageRecipes: true, supportsRepeatedSheets: false, supportsMirroredPages: true, supportsPatterns: true, supportsSpreads: true },
+    defaultBinding: "perfect-bound",
+    allowedBindings: ["perfect-bound", "case-bound", "coil", "wire-o", "saddle-stitch", "discbound"],
+    defaultPrintProfile: "kdp",
+    suggestedSizes: ["6x9", "5.5x8.5", "7x9", "8.5x11", "a5", "8x10"],
+  },
   tracker: {
     id: "tracker",
     label: "Tracker",

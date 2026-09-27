@@ -11,6 +11,7 @@ import { DEBUG_ALL, DEBUG_LABELS, DEBUG_OFF, type DebugFlags } from "../debug/De
 import { GeometryInfo } from "../debug/GeometryInfo";
 import { ExportDialog, IssueList } from "../export/ExportDialog";
 import { PagePreview, visibleIndices } from "../preview/PagePreview";
+import { StationeryPanel } from "./StationeryPanel";
 import { BackgroundPanel, ColorPanel, DecorationPanel, LayoutPanel, PatternPanel, SpacingPanel, TextPlacementPanel, TypographyPanel, VariantsPanel, WordingPanel } from "./DesignPanels";
 import { PagesPanel, ProductPanel, ProductionPanel } from "./ProductionPanels";
 import { BookOutlinePanel, BookStructurePanel } from "./BookPanels";
@@ -120,6 +121,7 @@ export function Editor({ project, onChange, onBack, saveStatus }: Props) {
               {!doc.binding.sheetCountIsMetadata && <BookStructurePanel project={project} update={update} doc={doc} goToStep={nav.goToItem} />}
               {doc.recipe.pageCount > 1 && <BookOutlinePanel doc={doc} current={current} goTo={setIndex} />}
               <LayoutPanel nav={nav} project={project} update={update} usage={usage} />
+              <StationeryPanel project={project} update={update} usage={usage} />
               <PatternPanel nav={nav} project={project} update={update} usage={usage} />
               <SpacingPanel nav={nav} project={project} update={update} usage={usage} />
               {/* DESIGN: theme / palette → background → decorative elements → typography */}

@@ -26,7 +26,7 @@ export type SizePreset = {
 };
 
 const P: ProductType[] = ["planner", "insert", "worksheet", "tracker"];
-const BOOK: ProductType[] = ["journal", "notebook", "planner"];
+const BOOK: ProductType[] = ["journal", "notebook", "planner", "devotional"];
 const PAD: ProductType[] = ["notepad"];
 
 export const SIZE_PRESETS: SizePreset[] = [

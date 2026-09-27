@@ -198,6 +198,10 @@ export function ProjectList({ projects, meta, onStart, onOpen, onDuplicate, onDu
                 <strong>Start from a starter template</strong>
                 <span>Notepad, journal, monthly and weekly planner, desk pad.</span>
               </button>
+              <button type="button" className="quick-action" onClick={() => onStart({ type: "planner", recipeId: "book-daily-planner", section: "build" })}>
+                <strong>Start a daily planner</strong>
+                <span>A dated page for every day, with the month and week around it.</span>
+              </button>
               <button type="button" className="quick-action" onClick={() => onStart({ type: "planner", recipeId: "book-meetings-with-god", section: "build" })}>
                 <strong>Build a multi-section book</strong>
                 <span>Front matter, every month, every week, reviews.</span>

@@ -9,13 +9,14 @@ import { luxuryDailyExecution } from "./planner/dailyPlanner";
 import { monthlyCalendar } from "./planner/monthlyCalendar";
 import { weeklySpread } from "./planner/weeklySpread";
 import type { LayoutDefinition } from "./shared/types";
+import { STATIONERY_LAYOUTS } from "./stationery/stationeryLayout";
 
 /**
  * Layout registry. Milestone 1 ships the five geometry-proving layouts plus
  * the shared notes page (used as spread filler). The full template library
  * is Phase 6 — added only after these validate.
  */
-export const LAYOUTS: LayoutDefinition[] = [todoNotepad, groceryNotepad, linedJournal, notesPage, monthlyCalendar, weeklySpread, weeklyDeskPad, guidedPage, weeklyPlanMwgSpread, dailyPlanner, luxuryDailyExecution, dailyPlannerSheet];
+export const LAYOUTS: LayoutDefinition[] = [todoNotepad, groceryNotepad, linedJournal, notesPage, monthlyCalendar, weeklySpread, weeklyDeskPad, guidedPage, weeklyPlanMwgSpread, dailyPlanner, luxuryDailyExecution, dailyPlannerSheet, ...STATIONERY_LAYOUTS];
 
 export const FILLER_LAYOUT_ID = notesPage.id;
 

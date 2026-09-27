@@ -62,6 +62,11 @@ export type LayoutOptions = {
    * blank for the writer to fill in. Absent = printed.
    */
   scheduleTimes?: "printed" | "blank";
+  /**
+   * Stationery recipes: the creator's semantic customization per combo id
+   * (rename, hide optional sections, order, space). The recipe itself is never changed.
+   */
+  stationery?: Record<string, import("./stationery").StationeryCustomization>;
   /** Journal prompt text (guided pages). */
   promptText: string;
   /** User placement of semantic text (Week of, month title, Notes…). Absent = layout default. */

@@ -8,7 +8,7 @@ import type { FunctionalPattern, FunctionalPatternKind } from "../../types/theme
 import type { SpacingTokens, TypographySettings, Wording, WordingKey } from "../../types/tokens";
 import type { WeekStart } from "../../types/calendar";
 
-export type LayoutFamily = "planner" | "journal" | "notepad" | "deskpad" | "worksheet" | "tracker" | "shared";
+export type LayoutFamily = "planner" | "journal" | "devotional" | "notepad" | "deskpad" | "worksheet" | "tracker" | "shared";
 
 /**
  * Everything a layout solver may read. Solvers are pure functions of this

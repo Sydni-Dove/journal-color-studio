@@ -2,6 +2,28 @@ import type { ProductType } from "../../types/product";
 import type { ProductRecipe } from "../../types/recipe";
 import type { LayoutOptions } from "../../types/project";
 import { BOOK_PRESETS, dailyPlannerBook, meetingsWithGodBook } from "../bookRecipes";
+import { STATIONERY_RECIPES, stationeryLayoutId } from "../stationery/catalog";
+import type { StationeryRecipe } from "../../types/stationery";
+
+/** Product types each stationery family is offered in by the New Product flow. */
+const STATIONERY_PRODUCT_TYPES: Record<StationeryRecipe["family"], ProductType[]> = {
+  devotional: ["devotional"],
+  worksheet: ["worksheet"],
+  journal: ["journal"],
+  planner: ["planner"],
+};
+
+/** Every catalog recipe is a New Product choice: pick it, pick a trim, and the page is solved. */
+const STATIONERY_PRESETS: RecipePreset[] = STATIONERY_RECIPES.map((r) => ({
+  id: stationeryLayoutId(r.comboId),
+  label: r.label,
+  productTypes: STATIONERY_PRODUCT_TYPES[r.family],
+  needsCalendar: false,
+  build: ({ count }) => ({
+    items: [{ id: "page", layoutId: stationeryLayoutId(r.comboId), repeat: { kind: "count", count: Math.max(1, Math.round(count / r.pages.length)) } }],
+    ordering: "sequential",
+  }),
+}));
 
 /** Layout / page-recipe choices offered by the New Product flow per product type. */
 export type RecipePreset = {
@@ -126,6 +148,8 @@ export const RECIPE_PRESETS: RecipePreset[] = [
     layoutOptions: { showSidebar: true, sidebarContent: "priorities", sidebarWidthIn: 2.5 },
   },
 ];
+
+RECIPE_PRESETS.push(...STATIONERY_PRESETS);
 
 export function recipePresetsFor(t: ProductType): RecipePreset[] {
   const own = RECIPE_PRESETS.filter((r) => r.productTypes.includes(t));

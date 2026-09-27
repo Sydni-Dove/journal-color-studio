@@ -32,6 +32,20 @@ export const PRODUCT_FAMILIES: ProductFamily[] = [
     status: "ready",
     start: { type: "planner", recipeId: "book-daily-planner", section: "build" },
   },
+  {
+    id: "devotional",
+    label: "Devotional",
+    blurb: "Daily Reflection, SOAP and Verse Mapping — Scripture with room to respond, proportioned for your trim.",
+    status: "ready",
+    start: { type: "devotional", section: "build" },
+  },
+  {
+    id: "worksheet",
+    label: "Worksheet",
+    blurb: "Prompt worksheets, Reading Tracker and Prayer Log tables.",
+    status: "ready",
+    start: { type: "worksheet", section: "build" },
+  },
   { id: "journal", label: "Journal", blurb: "Lined, dot, graph and guided writing pages.", status: "ready", start: { type: "journal", section: "build" } },
   {
     id: "planner-journal",
@@ -43,7 +57,5 @@ export const PRODUCT_FAMILIES: ProductFamily[] = [
   { id: "notepad", label: "Notepad", blurb: "Tear-off pads: to-do, lists and notes.", status: "ready", start: { type: "notepad", section: "build" } },
   { id: "deskpad", label: "Desk Pad", blurb: "Large-format weekly desk planners.", status: "ready", start: { type: "deskpad", section: "build" } },
   { id: "custom", label: "Custom Product", blurb: "Any size, binding and page sequence.", status: "ready", start: { section: "build" } },
-  { id: "devotional", label: "Devotional", blurb: "Daily scripture, reading, reflection and prayer.", status: "next", nextNote: "Template system next" },
   { id: "workbook", label: "Workbook", blurb: "Lessons with guided exercises and response space.", status: "next", nextNote: "Template system next" },
-  { id: "worksheet", label: "Worksheet", blurb: "Single guided sheets and printables.", status: "next", nextNote: "Layout research next" },
 ];

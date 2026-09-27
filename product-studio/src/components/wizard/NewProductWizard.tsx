@@ -38,7 +38,7 @@ function Choices<T extends string>({ value, options, onChange }: { value: T; opt
   );
 }
 
-const PRODUCT_ORDER: ProductType[] = ["notepad", "journal", "planner", "deskpad", "notebook", "insert", "worksheet", "tracker"];
+const PRODUCT_ORDER: ProductType[] = ["notepad", "journal", "planner", "devotional", "worksheet", "deskpad", "notebook", "insert", "tracker"];
 const nextYear = new Date().getFullYear() + 1;
 
 export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: ProductProject) => void; onCancel: () => void; start?: WizardStart }) {
@@ -77,6 +77,8 @@ export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: 
     setProfileId(d.defaultPrintProfile);
     setRecipeId(recipePresetsFor(t)[0].id);
     setSheets(t === "deskpad" ? STUDIO_PAD.deskPadSheets : STUDIO_PAD.defaultSheets);
+    // Worksheets are single printables; devotionals default to a 90-day book.
+    setCount(t === "worksheet" ? 1 : t === "devotional" ? 90 : 120);
   };
 
   // Arriving from a product family / quick action: apply its type's defaults, its page structure, and scroll to the step.
@@ -120,7 +122,8 @@ export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: 
     return bad && !bad.ok ? bad.reason : null;
   };
   const recipeProblem = recipeFit(recipe);
-  const needsCount = recipe.id === "journal-lined" || recipe.id === "planner-monthly-weekly";
+  const stationery = recipe.id.startsWith("stationery:");
+  const needsCount = recipe.id === "journal-lined" || recipe.id === "planner-monthly-weekly" || stationery;
 
   const generate = () => {
     const sizeLabel = sizeId === CUSTOM_SIZE_ID ? `${custom.width}×${custom.height}${custom.unit}` : sizes.find((s) => s.id === sizeId)?.label ?? sizeId;
@@ -238,7 +241,8 @@ export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: 
               </Field>
             </div>
           )}
-          {recipe.id === "journal-lined" && <NumberField label="Pages" step={1} min={1} value={count} onChange={(c) => setCount(Math.max(1, Math.round(c)))} />}
+          {(recipe.id === "journal-lined" || stationery) && <NumberField label="Pages" step={1} min={1} value={count} onChange={(c) => setCount(Math.max(1, Math.round(c)))} />}
+          {stationery && <p className="hint">Margins, section heights, writing lines and table columns are solved from the trim — nothing to measure.</p>}
           {isPad && (
             <Field label="Sheets per pad">
               <select value={sheets} onChange={(e) => setSheets(+e.target.value)}>

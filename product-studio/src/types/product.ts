@@ -6,6 +6,7 @@ export type ProductType =
   | "deskpad"
   | "insert"
   | "worksheet"
+  | "devotional"
   | "tracker"
   | "custom";
 
