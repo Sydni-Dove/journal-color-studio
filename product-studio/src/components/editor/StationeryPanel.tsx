@@ -1,99 +1,84 @@
 /**
- * STATIONERY SECTIONS — semantic customization of a catalog recipe:
- * rename, remove optional sections, reorder, and give a section Less / Standard
- * / More space (or make every section equal). No raw measurements: the
- * geometry layer turns these choices into valid dimensions for the trim, and
- * a choice that cannot fit is reported, never squeezed.
+ * PAGE SECTIONS — a catalog recipe's content: its title, optional fixed rows
+ * (the date line) and its prompts, edited with the shared prompt editor
+ * (PromptEditor: number of prompts, wording, writing lines, answer area).
+ * No raw measurements: the layout engine turns these choices into a page that
+ * fits the trim, continuing on another page rather than cramping the writing.
  */
 import type { ProjectUsage } from "../../engines/document/usage";
-import { effectiveZones } from "../../engines/stationery/geometry";
-import { getStationeryRecipe } from "../../presets/stationery/catalog";
-import { variantStructure } from "../../layouts/stationery/stationeryLayout";
+import { solvePage, type ResolvedDocument } from "../../engines/document/resolve";
+import { getStationeryRecipe, stationeryLayoutId } from "../../presets/stationery/catalog";
+import { recipePromptSet, variantStructure } from "../../layouts/stationery/stationeryLayout";
 import type { ProductProject } from "../../types/project";
-import type { SectionSpace, StationeryCustomization, StationeryRecipe } from "../../types/stationery";
-import { Field, Section, Segmented } from "./ui";
+import type { StationeryCustomization, StationeryRecipe } from "../../types/stationery";
+import { Field, Section } from "./ui";
 import { TechnicalDetails } from "../help/visuals";
+import { PromptEditor, type PromptFit } from "./PromptEditor";
 
 type Update = (fn: (p: ProductProject) => ProductProject) => void;
 
-const SPACE: { value: SectionSpace; label: string }[] = [
-  { value: "less", label: "Less" },
-  { value: "standard", label: "Standard" },
-  { value: "more", label: "More" },
-];
+/** How a recipe's prompts fit in this product: pages each time, and a plain message when they can't. */
+function recipeFit(doc: ResolvedDocument | null, comboId: string): PromptFit | undefined {
+  if (!doc) return undefined;
+  const i = doc.recipe.pages.findIndex((p) => p.layoutId === stationeryLayoutId(comboId));
+  if (i < 0) return undefined;
+  const pages = doc.recipe.pages[i].flowCount ?? 1;
+  const problem = [...Array(pages).keys()].flatMap((k) => solvePage(doc, i + k).diagnostics).find((d) => d.rule === "prompt-fit")?.message;
+  return { pages, problem };
+}
 
-function RecipeSections({ recipe, custom, set }: { recipe: StationeryRecipe; custom: StationeryCustomization; set: (c: StationeryCustomization) => void }) {
+function RecipeSections({ recipe, custom, set, fit }: { recipe: StationeryRecipe; custom: StationeryCustomization; set: (c: StationeryCustomization) => void; fit?: PromptFit }) {
   const can = recipe.customization;
+  const hidden = new Set(custom.hidden ?? []);
   return (
     <div className="stationery-recipe" data-recipe={recipe.comboId}>
       <p className="hint">
         <strong>{recipe.label}</strong> — {recipe.description} Margins, section sizes and writing lines are worked out for this page size.
       </p>
-      {can.adjustSpace && (
-        <Segmented
-          label="Section space"
-          value={custom.balance ?? "recipe"}
-          options={[{ value: "recipe", label: "As designed" }, { value: "equal", label: "Equal sections" }]}
-          onChange={(balance) => set({ ...custom, balance: balance === "recipe" ? undefined : balance })}
-        />
+      {can.rename && recipe.pages[0].title && (
+        <Field label="Page title">
+          <input type="text" value={custom.title ?? custom.rename?.page0 ?? recipe.pages[0].title} onChange={(e) => set({ ...custom, title: e.target.value })} />
+        </Field>
       )}
       {recipe.pages.map((page, pi) => {
-        const shown = effectiveZones(page, pi, custom);
-        const flow = shown.filter((z) => z.surface !== "fill-in").map((z) => z.key);
-        const move = (key: string, d: -1 | 1) => {
-          const order = [...flow];
-          const i = order.indexOf(key), j = i + d;
-          if (j < 0 || j >= order.length) return;
-          [order[i], order[j]] = [order[j], order[i]];
-          const all = [...(custom.order ?? [])];
-          all[pi] = order;
-          set({ ...custom, order: all });
-        };
+        const fixedOptional = page.zones.filter((z) => z.surface === "fill-in" && z.optional);
+        const writing = page.zones.some((z) => z.surface !== "fill-in" && z.surface !== "table");
+        const promptSet = recipePromptSet(recipe, pi, custom);
         return (
-          <div key={pi} className="stationery-page">
-            {recipe.pages.length > 1 && <p className="hint">{pi === 0 ? "Left page" : "Right page"}</p>}
-            {page.zones.map((z) => {
-              const hidden = !!z.optional && (custom.hidden ?? []).includes(z.key);
-              const writing = z.surface !== "fill-in";
-              const i = flow.indexOf(z.key);
-              return (
-                <div key={z.key} className="stationery-section" data-section={z.key}>
-                  <div className="row">
-                    {z.optional ? (
-                      <label className="check">
-                        <input
-                          type="checkbox"
-                          checked={!hidden}
-                          onChange={(e) => set({ ...custom, hidden: e.target.checked ? (custom.hidden ?? []).filter((k) => k !== z.key) : [...(custom.hidden ?? []), z.key] })}
-                        />
-                        <span>{custom.rename?.[z.key] ?? (z.label || "Table")}</span>
-                      </label>
-                    ) : (
-                      <strong>{custom.rename?.[z.key] ?? (z.label || "Table")}</strong>
-                    )}
-                    {can.reorder && writing && !hidden && (
-                      <span className="order-buttons">
-                        <button type="button" className="btn" aria-label={`Move ${z.label} up`} disabled={i <= 0} onClick={() => move(z.key, -1)}>↑</button>
-                        <button type="button" className="btn" aria-label={`Move ${z.label} down`} disabled={i < 0 || i >= flow.length - 1} onClick={() => move(z.key, 1)}>↓</button>
-                      </span>
-                    )}
-                  </div>
-                  {!hidden && can.rename && z.label && (
-                    <Field label="Heading">
-                      <input type="text" value={custom.rename?.[z.key] ?? z.label} onChange={(e) => set({ ...custom, rename: { ...custom.rename, [z.key]: e.target.value } })} />
-                    </Field>
-                  )}
-                  {!hidden && can.editPrompts && z.surface === "prompt-response" && (
-                    <Field label="Prompt">
-                      <input type="text" value={custom.prompts?.[z.key] ?? z.prompt ?? ""} placeholder="Write the question or instruction" onChange={(e) => set({ ...custom, prompts: { ...custom.prompts, [z.key]: e.target.value } })} />
-                    </Field>
-                  )}
-                  {!hidden && can.adjustSpace && writing && custom.balance !== "equal" && (
-                    <Segmented label="Space" value={custom.space?.[z.key] ?? "standard"} options={SPACE} onChange={(v) => set({ ...custom, space: { ...custom.space, [z.key]: v } })} />
-                  )}
-                </div>
-              );
-            })}
+          <div key={pi} className="stationery-page" data-page={pi}>
+            {recipe.pages.length > 1 && <p className="field-label">{pi === 0 ? "Left page" : "Right page"}</p>}
+            {fixedOptional.map((z) => (
+              <label key={z.key} className="check" data-section={z.key}>
+                <input type="checkbox" checked={!hidden.has(z.key)} onChange={(e) => set({ ...custom, hidden: e.target.checked ? (custom.hidden ?? []).filter((k) => k !== z.key) : [...(custom.hidden ?? []), z.key] })} />
+                <span>{z.fields?.length ? `${z.fields.join(" / ")} line` : z.label}</span>
+              </label>
+            ))}
+            {page.zones.some((z) => z.surface === "table") && <p className="hint">The table's columns come from its design and fit the page automatically.</p>}
+            {writing && (
+              <PromptEditor
+                set={promptSet}
+                onChange={(next) => {
+                  const pages = [...(custom.promptPages ?? [])];
+                  pages[pi] = next;
+                  set({ ...custom, promptPages: pages });
+                }}
+                allowInstructions={recipe.family === "worksheet" && pi === 0}
+                fit={recipe.pages.length === 1 ? fit : undefined}
+              />
+            )}
+            {custom.promptPages?.[pi] && (
+              <button
+                type="button"
+                className="btn btn--ghost"
+                onClick={() => {
+                  const pages = [...(custom.promptPages ?? [])];
+                  pages[pi] = undefined;
+                  set({ ...custom, promptPages: pages });
+                }}
+              >
+                Go back to the original prompts
+              </button>
+            )}
           </div>
         );
       })}
@@ -101,7 +86,7 @@ function RecipeSections({ recipe, custom, set }: { recipe: StationeryRecipe; cus
   );
 }
 
-export function StationeryPanel({ project, update, usage }: { project: ProductProject; update: Update; usage: ProjectUsage }) {
+export function StationeryPanel({ project, update, usage, doc }: { project: ProductProject; update: Update; usage: ProjectUsage; doc: ResolvedDocument | null }) {
   const recipes = usage.layouts.map((l) => (l.layout.id.startsWith("stationery:") ? getStationeryRecipe(l.layout.id.slice("stationery:".length)) : undefined)).filter((r): r is StationeryRecipe => !!r);
   if (!recipes.length) return null;
   const all = project.layoutOptions.stationery ?? {};
@@ -120,7 +105,7 @@ export function StationeryPanel({ project, update, usage }: { project: ProductPr
             {fit && !fit.ok && (
               <div className="issue issue--error">
                 <div className="issue-title">This page doesn't have enough room at this size.</div>
-                <div className="issue-advice">Choose a larger page size, turn off an optional section, or give a section Less space.</div>
+                <div className="issue-advice">Choose a larger page size, use fewer prompts, or use fewer writing lines.</div>
                 <TechnicalDetails label="Show details">{fit.reason}</TechnicalDetails>
               </div>
             )}
@@ -129,7 +114,7 @@ export function StationeryPanel({ project, update, usage }: { project: ProductPr
                 <strong>Using the {v.label}.</strong> The full {r.label} page is not available at this size: with every section it would not leave enough room to write. The compact version keeps the most important sections and leaves out {left.join(" and ")}.
               </div>
             )}
-            <RecipeSections recipe={v ? variantStructure(r, v) : r} custom={all[r.comboId] ?? {}} set={setFor(r.comboId)} />
+            <RecipeSections recipe={v ? variantStructure(r, v) : r} custom={all[r.comboId] ?? {}} set={setFor(r.comboId)} fit={recipeFit(doc, r.comboId)} />
           </div>
         );
       })}

@@ -20,7 +20,19 @@ export type StationeryFamily = "planner" | "journal" | "devotional" | "worksheet
  * Writing surfaces a zone may request. Surfaces are rendered by one registry
  * (layouts/stationery/surfaces.ts), independent of any recipe.
  */
-export type SurfaceKind = "blank" | "lined" | "prompt-response" | "table" | "checkbox" | "fill-in" | "scripture" | "reflection" | "prayer";
+export type SurfaceKind =
+  | "blank"
+  | "lined"
+  | "prompt-response"
+  | "table"
+  | "checkbox"
+  | "fill-in"
+  | "scripture"
+  | "reflection"
+  | "prayer"
+  | "dot-grid"
+  /** The project's own writing style (ruled, dot grid, graph or blank): guided pages. */
+  | "pattern";
 
 /** A research table column: reference width in inches, scaled by the geometry layer to the page. */
 export type TableColumn = { key: string; label: string; referenceWidthIn: number };
@@ -57,6 +69,10 @@ export type StationeryZone = {
    * the recipe's design language.
    */
   treatment?: "framed" | "open" | "callout";
+  /** Prompt blocks: writing lines requested (undefined = share the page's free space). */
+  lines?: number;
+  /** Prompt blocks: the fewest lines the section may get. */
+  minLines?: number;
 };
 
 export type StationeryPageSpec = {
@@ -131,4 +147,12 @@ export type StationeryCustomization = {
   space?: Record<string, SectionSpace>;
   /** "recipe" keeps the designed proportions; "equal" gives every writing section the same space. */
   balance?: "recipe" | "equal";
+  /**
+   * Prompt + response blocks per page (types/prompts.ts). When set for a page,
+   * its writing sections are exactly these blocks (fixed rows such as the date
+   * line stay); rename / hidden / order / space above then no longer apply to it.
+   */
+  promptPages?: (import("./prompts").PromptSet | undefined)[];
+  /** Page title override (the recipe's title otherwise). */
+  title?: string;
 };

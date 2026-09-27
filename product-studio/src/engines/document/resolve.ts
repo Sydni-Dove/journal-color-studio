@@ -127,17 +127,40 @@ export function resolveDocument(input: ProductProject): ResolvedDocument {
   const duplex = binding.boundEdgeMode === "book-spine" ? true : project.production.duplex;
   const paged = isPaged(binding, duplex);
 
+  const base = {
+    calendar,
+    paged,
+    fillerLayoutId: FILLER_LAYOUT_ID,
+    pagesPerInstance: (id: string) => getLayout(id).pages,
+    layoutPeriod: (id: string) => getLayout(id).period,
+    layoutLabel: (id: string) => getLayout(id).label,
+  };
   const recipeKey = JSON.stringify([project.recipe, project.calendar, paged]);
-  const recipe = recipeCache.get(recipeKey, () =>
-    expandRecipe(project.recipe, {
-      calendar,
-      paged,
-      fillerLayoutId: FILLER_LAYOUT_ID,
-      pagesPerInstance: (id) => getLayout(id).pages,
-      layoutPeriod: (id) => getLayout(id).period,
-      layoutLabel: (id) => getLayout(id).label,
-    }),
-  );
+  let recipe = recipeCache.get(recipeKey, () => expandRecipe(project.recipe, base));
+  // Content that continues on more pages (prompt + response pages): measure against this product's page, then
+  // expand again with the continuation pages. (Geometry depends on the page count only through the spine, so
+  // the first pass's page is the right size to measure on.)
+  if (recipe.pages.some((pg) => getLayout(pg.layoutId).flowPages)) {
+    const spacing = resolveSpacing(project.spacing.density, project.spacing.overrides);
+    const typography = resolveTypography(project.typography.fonts, project.typography.roleOverrides);
+    const page = computePageGeometry({
+      trim,
+      binding,
+      boundEdge: project.production.boundEdge,
+      printProfile,
+      includeBleed: project.production.includeBleed,
+      pageCount: recipe.pageCount,
+      side: paged ? "recto" : "single",
+      duplex,
+      recommendedOverrides: PRODUCT_RECOMMENDED_MARGINS[project.productType],
+      userMargins: project.production.userMargins,
+    });
+    const fit = { page, spacing, typography, options: project.layoutOptions, pattern: project.functionalPattern };
+    const flowKey = JSON.stringify([recipeKey, trim, project.production, project.productType, spacing, project.typography, project.layoutOptions, project.functionalPattern, getLayoutMeasurer().id]);
+    recipe = recipeCache.get(flowKey, () =>
+      expandRecipe(project.recipe, { ...base, flowPages: (id, module) => getLayout(id).flowPages?.({ ...fit, module }) ?? 1 }),
+    );
+  }
 
   return {
     project,
@@ -181,9 +204,14 @@ export function geometryFor(doc: ResolvedDocument, page: Pick<PageInstance, "sid
   );
 }
 
-/** Pages that belong to the same layout instance (1, or 2 for a spread). */
+/** Pages that belong to the same layout instance (1, 2 for a spread, or a page and its continuation pages). */
 export function instancePages(doc: ResolvedDocument, index: number): PageInstance[] {
   const page = doc.recipe.pages[index];
+  // Content continued on more pages is one instance.
+  if (page.flowCount && page.flowPart !== undefined) {
+    const first = index - page.flowPart;
+    return doc.recipe.pages.slice(first, first + page.flowCount);
+  }
   if (page.spreadPart === undefined) return [page];
   const first = page.spreadPart === 0 ? index : index - 1;
   return [doc.recipe.pages[first], doc.recipe.pages[first + 1]];
@@ -260,7 +288,7 @@ export function layoutAvailability(doc: ResolvedDocument): LayoutAvailability[] 
     layoutId: l.id,
     label: l.label,
     supportedType: l.capability.supportedProductTypes.includes(doc.project.productType),
-    fit: l.fit({ page, spacing: doc.spacing, typography: doc.typography, options: doc.project.layoutOptions }),
+    fit: l.fit({ page, spacing: doc.spacing, typography: doc.typography, options: doc.project.layoutOptions, pattern: doc.project.functionalPattern }),
   }));
 }
 
@@ -270,7 +298,7 @@ export function recipeLayouts(doc: ResolvedDocument): { layout: LayoutDefinition
   const ids = [...new Set(recipeSteps(doc.project.recipe).map((i) => i.layoutId))];
   return ids.map((id) => {
     const layout = getLayout(id);
-    return { layout, fit: layout.fit({ page, spacing: doc.spacing, typography: doc.typography, options: doc.project.layoutOptions }) };
+    return { layout, fit: layout.fit({ page, spacing: doc.spacing, typography: doc.typography, options: doc.project.layoutOptions, pattern: doc.project.functionalPattern }) };
   });
 }
 

@@ -8,21 +8,16 @@
  * It invents no structure the recipe does not declare, and holds no
  * trim-specific constants.
  */
-import { effectiveZones, resolveZones, type ZoneRequest } from "../../engines/stationery/geometry";
-import { DEFAULT_FUNCTIONAL_PATTERN, lineSpacingIn } from "../../engines/patterns/patterns";
-import { getLayoutMeasurer, styleForRole } from "../../engines/typography/textMeasure";
+import { effectiveZones } from "../../engines/stationery/geometry";
+import { blocksToZones, countZonePages, probeContext, promptGap, solveZonePages, type ZonePageSpec } from "../shared/promptPages";
+import type { PromptSet } from "../../types/prompts";
 import { findSizePreset } from "../../presets/sizes/sizePresets";
-import { STUDIO_PLANNER } from "../../presets/studioDefaults";
-import { DEFAULT_WORDING } from "../../presets/wording";
 import { STATIONERY_RECIPES, stationeryLayoutId } from "../../presets/stationery/catalog";
 import type { PageGeometry } from "../../types/geometry";
-import type { LayoutDiagnostic, LayoutMetric, LayoutNode, SolvedPage, TextNode } from "../../types/layout";
+import type { SolvedPage } from "../../types/layout";
 import type { ProductType } from "../../types/product";
-import type { StationeryCustomization, StationeryRecipe, StationerySizeVariant } from "../../types/stationery";
-import { fitHeading, headerTitle, pageFrame } from "../shared/components";
-import { group, lineBoxIn, text } from "../shared/nodes";
+import type { StationeryCustomization, StationeryRecipe, StationerySizeVariant, StationeryZone } from "../../types/stationery";
 import type { FitContext, FitResult, LayoutContext, LayoutDefinition } from "../shared/types";
-import { fillInIn, SURFACES } from "./surfaces";
 
 /** Product types a family's pages can be used in (the page model is the same). */
 const PRODUCT_TYPES_FOR: Record<StationeryRecipe["family"], ProductType[]> = {
@@ -34,80 +29,54 @@ const PRODUCT_TYPES_FOR: Record<StationeryRecipe["family"], ProductType[]> = {
 
 export const customizationFor = (ctx: Pick<LayoutContext, "options">, comboId: string): StationeryCustomization => ctx.options.stationery?.[comboId] ?? {};
 
-/** Greedy word wrap with the layout measurer (prompts are creator-editable and may be long). */
-function wrap(value: string, width: number, ctx: LayoutContext): string[] {
-  const m = getLayoutMeasurer().measure, st = styleForRole(ctx.typography, "prompt");
-  const lines: string[] = [];
-  let cur = "";
-  for (const word of value.split(/\s+/).filter(Boolean)) {
-    const next = cur ? `${cur} ${word}` : word;
-    if (cur && m(next, st) > width) {
-      lines.push(cur);
-      cur = word;
-    } else cur = next;
-  }
-  if (cur) lines.push(cur);
-  return lines;
+/**
+ * The zones of one recipe page: the creator's prompt blocks when set for this
+ * page (fixed rows such as the date line stay), otherwise the recipe's zones
+ * with the older rename / hide / order / space customization.
+ */
+export function recipePageZones(recipe: StationeryRecipe, pageIndex: number, custom: StationeryCustomization): StationeryZone[] {
+  const spec = recipe.pages[pageIndex];
+  const set = custom.promptPages?.[pageIndex];
+  if (!set) return effectiveZones(spec, pageIndex, custom);
+  const fixed = effectiveZones({ ...spec, zones: spec.zones.filter((z) => z.surface === "fill-in" || z.surface === "table") }, pageIndex, custom);
+  const own = new Map(spec.zones.map((z) => [z.key, z]));
+  return [...fixed, ...blocksToZones(set, (b) => ({ surface: own.get(b.id)?.surface ?? "lined", treatment: own.get(b.id)?.treatment }))];
 }
 
-function solveRecipePage(recipe: StationeryRecipe, pageIndex: number, ctx: LayoutContext): SolvedPage {
-  const spec = recipe.pages[pageIndex];
+/** The recipe page's default prompt set: its writing zones as prompt blocks (what the editor starts from). */
+export function recipePromptSet(recipe: StationeryRecipe, pageIndex: number, custom: StationeryCustomization): PromptSet {
+  const existing = custom.promptPages?.[pageIndex];
+  if (existing) return existing;
+  const zones = effectiveZones(recipe.pages[pageIndex], pageIndex, custom).filter((z) => z.surface !== "fill-in" && z.surface !== "table");
+  return { blocks: zones.map((z) => ({ id: z.key, label: z.label, weight: z.weight })) };
+}
+
+/** The shared prompt page spec for one recipe page (or a single-page recipe with its continuation pages). */
+function recipeSpec(recipe: StationeryRecipe, pageIndex: number, ctx: Pick<LayoutContext, "options" | "spacing">): ZonePageSpec {
   const custom = customizationFor(ctx, recipe.comboId);
-  const frame = pageFrame(ctx, pageIndex, { headerH: spec.title ? STUDIO_PLANNER.weeklyTitle.valueIn : 0, headerRule: !!spec.title });
-  const nodes: LayoutNode[] = [...frame.nodes];
-  const diagnostics: LayoutDiagnostic[] = [...frame.diagnostics];
-  const metrics: LayoutMetric[] = [];
-  if (spec.title) {
-    const title = custom.rename?.[`page${pageIndex}`] ?? spec.title;
-    const head = headerTitle(`st${pageIndex}-header`, ctx, frame.zones, "pageTitle", title, "pageTitle", "header-left");
-    nodes.push(...head.nodes);
-    diagnostics.push(...head.diagnostics);
-  }
-  const body = frame.body;
-  const s = ctx.spacing;
-  const headingLine = lineBoxIn(ctx.typography, "sectionHeading"), promptLine = lineBoxIn(ctx.typography, "prompt");
+  const set = custom.promptPages?.[pageIndex];
+  const title = pageIndex === 0 ? custom.title ?? custom.rename?.page0 ?? recipe.pages[0].title : custom.rename?.[`page${pageIndex}`] ?? recipe.pages[pageIndex].title;
+  return {
+    idPrefix: "st",
+    title,
+    instructions: set?.instructions,
+    zones: recipePageZones(recipe, pageIndex, custom),
+    // Each section carries its own heading, so sections sit a block gap apart (not a full section gap).
+    gapIn: promptGap(ctx.spacing.block, set),
+    ratio: recipe.minResponseToPromptRatio ?? 0,
+    lineSnap: recipe.composition?.lineSnap,
+    // Single-page recipes continue on another page when the creator's prompts don't fit; spreads keep their two pages.
+    flow: recipe.pages.length === 1,
+    fewerLines: set?.whenFull === "fewer-lines",
+    emptySurface: "lined",
+    basis: `recipe ${recipe.comboId}`,
+  };
+}
 
-  // Typography: what each zone's heading and prompt occupy (the geometry layer shares out the rest).
-  const zones = effectiveZones(spec, pageIndex, custom);
-  const measured = zones.map((zone) => {
-    const heading = zone.label ? fitHeading(zone.label, "sectionHeading", { w: body.w, h: 2 * headingLine }, ctx) : null;
-    const promptLines = zone.prompt ? wrap(zone.prompt, body.w, ctx) : [];
-    const headingH = heading ? heading.heightIn : 0;
-    const promptH = promptLines.length * promptLine;
-    const overhead = headingH + (promptH ? s.block + promptH : 0) + (headingH || promptH ? s.headingToContentGap : 0);
-    return { zone, heading, headingH, promptLines, promptH, overhead, promptText: headingH + promptH };
-  });
-  const reqs: ZoneRequest[] = measured.map((m) => (m.zone.surface === "fill-in" ? { zone: m.zone, overheadIn: 0, fixedIn: fillInIn(ctx) } : { zone: m.zone, overheadIn: m.overhead, promptTextIn: m.promptText }));
-  // Each section carries its own heading, so sections sit a block gap apart (not a full section gap).
-  // Line-snapped recipes hold whole lines at the page's ruling (the pattern owns the pitch; blank pages don't snap).
-  const pitch = recipe.composition?.lineSnap && ctx.pattern.kind !== "blank" ? lineSpacingIn(ctx.pattern) : 0;
-  const res = resolveZones(reqs, body, s.block, recipe.minResponseToPromptRatio ?? 0, pitch);
-  diagnostics.push(...res.problems.map((message): LayoutDiagnostic => ({ severity: "error", rule: "stationery-fit", componentId: `st${pageIndex}`, message })));
-
-  res.zones.forEach((z, i) => {
-    const m = measured[i];
-    const id = `st${pageIndex}-${z.zone.key}`;
-    nodes.push(group(id, "Section", z.rect));
-    if (z.head && m.heading) {
-      const t = text(`${id}-title`, { x: z.rect.x, y: z.rect.y, w: z.rect.w, h: m.headingH }, z.zone.label, "sectionHeading", { component: "SectionHeader" });
-      if (m.heading.lines.length > 1 || m.heading.sizePt !== ctx.typography.roles.sectionHeading.sizePt) t.fit = { sizePt: m.heading.sizePt, lineHeight: m.heading.lineHeight, lines: m.heading.lines };
-      nodes.push(t);
-    }
-    if (m.promptLines.length) {
-      const y = z.rect.y + m.headingH + (m.headingH ? s.block : 0);
-      const p: TextNode = text(`${id}-prompt`, { x: z.rect.x, y, w: z.rect.w, h: m.promptH }, m.promptLines.join(" "), "prompt", { component: "Text", vAlign: "top", wrap: true });
-      p.fit = { sizePt: ctx.typography.roles.prompt.sizePt, lineHeight: ctx.typography.roles.prompt.lineHeight, lines: m.promptLines };
-      nodes.push(p);
-    }
-    const out = SURFACES[z.zone.surface](`${id}-surface`, z.response, z.zone, ctx);
-    nodes.push(...out.nodes);
-    diagnostics.push(...out.diagnostics);
-    metrics.push(...out.metrics);
-    if (z.zone.surface !== "fill-in") {
-      metrics.push({ label: `"${z.zone.label || z.zone.key}" writing height`, value: z.response.h, unit: "in", provenance: { geometryClass: "user-design", basis: `recipe ${recipe.comboId}: weight ${z.zone.weight.toFixed(2)} of the page body` } });
-    }
-  });
-  return { nodes, diagnostics, metrics, regions: { mainContent: body, writingArea: body } };
+/** Solve a recipe: a spread page by page, or a single page with any continuation pages. */
+function solveRecipe(recipe: StationeryRecipe, ctx: LayoutContext): SolvedPage[] {
+  if (recipe.pages.length > 1) return recipe.pages.flatMap((_, i) => solveZonePages({ ...recipeSpec(recipe, i, ctx), flow: false }, ctx, [i]));
+  return solveZonePages(recipeSpec(recipe, 0, ctx), ctx, ctx.pages.map((_, i) => i));
 }
 
 /** Trim check: the recipe is engineered for its listed trims (either orientation). */
@@ -124,20 +93,10 @@ function trimSupported(recipe: StationeryRecipe, page: PageGeometry): string | n
   return `${recipe.label} is engineered for ${names}.`;
 }
 
-/** A probe context for fit(): the real solver on this page, so fit and solve never disagree. */
+/** A probe context for fit(): the real solver on this page (with any continuation pages), so fit and solve never disagree. */
 function probe(recipe: StationeryRecipe, f: FitContext): LayoutContext {
-  return {
-    pages: recipe.pages.map(() => f.page),
-    pageNumbers: recipe.pages.map((_, i) => i + 1),
-    spacing: f.spacing,
-    typography: f.typography,
-    options: f.options,
-    wording: DEFAULT_WORDING,
-    pattern: DEFAULT_FUNCTIONAL_PATTERN,
-    calendar: null,
-    weekStart: 1,
-    period: { kind: "none" },
-  };
+  const pages = recipe.pages.length > 1 ? recipe.pages.length : countZonePages(recipeSpec(recipe, 0, f), f);
+  return probeContext(f, pages);
 }
 
 /** The structure a size variant produces: the recipe with the variant's sections left out. */
@@ -166,7 +125,7 @@ function chooseStructure(recipe: StationeryRecipe, f: FitContext): Choice & { fu
   const attempt = (r: StationeryRecipe): string | null => {
     const trim = trimSupported(r, f.page);
     if (trim) return trim;
-    const problems = r.pages.map((_, i) => solveRecipePage(r, i, probe(r, f))).flatMap((p) => p.diagnostics.filter((d) => d.rule === "stationery-fit").map((d) => d.message));
+    const problems = solveRecipe(r, probe(r, f)).flatMap((p) => p.diagnostics.filter((d) => d.rule === "stationery-fit" || d.rule === "prompt-fit").map((d) => d.message));
     return problems[0] ?? null;
   };
   const fullReason = attempt(recipe);
@@ -183,7 +142,7 @@ export function stationeryLayout(recipe: StationeryRecipe): LayoutDefinition {
     const choice = chooseStructure(recipe, { page: ctx.pages[0], spacing: ctx.spacing, typography: ctx.typography, options: ctx.options });
     // Nothing fits: solve the full structure so its problems are reported (never squeezed).
     const structure = choice.ok ? choice.structure : recipe;
-    const pages = structure.pages.map((_, i) => solveRecipePage(structure, i, ctx));
+    const pages = solveRecipe(structure, ctx);
     if (choice.ok && structure !== recipe) {
       const left = recipe.sizeVariants!.find((v) => v.id === structure.variant)!.omit.map((k) => recipe.pages.flatMap((p) => p.zones).find((z) => z.key === k)?.label ?? k);
       pages[0].diagnostics.push({
@@ -225,6 +184,12 @@ export function stationeryLayout(recipe: StationeryRecipe): LayoutDefinition {
       return { ok: true, variant: choice.structure.variant, variantLabel: choice.structure.label, sidebarAvailable: false };
     },
     solve,
+    // A single-page recipe whose prompts don't fit continues on another page.
+    flowPages: (f) => {
+      if (recipe.pages.length > 1) return 1;
+      const choice = chooseStructure(recipe, f);
+      return countZonePages(recipeSpec(choice.ok ? choice.structure : recipe, 0, f), f);
+    },
   };
 }
 

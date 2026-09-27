@@ -5,7 +5,9 @@
  * colour, surface, decoration, spacing) stays in the design panels.
  */
 import { Visual } from "../help/visuals";
-import { layoutAvailability, type ResolvedDocument } from "../../engines/document/resolve";
+import { PromptEditor, type PromptFit } from "./PromptEditor";
+import { promptSetFromList } from "../../types/prompts";
+import { layoutAvailability, solvePage, type ResolvedDocument } from "../../engines/document/resolve";
 import { addNode, bookOutline, duplicateNode, moveNode, newSection, newStep, removeNode, structureFromItems, updateNode } from "../../engines/recipe/bookEdit";
 import { getLayout } from "../../layouts/registry";
 import { BOOK_PRESETS } from "../../presets/bookRecipes";
@@ -45,6 +47,16 @@ function cadenceFrom(v: string, prev: RecipeCadence): RecipeCadence {
   if (v.startsWith("end:")) return { type: "end-of-period", period: v.slice(4) as "week" | "month" | "quarter" | "year" };
   if (v === "copies") return { type: "copies", count: prev.type === "copies" ? prev.count : 1 };
   return { type: v } as RecipeCadence;
+}
+
+/** How a step's prompts fit: pages each time, and a plain message when they can't. */
+function stepFit(doc: ResolvedDocument, stepId: string): PromptFit | undefined {
+  const i = doc.recipe.pages.findIndex((p) => p.recipeItemId === stepId && !p.filler);
+  if (i < 0) return undefined;
+  const page = doc.recipe.pages[i];
+  const pages = page.flowCount ?? 1;
+  const problem = [...Array(pages).keys()].flatMap((k) => solvePage(doc, i + k).diagnostics).find((d) => d.rule === "prompt-fit")?.message;
+  return { pages, problem };
 }
 
 const stepName = (s: BookStep, scope: Scope) =>
@@ -125,14 +137,16 @@ function StepCard({ s, siblings, scope, props, first, last }: { s: BookStep; sib
         </Field>
       )}
       {guided && (
-        <Field label="Prompts (one per line)">
-          <textarea
-            rows={Math.max(3, (s.prompts ?? mod.prompts.none).length)}
-            value={(s.prompts ?? mod.prompts[scope === "none" ? "none" : scope] ?? mod.prompts.none).join("\n")}
-            onChange={(e) => set({ prompts: e.target.value.split("\n") })}
-            onBlur={(e) => set({ prompts: e.target.value.split("\n").map((x) => x.trim()).filter(Boolean) })}
+        <details className="subsection" open>
+          <summary>Prompts</summary>
+          <PromptEditor
+            set={s.promptSet ?? promptSetFromList(s.prompts ?? mod.prompts[scope === "none" ? "none" : scope] ?? mod.prompts.none)}
+            onChange={(promptSet) => set({ promptSet, prompts: undefined })}
+            ownStyleLabel="Your writing lines style"
+            allowInstructions
+            fit={stepFit(doc, s.id)}
           />
-        </Field>
+        </details>
       )}
       <div className="card-actions">
         <button className="btn" disabled={first} onClick={() => edit((n) => moveNode(n, s.id, -1))}>Move up</button>

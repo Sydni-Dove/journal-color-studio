@@ -121,7 +121,7 @@ export function Editor({ project, onChange, onBack, saveStatus }: Props) {
               {!doc.binding.sheetCountIsMetadata && <BookStructurePanel project={project} update={update} doc={doc} goToStep={nav.goToItem} />}
               {doc.recipe.pageCount > 1 && <BookOutlinePanel doc={doc} current={current} goTo={setIndex} />}
               <LayoutPanel nav={nav} project={project} update={update} usage={usage} />
-              <StationeryPanel project={project} update={update} usage={usage} />
+              <StationeryPanel project={project} update={update} usage={usage} doc={doc} />
               <PatternPanel nav={nav} project={project} update={update} usage={usage} />
               <SpacingPanel nav={nav} project={project} update={update} usage={usage} />
               {/* DESIGN: theme / palette → background → decorative elements → typography */}

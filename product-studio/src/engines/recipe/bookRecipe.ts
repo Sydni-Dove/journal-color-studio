@@ -347,16 +347,20 @@ export function expandBook(structure: BookNode[], ctx: BookContext): ExpandedRec
     const base = `${step.id}@${leaf.path}:${periodKey(period)}#${leaf.copy}`;
     if (seen.has(base)) diagnostics.push({ severity: "error", itemId: step.id, message: `"${title}" is generated twice for ${subtitle ?? periodKey(period)}.` });
     seen.add(base);
-    for (let part = 0; part < n; part++) {
+    const module = { type: step.module, title, subtitle, prompts: step.prompts ?? modulePrompts(step.module, kind), ...(step.promptSet ? { promptSet: step.promptSet } : {}) };
+    // Prompts that don't fit one page continue on more pages (single-page layouts only).
+    const flow = n === 1 ? Math.max(1, ctx.flowPages?.(step.layoutId, module) ?? 1) : 1;
+    for (let part = 0; part < n * flow; part++) {
       pages.push({
-        key: n === 2 ? `${base}:${part}` : base,
+        key: n === 2 ? `${base}:${part}` : part > 0 ? `${base}~${part}` : base,
         recipeItemId: step.id,
         layoutId: step.layoutId,
         period,
         spreadPart: n === 2 ? (part as 0 | 1) : undefined,
         pageNumber,
         side: sideOf(pageNumber),
-        module: { type: step.module, title, subtitle, prompts: step.prompts ?? modulePrompts(step.module, kind) },
+        module,
+        ...(flow > 1 ? { flowPart: part, flowCount: flow } : {}),
       });
       pageNumber++;
     }

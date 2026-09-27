@@ -13,7 +13,7 @@ import type { Rect } from "../../types/geometry";
 import type { LayoutDiagnostic, LayoutMetric, LayoutNode } from "../../types/layout";
 import type { StationeryZone, SurfaceKind } from "../../types/stationery";
 import { getLayoutMeasurer, styleForRole } from "../../engines/typography/textMeasure";
-import { checklistRows, fitHeading, HEADING_MIN_PT } from "../shared/components";
+import { checklistRows, fitHeading, HEADING_MIN_PT, writingSurface } from "../shared/components";
 import { box, group, lineBoxIn, rule, text } from "../shared/nodes";
 import type { LayoutContext } from "../shared/types";
 
@@ -131,4 +131,6 @@ export const SURFACES: Record<SurfaceKind, SurfaceRenderer> = {
   checkbox: (id, rect, _z, ctx) => empty(checklistRows(id, rect, ctx).nodes),
   "fill-in": fillIn,
   table,
+  "dot-grid": (id, rect, _z, ctx) => empty([group(id, "NotesArea", rect), ...fillWritingRegion(`${id}-dots`, rect, { ...ctx.pattern, kind: "dot-grid", gridPreset: ctx.pattern.kind === "dot-grid" ? ctx.pattern.gridPreset : "dot-5mm" })]),
+  pattern: (id, rect, _z, ctx) => empty([group(id, "NotesArea", rect), ...writingSurface(`${id}-lines`, rect, ctx)]),
 };

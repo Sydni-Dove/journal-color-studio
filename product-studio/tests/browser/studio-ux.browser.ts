@@ -104,11 +104,20 @@ describe("Studio home", () => {
     await page.waitForSelector(".ps-page--editor");
     await expect(page.locator(".badge").first().textContent()).resolves.toBe("Page OK");
     const sections = page.locator("details.section", { has: page.locator(":scope > summary", { hasText: /^Page sections$/ }) });
-    await expect(sections.locator('[data-section="prayer"]').count()).resolves.toBe(1);
-    // No raw measurements among the section controls.
+    // The SOAP prompts, in the shared prompt editor; no raw measurements among the controls.
+    const prayer = sections.locator('[data-prompt="prayer"]');
+    await expect(prayer.count()).resolves.toBe(1);
     await expect(sections.locator('input[type="number"]').count()).resolves.toBe(0);
-    await sections.locator('[data-section="prayer"]').getByRole("button", { name: "More" }).click();
-    await expect(page.locator(".badge").first().textContent()).resolves.toBe("Page OK");
+    // Choosing writing lines updates the page immediately.
+    const field = prayer.getByRole("spinbutton", { name: "Writing lines" });
+    await field.click();
+    await field.fill("4");
+    await field.press("Enter");
+    await expect.poll(() => page.locator(".badge").first().textContent()).toBe("Page OK");
+    // Rename a prompt: the page shows the new wording.
+    await prayer.getByRole("textbox", { name: "Prompt 4" }).fill("What should I pray about?");
+    await expect.poll(() => page.locator(".ps-page--editor").first().textContent()).toMatch(/What should I pray about\?/i);
+
     await page.context().close();
   });
 
@@ -190,6 +199,32 @@ describe("Editor panel width", () => {
     const page = await editor(PHONE);
     await expect(page.getByRole("separator", { name: "Resize the editor panel" }).isVisible()).resolves.toBe(false);
     expect(await overflow(page)).toBeLessThanOrEqual(0);
+    await page.context().close();
+  });
+});
+
+describe("Prompt editor in a book", () => {
+  it("Meeting With God guided page: add prompts with 5 lines each; the page continues on another page", async () => {
+    const p = { ...TEST_PRODUCTS[1].build(), name: "PE" } as ProductProject;
+    p.recipe = { items: [], ordering: "sequential", structure: [{ kind: "step", id: "mwg", module: "meeting-with-god", layoutId: "guided-page", cadence: { type: "once" } }] } as never;
+    const page = await home([p], DESKTOP);
+    await page.locator(".card", { hasText: "PE" }).first().getByRole("button", { name: "Open" }).click();
+    await page.waitForSelector(".ps-page--editor");
+    // Open the step's card in Book structure.
+    await page.locator('details.book-step[data-step="mwg"] > summary').click();
+    const editor = page.getByTestId("prompt-editor").first();
+    await editor.scrollIntoViewIfNeeded();
+    await editor.getByLabel("Use the same number of lines for every prompt").check();
+    const per = editor.getByRole("spinbutton", { name: "Lines per prompt" });
+    await per.fill("5");
+    await per.press("Enter");
+    const count = editor.getByRole("spinbutton", { name: "Number of prompts" });
+    await count.fill("9");
+    await count.press("Enter");
+    await expect(editor.locator(".prompt-block").count()).resolves.toBe(9);
+    await expect.poll(() => page.getByTestId("prompt-continues").count(), { timeout: 10_000 }).toBe(1);
+    // Continuing is not a problem: nothing about the prompts needs fixing.
+    await expect(page.getByTestId("prompt-fit").count()).resolves.toBe(0);
     await page.context().close();
   });
 });

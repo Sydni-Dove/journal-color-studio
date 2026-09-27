@@ -31,7 +31,7 @@ export type LayoutContext = {
 };
 
 /** Inputs a layout needs to decide whether (and how) it fits a page. */
-export type FitContext = Pick<LayoutContext, "spacing" | "typography" | "options"> & { page: PageGeometry };
+export type FitContext = Pick<LayoutContext, "spacing" | "typography" | "options"> & { page: PageGeometry; pattern?: FunctionalPattern; module?: PageModuleContent };
 
 export type FitResult =
   | {
@@ -89,6 +89,13 @@ export type LayoutDefinition = {
   /** Decide whether this layout fits a page and which variant to use. */
   fit: (ctx: FitContext) => FitResult;
   solve: (ctx: LayoutContext) => SolvedPage[];
+  /**
+   * Single-page layouts whose content can continue on more pages (prompt +
+   * response pages): how many pages one instance needs on this page size.
+   * The recipe engine adds the continuation pages; solve() then receives one
+   * geometry per page and returns one solved page each.
+   */
+  flowPages?: (ctx: FitContext) => number;
 };
 
 /** Fit helper for layouts with a single structure and a minimum usable area. */

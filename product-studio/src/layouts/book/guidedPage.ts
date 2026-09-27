@@ -1,15 +1,18 @@
 /**
  * GUIDED PAGE — one design that serves many PURPOSES. The page's module
  * (Meeting With God, Vision, Goals, Monthly Review, …) supplies its title,
- * period label and prompts; the layout only decides geometry: a titled header
- * and one writing section per prompt. With three or more prompts the first
- * one gets twice the writing space (the main conversation / reflection).
+ * period label and prompt + response blocks (types/prompts.ts); the shared
+ * prompt page solver (layouts/shared/promptPages.ts) decides geometry, and
+ * continues on another page when the prompts don't fit. A plain prompt list
+ * (older pages, module defaults) keeps its original look: with three or more
+ * prompts the first one gets twice the writing space.
  */
-import { STUDIO_PLANNER } from "../../presets/studioDefaults";
-import type { LayoutNode, SolvedPage } from "../../types/layout";
-import { headerTitle, pageFrame, section, writingSurface } from "../shared/components";
-import { text } from "../shared/nodes";
-import { minimumAreaFit, type LayoutContext, type LayoutDefinition } from "../shared/types";
+import { DEFAULT_WORDING } from "../../presets/wording";
+import { promptSetFromList } from "../../types/prompts";
+import type { PageModuleContent } from "../../types/recipe";
+import type { SpacingTokens } from "../../types/tokens";
+import { blocksToZones, countZonePages, promptGap, solveZonePages, type ZonePageSpec } from "../shared/promptPages";
+import { minimumAreaFit, type LayoutDefinition } from "../shared/types";
 
 /** Split a height into sections by weight, with a fixed gap between them. */
 export function weightedStack(y: number, h: number, weights: number[], gap: number): { y: number; h: number }[] {
@@ -24,30 +27,27 @@ export function weightedStack(y: number, h: number, weights: number[], gap: numb
   });
 }
 
-function solveGuided(ctx: LayoutContext): SolvedPage {
-  const title = ctx.module?.title ?? ctx.wording.journalTitle;
-  const prompts = ctx.module?.prompts ?? [];
-  const frame = pageFrame(ctx, 0, { headerH: STUDIO_PLANNER.weeklyTitle.valueIn });
-  const head = headerTitle("gp-header", ctx, frame.zones, "pageTitle", title, "pageTitle", "header-left");
-  const nodes: LayoutNode[] = [...frame.nodes, ...head.nodes];
-  const diagnostics = [...frame.diagnostics, ...head.diagnostics];
-  const sub = ctx.module?.subtitle;
-  if (sub) {
-    // The period this page belongs to (e.g. "January 2027"), opposite the title.
-    const z = frame.zones.header;
-    nodes.push(text("gp-period", { x: z.x, y: z.y, w: z.w, h: z.h - ctx.spacing.titleToRuleGap }, sub, "label", { component: "PageHeader", align: "right", vAlign: "bottom" }));
-  }
-  const b = frame.body;
-  if (!prompts.length) nodes.push(...writingSurface("gp-writing", b, ctx));
-  else {
-    const weights = prompts.map((_, i) => (i === 0 && prompts.length >= 3 ? 2 : 1));
-    weightedStack(b.y, b.h, weights, ctx.spacing.section).forEach((r, i) => {
-      const sec = section(`gp-s${i}`, { x: b.x, y: r.y, w: b.w, h: r.h }, prompts[i], ctx, "surface", { titleRole: "sectionHeading" });
-      nodes.push(...sec.nodes);
-      diagnostics.push(...sec.diagnostics);
-    });
-  }
-  return { nodes, diagnostics, metrics: [{ label: "Prompt sections", value: prompts.length, unit: "count", provenance: { geometryClass: "user-design", basis: "page module prompts" } }], regions: { mainContent: b, writingArea: b } };
+/**
+ * The page's prompt + response content: the creator's prompt blocks, or (pages
+ * saved before prompt blocks, and module defaults) its plain prompt list,
+ * migrated so it renders exactly as before.
+ */
+export function guidedSpec(module: PageModuleContent | undefined, fallbackTitle: string, spacing: SpacingTokens): ZonePageSpec {
+  const set = module?.promptSet ?? promptSetFromList(module?.prompts ?? []);
+  return {
+    idPrefix: "gp",
+    title: module?.title ?? fallbackTitle,
+    headerRight: module?.subtitle,
+    instructions: set.instructions,
+    // "The page's own style" for a guided page is the project's writing lines (ruled, dot grid, graph, blank).
+    zones: blocksToZones(set, () => ({ surface: "pattern" })),
+    gapIn: promptGap(spacing.section, set),
+    legacyWeights: set.legacyWeights,
+    flow: true,
+    fewerLines: set.whenFull === "fewer-lines",
+    emptySurface: "pattern",
+    basis: "guided page",
+  };
 }
 
 export const guidedPage: LayoutDefinition = {
@@ -74,5 +74,7 @@ export const guidedPage: LayoutDefinition = {
     defaultRepeat: "once",
   },
   fit: minimumAreaFit(2, 3, "Guided page"),
-  solve: (ctx) => [solveGuided(ctx)],
+  solve: (ctx) => solveZonePages(guidedSpec(ctx.module, ctx.wording.journalTitle, ctx.spacing), ctx, ctx.pages.map((_, i) => i)),
+  // Prompts that don't fit one page continue on another page (never cramped).
+  flowPages: (f) => countZonePages(guidedSpec(f.module, DEFAULT_WORDING.journalTitle, f.spacing), f),
 };

@@ -23,6 +23,8 @@ export type RecipeContext = {
   /** Composite books: the period a layout needs, and its label (for diagnostics). */
   layoutPeriod?: (layoutId: string) => "none" | "month" | "week" | "day";
   layoutLabel?: (layoutId: string) => string;
+  /** Pages one instance of a single-page layout needs (content that continues on another page). Default 1. */
+  flowPages?: (layoutId: string, module?: import("../../types/recipe").PageModuleContent) => number;
 };
 
 export type RecipeDiagnostic = { severity: "error" | "warning" | "info"; itemId: string; message: string };
@@ -179,9 +181,11 @@ export function expandRecipe(recipe: ProductRecipe, ctx: RecipeContext): Expande
       });
       pageNumber++;
     }
-    for (let part = 0; part < u.pages; part++) {
+    // Content that doesn't fit one page continues on more pages (single-page layouts only).
+    const flow = u.pages === 1 && !u.physicalSheets ? Math.max(1, ctx.flowPages?.(u.item.layoutId) ?? 1) : 1;
+    for (let part = 0; part < u.pages * flow; part++) {
       pages.push({
-        key: `${u.item.id}:${pk}${u.pages === 2 ? `:${part}` : ""}`,
+        key: `${u.item.id}:${pk}${u.pages === 2 ? `:${part}` : part > 0 ? `~${part}` : ""}`,
         recipeItemId: u.item.id,
         layoutId: u.item.layoutId,
         period: u.period,
@@ -189,6 +193,7 @@ export function expandRecipe(recipe: ProductRecipe, ctx: RecipeContext): Expande
         pageNumber,
         side: sideOf(pageNumber),
         physicalSheets: u.physicalSheets,
+        ...(flow > 1 ? { flowPart: part, flowCount: flow } : {}),
       });
       pageNumber++;
     }

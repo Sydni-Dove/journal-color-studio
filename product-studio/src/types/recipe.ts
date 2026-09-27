@@ -101,8 +101,10 @@ export type BookStep = {
   start?: PageStartRule;
   /** Title override (otherwise the module's title for the period). */
   title?: string;
-  /** Prompt overrides for guided pages. */
+  /** Prompt overrides for guided pages (saved before prompt blocks; still read). */
   prompts?: string[];
+  /** Prompt + response blocks for guided pages (wins over `prompts`). */
+  promptSet?: import("./prompts").PromptSet;
 };
 
 /** A section of the book. With a period it repeats for each period inside its parent. */
@@ -117,7 +119,15 @@ export type BookGroup = {
 export type BookNode = BookStep | BookGroup;
 
 /** Module content handed to the layout (title for the period + prompts). */
-export type PageModuleContent = { type: PageModuleType; title: string; subtitle?: string; prompts: string[] };
+export type PageModuleContent = {
+  type: PageModuleType;
+  title: string;
+  subtitle?: string;
+  /** Plain prompt list (pages saved before prompt blocks, and module defaults). */
+  prompts: string[];
+  /** Prompt + response blocks chosen by the creator (types/prompts.ts); wins over `prompts`. */
+  promptSet?: import("./prompts").PromptSet;
+};
 
 export type PeriodRef =
   | { kind: "none" }
@@ -147,4 +157,7 @@ export type PageInstance = {
   module?: PageModuleContent;
   /** Repeated-sheet metadata (pads). */
   physicalSheets?: number;
+  /** Content that continues on more pages (prompts that don't fit one page): this page's part and the total. */
+  flowPart?: number;
+  flowCount?: number;
 };

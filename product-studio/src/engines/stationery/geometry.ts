@@ -76,7 +76,67 @@ export type ZoneRequest = {
   promptTextIn?: number;
   /** Fixed-height surfaces (fill-in rows): their total height. */
   fixedIn?: number;
+  /** Prompt blocks: writing lines requested (fixed); undefined = share the free space. */
+  lines?: number;
+  /** Prompt blocks: the fewest lines this zone may get (undefined = MIN_RESPONSE_IN of writing). */
+  minLines?: number;
+  /** Height of one line of this zone's answer area when it differs from the page's writing lines (checklist rows). */
+  rowIn?: number;
 };
+
+export type ZoneOptions = {
+  /** Line-snapped composition: shared zones hold whole lines and the remainder is spread between sections. */
+  snapPitch?: number;
+  /** The page's writing-line spacing (needed for fixed line counts and minLines). */
+  linePitch?: number;
+  /** Pages saved before prompt blocks: shared space follows the weights of whole sections (heading included). */
+  legacyWeights?: boolean;
+};
+
+/** The least height a zone can take (fixed rows, requested lines, or its minimum writing). */
+export function minZoneHeight(r: ZoneRequest, linePitch: number): number {
+  const row = r.rowIn ?? linePitch;
+  if (r.fixedIn !== undefined) return r.fixedIn;
+  if (r.lines !== undefined) return r.overheadIn + r.lines * row;
+  return r.overheadIn + (r.minLines !== undefined ? r.minLines * row : MIN_RESPONSE_IN);
+}
+
+/**
+ * Split zones across pages in order: each page takes the zones that fit at
+ * their minimum height; the next zone starts a new page (prompts continue on
+ * another page rather than getting cramped). With `fewerLines`, a zone with
+ * more lines than its minimum first gives up lines to stay on the page. With
+ * `flow` off, everything stays on one page and the overflow is reported.
+ */
+export function paginateZones(reqs: ZoneRequest[], pageHeights: (i: number) => number, gapIn: number, linePitch: number, opts: { flow: boolean; fewerLines?: boolean; maxPages?: number }): { pages: ZoneRequest[][]; overflow: boolean } {
+  const pages: ZoneRequest[][] = [[]];
+  let used = 0;
+  let overflow = false;
+  for (const r0 of reqs) {
+    let r = r0;
+    const cur = pages[pages.length - 1];
+    const room = () => pageHeights(pages.length - 1) - used - (cur.length ? gapIn : 0);
+    let need = minZoneHeight(r, linePitch);
+    if (need > room() + 1e-6 && opts.fewerLines && r.lines !== undefined) {
+      const floor = r.minLines ?? DEFAULT_MIN_LINES_GEOMETRY;
+      const fit = Math.floor((room() - r.overheadIn) / (r.rowIn ?? linePitch) + 1e-6);
+      if (fit >= floor && fit < r.lines) {
+        r = { ...r, lines: fit };
+        need = minZoneHeight(r, linePitch);
+      }
+    }
+    if (need > room() + 1e-6 && cur.length && opts.flow && pages.length < (opts.maxPages ?? Infinity)) {
+      pages.push([r]);
+      used = need;
+      continue;
+    }
+    if (need > room() + 1e-6) overflow = true;
+    used += need + (cur.length ? gapIn : 0);
+    cur.push(r);
+  }
+  return { pages, overflow };
+}
+const DEFAULT_MIN_LINES_GEOMETRY = 2;
 
 export type ResolvedZone = {
   zone: StationeryZone;
@@ -124,21 +184,38 @@ export function snapToLines(total: number, shares: number[], pitch: number): num
   return lines;
 }
 
-export function resolveZones(reqs: ZoneRequest[], body: Rect, gapIn: number, ratio = 0, snapPitch = 0): ZoneResolution {
+export function resolveZones(reqs: ZoneRequest[], body: Rect, gapIn: number, ratio = 0, snapPitchOrOpts: number | ZoneOptions = 0): ZoneResolution {
+  const opts: ZoneOptions = typeof snapPitchOrOpts === "number" ? { snapPitch: snapPitchOrOpts } : snapPitchOrOpts;
+  const snapPitch = opts.snapPitch ?? 0;
+  const pitch = opts.linePitch ?? snapPitch;
   const problems: string[] = [];
-  const fixed = reqs.reduce((a, r) => a + (r.fixedIn ?? 0), 0);
-  const overhead = reqs.reduce((a, r) => a + (r.fixedIn === undefined ? r.overheadIn : 0), 0);
+  // Fixed rows and fixed line counts are set; the rest of the writing is shared.
+  const isShared = (r: ZoneRequest) => r.fixedIn === undefined && r.lines === undefined;
+  const rowOf = (r: ZoneRequest) => r.rowIn ?? pitch;
+  const fixedH = (r: ZoneRequest) => (r.fixedIn !== undefined ? r.fixedIn : r.lines !== undefined ? r.overheadIn + r.lines * rowOf(r) : 0);
+  const fixed = reqs.reduce((a, r) => a + fixedH(r), 0);
+  const overhead = reqs.reduce((a, r) => a + (isShared(r) ? r.overheadIn : 0), 0);
   const promptText = reqs.reduce((a, r) => a + (r.fixedIn === undefined ? (r.promptTextIn ?? r.overheadIn) : 0), 0);
+  const fixedWriting = reqs.reduce((a, r) => a + (r.fixedIn === undefined && r.lines !== undefined ? r.lines * rowOf(r) : 0), 0);
   const gaps = gapIn * Math.max(0, reqs.length - 1);
   const writing = body.h - fixed - gaps - overhead;
-  // Every writing area gets at least MIN_RESPONSE_IN; the rest follows the weights.
-  const flexIdx = reqs.map((r, i) => (r.fixedIn === undefined ? i : -1)).filter((i) => i >= 0);
-  const shares = shareWithMinimums(Math.max(0, writing), flexIdx.map((i) => reqs[i].zone.weight), flexIdx.map(() => MIN_RESPONSE_IN));
-  const shareOf = new Map(flexIdx.map((i, k) => [i, shares ? shares[k] : (Math.max(0, writing) * reqs[i].zone.weight) / (flexIdx.reduce((a, j) => a + reqs[j].zone.weight, 0) || 1)]));
+  const flexIdx = reqs.map((r, i) => (isShared(r) ? i : -1)).filter((i) => i >= 0);
+  const minOf = (r: ZoneRequest) => (r.minLines !== undefined ? r.minLines * rowOf(r) : MIN_RESPONSE_IN);
+  let shareOf: Map<number, number>;
+  if (opts.legacyWeights) {
+    // As before prompt blocks: each whole section (heading included) gets its weighted share of the free height.
+    const free = Math.max(0, writing + overhead);
+    const totalW = flexIdx.reduce((a, i) => a + reqs[i].zone.weight, 0) || 1;
+    shareOf = new Map(flexIdx.map((i) => [i, Math.max(0, (free * reqs[i].zone.weight) / totalW - reqs[i].overheadIn)]));
+  } else {
+    // Every writing area gets at least its minimum; the rest follows the weights.
+    const shares = shareWithMinimums(Math.max(0, writing), flexIdx.map((i) => reqs[i].zone.weight), flexIdx.map((i) => minOf(reqs[i])));
+    shareOf = new Map(flexIdx.map((i, k) => [i, shares ? shares[k] : (Math.max(0, writing) * reqs[i].zone.weight) / (flexIdx.reduce((a, j) => a + reqs[j].zone.weight, 0) || 1)]));
+  }
   // Line-snapped composition: whole lines per section; the part-line remainder is spread evenly between sections.
   let gap = gapIn;
-  if (snapPitch > 0 && writing > 0) {
-    const lines = snapToLines(writing, flexIdx.map((i) => shareOf.get(i)!), snapPitch);
+  if (snapPitch > 0 && writing >= 0) {
+    const lines = flexIdx.length ? snapToLines(writing, flexIdx.map((i) => shareOf.get(i)!), snapPitch) : [];
     if (!lines) problems.push(`The sections need at least ${MIN_SNAPPED_LINES} writing lines each; this page has room for ${Math.floor(writing / snapPitch)} lines in all.`);
     else {
       flexIdx.forEach((i, k) => shareOf.set(i, lines[k] * snapPitch));
@@ -153,17 +230,18 @@ export function resolveZones(reqs: ZoneRequest[], body: Rect, gapIn: number, rat
       y += r.fixedIn + gap;
       return { zone: r.zone, rect, head: null, response: rect };
     }
-    const responseH = shareOf.get(idx) ?? 0;
+    const responseH = r.lines !== undefined ? r.lines * rowOf(r) : shareOf.get(idx) ?? 0;
     const rect = { x: body.x, y, w: body.w, h: r.overheadIn + responseH };
     y += rect.h + gap;
     const head = r.overheadIn > 0 ? { x: rect.x, y: rect.y, w: rect.w, h: r.overheadIn } : null;
     const response = { x: rect.x, y: rect.y + r.overheadIn, w: rect.w, h: responseH };
-    if (!snapPitch && responseH + 1e-6 < MIN_RESPONSE_IN) problems.push(`"${r.zone.label || r.zone.key}" gets ${responseH.toFixed(2)}" of writing space; it needs at least ${MIN_RESPONSE_IN.toFixed(2)}".`);
+    if (isShared(r) && !snapPitch && !opts.legacyWeights && responseH + 1e-6 < minOf(r)) problems.push(`"${r.zone.label || r.zone.key}" gets ${responseH.toFixed(2)}" of writing space; it needs at least ${minOf(r).toFixed(2)}".`);
     return { zone: r.zone, rect, head, response };
   });
-  if (writing < 0) problems.push(`Headings and fixed rows need ${(fixed + gaps + overhead).toFixed(2)}" but the page body is ${body.h.toFixed(2)}".`);
-  else if (ratio > 0 && promptText > 0 && writing + 1e-6 < ratio * promptText) {
-    problems.push(`Writing space is ${(writing / promptText).toFixed(1)}× the prompt space; this structure needs at least ${ratio}× (prompt : response 1 : ${ratio}).`);
+  if (writing < -1e-6) problems.push(`Headings, fixed rows and requested lines need ${(fixed + gaps + overhead).toFixed(2)}" but the page body is ${body.h.toFixed(2)}".`);
+  else if (ratio > 0 && promptText > 0 && Math.max(0, writing) + fixedWriting + 1e-6 < ratio * promptText) {
+    const w = Math.max(0, writing) + fixedWriting;
+    problems.push(`Writing space is ${(w / promptText).toFixed(1)}× the prompt space; this structure needs at least ${ratio}× (prompt : response 1 : ${ratio}).`);
   }
   return { zones, problems };
 }

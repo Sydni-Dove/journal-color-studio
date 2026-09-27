@@ -108,6 +108,7 @@ export function plainIssue(i: ValidationIssue): PlainIssue {
     case "text-region":
       return { title: q ? `“${q}” was kept inside its area.` : "Some text was kept inside its area.", advice: "Your position was limited so it stays on the page." };
     case "layout-solver":
+      if (/does not have enough room for \d+ prompt/.test(m)) return { title: m, advice: "Use fewer prompts, use fewer lines, or continue the prompts on another page." };
       if (/prompt space/.test(m)) return { title: "The headings take too much of this page for its size — there isn't enough writing room.", advice: "Choose a larger size, or turn off an optional section." };
       if (/gets .* of writing space/.test(m)) return { title: q ? `“${q}” doesn't get enough writing room at this size.` : "A section doesn't get enough writing room at this size.", advice: "Choose a larger size, give it More space, or turn off an optional section." };
       if (/column headings need|Column ".*" would be/.test(m)) return { title: "The table's columns don't fit across this page.", advice: "Choose a wider page size." };
