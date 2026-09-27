@@ -1,3 +1,4 @@
+import { migrateLayers } from "../../themes/layers";
 import { DEFAULT_FUNCTIONAL_PATTERN } from "../../engines/patterns/patterns";
 import { DEFAULT_FONTS } from "../typography/typography";
 import { STUDIO_PLANNER, STUDIO_PAD } from "../studioDefaults";
@@ -41,7 +42,7 @@ export function newId(prefix = "p"): string {
 /** Template patch: nested settings objects may be partial. */
 export type ProjectPatch = Omit<
   Partial<ProductProject>,
-  "dimensions" | "production" | "typography" | "colors" | "spacing" | "functionalPattern" | "decorativeTheme" | "layoutOptions" | "exportSettings"
+  "dimensions" | "production" | "typography" | "colors" | "spacing" | "functionalPattern" | "decorativeTheme" | "backgroundTheme" | "layoutOptions" | "exportSettings"
 > & {
   dimensions?: Partial<ProductProject["dimensions"]>;
   production?: Partial<ProductProject["production"]>;
@@ -50,6 +51,7 @@ export type ProjectPatch = Omit<
   spacing?: Partial<ProductProject["spacing"]>;
   functionalPattern?: Partial<ProductProject["functionalPattern"]>;
   decorativeTheme?: Partial<ProductProject["decorativeTheme"]>;
+  backgroundTheme?: Partial<ProductProject["decorativeTheme"]>;
   layoutOptions?: Partial<ProductProject["layoutOptions"]>;
   exportSettings?: Partial<ProductProject["exportSettings"]>;
 };
@@ -86,7 +88,7 @@ export function createProject(productType: ProductType, patch: ProjectPatch = {}
     createdAt: now,
     updatedAt: now,
   };
-  return {
+  const merged: ProductProject = {
     ...base,
     ...patch,
     dimensions: { ...base.dimensions, ...patch.dimensions },
@@ -96,7 +98,10 @@ export function createProject(productType: ProductType, patch: ProjectPatch = {}
     spacing: { ...base.spacing, ...patch.spacing },
     functionalPattern: { ...base.functionalPattern, ...patch.functionalPattern },
     decorativeTheme: { ...base.decorativeTheme, ...patch.decorativeTheme },
+    backgroundTheme: patch.backgroundTheme ? { ...DEFAULT_DECORATIVE, ...patch.backgroundTheme } : undefined,
     layoutOptions: { ...base.layoutOptions, ...patch.layoutOptions },
     exportSettings: { ...base.exportSettings, ...patch.exportSettings },
   };
+  // Every new project carries both layers: a surface in a template's decorativeTheme becomes its background.
+  return migrateLayers(merged);
 }

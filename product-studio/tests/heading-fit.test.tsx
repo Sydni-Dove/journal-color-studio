@@ -40,7 +40,7 @@ function solveWith(make: () => ProductProject, heading: string) {
   const slot = solved.nodes.find((n) => n.id === "wk0-sidebar-bounds")!;
   const issues = validateProject(p, heuristicMeasurer, { pageIndices: [index] }).issues;
   const html = renderToStaticMarkup(
-    <PrintablePage geometry={geometryFor(doc, doc.recipe.pages[index])} solved={solved} colors={doc.colors} typography={doc.typography} decorative={doc.decorative} spacing={doc.spacing} mode="print" />,
+    <PrintablePage geometry={geometryFor(doc, doc.recipe.pages[index])} solved={solved} colors={doc.colors} typography={doc.typography} decorative={doc.decorative} background={doc.background} spacing={doc.spacing} mode="print" />,
   );
   return { p, doc, index, solved, node, slot, ink: inkBoxFor(node, doc.typography, heuristicMeasurer), issues, html };
 }

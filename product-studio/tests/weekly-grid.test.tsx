@@ -99,7 +99,7 @@ describe("weekly spread = one connected planner grid", () => {
       [0, 1].forEach((p) => {
         it(`${p === 0 ? "left" : "right"} page, rendered SVG: one border, shared rules once, no card rects`, () => {
           const html = renderToStaticMarkup(
-            <PrintablePage geometry={geometryFor(doc, doc.recipe.pages[first + p])} solved={solvePage(doc, first + p)} colors={doc.colors} typography={doc.typography} decorative={doc.decorative} mode="print" />,
+            <PrintablePage geometry={geometryFor(doc, doc.recipe.pages[first + p])} solved={solvePage(doc, first + p)} colors={doc.colors} typography={doc.typography} decorative={doc.decorative} background={doc.background} mode="print" />,
           );
           // Every stroked rectangle drawn is either the grid border or a checklist checkbox.
           const rects = [...html.matchAll(/<rect[^>]*data-node="([^"]+)"/g)].map((m) => m[1]);
@@ -155,7 +155,7 @@ describe("weekly desk pad = one connected 7-day grid", () => {
   });
   it("rendered SVG: no per-cell rects; only the grid border (+ the separate priorities panel)", () => {
     const html = renderToStaticMarkup(
-      <PrintablePage geometry={geometryFor(doc, doc.recipe.pages[0])} solved={solvePage(doc, 0)} colors={doc.colors} typography={doc.typography} decorative={doc.decorative} mode="print" />,
+      <PrintablePage geometry={geometryFor(doc, doc.recipe.pages[0])} solved={solvePage(doc, 0)} colors={doc.colors} typography={doc.typography} decorative={doc.decorative} background={doc.background} mode="print" />,
     );
     const rects = [...html.matchAll(/<rect[^>]*data-node="([^"]+)"/g)].map((m) => m[1]).filter((id) => !/-cb\d+$/.test(id));
     expect(rects.sort()).toEqual(project.layoutOptions.showSidebar ? ["dp-grid-border", "dp-priorities-box"] : ["dp-grid-border"]);

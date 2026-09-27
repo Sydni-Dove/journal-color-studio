@@ -172,10 +172,10 @@ export function defaultCorners(assetId: string | undefined): CornerSet {
 
 /** Bring any stored theme onto a valid style/asset/placement combination (and migrate old fields). */
 export function normalizeDecoration(t: DecorativeTheme): DecorativeTheme {
-  const styles = ["none", "solid", "marble", "watercolor", "floral", "accent"];
+  const styles = ["none", "solid", "marble", "pattern", "watercolor", "floral", "accent"];
   if (!styles.includes(t.style)) return { ...t, style: "none" };
   let assetId = t.assetId;
-  if (t.style === "marble" || t.style === "floral" || t.style === "accent") {
+  if (t.style === "marble" || t.style === "pattern" || t.style === "floral" || t.style === "accent") {
     if (!findAsset(assetId) || findAsset(assetId)!.type !== t.style) assetId = assetsFor(t.style)[0].id;
   }
   let placement: string = t.placement;
@@ -209,7 +209,8 @@ function rasterFor(asset: DesignAsset, rect: Rect, theme: DecorativeTheme, color
     pxW,
     pxH,
     fit,
-    zoom: asset.type === "marble" ? Math.max(1, theme.scale) : 1,
+    zoom: asset.type === "marble" || asset.type === "pattern" ? Math.max(1, theme.scale) : 1,
+    ...(asset.type === "floral" && theme.artColors === "original" ? { original: true } : {}),
     roles: {
       base: hexOf(colors, theme.colorA, "#630000"),
       vein: hexOf(colors, theme.colorB, "#E6A742"),
@@ -482,7 +483,7 @@ function noRoomReason(comp: Composition, s: Spec, fallback = "no room"): string 
   return fallback;
 }
 
-function placeObjects(c: Ctx, asset: Exclude<DesignAsset, { type: "marble" }>, specs: Spec[]) {
+function placeObjects(c: Ctx, asset: Exclude<DesignAsset, { type: "marble" | "pattern" }>, specs: Spec[]) {
   const ar = asset.size.w / asset.size.h;
   const pieces: DecorPiece[] = [];
   const reports: PieceReport[] = [];
@@ -563,10 +564,10 @@ export function planDecoration(g: PageGeometry, input: DecorativeTheme, colors: 
     targetGapIn: null,
   });
   const edge: EdgeTreatment = theme.edge ?? "contained";
-  const run = (specs: Spec[]) => placeObjects(c, asset as Exclude<DesignAsset, { type: "marble" }>, withOverrides(specs, theme, comp));
+  const run = (specs: Spec[]) => placeObjects(c, asset as Exclude<DesignAsset, { type: "marble" | "pattern" }>, withOverrides(specs, theme, comp));
 
-  // ── Fields: solid, watercolor, marble ──
-  if (theme.style === "solid" || theme.style === "watercolor" || theme.style === "marble") {
+  // ── Fields: solid, watercolor, marble, pattern ──
+  if (theme.style === "solid" || theme.style === "watercolor" || theme.style === "marble" || theme.style === "pattern") {
     // Surfaces attach to the page's structure: the header, the footer, the outer edge or the margins around the content.
     const region = theme.placement === "header-band" ? band : theme.placement === "footer-band" ? footerBand : theme.placement === "edge-strip" ? edgeStrip : media;
     const knock = theme.placement === "border-frame" ? frameHole : [];
@@ -583,12 +584,13 @@ export function planDecoration(g: PageGeometry, input: DecorativeTheme, colors: 
       }));
       return plan([{ kind: "watercolor", rect: region, paper: "background", blooms }], knock, reports, feather);
     }
-    const marble = findAsset(theme.assetId)!;
-    return plan([{ kind: "raster", assetId: marble.id, rect: region, request: rasterFor(marble, region, theme, colors, "cover"), fallback: theme.colorA }], knock, reports);
+    // Marble and pattern artwork is cover-fitted to its region: cropped, never stretched.
+    const surface = findAsset(theme.assetId)!;
+    return plan([{ kind: "raster", assetId: surface.id, rect: region, request: rasterFor(surface, region, theme, colors, "cover"), fallback: theme.colorA }], knock, reports);
   }
 
   const asset = findAsset(theme.assetId)!;
-  if (asset.type === "marble") return null;
+  if (asset.type === "marble" || asset.type === "pattern") return null;
   const ar = asset.size.w / asset.size.h;
   const trimW = g.trimWidthIn;
 

@@ -104,19 +104,18 @@ ratios and their sources.
   header / footer flourish). Only role-appropriate placements are offered, and
   every placement attaches to a target (title rule, page edge, header, footer,
   content boundary).
-- **Marble.** The current snapshot is Journal Color Studio `14e4e75`: veined,
-  bold gold, gold leaf and white. The newer approved, polished marbles are on
-  Journal Color Studio `main`:
-  - `d7068ea`: four recolorable kintsugi marbles (Rose, Burgundy + blush,
-    Black ember, Peach);
-  - merged in `ba916ad`, 2026-09-26.
-
-  They need two recolor-engine extensions Product Studio does not have yet:
-  - a per-texture stone texture range (`texScale`);
-  - a second-stone layer that stays visible under a transparent gold-seam
-    overlay (`veinsAlpha`).
-
-  Burgundy also keeps its whole original as a per-pixel tone-transfer source.
-  Snapshotting them is the next marble step. It needs a faithful port of
-  those two changes and a side-by-side check against Journal Color Studio,
-  never a substitute marble.
+- **Layers.** A page has a BACKGROUND / surface layer (marble, watercolor,
+  stripes, solid) and a DECORATIVE ELEMENTS layer (florals, line art), each
+  picked from a curated library with palette-recolored thumbnails
+  (`design-library/catalog.ts`, `themes/layers.ts`). Projects saved with one
+  combined decoration are migrated without any visual change.
+- **Design library.** Synced to Journal Color Studio `main` `ba916ad`
+  (`src/design-library/SNAPSHOT.md`): the four kintsugi marbles with their
+  recolor model (`texScale`, the second stone under a transparent seam
+  overlay, burgundy's whole-original source), three stripe patterns, the
+  "As designed" marble palettes, the 11 color families, the line-art accent
+  role and the floral "original colors" option.
+- **Next library step.** Bold stripes, Scribble and Abstract arches wait for
+  full-size Canva exports upstream (JCS marks their current maps as low
+  resolution). Cover backgrounds (photo marbles, leathers, washes) wait for a
+  cover product.

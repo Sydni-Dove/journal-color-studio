@@ -25,19 +25,35 @@ import accentArcs from "./assets/accent-arcs.png?url";
 import accentRibbon from "./assets/accent-ribbon.png?url";
 import accentDots from "./assets/accent-dots.png?url";
 import accentStripes from "./assets/accent-stripes.png?url";
+import marbleRose from "./assets/marble-layers-rose.png?url";
+import marbleRoseVeins from "./assets/marble-rose-gold.png?url";
+import marbleBurgundy from "./assets/marble-layers-burgundy.png?url";
+import marbleBurgundySource from "./assets/marble-burgundy-source.jpg?url";
+import marbleEmber from "./assets/marble-layers-ember.png?url";
+import marbleEmberVeins from "./assets/marble-ember-gold.png?url";
+import marblePeach from "./assets/marble-layers-peach.png?url";
+import marblePeachVeins from "./assets/marble-peach-gold.png?url";
+import patternCabana from "./assets/pattern-cabana.png?url";
+import patternPinstripe from "./assets/pattern-pinstripe.png?url";
+import patternBias from "./assets/pattern-bias.png?url";
 import type { DecorationCapability, DecorativePlacement } from "../types/theme";
 import { DECORATION_CAPABILITIES, placementsForCapabilities } from "./placement";
 
 export const JCS_SNAPSHOT = {
   source: "journal-color-studio snapshot",
   repository: "Sydni-Dove/journal-color-studio",
-  /** Branch that carries the current Journal Color Studio designs (patterns merged onto the four-journal baseline). */
-  branch: "integration/multi-journal-plus-patterns",
-  commit: "14e4e75",
-  /** Every asset below was verified byte-identical to this commit (or copied from it). */
-  verified: "2026-09-25",
-  previousCommit: "8282a74",
+  /** The stable source: `main` (the pattern / multi-journal integration branch was merged into it). */
+  branch: "main",
+  commit: "ba916ad",
+  /** Every asset below was verified byte-identical (SHA-1) to this commit. */
+  verified: "2026-09-27",
+  previousCommit: "14e4e75",
+  previousBranch: "integration/multi-journal-plus-patterns",
 } as const;
+
+/** Picker thumbnails: derived by tools/build_thumbs.py (160 px), recolored live; pages and print use the full files. */
+const THUMBS = import.meta.glob("./assets/thumbs/*", { eager: true, query: "?url", import: "default" }) as Record<string, string>;
+const thumbOf = (sourceFile: string) => THUMBS[`./assets/thumbs/${sourceFile.replace(/\.(png|jpg)$/, "")}.${sourceFile.endsWith(".jpg") ? "jpg" : "png"}`];
 
 type Base = {
   id: string;
@@ -51,6 +67,8 @@ type Base = {
   size: { w: number; h: number };
   /** Journal Color Studio commit the file was copied from. */
   sourceCommit: string;
+  /** Date the file was snapshotted into Product Studio. */
+  snapshotted: string;
   /** What the artwork is designed to do (design-library/placement.ts). */
   capabilities: DecorationCapability[];
   /** Placements realising those capabilities. */
@@ -64,23 +82,51 @@ type Base = {
  * originalPalette = the palette whose vein/highlight colours ARE the artwork's
  * own colours: that colourway draws the overlay untouched.
  */
-export type VeinOverlay = { url: string; sourceFile: string; sha1: string; sourceCommit: string; size: { w: number; h: number }; alpha: boolean; originalPalette: string };
+export type VeinOverlay = { url: string; thumb?: string; sourceFile: string; sha1: string; sourceCommit: string; size: { w: number; h: number }; alpha: boolean; originalPalette: string };
+
+/** What each marble layer IS in this artwork (JCS TEXTURES `roles`): label + hint, per recolor role. */
+export type MarbleLayerNames = { stone: [string, string]; highlight: [string, string]; vein: [string, string] };
 
 /**
  * Marble layer map. Channels: R = stone detail, G = vein coverage,
  * B = highlight coverage. Recolored onto three roles.
  */
-export type MarbleAsset = Base & { type: "marble"; shadeBase: number; shadeAmt: number; veins?: VeinOverlay };
+export type MarbleAsset = Base & {
+  type: "marble";
+  shadeBase: number;
+  shadeAmt: number;
+  veins?: VeinOverlay;
+  /** Stone texture range multiplier (JCS `texScale`; burgundy's wine stone spans a wider light/dark range). */
+  texScale?: number;
+  /** Layer names shown next to the color roles (kintsugi marbles). */
+  layers?: MarbleLayerNames;
+  /** The palette holding this marble's own colors ("As designed", JCS `rec`). */
+  asDesigned?: string;
+  thumb?: string;
+  /** Whole-frame 240 px copy of the map: thumbnail tone statistics (derived, tools/build_thumbs.py). */
+  statsSample?: string;
+};
+/**
+ * Two-tone pattern ink map (JCS pattern-*.png, 8-bit grey: 0 = light ground,
+ * 255 = full ink). Rebuilt between two palette roles: ground + ink.
+ * `original` = the design's own Canva colors (JCS PATTERNS `original`).
+ */
+export type PatternAsset = Base & { type: "pattern"; original: { ground: string; ink: string }; thumb?: string };
 /** Full-color floral artwork, recolored by hue family onto five roles. */
-export type FloralAsset = Base & { type: "floral"; usage: "bouquet" | "corner" | "sprig" };
+export type FloralAsset = Base & { type: "floral"; usage: "bouquet" | "corner" | "sprig"; thumb?: string };
 /** Single-color line art (white alpha mask), tinted with one role. */
 export type AccentAsset = Base & { type: "accent" };
 
-export type DesignAsset = MarbleAsset | FloralAsset | AccentAsset;
+export type DesignAsset = MarbleAsset | PatternAsset | FloralAsset | AccentAsset;
 
-const snap = { source: JCS_SNAPSHOT.source, version: 1, sourceCommit: "8282a74" } as const;
+const snap = { source: JCS_SNAPSHOT.source, version: 1, sourceCommit: "8282a74", snapshotted: "2026-09-25" } as const;
 /** Assets first copied at 14e4e75 (or replaced by a newer approved file there). */
-const snap2 = { source: JCS_SNAPSHOT.source, version: 2, sourceCommit: "14e4e75" } as const;
+const snap2 = { source: JCS_SNAPSHOT.source, version: 2, sourceCommit: "14e4e75", snapshotted: "2026-09-25" } as const;
+/** Assets first copied from `main` (d7068ea kintsugi marbles, 8ed5ace stripe maps), verified at ba916ad. */
+const snap3 = (sourceCommit: string) => ({ source: JCS_SNAPSHOT.source, version: 3, sourceCommit, snapshotted: "2026-09-27" }) as const;
+/** Kintsugi marbles share one shading setup (JCS TEXTURES: shadeBase .6, shadeAmt .5). */
+const KINTSUGI = { shadeBase: 0.6, shadeAmt: 0.5 } as const;
+const KINTSUGI_VEINS = { sourceCommit: "d7068ea", alpha: true } as const;
 
 type Raw<T> = T extends unknown ? Omit<T, "capabilities" | "placements"> : never;
 
@@ -92,6 +138,28 @@ const RAW_ASSETS: Raw<DesignAsset>[] = [
   { ...snap, type: "marble", id: "jcs-marble-goldleaf", label: "Gold leaf marble", sourceFile: "marble-layers-goldleaf.png", sha1: "497da5d008f29be0e0e6095c6f947a27df5b2cd5", url: marbleGoldLeaf, size: { w: 1500, h: 1922 }, shadeBase: 0.62, shadeAmt: 0.5,
     veins: { url: marbleGoldLeafVeins, sourceFile: "marble-goldleaf-gold.png", sha1: "768a91750cfe97935ce9b381543f2cd4434432d5", sourceCommit: "14e4e75", size: { w: 1594, h: 2042 }, alpha: true, originalPalette: "Gold Leaf" } },
   { ...snap, type: "marble", id: "jcs-marble-white", label: "White marble", sourceFile: "marble-layers-white.png", sha1: "bd7ce03f23dbc3af604fdc1e9e82e003093a6b92", url: marbleWhite, size: { w: 1800, h: 2306 }, shadeBase: 0.7, shadeAmt: 0.4 },
+  // Kintsugi marbles (JCS Design Elements p.68-71, maps built by JCS tools/build_marble_maps.py). The stone and the
+  // SECOND stone are rebuilt from the map; the gold seams are the original pixels (exact in the marble's own colors,
+  // tone-transferred for any other palette).
+  { ...snap3("d7068ea"), ...KINTSUGI, type: "marble", id: "jcs-marble-rose", label: "Rose kintsugi marble", sourceFile: "marble-layers-rose.png", sha1: "6c06cd18ba689d1b7e21f94528eb7cf470a5b5fd", url: marbleRose, size: { w: 2666, h: 3466 },
+    veins: { ...KINTSUGI_VEINS, url: marbleRoseVeins, sourceFile: "marble-rose-gold.png", sha1: "4f7e0a5f50f5b0fb987cb075f9f714f8491800a8", size: { w: 2666, h: 3466 }, originalPalette: "Rose Marble" },
+    asDesigned: "Rose Marble", layers: { stone: ["Rose stone", "Deeper pink slabs"], highlight: ["Blush stone", "Pale pink + white slabs"], vein: ["Gold seams", "Kintsugi gold"] } },
+  // Three stone tones (wine, rose, cream): keeps the WHOLE original as its source (an opaque overlay covering the map's
+  // B = 1 area) — exact pixels in its own colors, per-pixel tone transfer for any other palette.
+  { ...snap3("d7068ea"), ...KINTSUGI, type: "marble", id: "jcs-marble-burgundy", label: "Burgundy + blush kintsugi marble", sourceFile: "marble-layers-burgundy.png", sha1: "2596f5d648b1e702c5b6613ecd12d28e66f258ce", url: marbleBurgundy, size: { w: 2666, h: 3512 },
+    veins: { url: marbleBurgundySource, sourceFile: "marble-burgundy-source.jpg", sha1: "9ca564d88e0d37360d8566d01b14e6742ec900b1", sourceCommit: "d7068ea", size: { w: 2666, h: 3512 }, alpha: false, originalPalette: "Burgundy Blush Marble" },
+    texScale: 2, asDesigned: "Burgundy Blush Marble", layers: { stone: ["Wine + rose stone", "Burgundy and rose-pink slabs"], highlight: ["Cream stone", "Pale cream + blush slabs"], vein: ["Gold seams", "Kintsugi gold"] } },
+  { ...snap3("d7068ea"), ...KINTSUGI, type: "marble", id: "jcs-marble-ember", label: "Black ember kintsugi marble", sourceFile: "marble-layers-ember.png", sha1: "f5535a0c1c696e71233ce11a5abe106d995a70a1", url: marbleEmber, size: { w: 2666, h: 3289 },
+    veins: { ...KINTSUGI_VEINS, url: marbleEmberVeins, sourceFile: "marble-ember-gold.png", sha1: "73c3fcb672ba24f7256865de49655d97cd2447fd", size: { w: 2666, h: 3289 }, originalPalette: "Black Ember Marble" },
+    asDesigned: "Black Ember Marble", layers: { stone: ["Black stone", "Deep charcoal"], highlight: ["Smoke", "Grey smoky wisps"], vein: ["Ember seams", "Glowing gold veins"] } },
+  { ...snap3("d7068ea"), ...KINTSUGI, type: "marble", id: "jcs-marble-peach", label: "Peach kintsugi marble", sourceFile: "marble-layers-peach.png", sha1: "41b0a77820e9e4850cc58a4710aee1707e29003c", url: marblePeach, size: { w: 2432, h: 3559 },
+    veins: { ...KINTSUGI_VEINS, url: marblePeachVeins, sourceFile: "marble-peach-gold.png", sha1: "4dc9eb3e07ed59aca49d8578df15fc1bb81865b5", size: { w: 2432, h: 3559 }, originalPalette: "Peach Marble" },
+    asDesigned: "Peach Marble", layers: { stone: ["Coral stone", "Deeper peach slabs"], highlight: ["Champagne stone", "Pale cream slabs"], vein: ["Gold seams", "Kintsugi gold"] } },
+  // Stripe patterns (JCS Design Elements p.30/33/34, sharper Canva exports in 8ed5ace). Ink maps: geometry, weave and
+  // anti-aliasing live in the map; only the two colors change.
+  { ...snap3("8ed5ace"), type: "pattern", id: "jcs-pattern-cabana", label: "Cabana stripe", sourceFile: "pattern-cabana.png", sha1: "02c8f892db89c6af4c86b6e856c8546a8cf909d8", url: patternCabana, size: { w: 1700, h: 1688 }, original: { ground: "#FCF7F1", ink: "#8D9DB6" } },
+  { ...snap3("8ed5ace"), type: "pattern", id: "jcs-pattern-pinstripe", label: "Pinstripe", sourceFile: "pattern-pinstripe.png", sha1: "37574a25225c4ff89e8036449194ac21ac268c66", url: patternPinstripe, size: { w: 1656, h: 1120 }, original: { ground: "#EDF1FA", ink: "#07080D" } },
+  { ...snap3("8ed5ace"), type: "pattern", id: "jcs-pattern-bias", label: "Bias stripe", sourceFile: "pattern-bias.png", sha1: "52df1d2e476c0e6e9d0ffbfe8cab25fc469375ba", url: patternBias, size: { w: 1692, h: 1120 }, original: { ground: "#F1F2F6", ink: "#040306" } },
   // Floral artwork.
   // floral-cover.jpg (lettering baked in) was retired upstream; the bouquet is now its own transparent layer.
   { ...snap2, type: "floral", usage: "bouquet", id: "jcs-floral-bouquet", label: "Floral bouquet", sourceFile: "floral-bouquet.png", sha1: "57b03db65e1c35cd0687beb308995cc10211e9ba", url: floralBouquet, size: { w: 2479, h: 1593 } },
@@ -108,7 +176,16 @@ const RAW_ASSETS: Raw<DesignAsset>[] = [
 
 export const DESIGN_ASSETS: DesignAsset[] = RAW_ASSETS.map((a) => {
   const capabilities = DECORATION_CAPABILITIES[a.id] ?? [];
-  return { ...a, capabilities, placements: placementsForCapabilities(capabilities) } as DesignAsset;
+  const withThumb =
+    a.type === "accent"
+      ? a
+      : {
+          ...a,
+          thumb: thumbOf(a.sourceFile),
+          ...(a.type === "marble" ? { statsSample: THUMBS[`./assets/thumbs/${a.sourceFile.replace(/\.png$/, "")}-stats.png`] } : {}),
+          ...(a.type === "marble" && a.veins ? { veins: { ...a.veins, thumb: thumbOf(a.veins.sourceFile) } } : {}),
+        };
+  return { ...withThumb, capabilities, placements: placementsForCapabilities(capabilities) } as DesignAsset;
 });
 
 /**

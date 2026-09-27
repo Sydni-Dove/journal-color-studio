@@ -10,9 +10,9 @@ import { GRID_PRESETS, RULING_PRESETS } from "../../engines/patterns/patterns";
 import { addVariantFromCurrent } from "../../persistence/projectStore";
 import { SPACING_LABELS } from "../../presets/spacing/spacingPresets";
 import { PALETTES, findPalette } from "../../presets/themes/palettes";
-import { DEFAULT_ROLES, FONT_CATALOG, FONT_CATEGORY_LABEL, ROLE_LABELS } from "../../presets/typography/typography";
+import { DEFAULT_ROLES, DESIGN_TYPE_PAIRINGS, FONT_CATALOG, FONT_CATEGORY_LABEL, ROLE_LABELS } from "../../presets/typography/typography";
 import { DEFAULT_WORDING } from "../../presets/wording";
-import { DESIGN_ASSETS, JCS_SNAPSHOT } from "../../design-library/library";
+import { JCS_SNAPSHOT } from "../../design-library/library";
 import { COMPOSITION_ANCHORS, type AlignX, type AlignY, type CompositionAnchor, type DecorationPlacementOverrides } from "../../types/composition";
 import type { ElementPosition, SemanticTextKey, TextAnchor } from "../../types/layout";
 import { defaultCorners, edgesFor, isObjectPlacement, normalizeDecoration, opacityCap, placementsFor, titlePositionsFor, type PieceReport } from "../../themes/decorationPlan";
@@ -20,6 +20,11 @@ import type { ProductProject } from "../../types/project";
 import type { CornerSet, DecorativePlacement, DecorativeTheme, EdgeTreatment, FunctionalPatternKind, TitleAccentPosition } from "../../types/theme";
 import type { ColorToken, ColorTokens, FontCategory, FontGroup, SpacingDensity, WordingKey } from "../../types/tokens";
 import { AppliesTo, Check, Field, NumberField, Section, Segmented, Select, type EditorNav } from "./ui";
+import { useEffect, useState } from "react";
+import { BACKGROUND_GROUPS, ELEMENT_GROUPS, defaultRoles, designValue, groupOf, type CatalogDesign, type CatalogGroup } from "../../design-library/catalog";
+import { jcsPaletteId } from "../../design-library/palettes";
+import { isSurfaceStyle, NO_LAYER, splitLayers } from "../../themes/layers";
+import { DesignThumb } from "./DesignThumb";
 
 type Update = (fn: (p: ProductProject) => ProductProject) => void;
 type PanelProps = { project: ProductProject; update: Update; usage: ProjectUsage; nav: EditorNav };
@@ -148,6 +153,15 @@ export function TypographyPanel({ project, update, usage }: PanelProps) {
   const groups = (Object.keys(GROUP_LABEL) as FontGroup[]).filter((g) => usage.fontGroups.includes(g));
   return (
     <Section title="Typography">
+      <Select
+        label="Design pairing"
+        value={DESIGN_TYPE_PAIRINGS.find((t) => Object.entries(t.fonts).every(([g, f]) => fonts[g as FontGroup] === f))?.id ?? "__custom"}
+        options={[{ value: "__custom", label: "Custom — choose each font below" }, ...DESIGN_TYPE_PAIRINGS.map((t) => ({ value: t.id, label: t.label }))]}
+        onChange={(id) => {
+          const t = DESIGN_TYPE_PAIRINGS.find((x) => x.id === id);
+          if (t) update((p) => ({ ...p, typography: { ...p.typography, fonts: { ...p.typography.fonts, ...t.fonts } } }));
+        }}
+      />
       {groups.map((g) => (
         <Field key={g} label={GROUP_LABEL[g]}>
           <select value={fonts[g]} onChange={(e) => update((p) => ({ ...p, typography: { ...p.typography, fonts: { ...p.typography.fonts, [g]: e.target.value } } }))}>
@@ -183,7 +197,8 @@ export function TypographyPanel({ project, update, usage }: PanelProps) {
  * Colors and decoration are the variant-overridable "look". While a variant is
  * active, edits go to that variant; otherwise to the base design.
  */
-function setLook(update: Update, patch: { colors?: Partial<ProductProject["colors"]["overrides"]>; decorativeTheme?: Partial<ProductProject["decorativeTheme"]> }) {
+type LookPatch = { colors?: Partial<ProductProject["colors"]["overrides"]>; decorativeTheme?: Partial<ProductProject["decorativeTheme"]>; backgroundTheme?: Partial<ProductProject["decorativeTheme"]> };
+function setLook(update: Update, patch: LookPatch) {
   update((p) => {
     if (p.activeVariantId) {
       return {
@@ -197,6 +212,7 @@ function setLook(update: Update, patch: { colors?: Partial<ProductProject["color
                   ...v.overrides,
                   colors: patch.colors ? { ...v.overrides.colors, ...patch.colors } : v.overrides.colors,
                   decorativeTheme: patch.decorativeTheme ? { ...v.overrides.decorativeTheme, ...patch.decorativeTheme } : v.overrides.decorativeTheme,
+                  backgroundTheme: patch.backgroundTheme ? { ...v.overrides.backgroundTheme, ...patch.backgroundTheme } : v.overrides.backgroundTheme,
                 },
               },
         ),
@@ -206,6 +222,7 @@ function setLook(update: Update, patch: { colors?: Partial<ProductProject["color
       ...p,
       colors: patch.colors ? { ...p.colors, overrides: { ...p.colors.overrides, ...patch.colors } } : p.colors,
       decorativeTheme: patch.decorativeTheme ? { ...p.decorativeTheme, ...patch.decorativeTheme } : p.decorativeTheme,
+      backgroundTheme: patch.backgroundTheme ? { ...(p.backgroundTheme ?? NO_LAYER), ...patch.backgroundTheme } : p.backgroundTheme,
     };
   });
 }
@@ -222,6 +239,9 @@ const TOKEN_LABEL: Record<ColorToken, string> = {
   decorativeAccent: "Decoration veins / line art",
   decorBase: "Decoration base",
   decorHighlight: "Decoration highlights",
+  lineArt: "Line art",
+  patternGround: "Pattern ground",
+  patternInk: "Pattern stripes",
 };
 const HEX = /^#[0-9a-f]{6}$/i;
 
@@ -232,12 +252,13 @@ export function ColorPanel({ project, update, usage }: PanelProps) {
   const active = project.variants.find((v) => v.id === project.activeVariantId);
   const groups = [
     { label: "Dove Expressions brand", list: PALETTES.filter((p) => p.brandPalette) },
-    { label: "Journal Color Studio palettes", list: PALETTES.filter((p) => p.source) },
+    { label: "Journal Color Studio palettes", list: PALETTES.filter((p) => p.source && p.group !== "family") },
+    { label: "Journal Color Studio color families", list: PALETTES.filter((p) => p.source && p.group === "family") },
     { label: "Variants (pending approval)", list: PALETTES.filter((p) => !p.brandPalette && !p.source) },
   ];
   const editable = usage.colorTokens.filter((t) => HEX.test(effective[t]));
   return (
-    <Section title="Colors">
+    <Section title={"Theme & palette"}>
       <Field label="Palette">
         <select value={project.colors.paletteId} onChange={(e) => update((p) => ({ ...p, colors: { paletteId: e.target.value, overrides: {} } }))}>
           {groups.map((g) => (
@@ -283,13 +304,6 @@ export function WordingPanel({ project, update, usage }: PanelProps) {
   );
 }
 
-/** One dropdown entry per REAL design: style + snapshot asset. */
-const DESIGN_CHOICES: { value: string; label: string; style: DecorativeTheme["style"]; assetId?: string }[] = [
-  { value: "none", label: "None", style: "none" },
-  { value: "solid", label: "Solid color", style: "solid" },
-  { value: "watercolor", label: "Watercolor wash", style: "watercolor" },
-  ...DESIGN_ASSETS.map((a) => ({ value: a.id, label: `${a.type === "marble" ? "Marble" : a.type === "floral" ? "Floral" : "Line art"} — ${a.label}`, style: a.type, assetId: a.id })),
-];
 const PLACEMENT_LABEL: Record<DecorativePlacement, string> = {
   "full-page": "Full background (behind content, soft)",
   "header-band": "Header band",
@@ -335,11 +349,12 @@ const TITLE_POSITION_LABEL: Record<TitleAccentPosition, string> = {
 const ROLE_NAMES: Record<string, [string, string, string]> = {
   solid: ["Fill", "", ""],
   marble: ["Stone", "Veins", "Highlights"],
+  pattern: ["Ground", "Stripes", ""],
   watercolor: ["Wash", "Wisps", "Blooms"],
   floral: ["Leaves", "Gold", "Soft flowers"],
   accent: ["", "Line color", ""],
 };
-const DECOR_TOKENS: ColorToken[] = ["decorBase", "decorativeAccent", "decorHighlight", "primary", "accent", "border", "background", "text"];
+const DECOR_TOKENS: ColorToken[] = ["decorBase", "decorativeAccent", "decorHighlight", "lineArt", "patternGround", "patternInk", "primary", "accent", "border", "background", "text"];
 const ALIGN_LABEL = { start: "Start", center: "Center", end: "End" } as const;
 /** Behind-content backgrounds above this strength compete with writing (JCS soft interiors use 0.16). */
 const BEHIND_CONTENT_HINT = 0.3;
@@ -347,6 +362,7 @@ const BEHIND_CONTENT_HINT = 0.3;
 /** What the Size control scales, per design (null = the design has no size). */
 function sizeControl(d: DecorativeTheme): { label: string; min: number; max: number } | null {
   if (d.style === "marble") return { label: "Zoom", min: 1, max: 3 };
+  if (d.style === "pattern") return { label: "Stripe scale", min: 1, max: 3 };
   if (d.style === "floral") return { label: "Size", min: 0.3, max: 2 };
   if (d.style === "accent" && d.placement !== "behind-title") return { label: d.placement === "header-band" || d.placement === "border-frame" ? "Pattern size" : "Size", min: 0.3, max: 3 };
   return null;
@@ -366,13 +382,119 @@ function pieceName(r: PieceReport): string {
 
 type DecorStatus = { reports: PieceReport[]; colors: ColorTokens; pageNumber: number } | null;
 
-export function DecorationPanel({ project, update, usage, decor }: PanelProps & { decor?: DecorStatus }) {
-  const d = normalizeDecoration(applyVariant(project).decorativeTheme);
-  const set = (patch: Partial<DecorativeTheme>) => setLook(update, { decorativeTheme: patch });
-  const setLayout = (patch: Partial<DecorationPlacementOverrides>) => set({ layout: { ...(d.layout ?? {}), ...patch } });
-  const choice = d.style === "marble" || d.style === "floral" || d.style === "accent" ? d.assetId! : d.style;
+/**
+ * Curated design picker: the library's groups as tabs, each design a
+ * thumbnail in the current palette. Picking never exposes raw source files.
+ */
+function DesignPicker({ label, groups, value, colors, roles, original, onPick }: { label: string; groups: CatalogGroup[]; value: string; colors?: ColorTokens; roles?: Pick<DecorativeTheme, "colorA" | "colorB" | "colorC">; original?: boolean; onPick: (d: CatalogDesign) => void }) {
+  const [tab, setTab] = useState(() => groupOf(groups, value).id);
+  useEffect(() => setTab(groupOf(groups, value).id), [groups, value]);
+  const group = groups.find((g) => g.id === tab) ?? groups[0];
+  return (
+    <div className="design-picker" role="group" aria-label={label}>
+      <div className="design-tabs" role="tablist" aria-label={`${label} groups`}>
+        {groups.map((g) => (
+          <button
+            key={g.id}
+            type="button"
+            role="tab"
+            aria-selected={g.id === group.id}
+            className={`design-tab${g.id === group.id ? " design-tab--on" : ""}`}
+            onClick={() => (g.id === "none" ? onPick(g.designs[0]) : setTab(g.id))}
+          >
+            {g.label}
+          </button>
+        ))}
+      </div>
+      {group.id !== "none" && (
+        <div className="design-grid">
+          {group.designs.map((d) => (
+            <button key={d.value} type="button" className="design-card" aria-pressed={d.value === value} title={d.hint} onClick={() => onPick(d)}>
+              {colors && <DesignThumb design={d} colors={colors} roles={d.value === value ? roles : undefined} original={d.value === value && original} />}
+              <span className="design-card-label">{d.label}</span>
+              <span className="design-card-hint">{d.hint}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Start a design from its strongest composition (first role-appropriate placement) and its own color roles. */
+function pickDesign(d: DecorativeTheme, c: CatalogDesign): DecorativeTheme {
+  const placement = placementsFor({ style: c.style, assetId: c.assetId })[0] ?? d.placement;
+  const roles = c.style === d.style ? {} : defaultRoles(c.style);
+  return normalizeDecoration({ ...d, ...roles, style: c.style, assetId: c.assetId, placement, corners: undefined, edge: undefined, titlePosition: undefined, layout: undefined, artColors: undefined, scale: c.style === d.style ? d.scale : 1 });
+}
+
+/**
+ * BACKGROUND / SURFACE — marble, watercolor, stripes, solid. A surface covers
+ * the page or one of its structural areas (header, footer, outer edge, margins).
+ */
+export function BackgroundPanel({ project, update, colors }: PanelProps & { colors?: ColorTokens }) {
+  const view = applyVariant(project);
+  const d = normalizeDecoration(splitLayers(view.backgroundTheme, { ...NO_LAYER, ...view.decorativeTheme }).background);
+  // Always write the whole effective background, and clear a surface still held by the old combined slot,
+  // so an edit can never fall back to (or be hidden by) the legacy value.
+  const legacySurface = isSurfaceStyle(view.decorativeTheme.style);
+  const set = (patch: Partial<DecorativeTheme>) => setLook(update, { backgroundTheme: { ...d, ...patch }, ...(legacySurface ? { decorativeTheme: { style: "none" } } : {}) });
+  const a = findAsset(d.assetId);
+  const marble = d.style === "marble" && a?.type === "marble" ? a : null;
   const placements = placementsFor(d);
-  const designRoles = d.style === "solid" || d.style === "watercolor" ? rolesFor(["header-band", "footer-band", "edge-strip", "margin-frame", "background"]) : d.style === "none" ? [] : rolesFor(findAsset(d.assetId)?.capabilities ?? []);
+  const size = sizeControl(d);
+  const names: [string, string, string] = marble?.layers ? [marble.layers.stone[0], marble.layers.vein[0], marble.layers.highlight[0]] : ROLE_NAMES[d.style] ?? ["", "", ""];
+  const tokenOptions = DECOR_TOKENS.map((c) => ({ value: c, label: colors?.[c] ? `${TOKEN_LABEL[c]} · ${colors[c]}` : TOKEN_LABEL[c] }));
+  const ownPalette = marble?.asDesigned ? jcsPaletteId(marble.asDesigned) : null;
+  const usingOwn = ownPalette === project.colors.paletteId && !Object.keys(project.colors.overrides).length && d.colorA === "decorBase" && d.colorB === "decorativeAccent" && d.colorC === "decorHighlight";
+  return (
+    <Section title="Background">
+      <p className="hint">The surface the page is printed on — a full background, a header or footer band, an edge strip or a margin frame. Content always stays on clean paper unless you choose the full background.</p>
+      <DesignPicker label="Background" groups={BACKGROUND_GROUPS} value={designValue(d)} colors={colors} roles={d} onPick={(c) => set(pickDesign(d, c))} />
+      {d.style !== "none" && (
+        <>
+          {placements.length > 1 && <Select label="Covers" value={d.placement} options={placements.map((p) => ({ value: p, label: PLACEMENT_LABEL[p] }))} onChange={(placement) => set(normalizeDecoration({ ...d, placement }))} />}
+          {ownPalette && (
+            <div className="as-designed">
+              {usingOwn ? (
+                <p className="hint">Showing this marble in its own colors (palette “{marble!.asDesigned}”).</p>
+              ) : (
+                <button type="button" className="btn" onClick={() => update((p) => ({ ...p, colors: { paletteId: ownPalette, overrides: {} } }))}>
+                  Use its own colors — palette “{marble!.asDesigned}”
+                </button>
+              )}
+            </div>
+          )}
+          <div className="row">
+            {size && <NumberField label={size.label} step={0.1} min={size.min} max={size.max} value={d.scale} onChange={(scale) => set({ scale })} />}
+            <NumberField label="Opacity" step={0.05} min={0.05} max={1} value={d.opacity} onChange={(opacity) => set({ opacity })} />
+          </div>
+          {d.placement === "full-page" && d.opacity > BEHIND_CONTENT_HINT && <p className="hint">Behind writing, keep opacity ≤ {BEHIND_CONTENT_HINT} for legibility (Journal Color Studio interiors use 0.16).</p>}
+          <div className="row">
+            {names[0] && <Select label={names[0]} value={d.colorA} options={tokenOptions} onChange={(colorA) => set({ colorA })} />}
+            {names[1] && <Select label={names[1]} value={d.colorB} options={tokenOptions} onChange={(colorB) => set({ colorB })} />}
+            {names[2] && <Select label={names[2]} value={d.colorC} options={tokenOptions} onChange={(colorC) => set({ colorC })} />}
+          </div>
+        </>
+      )}
+    </Section>
+  );
+}
+
+/**
+ * DECORATIVE ELEMENTS — florals and line art, each placed against the page's
+ * structure in one of the roles it was designed for.
+ */
+export function DecorationPanel({ project, update, usage, decor }: PanelProps & { decor?: DecorStatus }) {
+  const view = applyVariant(project);
+  const layers = splitLayers(view.backgroundTheme, { ...NO_LAYER, ...view.decorativeTheme });
+  const d = normalizeDecoration(layers.elements);
+  // A surface still held by the old combined slot moves to the background slot before the element slot is written.
+  const legacySurface = isSurfaceStyle(view.decorativeTheme.style);
+  const set = (patch: Partial<DecorativeTheme>) => setLook(update, { decorativeTheme: legacySurface ? { ...d, ...patch } : patch, ...(legacySurface ? { backgroundTheme: layers.background } : {}) });
+  const setLayout = (patch: Partial<DecorationPlacementOverrides>) => set({ layout: { ...(d.layout ?? {}), ...patch } });
+  const placements = placementsFor(d);
+  const designRoles = d.style === "none" ? [] : rolesFor(findAsset(d.assetId)?.capabilities ?? []);
   const roles = ROLE_NAMES[d.style] ?? ["", "", ""];
   const size = sizeControl(d);
   const cap = opacityCap(d);
@@ -380,29 +502,20 @@ export function DecorationPanel({ project, update, usage, decor }: PanelProps & 
   const o = d.layout ?? {};
   const edges = edgesFor(d.assetId);
   const titlePositions = titlePositionsFor(d.assetId);
+  const original = d.style === "floral" && d.artColors === "original";
   // Show each token's actual colour: tokens that share a colour in this palette look identical on the page.
   const tokenOptions = DECOR_TOKENS.map((c) => ({ value: c, label: decor?.colors[c] ? `${TOKEN_LABEL[c]} · ${decor.colors[c]}` : TOKEN_LABEL[c] }));
   return (
-    <Section title="Decoration">
+    <Section title="Decorative elements">
       <p className="hint">
-        Designs from Journal Color Studio (snapshot {JCS_SNAPSHOT.commit}). Decoration is composed around the page's content — it never moves lines, grids or calendars, and keeps
-        a clearance from them unless you allow overlap.
+        Artwork from Journal Color Studio (snapshot {JCS_SNAPSHOT.commit}), placed against the page's structure — the title rule, corners, edges, header and footer. It never moves
+        lines, grids or calendars, and keeps a clearance from them unless you allow overlap.
       </p>
-      <Select
-        label="Design"
-        value={choice}
-        options={DESIGN_CHOICES.map((c) => ({ value: c.value, label: c.label }))}
-        onChange={(v) => {
-          const c = DESIGN_CHOICES.find((x) => x.value === v)!;
-          // A new design starts from its strongest composition (its first role-appropriate placement), not the old one.
-          const placement = placementsFor({ style: c.style, assetId: c.assetId })[0] ?? d.placement;
-          set(normalizeDecoration({ ...d, style: c.style, assetId: c.assetId, placement, corners: undefined, edge: undefined, titlePosition: undefined, layout: undefined }));
-        }}
-      />
+      <DesignPicker label="Decorative element" groups={ELEMENT_GROUPS} value={designValue(d)} colors={decor?.colors} roles={d} original={original} onPick={(c) => set(pickDesign(d, c))} />
       {designRoles.length > 0 && <p className="hint decor-roles">Designed for: {designRoles.map((r) => ROLE_LABEL[r]).join(" · ")}</p>}
       {d.style !== "none" && (
         <>
-          {placements.length > 1 && <Select label="Placement" value={d.placement} options={placements.map((p) => ({ value: p, label: PLACEMENT_LABEL[p] }))} onChange={(placement) => set(normalizeDecoration({ ...d, placement, layout: undefined }))} />}
+          {placements.length > 1 && <Select label="Use as" value={d.placement} options={placements.map((p) => ({ value: p, label: PLACEMENT_LABEL[p] }))} onChange={(placement) => set(normalizeDecoration({ ...d, placement, layout: undefined }))} />}
           {(d.placement === "corners" || d.placement === "table-corner") && (
             <Select
               label="Corners"
@@ -446,14 +559,23 @@ export function DecorationPanel({ project, update, usage, decor }: PanelProps & 
             </div>
           )}
           {d.placement === "full-page" && d.opacity > BEHIND_CONTENT_HINT && <p className="hint">Behind writing, keep opacity ≤ {BEHIND_CONTENT_HINT} for legibility (Journal Color Studio interiors use 0.16).</p>}
+          {d.style === "floral" && (
+            <Segmented
+              label="Artwork colors"
+              value={original ? "original" : "palette"}
+              options={[{ value: "palette", label: "Palette" }, { value: "original", label: "As designed" }]}
+              onChange={(v) => set({ artColors: v === "original" ? "original" : undefined })}
+            />
+          )}
+          {original && <p className="hint">The artwork keeps its own painted colors; the palette does not recolor it.</p>}
           <div className="row">
-            {roles[0] && <Select label={roles[0]} value={d.colorA} options={tokenOptions} onChange={(colorA) => set({ colorA })} />}
-            {roles[1] && <Select label={roles[1]} value={d.colorB} options={tokenOptions} onChange={(colorB) => set({ colorB })} />}
-            {roles[2] && <Select label={roles[2]} value={d.colorC} options={tokenOptions} onChange={(colorC) => set({ colorC })} />}
+            {!original && roles[0] && <Select label={roles[0]} value={d.colorA} options={tokenOptions} onChange={(colorA) => set({ colorA })} />}
+            {!original && roles[1] && <Select label={roles[1]} value={d.colorB} options={tokenOptions} onChange={(colorB) => set({ colorB })} />}
+            {!original && roles[2] && <Select label={roles[2]} value={d.colorC} options={tokenOptions} onChange={(colorC) => set({ colorC })} />}
           </div>
           {object && (
             <details className="subsection">
-              <summary>Advanced placement</summary>
+              <summary>Advanced composition</summary>
               <p className="hint">
                 The system places the artwork against its target (title, rule, corner, edge) with the spacing tokens, and shrinks it — never crops it — to stay clear of content unless
                 bleed is chosen. These settings are fine adjustments; the page rules still apply.
@@ -579,9 +701,9 @@ export function VariantsPanel({ project, update }: PanelProps) {
         onClick={() =>
           update((p) => {
             const look = applyVariant(p);
-            const next = addVariantFromCurrent({ ...p, decorativeTheme: look.decorativeTheme }, `Variant ${p.variants.length + 1}`, { ...findPalette(p.colors.paletteId).colors, ...look.colors.overrides });
+            const next = addVariantFromCurrent({ ...p, decorativeTheme: look.decorativeTheme, backgroundTheme: look.backgroundTheme }, `Variant ${p.variants.length + 1}`, { ...findPalette(p.colors.paletteId).colors, ...look.colors.overrides });
             // The base design is untouched; only the new variant captures the look.
-            return { ...next, decorativeTheme: p.decorativeTheme };
+            return { ...next, decorativeTheme: p.decorativeTheme, backgroundTheme: p.backgroundTheme };
           })
         }
       >

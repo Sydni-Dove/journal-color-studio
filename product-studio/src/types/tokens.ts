@@ -117,7 +117,13 @@ export type ColorToken =
   /** Decoration base (marble stone, floral leaves, watercolor wash). */
   | "decorBase"
   /** Decoration highlight (marble highlights, soft flowers). */
-  | "decorHighlight";
+  | "decorHighlight"
+  /** Line-art color (JCS `accent`). */
+  | "lineArt"
+  /** Pattern ground between the stripes (JCS stripeBackground). */
+  | "patternGround"
+  /** Pattern stripes / ink (JCS stripePrimary). */
+  | "patternInk";
 
 export type ColorTokens = Record<ColorToken, string> & {
   /** Opacity applied to `line` for functional writing lines/grids (0–1). */
@@ -131,6 +137,8 @@ export type ColorPalette = {
   brandPalette: boolean;
   /** Where the palette came from (e.g. "journal-color-studio snapshot"). */
   source?: string;
+  /** Picker group for snapshotted palettes: journal palettes vs color families. */
+  group?: "journal" | "family";
   colors: ColorTokens;
   note?: string;
 };

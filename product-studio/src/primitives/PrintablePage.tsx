@@ -34,6 +34,8 @@ type Props = {
   colors: ColorTokens;
   typography: TypographySettings;
   decorative: DecorativeTheme;
+  /** Background / surface layer, drawn under the decorative elements. */
+  background?: DecorativeTheme;
   /** Spacing tokens (decoration clearance). Defaults to the balanced preset. */
   spacing?: SpacingTokens;
   mode: "editor" | "print";
@@ -53,7 +55,7 @@ export const SafeArea = ({ geometry: g, children }: { geometry: PageGeometry; ch
 
 const DEFAULT_SPACING = resolveSpacing("balanced");
 
-export const PrintablePage = memo(function PrintablePage({ geometry: g, solved, colors, typography, decorative, spacing = DEFAULT_SPACING, mode, overlay }: Props) {
+export const PrintablePage = memo(function PrintablePage({ geometry: g, solved, colors, typography, decorative, background, spacing = DEFAULT_SPACING, mode, overlay }: Props) {
   // Composition regions + protected content come from the SAME solved nodes drawn below.
   const composition = useMemo(() => resolveComposition(g, solved, typography, spacing), [g, solved, typography, spacing]);
   const style: CSSProperties = {
@@ -66,7 +68,8 @@ export const PrintablePage = memo(function PrintablePage({ geometry: g, solved, 
       {/* 1 background */}
       <div className="ps-layer ps-bg" />
       {/* 2 decorative */}
-      <DecorativeLayer geometry={g} theme={decorative} colors={colors} composition={composition} />
+      {background && <DecorativeLayer geometry={g} theme={background} colors={colors} composition={composition} layer="background" />}
+      <DecorativeLayer geometry={g} theme={decorative} colors={colors} composition={composition} layer="elements" />
       {/* 3 functional pattern */}
       <SafeArea geometry={g}>
         <PatternLayer nodes={solved.nodes} />

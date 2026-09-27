@@ -109,7 +109,7 @@ describe("numeric fields edit naturally (real keystrokes)", () => {
 
   it("decoration opacity: 1 → ⌫ → '' → '.5' commits 0.5", async () => {
     await open(journal());
-    const field = page.locator("details", { has: page.locator("summary", { hasText: /^Decoration$/ }) }).getByLabel("Opacity", { exact: true });
+    const field = page.locator("details", { has: page.locator("summary", { hasText: /^Background$/ }) }).getByLabel("Opacity", { exact: true });
     await caretToEnd(field);
     await field.press("Backspace");
     expect(await field.inputValue()).toBe("");

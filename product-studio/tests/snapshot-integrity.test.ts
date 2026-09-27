@@ -19,9 +19,10 @@ describe("design-library snapshot", () => {
   const snapshotMd = readFileSync(join(ROOT, "src/design-library/SNAPSHOT.md"), "utf8");
 
   it("records the current Journal Color Studio source", () => {
-    expect(JCS_SNAPSHOT.commit).toBe("14e4e75");
-    expect(JCS_SNAPSHOT.branch).toBe("integration/multi-journal-plus-patterns");
-    expect(snapshotMd).toContain("14e4e75");
+    expect(JCS_SNAPSHOT.commit).toBe("ba916ad");
+    expect(JCS_SNAPSHOT.branch).toBe("main");
+    expect(JCS_SNAPSHOT.previousCommit).toBe("14e4e75");
+    expect(snapshotMd).toContain("ba916ad");
   });
 
   for (const a of DESIGN_ASSETS) {

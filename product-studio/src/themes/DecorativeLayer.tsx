@@ -17,7 +17,7 @@ import type { ArtTransform } from "../engines/composition/fit";
 import { planDecoration, type DecorPiece } from "./decorationPlan";
 import { ensureRaster, onRasterReady, rasterKey, rasterUrl } from "./recolor";
 
-type Props = { geometry: PageGeometry; theme: DecorativeTheme; colors: ColorTokens; composition: Composition };
+type Props = { geometry: PageGeometry; theme: DecorativeTheme; colors: ColorTokens; composition: Composition; layer?: "background" | "elements" };
 
 /** Re-render when any raster this layer uses finishes recoloring. */
 function useRasters(pieces: DecorPiece[]) {
@@ -127,7 +127,7 @@ function Piece({ p, uid, i }: { p: DecorPiece; uid: string; i: number }) {
   }
 }
 
-export const DecorativeLayer = memo(function DecorativeLayer({ geometry: g, theme, colors, composition }: Props) {
+export const DecorativeLayer = memo(function DecorativeLayer({ geometry: g, theme, colors, composition, layer = "elements" }: Props) {
   const uid = useId().replace(/[:«»]/g, "");
   const plan = useMemo(() => planDecoration(g, theme, colors, composition), [g, theme, colors, composition]);
   const pieces = useMemo(() => plan?.pieces ?? [], [plan]);
@@ -137,7 +137,7 @@ export const DecorativeLayer = memo(function DecorativeLayer({ geometry: g, them
   const knock = plan.knockouts.length > 0;
   const f = plan.featherIn;
   return (
-    <svg className="ps-layer ps-decor" viewBox={`0 0 ${W} ${H}`} style={{ width: `${W}in`, height: `${H}in` }} aria-hidden>
+    <svg className="ps-layer ps-decor" data-layer={layer} viewBox={`0 0 ${W} ${H}`} style={{ width: `${W}in`, height: `${H}in` }} aria-hidden>
       {knock && (
         <defs>
           {f > 0 && (

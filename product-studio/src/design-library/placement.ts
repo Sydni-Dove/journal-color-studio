@@ -1,7 +1,7 @@
 /**
  * DECORATIVE PLACEMENT METADATA — one-way snapshot of Journal Color Studio's
  * approved composition data (branch integration/multi-journal-plus-patterns,
- * commit 14e4e75: ACCENT_LAYOUTS / ACCENT_CAPS / ACCENT_SUPPORT / drawAccent
+ * commit 14e4e75, unchanged on main ba916ad: ACCENT_LAYOUTS / ACCENT_CAPS / ACCENT_SUPPORT / drawAccent
  * constants, floralFlank, "soft" interior backgrounds). Pure design data;
  * Product Studio's composition engine applies it to physical page regions.
  */
@@ -59,6 +59,15 @@ export const DECORATION_CAPABILITIES: Record<string, DecorationCapability[]> = {
   "jcs-marble-boldgold": SURFACE,
   "jcs-marble-goldleaf": SURFACE,
   "jcs-marble-white": SURFACE,
+  // Kintsugi marbles (JCS main d7068ea / ba916ad): surfaces, like every marble.
+  "jcs-marble-rose": SURFACE,
+  "jcs-marble-burgundy": SURFACE,
+  "jcs-marble-ember": SURFACE,
+  "jcs-marble-peach": SURFACE,
+  // Stripe patterns (JCS pattern maps, 8ed5ace): surfaces.
+  "jcs-pattern-cabana": SURFACE,
+  "jcs-pattern-pinstripe": SURFACE,
+  "jcs-pattern-bias": SURFACE,
   "jcs-floral-bouquet": ["title-rule-right", "title-rule-left", "title-rule-center", "table-corner", "footer-flourish", "top-bottom"],
   "jcs-floral-corner": ["corner-contained", "corner-bleed", "table-corner"],
   "jcs-floral-sprig": ["title-rule-right", "title-rule-left", "title-rule-center", "title-left", "title-right", "table-corner"],

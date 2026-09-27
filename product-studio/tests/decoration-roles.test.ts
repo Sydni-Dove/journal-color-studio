@@ -30,12 +30,12 @@ describe("every asset declares its roles; only those placements are offered", ()
       expect(a.placements.length, a.id).toBeGreaterThan(0);
     }
   });
-  it("surfaces (marble) are only surfaces; florals and line art are never backgrounds or bands they were not designed for", () => {
-    for (const a of DESIGN_ASSETS.filter((x) => x.type === "marble")) {
+  it("surfaces (marble, stripe patterns) are only surfaces; florals and line art are never backgrounds or bands they were not designed for", () => {
+    for (const a of DESIGN_ASSETS.filter((x) => x.type === "marble" || x.type === "pattern")) {
       expect(new Set(rolesFor(a.capabilities))).toEqual(new Set(["band", "frame", "edge", "background"]));
       expect(a.placements).toEqual(["header-band", "footer-band", "edge-strip", "border-frame", "full-page"]);
     }
-    for (const a of DESIGN_ASSETS.filter((x) => x.type !== "marble")) expect(a.placements, a.id).not.toContain("full-page");
+    for (const a of DESIGN_ASSETS.filter((x) => x.type !== "marble" && x.type !== "pattern")) expect(a.placements, a.id).not.toContain("full-page");
   });
   it("removed placements: line art behind the title; sprigs floating above / below the title", () => {
     for (const a of DESIGN_ASSETS.filter((x) => x.type === "accent")) expect(a.placements, a.id).not.toContain("behind-title");

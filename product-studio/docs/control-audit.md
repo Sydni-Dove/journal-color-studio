@@ -76,6 +76,9 @@ Legend — WORKING · PARTIALLY WIRED · NOT WIRED · INCOMPATIBLE WITH CURRENT 
 | Decoration placement | `decorativeTheme.placement` | plan | region / corners / band | position | WORKING | WORKING (only placements the design supports) | `decoration placement…` |
 | Decoration scale | `decorativeTheme.scale` | plan | art size / marble zoom | size | WORKING | WORKING | `decoration scale…` |
 | Decoration opacity | `decorativeTheme.opacity` | plan | layer opacity | opacity | WORKING | WORKING | `decoration opacity…` |
+| Background design / covers / zoom / opacity / roles | `backgroundTheme.*` | `splitLayers` + `normalizeDecoration` | `planDecoration` → `DecorativeLayer` (layer "background") | surface | — | WORKING (Design Library Sync: separate Background section, curated groups + thumbnails) | `design-library-sync…`, `design-library.browser…` |
+| Floral artwork colors | `decorativeTheme.artColors` | raster request `original` | floral kept in its own colors | recolor | — | WORKING | `florals can keep their original colors` |
+| Design type pairing | `typography.fonts` | `DESIGN_TYPE_PAIRINGS` | fonts | typography | — | WORKING | — |
 | Decoration seed | `decorativeTheme.seed` | — | procedural placeholders only | random layout | WORKING (placeholder art) | REMOVED (snapshot art is fixed) | — |
 | Decoration role colors | `decorativeTheme.colorA/B/C` | plan / raster recolor | marble stone/veins/highlights, floral leaves/gold/flowers, line art | recolor | PARTIALLY (2 roles) | WORKING (3 roles, labelled per design) | `decoration role color…`, `marble recolors…` |
 | Extend under writing areas | `decorativeTheme.applyToInterior` | plan | safe-area mask | full-page decoration under writing | WORKING | WORKING (full page only) | `decoration never covers functional content` |

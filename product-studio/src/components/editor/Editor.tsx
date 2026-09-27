@@ -11,7 +11,7 @@ import { DEBUG_ALL, DEBUG_LABELS, DEBUG_OFF, type DebugFlags } from "../debug/De
 import { GeometryInfo } from "../debug/GeometryInfo";
 import { ExportDialog, IssueList } from "../export/ExportDialog";
 import { PagePreview, visibleIndices } from "../preview/PagePreview";
-import { ColorPanel, DecorationPanel, LayoutPanel, PatternPanel, SpacingPanel, TextPlacementPanel, TypographyPanel, VariantsPanel, WordingPanel } from "./DesignPanels";
+import { BackgroundPanel, ColorPanel, DecorationPanel, LayoutPanel, PatternPanel, SpacingPanel, TextPlacementPanel, TypographyPanel, VariantsPanel, WordingPanel } from "./DesignPanels";
 import { PagesPanel, ProductPanel, ProductionPanel } from "./ProductionPanels";
 import { BookOutlinePanel, BookStructurePanel } from "./BookPanels";
 import { Section, type EditorNav } from "./ui";
@@ -122,11 +122,13 @@ export function Editor({ project, onChange, onBack, saveStatus }: Props) {
               <LayoutPanel nav={nav} project={project} update={update} usage={usage} />
               <PatternPanel nav={nav} project={project} update={update} usage={usage} />
               <SpacingPanel nav={nav} project={project} update={update} usage={usage} />
-              <TypographyPanel nav={nav} project={project} update={update} usage={usage} />
+              {/* DESIGN: theme / palette → background → decorative elements → typography */}
               <ColorPanel nav={nav} project={project} update={update} usage={usage} />
+              <BackgroundPanel nav={nav} project={project} update={update} usage={usage} colors={doc.colors} />
+              <DecorationPanel nav={nav} project={project} update={update} usage={usage} decor={decor} />
+              <TypographyPanel nav={nav} project={project} update={update} usage={usage} />
               <WordingPanel nav={nav} project={project} update={update} usage={usage} />
               <TextPlacementPanel nav={nav} project={project} update={update} usage={usage} />
-              <DecorationPanel nav={nav} project={project} update={update} usage={usage} decor={decor} />
               <VariantsPanel nav={nav} project={project} update={update} usage={usage} />
             </>
           )}

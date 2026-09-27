@@ -96,7 +96,7 @@ describe("monthly calendar = one continuous connected grid", () => {
       it("rendered markup draws no per-cell rectangles and no rounded boxes", () => {
         const i = 0;
         const html = renderToStaticMarkup(
-          <PrintablePage geometry={geometryFor(doc, doc.recipe.pages[i])} solved={solvePage(doc, i)} colors={doc.colors} typography={doc.typography} decorative={doc.decorative} mode="print" />,
+          <PrintablePage geometry={geometryFor(doc, doc.recipe.pages[i])} solved={solvePage(doc, i)} colors={doc.colors} typography={doc.typography} decorative={doc.decorative} background={doc.background} mode="print" />,
         );
         expect(html).not.toMatch(/<rect[^>]*data-node="month-grid-r\d+c\d+"/);
         expect(html).toMatch(/<rect[^>]*data-node="month-grid-border"/);

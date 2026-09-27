@@ -30,7 +30,7 @@ function firstIndex(p: ProductProject) {
 function render(p: ProductProject, index = firstIndex(p)): string {
   const doc = resolveDocument(p);
   return renderToStaticMarkup(
-    <PrintablePage geometry={geometryFor(doc, doc.recipe.pages[index])} solved={solvePage(doc, index)} colors={doc.colors} typography={doc.typography} decorative={doc.decorative} mode="print" />,
+    <PrintablePage geometry={geometryFor(doc, doc.recipe.pages[index])} solved={solvePage(doc, index)} colors={doc.colors} typography={doc.typography} decorative={doc.decorative} background={doc.background} mode="print" />,
   );
 }
 

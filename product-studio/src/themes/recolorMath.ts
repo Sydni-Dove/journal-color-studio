@@ -211,10 +211,11 @@ export function marbleStats(d: Uint8ClampedArray): MarbleStats {
 }
 
 /** Stone / gold / highlight lookup tables indexed by the map's R value (×3 for RGB). */
-export function marbleLUTs(st: MarbleStats, roles: { stone: string; vein: string; highlight: string }, texture: number) {
+export function marbleLUTs(st: MarbleStats, roles: { stone: string; vein: string; highlight: string }, texture: number, texScale = 1) {
   const S = hexLab(roles.stone), G = hexLab(roles.vein), Hc = hexLab(roles.highlight);
   // Stone texture strength (L* per unit of source luminance); calibrated so the original colourway matches its source.
-  const A = 50 * texture;
+  // texScale: a texture whose stone spans a wider light/dark range than the others (JCS TEXTURES `texScale`, e.g. burgundy 2).
+  const A = 50 * texture * texScale;
   // A very pale (or dark) stone settles slightly (max 16 L*) so the texture has room instead of clipping flat.
   let Ls = S[0];
   const up = (st.p95 - st.stone) * A, down = (st.stone - st.p5) * A;
@@ -234,19 +235,24 @@ export function marbleLUTs(st: MarbleStats, roles: { stone: string; vein: string
 
 /**
  * Paint a marble from its layer map in place. When the texture has real vein
- * artwork (`ownVeins` = false), the map's own vein/highlight channels are not
- * painted — the overlay supplies them.
+ * artwork (`ownVeins` = false), the map's own vein channel is not painted —
+ * the overlay supplies the veins. The map's B channel (highlights, or the
+ * SECOND STONE of the kintsugi marbles) is painted as well when
+ * `secondStone` is set: a transparent vein overlay (JCS `veinsAlpha`) only
+ * carries the seams, so the pale slabs / smoky wisps under it come from the
+ * map (JCS: `cr = B · (veinsAlpha ? 1 : own)`).
  */
 export function paintMarblePixels(
   d: Uint8ClampedArray,
   luts: ReturnType<typeof marbleLUTs>,
   veinStrength: number,
   ownVeins: boolean,
+  secondStone = false,
 ): void {
-  const own = ownVeins ? 1 : 0;
+  const own = ownVeins ? 1 : 0, second = ownVeins || secondStone ? 1 : 0;
   const { stoneLUT, goldLUT, hiLUT } = luts;
   for (let i = 0; i < d.length; i += 4) {
-    const r = d[i] * 3, g = (d[i + 1] / 255) * veinStrength * own, cr = (d[i + 2] / 255) * veinStrength * own;
+    const r = d[i] * 3, g = (d[i + 1] / 255) * veinStrength * own, cr = (d[i + 2] / 255) * veinStrength * second;
     for (let k = 0; k < 3; k++) {
       let v = stoneLUT[r + k] * (1 - g) + goldLUT[r + k] * g;
       v = v * (1 - cr) + hiLUT[r + k] * cr;
@@ -264,5 +270,21 @@ export function paintMarblePixels(
 export function veinCoverage(overlay: Uint8ClampedArray, map: Uint8ClampedArray, veinsAlpha: boolean, veinStrength: number): void {
   for (let i = 0; i < overlay.length; i += 4) {
     overlay[i + 3] = overlay[i + 3] * (veinsAlpha ? veinStrength : Math.max((map[i + 1] / 255) * veinStrength, (map[i + 2] / 255) * veinStrength));
+  }
+}
+
+// ─── Patterns ──────────────────────────────────────────────────────────────
+/**
+ * Two-tone pattern from its ink map (JCS pattern-*.png: 0 = light ground,
+ * 255 = full ink, anti-aliased edges and fabric weave kept). Every pixel is
+ * rebuilt between the ground and ink colors, so only the colors change —
+ * never a flat tint over the artwork. Reads the map's R channel in place.
+ */
+export function paintPatternPixels(d: Uint8ClampedArray, ground: string, ink: string): void {
+  const B = hexRgb(ground), P = hexRgb(ink);
+  for (let i = 0; i < d.length; i += 4) {
+    const v = d[i] / 255;
+    for (let k = 0; k < 3; k++) d[i + k] = B[k] + (P[k] - B[k]) * v;
+    d[i + 3] = 255;
   }
 }

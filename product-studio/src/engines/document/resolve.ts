@@ -39,6 +39,7 @@ import { normalizeDecoration } from "../../themes/decorationPlan";
 import { resolveComposition } from "../composition/composition";
 import type { Composition } from "../../types/composition";
 import { DEFAULT_DECORATIVE } from "../../presets/products/projectFactory";
+import { NO_LAYER, splitLayers } from "../../themes/layers";
 
 // ─── Small keyed cache ─────────────────────────────────────────────────────
 class KeyedCache<T> {
@@ -80,6 +81,9 @@ export function applyVariant(project: ProductProject): ProductProject {
     ...project,
     colors: { ...project.colors, overrides: { ...project.colors.overrides, ...(v.overrides.colors ?? {}) } },
     decorativeTheme: { ...project.decorativeTheme, ...(v.overrides.decorativeTheme ?? {}) },
+    ...(project.backgroundTheme || v.overrides.backgroundTheme
+      ? { backgroundTheme: { ...(project.backgroundTheme ?? NO_LAYER), ...(v.overrides.backgroundTheme ?? {}) } }
+      : {}),
     wording: {
       ...project.wording,
       ...(v.overrides.title !== undefined ? { productTitle: v.overrides.title } : {}),
@@ -102,7 +106,10 @@ export type ResolvedDocument = {
   typography: TypographySettings;
   colors: ColorTokens;
   wording: Wording;
+  /** Decorative ELEMENTS layer (florals, line art). */
   decorative: DecorativeTheme;
+  /** BACKGROUND / surface layer (solid, marble, pattern, watercolor), drawn under the elements. */
+  background: DecorativeTheme;
   duplex: boolean;
 };
 
@@ -147,7 +154,10 @@ export function resolveDocument(input: ProductProject): ResolvedDocument {
     wording: resolveWording(project.wording),
     // Projects saved before the design-library snapshot may carry retired
     // styles (geometric, abstract, …) or lack role colors: normalize them.
-    decorative: normalizeDecoration({ ...DEFAULT_DECORATIVE, ...project.decorativeTheme }),
+    ...(() => {
+      const layers = splitLayers(project.backgroundTheme && { ...DEFAULT_DECORATIVE, ...project.backgroundTheme }, { ...DEFAULT_DECORATIVE, ...project.decorativeTheme });
+      return { decorative: normalizeDecoration(layers.elements), background: normalizeDecoration(layers.background) };
+    })(),
     duplex,
   };
 }

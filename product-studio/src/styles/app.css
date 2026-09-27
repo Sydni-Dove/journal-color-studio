@@ -865,3 +865,31 @@ button.family-card:focus-visible {
     font-size: 12px;
   }
 }
+
+/* ── Curated design picker (Background / Decorative elements) ── */
+.design-picker { display: grid; gap: 10px; min-width: 0; }
+.design-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.design-tab {
+  min-height: 36px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--ui-line);
+  background: transparent; color: inherit; font: inherit; font-size: 13px; cursor: pointer;
+}
+.design-tab--on { background: var(--ui-ink, #1b1717); color: #fff; border-color: transparent; }
+.design-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; min-width: 0; }
+.design-card {
+  display: grid; gap: 4px; align-content: start; padding: 6px; border-radius: 10px; min-width: 0;
+  border: 1px solid var(--ui-line); background: #fff; color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.design-card[aria-pressed="true"] { border-color: var(--ui-accent, #630000); box-shadow: 0 0 0 2px var(--ui-accent, #630000) inset; }
+.design-card-label { font-size: 12.5px; font-weight: 600; line-height: 1.2; overflow-wrap: anywhere; }
+.design-card-hint { font-size: 11px; opacity: 0.7; line-height: 1.25; overflow-wrap: anywhere; }
+.thumb {
+  display: grid; place-items: center; aspect-ratio: 1; width: 100%; overflow: hidden; border-radius: 6px;
+  background: repeating-conic-gradient(#f3efec 0 25%, #fff 0 50%) 50% / 12px 12px;
+}
+.thumb > * { grid-area: 1 / 1; }
+.thumb-fill { width: 100%; height: 100%; object-fit: cover; display: block; }
+.thumb-object { max-width: 92%; max-height: 92%; object-fit: contain; display: block; }
+.thumb-mask { width: 88%; height: 88%; -webkit-mask-size: contain; mask-size: contain; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; -webkit-mask-position: center; mask-position: center; }
+.thumb-loading { opacity: 0.6; }
+.thumb-none { width: 60%; height: 2px; background: var(--ui-line); transform: rotate(-35deg); }
+.as-designed { display: flex; flex-wrap: wrap; gap: 8px; }

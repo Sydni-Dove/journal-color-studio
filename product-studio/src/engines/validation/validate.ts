@@ -76,11 +76,11 @@ export function validateProductLevel(doc: ResolvedDocument): ValidationIssue[] {
     }
   }
 
-  const deco = doc.decorative;
-  if (binding.id === "glued-pad" && deco.style !== "none" && deco.placement === "full-page") {
+  const fullPage = [doc.background, doc.decorative].some((d) => d.style !== "none" && d.placement === "full-page");
+  if (binding.id === "glued-pad" && fullPage) {
     add("warning", "decoration", "Full-page backgrounds are discouraged on writable pads (UPrinting artwork guidance). Consider a header band.");
   }
-  if (deco.style !== "none" && deco.placement === "full-page" && !project.production.includeBleed) {
+  if (fullPage && !project.production.includeBleed) {
     add("warning", "bleed", "Full-page decoration without bleed can leave white slivers at the trim. Turn on bleed.");
   }
   if (project.production.includeBleed && !doc.printProfile.bleedRules.bleed) {

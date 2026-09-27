@@ -67,7 +67,7 @@ export function ExportDialog({ doc, currentIndex, fontsReady, onClose, onGoTo, o
     setPrepError(null);
     try {
       const pages = [...new Set(plan.sequence)].map((i) => ({ g: geometryFor(doc, doc.recipe.pages[i]), comp: compositionFor(doc, i) }));
-      await prepareRasters(rasterRequests(pages, doc.decorative, doc.colors));
+      await prepareRasters([...rasterRequests(pages, doc.background, doc.colors), ...rasterRequests(pages, doc.decorative, doc.colors)]);
       setPrinting(true);
     } catch (e) {
       setPrepError(`Decoration could not be prepared: ${(e as Error).message}`);

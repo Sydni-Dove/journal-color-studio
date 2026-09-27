@@ -79,6 +79,8 @@ export type ProductVariant = {
   overrides: {
     colors?: Partial<ColorTokens>;
     decorativeTheme?: Partial<DecorativeTheme>;
+    /** Background / surface layer override (see themes/layers.ts). */
+    backgroundTheme?: Partial<DecorativeTheme>;
     title?: string;
     subtitle?: string;
   };
@@ -108,7 +110,14 @@ export type ProductProject = {
   colors: { paletteId: string; overrides: Partial<ColorTokens> };
   spacing: { density: SpacingDensity; overrides: Partial<SpacingTokens> };
   functionalPattern: FunctionalPattern;
+  /** Decorative ELEMENTS: florals and line art placed against page structure. */
   decorativeTheme: DecorativeTheme;
+  /**
+   * BACKGROUND / SURFACE layer: solid, marble, pattern, watercolor. Absent on
+   * projects saved before the split; a surface stored in decorativeTheme is
+   * then the background (themes/layers.ts).
+   */
+  backgroundTheme?: DecorativeTheme;
   layoutOptions: LayoutOptions;
   exportSettings: ExportSettings;
 

@@ -22,12 +22,14 @@ const build = (i: number) => TEST_PRODUCTS[i].build();
 function render(p: ProductProject, index = 0) {
   const doc = resolveDocument(p);
   return renderToStaticMarkup(
-    <PrintablePage geometry={geometryFor(doc, doc.recipe.pages[index])} solved={solvePage(doc, index)} colors={doc.colors} typography={doc.typography} decorative={doc.decorative} spacing={doc.spacing} mode="print" />,
+    <PrintablePage geometry={geometryFor(doc, doc.recipe.pages[index])} solved={solvePage(doc, index)} colors={doc.colors} typography={doc.typography} decorative={doc.decorative} background={doc.background} spacing={doc.spacing} mode="print" />,
   );
 }
 function plan(p: ProductProject, index = 0) {
   const doc = resolveDocument(p);
-  return planDecoration(geometryFor(doc, doc.recipe.pages[index]), doc.decorative, doc.colors, compositionFor(doc, index))!;
+  // A surface is the page's background layer; florals / line art are its element layer.
+  const layer = doc.background.style !== "none" ? doc.background : doc.decorative;
+  return planDecoration(geometryFor(doc, doc.recipe.pages[index]), layer, doc.colors, compositionFor(doc, index))!;
 }
 const withDeco = (i: number, d: Partial<DecorativeTheme>) => {
   const p = build(i);

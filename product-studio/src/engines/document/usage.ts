@@ -101,8 +101,8 @@ export function computeUsage(doc: ResolvedDocument): ProjectUsage {
       }
     }
   });
-  const d = doc.decorative;
-  if (d.style !== "none") {
+  for (const d of [doc.background, doc.decorative]) {
+    if (d.style === "none") continue;
     tokens.add(d.colorA);
     if (d.style !== "solid") tokens.add(d.colorB);
     if (d.style === "marble" || d.style === "watercolor" || d.style === "floral") tokens.add(d.colorC);

@@ -45,7 +45,7 @@ const html = (p: ProductProject) => {
   const doc = resolveDocument(p);
   const i = firstPage(p);
   return renderToStaticMarkup(
-    <PrintablePage geometry={geometryFor(doc, doc.recipe.pages[i])} solved={solvePage(doc, i)} colors={doc.colors} typography={doc.typography} decorative={doc.decorative} spacing={doc.spacing} mode="print" />,
+    <PrintablePage geometry={geometryFor(doc, doc.recipe.pages[i])} solved={solvePage(doc, i)} colors={doc.colors} typography={doc.typography} decorative={doc.decorative} background={doc.background} spacing={doc.spacing} mode="print" />,
   );
 };
 const within = (c: Rect, b: Rect, tol = 1e-6) => c.x >= b.x - tol && c.y >= b.y - tol && c.x + c.w <= b.x + b.w + tol && c.y + c.h <= b.y + b.h + tol;

@@ -30,8 +30,18 @@ const brandBase: ColorTokens = {
   decorativeAccent: DOVE_BRAND.gold,
   decorBase: DOVE_BRAND.burgundy,
   decorHighlight: DOVE_BRAND.palePink,
+  lineArt: DOVE_BRAND.gold,
+  patternGround: DOVE_BRAND.softWhite,
+  patternInk: DOVE_BRAND.burgundy,
   lineOpacity: 0.32,
 };
+
+/**
+ * Product Studio's own palettes derive the newer roles from their existing
+ * ones: line art takes the decoration accent, patterns print the decoration
+ * base on the paper. (Snapshotted JCS palettes carry JCS's own values.)
+ */
+const derived = (c: ColorTokens): ColorTokens => ({ ...c, lineArt: c.decorativeAccent, patternGround: c.background, patternInk: c.decorBase });
 
 export const PALETTES: ColorPalette[] = [
   { id: "dove-signature", label: "Dove Signature — Burgundy / Soft White / Gold", brandPalette: true, colors: brandBase },
@@ -78,9 +88,11 @@ export const PALETTES: ColorPalette[] = [
     colors: { ...brandBase, primary: "#1E3A5C", border: "#1E3A5C", decorBase: "#1E3A5C", decorativeAccent: "#9FB6CE" },
     note: "Non-brand hex values — pending designer approval.",
   },
-  // Approved Journal Color Studio palettes (one-way snapshot).
+].map((p) => ({ ...p, colors: derived(p.colors) }));
+PALETTES.push(
+  // Approved Journal Color Studio palettes and color families (one-way snapshot).
   ...JCS_PALETTES_ADAPTED,
-];
+);
 
 export function findPalette(id: string): ColorPalette {
   return PALETTES.find((p) => p.id === id) ?? PALETTES[0];

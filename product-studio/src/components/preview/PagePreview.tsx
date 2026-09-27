@@ -144,6 +144,7 @@ export function PagePreview({ doc, index, onIndex, debug, issueIds }: Props) {
                   colors={doc.colors}
                   typography={doc.typography}
                   decorative={doc.decorative}
+                  background={doc.background}
                   spacing={doc.spacing}
                   mode="editor"
                   overlay={<DebugOverlay geometry={geos[k]} nodes={solved.nodes} flags={debug} issueIds={issueIds} />}

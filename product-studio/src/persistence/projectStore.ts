@@ -1,3 +1,4 @@
+import { migrateLayers } from "../themes/layers";
 import type { DecorativeTheme } from "../types/theme";
 /**
  * Project persistence — localStorage, one key per project plus an index.
@@ -50,7 +51,7 @@ export function migrate(raw: unknown): ProductProject | null {
     // than guessed at.
     return null;
   }
-  return migrateDecoration(p);
+  return migrateLayers(migrateDecoration(p));
 }
 
 /**
@@ -130,6 +131,7 @@ export function addVariantFromCurrent(p: ProductProject, name: string, resolvedC
         overrides: {
           colors: { ...resolvedColors },
           decorativeTheme: { ...p.decorativeTheme },
+          ...(p.backgroundTheme ? { backgroundTheme: { ...p.backgroundTheme } } : {}),
           title: p.wording.productTitle,
         },
       },

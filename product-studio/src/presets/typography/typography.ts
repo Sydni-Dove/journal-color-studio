@@ -32,6 +32,9 @@ export const FONT_CATALOG: FontDefinition[] = [
   { family: "Cormorant Garamond", category: "serif", googleSpec: "ital,wght@0,400;0,600;0,700;1,400", fallback: "Georgia, serif", avgCharEm: 0.45 },
   { family: "EB Garamond", category: "serif", googleSpec: "ital,wght@0,400;0,600;0,700;1,400", fallback: "Georgia, serif", avgCharEm: 0.47 },
   { family: "Libre Baskerville", category: "serif", googleSpec: "ital,wght@0,400;0,700;1,400", fallback: "Georgia, serif", avgCharEm: 0.56 },
+  // Journal Color Studio typography faces (FONT_STYLESHEETS, main ba916ad): Radley is the floral design's body face.
+  { family: "Radley", category: "serif", googleSpec: "ital@0;1", fallback: "Georgia, serif", avgCharEm: 0.52 },
+  { family: "Cardo", category: "serif", googleSpec: "ital,wght@0,400;0,700;1,400", fallback: "Georgia, serif", avgCharEm: 0.48 },
   // Sans serif
   { family: "Lato", category: "sans-serif", googleSpec: "ital,wght@0,400;0,700;1,400", fallback: "Helvetica, Arial, sans-serif", avgCharEm: 0.5 },
   { family: "Raleway", category: "sans-serif", googleSpec: "ital,wght@0,400;0,600;0,700;1,400", fallback: "Helvetica, Arial, sans-serif", avgCharEm: 0.53 },
@@ -76,6 +79,16 @@ export function fontStack(family: string): string {
  * defined here): Cinzel for covers, Playfair Display for headings, Lato for
  * labels/body. Three families maximum per design (brand rule).
  */
+/**
+ * Type pairings that belong to a Journal Color Studio design (DESIGN_PRESETS,
+ * main ba916ad). Only the pairings — cover lettering and title-plate styles are
+ * cover-specific and stay in Journal Color Studio.
+ */
+export const DESIGN_TYPE_PAIRINGS: { id: string; label: string; fonts: Partial<FontSelection> }[] = [
+  { id: "jcs-floral", label: "Floral design — Cormorant Garamond headings, Radley text", fonts: { headings: "Cormorant Garamond", subheadings: "Cormorant Garamond", body: "Radley", accent: "Cormorant Garamond" } },
+  { id: "jcs-abstract", label: "Abstract watercolor — Playfair Display", fonts: { cover: "Playfair Display", headings: "Playfair Display", accent: "Playfair Display" } },
+];
+
 export const DEFAULT_FONTS: FontSelection = {
   cover: "Cinzel",
   headings: "Playfair Display",

@@ -40,7 +40,7 @@ export type FunctionalPattern = {
  * marble / floral / line-art snapshots (design-library), or the JCS
  * watercolor bloom layout.
  */
-export type DecorativeStyle = "none" | "solid" | "marble" | "watercolor" | "floral" | "accent";
+export type DecorativeStyle = "none" | "solid" | "marble" | "pattern" | "watercolor" | "floral" | "accent";
 
 /**
  * Placement = WHAT kind of composition. Fields (solid / marble / watercolor)
@@ -165,6 +165,11 @@ export type DecorativeTheme = {
   titlePosition?: TitleAccentPosition;
   /** Advanced placement overrides for object decorations (anchor, alignment, size limits, offsets, rules). */
   layout?: DecorationPlacementOverrides;
+  /**
+   * Full-color artwork (florals): recolor onto the palette (default) or keep the
+   * artwork's own colors ("original", JCS "As designed" / colorMode original).
+   */
+  artColors?: "palette" | "original";
 };
 
 // ─── Generic theme interface (future Journal Color Studio integration) ─────

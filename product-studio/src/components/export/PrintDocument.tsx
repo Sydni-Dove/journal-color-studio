@@ -21,6 +21,7 @@ export function PrintDocument({ doc, plan }: { doc: ResolvedDocument; plan: Prin
             colors={doc.colors}
             typography={doc.typography}
             decorative={doc.decorative}
+            background={doc.background}
             spacing={doc.spacing}
             mode="print"
           />

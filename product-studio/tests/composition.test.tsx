@@ -36,7 +36,7 @@ function planFor(p: ProductProject, deco: Partial<DecorativeTheme>, index = firs
 const html = (p: ProductProject, index = firstPage(p)) => {
   const doc = resolveDocument(p);
   return renderToStaticMarkup(
-    <PrintablePage geometry={geometryFor(doc, doc.recipe.pages[index])} solved={solvePage(doc, index)} colors={doc.colors} typography={doc.typography} decorative={doc.decorative} spacing={doc.spacing} mode="print" />,
+    <PrintablePage geometry={geometryFor(doc, doc.recipe.pages[index])} solved={solvePage(doc, index)} colors={doc.colors} typography={doc.typography} decorative={doc.decorative} background={doc.background} spacing={doc.spacing} mode="print" />,
   );
 };
 const within = (a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }) =>
