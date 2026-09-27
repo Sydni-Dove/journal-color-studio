@@ -59,10 +59,25 @@ def stats_sample(name):
     im.resize((STATS_W, round(STATS_W * h / w)), Image.LANCZOS).save(OUT / (Path(name).stem + "-stats.png"), optimize=True)
 
 
+ABSTRACT_SCALE = 0.25  # layer copies for the picker: a 144 px page thumbnail needs ~0.15 of the layers' own resolution
+
+
+def abstract_layers():
+    """Abstract watercolor: every layer scaled by the SAME factor, so the Canva transforms still place them
+    (the renderer sizes each layer from its original pixel size, not the copy's)."""
+    out = OUT / "abstract64"
+    out.mkdir(exist_ok=True)
+    for f in sorted((SRC / "abstract64").glob("layer-*.png")):
+        im = Image.open(f)
+        w, h = im.size
+        im.resize((max(1, round(w * ABSTRACT_SCALE)), max(1, round(h * ABSTRACT_SCALE))), Image.LANCZOS).save(out / f.name, optimize=True)
+
+
 if __name__ == "__main__":
     OUT.mkdir(exist_ok=True)
     for f in FILES:
         thumb(f)
         if f.startswith("marble-layers"):
             stats_sample(f)
+    abstract_layers()
     print(f"wrote {len(FILES)} thumbnails to {OUT}")

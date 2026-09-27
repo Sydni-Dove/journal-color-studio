@@ -358,11 +358,11 @@ describe("placement controls reach the rendered page", () => {
 });
 
 describe("fields stay inside their region when rendered", () => {
-  it("a watercolor header band is clipped to the band (blooms never wash the whole page)", () => {
+  it("a watercolor header band shows its part of the page-sized painting, clipped to the band", () => {
     const p = build(4);
     p.decorativeTheme = { ...p.decorativeTheme, style: "watercolor", placement: "header-band" };
     const out = html(p, 0);
-    const m = out.match(/<clipPath id="([^"]+wcclip0)"><rect x="([^"]+)" y="([^"]+)" width="([^"]+)" height="([^"]+)"/);
+    const m = out.match(/<clipPath id="([^"]+rc0)"><rect x="([^"]+)" y="([^"]+)" width="([^"]+)" height="([^"]+)"/);
     expect(m).not.toBeNull();
     const doc = resolveDocument(p);
     const comp = compositionFor(doc, 0);

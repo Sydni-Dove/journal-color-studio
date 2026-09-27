@@ -56,6 +56,8 @@ const FLOWING: DecorationCapability[] = ["header-flourish", "corner-contained", 
  */
 export const DECORATION_CAPABILITIES: Record<string, DecorationCapability[]> = {
   "jcs-marble-veined": SURFACE,
+  // The Abstract watercolor is a full-page painting: a surface (a region shows its part of the page).
+  "jcs-watercolor-abstract": SURFACE,
   "jcs-marble-boldgold": SURFACE,
   "jcs-marble-goldleaf": SURFACE,
   "jcs-marble-white": SURFACE,

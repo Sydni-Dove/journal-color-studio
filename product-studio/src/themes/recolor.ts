@@ -8,11 +8,12 @@
  *           optionally with real vein artwork drawn over the recolored stone
  *   floral  full-colour art with alpha; Lab tone transfer per colour family
  *   pattern ink map (0 = ground, 255 = ink) rebuilt between two roles
+ *   watercolor  a painting's original layers, each tone-transferred to its role
  *
  * Output is identical for preview and print because both read the same
  * cache entry (print waits for prepareRasters before opening the dialog).
  */
-import { findAsset, type MarbleAsset } from "../design-library/library";
+import { findAsset, type MarbleAsset, type WatercolorAsset } from "../design-library/library";
 import { jcsPaletteRoles } from "../design-library/palettes";
 import { floralSoftFill, marbleLUTs, marbleStats, paintMarblePixels, paintPatternPixels, toneTransferPixels, veinCoverage, type MarbleStats } from "./recolorMath";
 
@@ -25,7 +26,7 @@ export type RasterRequest = {
   /** Zoom into the artwork (1 = cover-fit). Materials only. */
   zoom: number;
   /** Role colors as hex (patterns: base = ground, vein = ink). */
-  roles: { base: string; vein: string; highlight: string; deep: string; paper: string };
+  roles: { base: string; vein: string; highlight: string; deep: string; paper: string; accent?: string };
   /** Render from the small derived picker thumbnail instead of the print artwork (editor thumbnails only). */
   thumb?: boolean;
   /** Keep the artwork's own colors (florals "As designed"): no recolor. */
@@ -171,6 +172,39 @@ function renderFloral(img: HTMLImageElement, r: RasterRequest, w: number, h: num
   return out.canvas;
 }
 
+/**
+ * Layered watercolor (JCS paintAbstract): each original layer drawn at its
+ * Canva position on the page, cover-fitted so the painting bleeds off every
+ * edge. A layer whose role keeps the painting's own color is drawn untouched;
+ * otherwise it is tone-transferred to its role color (brush texture kept).
+ */
+async function renderWatercolor(asset: WatercolorAsset, r: RasterRequest, w: number, h: number) {
+  const { c, ctx } = canvas(w, h);
+  const k = Math.max(w / asset.size.w, h / asset.size.h), ox = (w - asset.size.w * k) / 2, oy = (h - asset.size.h * k) / 2;
+  const own = jcsPaletteRoles(asset.asDesigned);
+  const target = { paper: r.roles.paper, stone: r.roles.base, highlight: r.roles.highlight, vein: r.roles.vein, accent: r.roles.accent ?? r.roles.base };
+  const ownColor = own ? { paper: own.paper, stone: own.stone, highlight: own.highlight, vein: own.vein, accent: own.accent ?? own.trim } : null;
+  ctx.fillStyle = target.paper;
+  ctx.fillRect(0, 0, w, h);
+  const imgs = await Promise.all(asset.layers.map((l) => loadImage(r.thumb && l.thumb ? l.thumb : l.url)));
+  asset.layers.forEach((l, i) => {
+    const img = imgs[i];
+    const [a, , , d, e, f] = l.m;
+    const pw = l.w * a * k, ph = l.h * d * k;
+    const x = ox + e * k, y = oy + f * k;
+    if (r.original || ownColor?.[l.role].toLowerCase() === target[l.role].toLowerCase()) {
+      ctx.drawImage(img, x, y, pw, ph);
+      return;
+    }
+    const lw = Math.max(1, Math.round(Math.min(pw, img.naturalWidth))), lh = Math.max(1, Math.round(Math.min(ph, img.naturalHeight)));
+    const layer = pixels(img, lw, lh, "stretch", 1);
+    toneTransferPixels(layer.data.data, "all", { main: target[l.role] });
+    layer.ctx.putImageData(layer.data, 0, 0);
+    ctx.drawImage(layer.canvas, x, y, pw, ph);
+  });
+  return c;
+}
+
 function toUrl(c: HTMLCanvasElement, alpha: boolean): Promise<string> {
   return new Promise((res, rej) => c.toBlob((b) => (b ? res(URL.createObjectURL(b)) : rej(new Error("Recolor failed"))), alpha ? "image/png" : "image/jpeg", 0.92));
 }
@@ -184,10 +218,12 @@ export function ensureRaster(r: RasterRequest): Promise<string> {
     const asset = findAsset(r.assetId);
     if (!asset || asset.type === "accent" || typeof document === "undefined") return Promise.reject(new Error("Raster recolor unavailable"));
     const w = Math.max(1, Math.round(r.pxW)), h = Math.max(1, Math.round(r.pxH));
-    const src = r.thumb && asset.thumb ? asset.thumb : asset.url;
-    p = loadImage(src).then(async (img) => {
+    const src = asset.type === "watercolor" ? undefined : r.thumb && asset.thumb ? asset.thumb : asset.url;
+    // A layered watercolor loads its own layers.
+    p = (src ? loadImage(src) : Promise.resolve(null)).then(async (img) => {
       const t0 = performance.now();
-      const c = asset.type === "marble" ? await renderMarble(asset, img, r, w, h) : asset.type === "pattern" ? renderPattern(img, r, w, h) : renderFloral(img, r, w, h);
+      const c =
+        asset.type === "watercolor" ? await renderWatercolor(asset, r, w, h) : asset.type === "marble" ? await renderMarble(asset, img!, r, w, h) : asset.type === "pattern" ? renderPattern(img!, r, w, h) : renderFloral(img!, r, w, h);
       const url = await toUrl(c, asset.type === "floral");
       done.set(key, url);
       if (done.size > MAX_DONE) {

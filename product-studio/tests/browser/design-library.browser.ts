@@ -10,6 +10,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { chromium, type Browser, type Page } from "playwright-core";
 import { preview, type PreviewServer } from "vite";
 import { TEST_PRODUCTS } from "../../src/presets/products/testProducts";
+import { createProject } from "../../src/presets/products/projectFactory";
+import { step } from "../../src/presets/bookRecipes";
 import type { ProductProject } from "../../src/types/project";
 
 let server: PreviewServer;
@@ -128,6 +130,40 @@ describe("Background vs Decorative elements", () => {
     await expect(page.locator('.ps-page--editor [data-layer="background"] [data-asset="jcs-marble-goldleaf"]').count()).resolves.toBeGreaterThan(0);
     await section(page, "Background").locator(":scope > summary").click();
     await expect(section(page, "Background").locator('.design-card[aria-pressed="true"]').textContent()).resolves.toMatch(/Gold leaf/);
+    await page.context().close();
+  });
+
+  it("daily pages: tapping Watercolor applies the JCS Abstract watercolor; the Luxury daily page takes a title sprig", async () => {
+    const daily = (name: string, size: string, layoutId?: string) =>
+      createProject("planner", {
+        name,
+        dimensions: { sizePresetId: size, orientation: "portrait" },
+        calendar: { startDate: "2027-01-01", endDate: "2027-01-02", weekStart: 0, sixRowMonths: true },
+        recipe: { items: [], ordering: "chronological", structure: [{ ...step("daily-planner"), ...(layoutId ? { layoutId } : {}) }] },
+        colors: { paletteId: "jcs-abstract-watercolor", overrides: {} },
+      });
+    let page = await open(daily("DL daily", "7x9"));
+    const bg = section(page, "Background");
+    await bg.locator(":scope > summary").click();
+    // One design in the group: the tab itself applies it (it used to only open the group).
+    await bg.getByRole("tab", { name: "Watercolor" }).click();
+    await settled(page);
+    await expect(page.locator('.ps-page--editor [data-layer="background"] [data-asset="jcs-watercolor-abstract"]').count()).resolves.toBeGreaterThan(0);
+    await bg.locator("select").first().selectOption("full-page");
+    await settled(page);
+    // Its own colors: warm paper with burgundy / blush / gold paint (never the old grey-blue bloom wash).
+    const c = (await bgColor(page))!;
+    expect(c.r - c.b).toBeGreaterThan(20);
+    await page.context().close();
+
+    page = await open(daily("DL luxury", "8.5x11", "daily-luxury-execution"));
+    const el = section(page, "Decorative elements");
+    await el.locator(":scope > summary").click();
+    await el.getByRole("tab", { name: "Floral" }).click();
+    await el.locator('.design-card:has([data-thumb="jcs-floral-sprig"])').click();
+    await settled(page);
+    await expect(page.locator('.ps-page--editor [data-layer="elements"] [data-asset="jcs-floral-sprig"]').count()).resolves.toBeGreaterThan(0);
+    await expect(el.locator(".decor-status").innerText()).resolves.toMatch(/placed/);
     await page.context().close();
   });
 

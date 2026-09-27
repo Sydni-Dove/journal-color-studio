@@ -34,6 +34,16 @@ describe("design-library snapshot", () => {
         expect(sha1(join(ASSETS, a.veins.sourceFile))).toBe(a.veins.sha1);
         expect(snapshotMd).toContain(a.veins.sha1);
       }
+      if (a.type === "watercolor") {
+        // Every layer of the painting, byte-identical to JCS canva/abstract64.
+        expect(a.layers).toHaveLength(14);
+        for (const l of a.layers) {
+          expect(sha1(join(ASSETS, l.file)), l.file).toBe(l.sha1);
+          expect(snapshotMd).toContain(l.sha1);
+          expect(l.url, l.file).toBeTruthy();
+          expect(l.thumb, l.file).toBeTruthy();
+        }
+      }
     });
   }
 

@@ -1,8 +1,8 @@
 /**
  * DECORATIVE LAYER (page layer 2). Draws the decoration plan: solid fills,
  * recolored Journal Color Studio marble / floral snapshots, tinted line-art
- * accents (single motifs or mirror-tiled bands), and the JCS watercolor bloom
- * layout — masked away from content where the plan says so.
+ * accents (single motifs or mirror-tiled bands), and the layered JCS Abstract
+ * watercolor — masked away from content where the plan says so.
  *
  * Inputs are geometry + theme + colors + the page's COMPOSITION (regions and
  * protected content derived from the solved layout). It never changes layout.
@@ -44,41 +44,30 @@ function Piece({ p, uid, i }: { p: DecorPiece; uid: string; i: number }) {
       const { x, y, w, h } = p.rect;
       return <rect x={x} y={y} width={w} height={h} style={{ fill: colorVar(p.color) }} data-decor="solid" />;
     }
-    case "watercolor": {
-      const { x, y, w, h } = p.rect;
-      // Blooms are sized from the region's long side and would spill past a band: clip to the region.
-      return (
-        <g data-decor="watercolor" clipPath={`url(#${uid}-wcclip${i})`}>
-          <defs>
-            <clipPath id={`${uid}-wcclip${i}`}>
-              <rect x={x} y={y} width={w} height={h} />
-            </clipPath>
-            {p.blooms.map((b, k) => (
-              <radialGradient key={k} id={`${uid}-wc${i}-${k}`} cx={b.cx} cy={b.cy} r={b.r} gradientUnits="userSpaceOnUse">
-                <stop offset="0" style={{ stopColor: colorVar(b.color), stopOpacity: b.alpha }} />
-                <stop offset="0.45" style={{ stopColor: colorVar(b.color), stopOpacity: b.alpha * 0.6 }} />
-                <stop offset="1" style={{ stopColor: colorVar(b.color), stopOpacity: 0 }} />
-              </radialGradient>
-            ))}
-          </defs>
-          <rect x={x} y={y} width={w} height={h} style={{ fill: colorVar(p.paper) }} />
-          <g style={{ mixBlendMode: "multiply" }}>
-            {p.blooms.map((b, k) => (
-              <circle key={k} cx={b.cx} cy={b.cy} r={b.r} fill={`url(#${uid}-wc${i}-${k})`} />
-            ))}
-          </g>
-        </g>
-      );
-    }
     case "raster": {
       const { x, y, w, h } = p.rect;
       const url = rasterUrl(p.request);
       const key = rasterKey(p.request);
-      if (!url) {
+      // A painting shown in one region of the page is clipped to that region.
+      const c = p.clip;
+      const clipId = `${uid}-rc${i}`;
+      const body = !url ? (
         // Until the recolored bitmap is ready: the material's base colour, or an invisible box at the art's position.
-        return <rect x={x} y={y} width={w} height={h} style={{ fill: p.fallback ? colorVar(p.fallback) : "none" }} data-decor="raster-pending" data-asset={p.assetId} data-raster={key} />;
-      }
-      return <image href={url} x={x} y={y} width={w} height={h} preserveAspectRatio="none" transform={flip(p.transform, x, y, w, h)} data-decor="raster" data-asset={p.assetId} data-raster={key} />;
+        <rect x={x} y={y} width={w} height={h} style={{ fill: p.fallback ? colorVar(p.fallback) : "none" }} data-decor="raster-pending" data-asset={p.assetId} data-raster={key} />
+      ) : (
+        <image href={url} x={x} y={y} width={w} height={h} preserveAspectRatio="none" transform={flip(p.transform, x, y, w, h)} data-decor="raster" data-asset={p.assetId} data-raster={key} />
+      );
+      if (!c) return body;
+      return (
+        <g clipPath={`url(#${clipId})`}>
+          <defs>
+            <clipPath id={clipId}>
+              <rect x={c.x} y={c.y} width={c.w} height={c.h} />
+            </clipPath>
+          </defs>
+          {body}
+        </g>
+      );
     }
     case "mask": {
       const { x, y, w, h } = p.rect;

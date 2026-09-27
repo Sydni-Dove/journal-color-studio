@@ -73,6 +73,8 @@ type Preset = { comps: string[]; weights: (L: number, a: number, b: number, C: n
 
 /** How an artwork splits into independently coloured components (soft weights, no seams). */
 export const TONE_PRESETS = {
+  /** One colour for the whole artwork (a watercolor layer): every pixel keeps its offset from the layer's mean. */
+  all: { comps: ["main"], weights: () => [1] },
   /** Marble veins from the original artwork: gold, white/cream highlights, and the stone between them. */
   veins: {
     comps: ["gold", "light", "stone"],

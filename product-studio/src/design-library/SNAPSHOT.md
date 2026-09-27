@@ -54,19 +54,49 @@ commit that last changed the file upstream.
 | jcs-accent-ribbon | line art (alpha mask) | `accent-ribbon.png` | `accent-ribbon.png` | `8282a74` | fd31dee797dd7da16bc6ad13158255a0db259457 | 2026-09-25 | IDENTICAL |
 | jcs-accent-dots | line art (alpha mask) | `accent-dots.png` | `accent-dots.png` | `8282a74` | d11bd55dbb84963ebfc95e0505fa7681a05c9247 | 2026-09-25 | IDENTICAL |
 | jcs-accent-stripes | line art (alpha mask) | `accent-stripes.png` | `accent-stripes.png` | `8282a74` | bed6f555cdeb7b89a8b87abbe656d5649ccf2c8c | 2026-09-25 | IDENTICAL |
+| jcs-watercolor-abstract (layers) | watercolor layer record (Canva transforms) | `canva/abstract64/layers.json` | `abstract64/layers.json` | `46fd8ab` | c2406b25ef45f5abec83e6eb1a124c3fa276ee0f | 2026-09-27 | **NEW** |
+| jcs-watercolor-abstract | watercolor layer (transparent) | `canva/abstract64/layer-00.png` | `abstract64/layer-00.png` | `46fd8ab` | b32fb8fbcfa488745b33f8e5d88fe20ce2a0f9cd | 2026-09-27 | **NEW** |
+| jcs-watercolor-abstract | watercolor layer (transparent) | `canva/abstract64/layer-01.png` | `abstract64/layer-01.png` | `46fd8ab` | 31ce6189a20b7949606d9a8bc879c3799d183ce6 | 2026-09-27 | **NEW** |
+| jcs-watercolor-abstract | watercolor layer (transparent) | `canva/abstract64/layer-02.png` | `abstract64/layer-02.png` | `46fd8ab` | 9d05fc792f028a1c3bfd1d4ba2d3a75e6535a4e8 | 2026-09-27 | **NEW** |
+| jcs-watercolor-abstract | watercolor layer (transparent) | `canva/abstract64/layer-03.png` | `abstract64/layer-03.png` | `46fd8ab` | b9f198a5d3877df8a4863f5984fbd32ed8ac4025 | 2026-09-27 | **NEW** |
+| jcs-watercolor-abstract | watercolor layer (transparent) | `canva/abstract64/layer-04.png` | `abstract64/layer-04.png` | `46fd8ab` | dc21049d46b218ed0dd40d0547fd72941cc03899 | 2026-09-27 | **NEW** |
+| jcs-watercolor-abstract | watercolor layer (transparent) | `canva/abstract64/layer-05.png` | `abstract64/layer-05.png` | `46fd8ab` | 0795c9d9ddf4cd5afc4946ac1b41be263c55ad84 | 2026-09-27 | **NEW** |
+| jcs-watercolor-abstract | watercolor layer (transparent) | `canva/abstract64/layer-06.png` | `abstract64/layer-06.png` | `46fd8ab` | 24e587dc4a1acbb5dfb0715b845190a017203a9e | 2026-09-27 | **NEW** |
+| jcs-watercolor-abstract | watercolor layer (transparent) | `canva/abstract64/layer-07.png` | `abstract64/layer-07.png` | `46fd8ab` | 1e312379d1137334d234cebc7b30293117fd8fcf | 2026-09-27 | **NEW** |
+| jcs-watercolor-abstract | watercolor layer (transparent) | `canva/abstract64/layer-08.png` | `abstract64/layer-08.png` | `46fd8ab` | 76a46fe7fc4e917527c73aeba7fa9535be879079 | 2026-09-27 | **NEW** |
+| jcs-watercolor-abstract | watercolor layer (transparent) | `canva/abstract64/layer-09.png` | `abstract64/layer-09.png` | `46fd8ab` | ec3b942509ebaafd46a91bf63cfc1ad3174f52ff | 2026-09-27 | **NEW** |
+| jcs-watercolor-abstract | watercolor layer (transparent) | `canva/abstract64/layer-10.png` | `abstract64/layer-10.png` | `46fd8ab` | eb31b574ed945889d45c26ad8bde635e5f6e0576 | 2026-09-27 | **NEW** |
+| jcs-watercolor-abstract | watercolor layer (transparent) | `canva/abstract64/layer-11.png` | `abstract64/layer-11.png` | `46fd8ab` | 1b07c80ae8b0d726a5d3ff639cf6af7ce6e40b15 | 2026-09-27 | **NEW** |
+| jcs-watercolor-abstract | watercolor layer (transparent) | `canva/abstract64/layer-12.png` | `abstract64/layer-12.png` | `46fd8ab` | 0ee722cf37508427df8bd2a6559f795f2b6fcab5 | 2026-09-27 | **NEW** |
+| jcs-watercolor-abstract | watercolor layer (transparent) | `canva/abstract64/layer-13.png` | `abstract64/layer-13.png` | `46fd8ab` | ba1661934dc64db1f3261ddac71cff440fa60c2f | 2026-09-27 | **NEW** |
 | font "Against" | brand display font | `brand/against.otf` | `fonts/against.otf` | `14e4e75` | f033e74f39effdab4662789625e923475a8bd95f | 2026-09-25 | IDENTICAL |
 
 ### Derived files (not from Journal Color Studio)
 
 Picker thumbnails, 160 px centre crops (materials) or whole silhouettes
 (objects), and `*-stats.png` whole-frame 240 px samples of each marble map
-(thumbnail tone statistics), built by `tools/build_thumbs.py` from the files
-above. Used only
+(thumbnail tone statistics), and `thumbs/abstract64/*` (every watercolor layer
+at 25 %, one shared factor so the Canva transforms still place them), built by
+`tools/build_thumbs.py` from the files above. Used only
 in the editor's design picker, recolored live with the page's engine; pages
 and print always use the full files.
 
 | File | SHA-1 |
 |---|---|
+| `thumbs/abstract64/layer-00.png` | 21e09dd9d7a2834bbaa53e713d9435957e3d73df |
+| `thumbs/abstract64/layer-01.png` | d415b0fbf2f5d04f08bc9f67e8651c0072a3be3b |
+| `thumbs/abstract64/layer-02.png` | e0408c5070b0175a235742bbaccff1065607c19b |
+| `thumbs/abstract64/layer-03.png` | 13ca5408440398c7b4c196a455aca5d331b7cd25 |
+| `thumbs/abstract64/layer-04.png` | fa6698f0d00a6a765ef2583f4ca4d5f9990b50b6 |
+| `thumbs/abstract64/layer-05.png` | d72875533cc9aaa37a5b74c35f05173201cb8bab |
+| `thumbs/abstract64/layer-06.png` | 0b23b8e9a5a0dd892f541fa483e802f99f2ebaca |
+| `thumbs/abstract64/layer-07.png` | f5703ba6f7a215da44641942f4578ff8ffa197da |
+| `thumbs/abstract64/layer-08.png` | a35a237d8d19becb841f7276742b4bfcedc4b10c |
+| `thumbs/abstract64/layer-09.png` | 3679785923c6b242261c124ecc9f422b7ad8fbab |
+| `thumbs/abstract64/layer-10.png` | 6d58b375794a892c9d10ab0fc08732e881006773 |
+| `thumbs/abstract64/layer-11.png` | 59f2303cbdf683f03b1c765a4706ae648141fb24 |
+| `thumbs/abstract64/layer-12.png` | 8b6bf62b26c4610f75ac9b8983c6b3aea8aac996 |
+| `thumbs/abstract64/layer-13.png` | f7a44c2ad456e037ed784e598d7a47b21ae61cab |
 | `thumbs/floral-bouquet.png` | 67ed06dffcca54721a2fdee376fd24e96c6fe794 |
 | `thumbs/floral-corner.png` | cbe7e3673400c5d1631ea8f3c1f53407fb88c2b1 |
 | `thumbs/floral-header.png` | 3f93f70a53bb2a7f575f9a414873442d257cb68e |
@@ -108,7 +138,7 @@ and print always use the full files.
 | Floral recolor (`toneTransfer` `floral` preset, `floralSoftFill`) | `themes/recolorMath.ts` | identical |
 | Floral "original colors" (JCS `colorMode: original` / As designed) | `DecorativeTheme.artColors` | **new** |
 | Accent placement metadata (`ACCENT_CAPS`, `ACCENT_SUPPORT`, `drawAccent`) | `placement.ts` | identical (main only adds prayer-journal restrictions, JCS-only) |
-| Watercolor bloom layout (`paintWatercolor`) | `library.ts` `WATERCOLOR_BLOOMS` | identical |
+| Abstract watercolor (`bg-abstract`, `paintAbstract`: `ABSTRACT_LAYERS` transforms, `ABSTRACT_ROLE`, `toneTransfer` preset `all`, "Abstract Watercolor" palette) | `library.ts` `jcs-watercolor-abstract`, `themes/recolor.ts` `renderWatercolor`, `recolorMath.ts` preset `all` | **new** — replaces the procedural bloom wash (`paintWatercolor`, JCS `blush`), which JCS `main` retired from its picker because it is not Sydni's artwork. Saved projects that used the procedural wash now render the Abstract watercolor with the same color roles. Pages cover-fit the painting (it bleeds off every edge); a band, strip or frame shows its own part of the page-sized painting. |
 | Typography (`FONT_STYLESHEETS`, `DESIGN_PRESETS` font pairings) | `presets/typography/typography.ts` | **new** — Radley and Cardo faces; the floral (Cormorant Garamond + Radley) and abstract (Playfair Display) pairings |
 | Occupancy grids | `occupancy.ts` (`tools/build_occupancy.py`) | derived, unchanged |
 
@@ -133,10 +163,11 @@ and print always use the full files.
 | Upstream asset | Why |
 |---|---|
 | `pattern-candy.png`, `pattern-scribble.png`, `pattern-abstract-0/1/2.png` (Bold stripes, Scribble, Abstract arches) | Built from ~1545 px page renders; JCS itself marks them "rebuild when full-size Canva exports are available". Importing them would print soft at letter size. Import when the full-size maps land on `main`. |
-| `canva/*` photo backgrounds (leathers, photo marbles, photo stripes, notebook paper, white ribbons / chevron), `canva/abstract64/*` (abstract watercolor), `canva/wash-*`, `blob-purple`, `boho-abstract`, `scribble-charcoal`, `stripes-yellow`, `divider-gold-ornament` | Cover backgrounds and cover decor slots in JCS. Product Studio makes interiors and has no cover product yet. |
+| `canva/*` photo backgrounds (leathers, photo marbles, photo stripes, notebook paper, white ribbons / chevron), `canva/wash-*`, `blob-purple`, `boho-abstract`, `scribble-charcoal`, `stripes-yellow`, `divider-gold-ornament` | Cover backgrounds and cover decor slots in JCS. Product Studio makes interiors and has no cover product yet. |
 | `canva/elements/*`, `canva/lettering/*`, `title-*.png`, `floral-ring.png`, `floral-bar.png`, `floral-line.png`, `floral-peony.png`, `bevel-frame.png`, `ornament-divider.png`, `lines-hand.png` | Page-specific artwork of the four JCS journals (legend cards, prayer figures, rings, lettering, title plates). Product-specific, not reusable library artwork. |
 | `brand/*` logos | Brand marks, not design-library artwork. |
-| `marble-layers-blush.png` | An asset id only upstream: the watercolor is rendered procedurally (bloom layout, already snapshotted). |
+| `marble-layers-blush.png` / procedural `paintWatercolor` | Retired upstream (JCS maps `blush` to the Abstract watercolor); Product Studio no longer renders it either. |
+| "Violet + peach cloud wash" (`wip/cloud-and-new-marble`, a51c2d6) | Only on an unmerged WIP branch — not approved on `main`. Import it when it merges. |
 | `Design Elements (3).zip` (commit 17fe6ea "Added cloud and marble") | Raw Canva SVG exports (pages 8, 68–71). The marbles among them are the kintsugi marbles above, already built into maps upstream; the app renders no cloud artwork. |
 | Prayer / Prayer Warrior / Warring Woman palettes (JCS `JOURNAL_PALETTES`) | Their roles mean different things (stone = the journal's watercolor figure, plate = title lettering…) — tied to those journals' artwork. |
 | JCS "Dove Signature" palette | Product Studio's own Dove Signature brand palette is canonical for the same brand colors. |

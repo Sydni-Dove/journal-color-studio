@@ -34,6 +34,16 @@ A "next" family is shown on the home screen but is never clickable.
 
 ## Daily pages
 
+- **Decoration on daily pages:** backgrounds and decorative elements work on
+  every daily layout. The Luxury Daily Execution page now declares its date as
+  the title and its divider as the title rule, so title accents (header
+  sprigs, bouquet) anchor to them. Table-corner sprigs still need more space
+  around the schedule table than most daily layouts leave. On the configurable
+  page only the lower-right corner of the schedule has room.
+- **Watercolor = the JCS Abstract watercolor** (Canva page 64, 14 layers,
+  recolored per layer). The old procedural wash is retired; saved projects
+  that used it now show the Abstract watercolor.
+
 - **Daily Planner product** (studio home → Daily Planner): front matter →
   each month: calendar → each week: plan + Meeting With God spread → that
   week's daily pages → monthly review.

@@ -422,7 +422,7 @@ const ROLE_NAMES: Record<string, [string, string, string]> = {
   solid: ["Fill", "", ""],
   marble: ["Stone", "Veins", "Highlights"],
   pattern: ["Ground", "Stripes", ""],
-  watercolor: ["Wash", "Wisps", "Blooms"],
+  watercolor: ["Deep shapes", "Gold lines + splatter", "Pink washes"],
   floral: ["Leaves", "Gold", "Soft flowers"],
   accent: ["", "Line color", ""],
 };
@@ -472,12 +472,14 @@ function DesignPicker({ label, groups, value, colors, roles, original, onPick }:
             role="tab"
             aria-selected={g.id === group.id}
             className={`design-tab${g.id === group.id ? " design-tab--on" : ""}`}
-            onClick={() => (g.id === "none" ? onPick(g.designs[0]) : setTab(g.id))}
+            // A group with one design (None, Watercolor, Solid) applies it; a larger group opens for browsing.
+            onClick={() => (g.designs.length === 1 && g.designs[0].value !== value ? onPick(g.designs[0]) : setTab(g.id))}
           >
             {g.label}
           </button>
         ))}
       </div>
+      {group.id !== "none" && !group.designs.some((d) => d.value === value) && <p className="hint design-pick-hint">Tap a design to use it on your pages.</p>}
       {group.id !== "none" && (
         <div className="design-grid">
           {group.designs.map((d) => (
@@ -515,9 +517,15 @@ export function BackgroundPanel({ project, update, colors }: PanelProps & { colo
   const marble = d.style === "marble" && a?.type === "marble" ? a : null;
   const placements = placementsFor(d);
   const size = sizeControl(d);
-  const names: [string, string, string] = marble?.layers ? [marble.layers.stone[0], marble.layers.vein[0], marble.layers.highlight[0]] : ROLE_NAMES[d.style] ?? ["", "", ""];
+  const painting = d.style === "watercolor" && a?.type === "watercolor" ? a : null;
+  const names: [string, string, string] = marble?.layers
+    ? [marble.layers.stone[0], marble.layers.vein[0], marble.layers.highlight[0]]
+    : painting
+      ? [painting.layerNames.stone, painting.layerNames.vein, painting.layerNames.highlight]
+      : ROLE_NAMES[d.style] ?? ["", "", ""];
   const tokenOptions = DECOR_TOKENS.map((c) => ({ value: c, label: colors?.[c] ? `${TOKEN_LABEL[c]} · ${colors[c]}` : TOKEN_LABEL[c] }));
-  const ownPalette = marble?.asDesigned ? jcsPaletteId(marble.asDesigned) : null;
+  const asDesigned = marble?.asDesigned ?? painting?.asDesigned;
+  const ownPalette = asDesigned ? jcsPaletteId(asDesigned) : null;
   const usingOwn = ownPalette === project.colors.paletteId && !Object.keys(project.colors.overrides).length && d.colorA === "decorBase" && d.colorB === "decorativeAccent" && d.colorC === "decorHighlight";
   return (
     <Section title="Background">
@@ -529,10 +537,10 @@ export function BackgroundPanel({ project, update, colors }: PanelProps & { colo
           {ownPalette && (
             <div className="as-designed">
               {usingOwn ? (
-                <p className="hint">Showing this marble in its own colors (palette “{marble!.asDesigned}”).</p>
+                <p className="hint">Showing this {painting ? "watercolor" : "marble"} in its own colors (palette “{asDesigned}”).</p>
               ) : (
                 <button type="button" className="btn" onClick={() => update((p) => ({ ...p, colors: { paletteId: ownPalette, overrides: {} } }))}>
-                  Use its own colors — palette “{marble!.asDesigned}”
+                  Use its own colors — palette “{asDesigned}”
                 </button>
               )}
             </div>
@@ -547,6 +555,7 @@ export function BackgroundPanel({ project, update, colors }: PanelProps & { colo
             {names[1] && <Select label={names[1]} value={d.colorB} options={tokenOptions} onChange={(colorB) => set({ colorB })} />}
             {names[2] && <Select label={names[2]} value={d.colorC} options={tokenOptions} onChange={(colorC) => set({ colorC })} />}
           </div>
+          {painting && <p className="hint">{painting.layerNames.accent} follow the palette's line-art color; the paper texture follows the page background.</p>}
         </>
       )}
     </Section>

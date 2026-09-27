@@ -51,7 +51,7 @@ describe("Decoration → Placement: every offered option changes the solved plan
       expect(options.length).toBeGreaterThan(1);
       const plans = options.map((placement) => {
         const pl = plan(withDeco(2, { ...d, placement }));
-        return JSON.stringify([pl.pieces.map((x) => ("rect" in x ? x.rect : x.region)), pl.knockouts, pl.reports.map((r) => [r.id, r.reason])]);
+        return JSON.stringify([pl.pieces.map((x) => ("clip" in x && x.clip ? x.clip : "rect" in x ? x.rect : x.region)), pl.knockouts, pl.reports.map((r) => [r.id, r.reason])]);
       });
       const renders = options.map((placement) => render(withDeco(2, { ...d, placement })));
       expect(new Set(plans).size, "solved").toBe(options.length);

@@ -2,7 +2,7 @@
  * CURATED DESIGN LIBRARY — what the editor offers, grouped the way a designer
  * thinks about it. The raw snapshot (library.ts) is never listed file by file.
  *
- *   BACKGROUND / SURFACE   Marble · Watercolor · Stripes · Solid
+ *   BACKGROUND / SURFACE   Marble · Watercolor (Abstract) · Stripes · Solid
  *   DECORATIVE ELEMENTS    Floral · Line art
  *
  * A background is a surface the page is printed on (full background, header /
@@ -37,7 +37,7 @@ export const BACKGROUND_GROUPS: CatalogGroup[] = [
       asset("jcs-marble-white", "Soft grey veining", "White"),
     ],
   },
-  { id: "watercolor", label: "Watercolor", designs: [{ value: "watercolor", label: "Watercolor wash", hint: "Soft wash, layered blooms", style: "watercolor" }] },
+  { id: "watercolor", label: "Watercolor", designs: [asset("jcs-watercolor-abstract", "Burgundy, blush + gold — your Canva page 64 art")] },
   {
     id: "stripes",
     label: "Stripes",
@@ -71,7 +71,7 @@ export const ELEMENT_GROUPS: CatalogGroup[] = [
   },
 ];
 
-export const designValue = (t: Pick<DecorativeTheme, "style" | "assetId">) => (t.assetId && t.style !== "solid" && t.style !== "watercolor" && t.style !== "none" ? t.assetId : t.style);
+export const designValue = (t: Pick<DecorativeTheme, "style" | "assetId">) => (t.assetId && t.style !== "solid" && t.style !== "none" ? t.assetId : t.style);
 export const findDesign = (groups: CatalogGroup[], value: string) => groups.flatMap((g) => g.designs).find((d) => d.value === value);
 export const groupOf = (groups: CatalogGroup[], value: string) => groups.find((g) => g.designs.some((d) => d.value === value)) ?? groups[0];
 

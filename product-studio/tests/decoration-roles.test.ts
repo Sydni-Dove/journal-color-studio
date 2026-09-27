@@ -9,7 +9,7 @@ import { compositionFor, geometryFor, resolveDocument } from "../src/engines/doc
 import { DESIGN_ASSETS } from "../src/design-library/library";
 import { rolesFor } from "../src/design-library/placement";
 import { TEST_PRODUCTS } from "../src/presets/products/testProducts";
-import { planDecoration, placementsFor } from "../src/themes/decorationPlan";
+import { normalizeDecoration, planDecoration, placementsFor } from "../src/themes/decorationPlan";
 import type { DecorativeTheme } from "../src/types/theme";
 
 const MONTHLY = 2, NOTEPAD = 0, JOURNAL = 1;
@@ -31,11 +31,11 @@ describe("every asset declares its roles; only those placements are offered", ()
     }
   });
   it("surfaces (marble, stripe patterns) are only surfaces; florals and line art are never backgrounds or bands they were not designed for", () => {
-    for (const a of DESIGN_ASSETS.filter((x) => x.type === "marble" || x.type === "pattern")) {
+    for (const a of DESIGN_ASSETS.filter((x) => x.type === "marble" || x.type === "pattern" || x.type === "watercolor")) {
       expect(new Set(rolesFor(a.capabilities))).toEqual(new Set(["band", "frame", "edge", "background"]));
       expect(a.placements).toEqual(["header-band", "footer-band", "edge-strip", "border-frame", "full-page"]);
     }
-    for (const a of DESIGN_ASSETS.filter((x) => x.type !== "marble" && x.type !== "pattern")) expect(a.placements, a.id).not.toContain("full-page");
+    for (const a of DESIGN_ASSETS.filter((x) => x.type !== "marble" && x.type !== "pattern" && x.type !== "watercolor")) expect(a.placements, a.id).not.toContain("full-page");
   });
   it("removed placements: line art behind the title; sprigs floating above / below the title", () => {
     for (const a of DESIGN_ASSETS.filter((x) => x.type === "accent")) expect(a.placements, a.id).not.toContain("behind-title");
@@ -85,7 +85,8 @@ describe("placements attach to their targets", () => {
   });
   it("surfaces: footer band starts just below the content; edge strip runs along the outer edge up to the content", () => {
     const f = planFor(JOURNAL, { style: "watercolor", placement: "footer-band" });
-    const band = f.plan.pieces[0].kind === "watercolor" ? f.plan.pieces[0].rect : null;
+    // The painting spans the page; the band is its clip.
+    const band = f.plan.pieces[0].kind === "raster" ? f.plan.pieces[0].clip : null;
     const content = f.comp.content!;
     expect(band!.y).toBeCloseTo(f.g.trimOffset.y + content.y + content.h + f.comp.clearanceIn, 9);
     expect(band!.y + band!.h).toBeCloseTo(f.g.mediaHeightIn, 9);
@@ -100,5 +101,21 @@ describe("placements attach to their targets", () => {
     const t = trim(plan.reports[0].rect!);
     expect(t.y + t.h).toBeCloseTo(comp.headerRule!.y - comp.gaps.toRule, 9);
     expect(plan.reports[0].clippedShare).toBe(0);
+  });
+});
+
+describe("watercolor = the JCS Abstract watercolor (the procedural wash is retired)", () => {
+  it("a saved procedural watercolor now renders the Abstract watercolor with the same roles", () => {
+    const t = normalizeDecoration({ style: "watercolor", placement: "full-page", scale: 1, opacity: 0.2, colorA: "decorBase", colorB: "decorativeAccent", colorC: "decorHighlight" } as DecorativeTheme);
+    expect(t.assetId).toBe("jcs-watercolor-abstract");
+    expect(t.placement).toBe("full-page");
+    expect([t.colorA, t.colorB, t.colorC]).toEqual(["decorBase", "decorativeAccent", "decorHighlight"]);
+  });
+  it("its layers follow JCS ABSTRACT_ROLE, bottom to top, on the 612 × 792 pt Canva page", () => {
+    const a = DESIGN_ASSETS.find((x) => x.id === "jcs-watercolor-abstract")!;
+    if (a.type !== "watercolor") throw new Error("not a watercolor");
+    expect(a.size).toEqual({ w: 612, h: 792 });
+    expect(a.layers.map((l) => l.role)).toEqual(["paper", "stone", "vein", "highlight", "vein", "highlight", "accent", "highlight", "vein", "vein", "accent", "stone", "vein", "vein"]);
+    expect(a.asDesigned).toBe("Abstract Watercolor");
   });
 });

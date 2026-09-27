@@ -220,7 +220,7 @@ function solveDaily(ctx: LayoutContext): SolvedPage {
   const brandW = Math.max(S.header.brand.w, widthOf(w.brandHeading, "sectionHeading", ctx.typography) + 0.02);
   nodes.push(
     text("dl-brand", { x: brandRight - brandW, y: a.y + (S.header.brand.y - S.header.top), w: brandW, h: S.header.brand.h }, w.brandHeading, "sectionHeading", { component: "PageHeader", align: "right", vAlign: "middle" }),
-    rule("dl-divider", a.x, f.dividerY, a.x + a.w, f.dividerY, { strokePt: STUDIO_STROKES.headerRulePt, component: "PageHeader" }),
+    rule("dl-title-rule", a.x, f.dividerY, a.x + a.w, f.dividerY, { strokePt: STUDIO_STROKES.headerRulePt, component: "PageHeader" }),
   );
 
   // ── Weekday / verse / theme band ──
@@ -317,6 +317,8 @@ function solveDaily(ctx: LayoutContext): SolvedPage {
       { label: "Schedule column share (source 4.65 : 2.47)", value: f.left.w / (f.left.w + f.right.w), unit: "count", provenance: { geometryClass: "user-design", basis: "Luxury Planner PPTX panel widths" } },
     ],
     regions: { mainContent: { x: f.left.x, y: f.left.y, w: f.right.x + f.right.w - f.left.x, h: f.left.h }, calendar: f.left, notes: f.right, writingArea: f.left },
+    // The date is the page title and the header divider its rule: title accents (floral sprigs) anchor to them.
+    titleId: "dl-date",
   };
 }
 

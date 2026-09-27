@@ -36,6 +36,7 @@ import marblePeachVeins from "./assets/marble-peach-gold.png?url";
 import patternCabana from "./assets/pattern-cabana.png?url";
 import patternPinstripe from "./assets/pattern-pinstripe.png?url";
 import patternBias from "./assets/pattern-bias.png?url";
+import abstractLayers from "./assets/abstract64/layers.json?url";
 import type { DecorationCapability, DecorativePlacement } from "../types/theme";
 import { DECORATION_CAPABILITIES, placementsForCapabilities } from "./placement";
 
@@ -50,6 +51,10 @@ export const JCS_SNAPSHOT = {
   previousCommit: "14e4e75",
   previousBranch: "integration/multi-journal-plus-patterns",
 } as const;
+
+/** Abstract watercolor layers (JCS canva/abstract64) and their derived picker copies. */
+const ABSTRACT_FILES = import.meta.glob("./assets/abstract64/*.png", { eager: true, query: "?url", import: "default" }) as Record<string, string>;
+const ABSTRACT_THUMBS = import.meta.glob("./assets/thumbs/abstract64/*.png", { eager: true, query: "?url", import: "default" }) as Record<string, string>;
 
 /** Picker thumbnails: derived by tools/build_thumbs.py (160 px), recolored live; pages and print use the full files. */
 const THUMBS = import.meta.glob("./assets/thumbs/*", { eager: true, query: "?url", import: "default" }) as Record<string, string>;
@@ -116,8 +121,22 @@ export type PatternAsset = Base & { type: "pattern"; original: { ground: string;
 export type FloralAsset = Base & { type: "floral"; usage: "bouquet" | "corner" | "sprig"; thumb?: string };
 /** Single-color line art (white alpha mask), tinted with one role. */
 export type AccentAsset = Base & { type: "accent" };
+/** What each watercolor layer follows when recolored (JCS ABSTRACT_ROLE). */
+export type WatercolorRole = "paper" | "stone" | "highlight" | "accent" | "vein";
+/**
+ * One layer of a layered watercolor painting (JCS ABSTRACT_LAYERS): a
+ * transparent PNG placed by its Canva transform m = [a, b, c, d, e, f] in
+ * points on the Canva page (y down). Recolored by per-layer tone transfer,
+ * so every brush stroke keeps its texture.
+ */
+export type WatercolorLayer = { file: string; sha1: string; url: string; thumb?: string; w: number; h: number; m: [number, number, number, number, number, number]; role: WatercolorRole };
+/**
+ * A full-page watercolor painting rebuilt from its original Canva layers
+ * (JCS `bg-abstract`, renderer `paintAbstract`). `size` is the Canva page in points.
+ */
+export type WatercolorAsset = Base & { type: "watercolor"; layers: WatercolorLayer[]; asDesigned: string; layerNames: Record<Exclude<WatercolorRole, "paper">, string>; thumb?: string };
 
-export type DesignAsset = MarbleAsset | PatternAsset | FloralAsset | AccentAsset;
+export type DesignAsset = MarbleAsset | PatternAsset | FloralAsset | AccentAsset | WatercolorAsset;
 
 const snap = { source: JCS_SNAPSHOT.source, version: 1, sourceCommit: "8282a74", snapshotted: "2026-09-25" } as const;
 /** Assets first copied at 14e4e75 (or replaced by a newer approved file there). */
@@ -127,6 +146,39 @@ const snap3 = (sourceCommit: string) => ({ source: JCS_SNAPSHOT.source, version:
 /** Kintsugi marbles share one shading setup (JCS TEXTURES: shadeBase .6, shadeAmt .5). */
 const KINTSUGI = { shadeBase: 0.6, shadeAmt: 0.5 } as const;
 const KINTSUGI_VEINS = { sourceCommit: "d7068ea", alpha: true } as const;
+
+/**
+ * Abstract watercolor (JCS `bg-abstract`, Canva page 64): its 14 original layers, bottom to top, with their Canva
+ * transforms (JCS ABSTRACT_LAYERS, which rounds e/f of the exported layers.json) and the role each follows
+ * (JCS ABSTRACT_ROLE). Layer 00 is the paper texture.
+ */
+const ABSTRACT_LAYER_DATA: [string, number, number, WatercolorLayer["m"], WatercolorRole, string][] = [
+  ["00", 1102, 1427, [0.567604, 0, 0, 0.567624, 2e-06, 2e-05], "paper", "b32fb8fbcfa488745b33f8e5d88fe20ce2a0f9cd"],
+  ["01", 594, 553, [0.566919, 0, 0, 0.566908, 2e-06, 2e-05], "stone", "31ce6189a20b7949606d9a8bc879c3799d183ce6"],
+  ["02", 255, 608, [0.567647, 0, 0, 0.567434, 2e-06, 9.647597], "vein", "9d05fc792f028a1c3bfd1d4ba2d3a75e6535a4e8"],
+  ["03", 403, 411, [0.567618, 0, 0, 0.567518, 396.685881, 2e-05], "highlight", "b9f198a5d3877df8a4863f5984fbd32ed8ac4025"],
+  ["04", 340, 215, [0.566912, 0, 0, 0.568605, 432.438701, 50.507955], "vein", "dc21049d46b218ed0dd40d0547fd72941cc03899"],
+  ["05", 234, 536, [0.567308, 0, 0, 0.568097, 2e-06, 354.12305], "highlight", "0795c9d9ddf4cd5afc4946ac1b41be263c55ad84"],
+  ["06", 679, 679, [0.567747, 0, 0, 0.567747, 2e-06, 384.200838], "accent", "24e587dc4a1acbb5dfb0715b845190a017203a9e"],
+  ["07", 636, 500, [0.567217, 0, 0, 0.567, 2e-06, 526.076994], "highlight", "1e312379d1137334d234cebc7b30293117fd8fcf"],
+  ["08", 636, 571, [0.567217, 0, 0, 0.567425, 2e-06, 485.784169], "vein", "76a46fe7fc4e917527c73aeba7fa9535be879079"],
+  ["09", 255, 464, [0.567647, 0, 0, 0.567349, 11.917604, 435.276262], "vein", "ec3b942509ebaafd46a91bf63cfc1ad3174f52ff"],
+  ["10", 297, 660, [0.568182, 0, 0, 0.567045, 456.841396, 435.276306], "accent", "eb31b574ed945889d45c26ad8bde635e5f6e0576"],
+  ["11", 509, 429, [0.567289, 0, 0, 0.568182, 336.530405, 566.369872], "stone", "1b07c80ae8b0d726a5d3ff639cf6af7ce6e40b15"],
+  ["12", 509, 447, [0.567289, 0, 0, 0.567114, 336.530405, 546.507156], "vein", "0ee722cf37508427df8bd2a6559f795f2b6fcab5"],
+  ["13", 277, 322, [0.568592, 0, 0, 0.568323, 432.438701, 515.861946], "vein", "ba1661934dc64db1f3261ddac71cff440fa60c2f"],
+];
+const abstractLayersOf = (): WatercolorLayer[] =>
+  ABSTRACT_LAYER_DATA.map(([n, w, h, m, role, sha1]) => ({
+    file: `abstract64/layer-${n}.png`,
+    sha1,
+    url: ABSTRACT_FILES[`./assets/abstract64/layer-${n}.png`],
+    thumb: ABSTRACT_THUMBS[`./assets/thumbs/abstract64/layer-${n}.png`],
+    w,
+    h,
+    m,
+    role,
+  }));
 
 type Raw<T> = T extends unknown ? Omit<T, "capabilities" | "placements"> : never;
 
@@ -160,6 +212,9 @@ const RAW_ASSETS: Raw<DesignAsset>[] = [
   { ...snap3("8ed5ace"), type: "pattern", id: "jcs-pattern-cabana", label: "Cabana stripe", sourceFile: "pattern-cabana.png", sha1: "02c8f892db89c6af4c86b6e856c8546a8cf909d8", url: patternCabana, size: { w: 1700, h: 1688 }, original: { ground: "#FCF7F1", ink: "#8D9DB6" } },
   { ...snap3("8ed5ace"), type: "pattern", id: "jcs-pattern-pinstripe", label: "Pinstripe", sourceFile: "pattern-pinstripe.png", sha1: "37574a25225c4ff89e8036449194ac21ac268c66", url: patternPinstripe, size: { w: 1656, h: 1120 }, original: { ground: "#EDF1FA", ink: "#07080D" } },
   { ...snap3("8ed5ace"), type: "pattern", id: "jcs-pattern-bias", label: "Bias stripe", sourceFile: "pattern-bias.png", sha1: "52df1d2e476c0e6e9d0ffbfe8cab25fc469375ba", url: patternBias, size: { w: 1692, h: 1120 }, original: { ground: "#F1F2F6", ink: "#040306" } },
+  // Watercolor (JCS bg-abstract, "Your Canva page 64 art"): rebuilt from its original layers so each color group recolors.
+  { ...snap3("46fd8ab"), type: "watercolor", id: "jcs-watercolor-abstract", label: "Abstract watercolor", sourceFile: "abstract64/layers.json", sha1: "c2406b25ef45f5abec83e6eb1a124c3fa276ee0f", url: abstractLayers, size: { w: 612, h: 792 },
+    layers: abstractLayersOf(), asDesigned: "Abstract Watercolor", layerNames: { stone: "Deep shapes", highlight: "Pink washes", accent: "Orange + peach shapes", vein: "Gold lines + splatter" } },
   // Floral artwork.
   // floral-cover.jpg (lettering baked in) was retired upstream; the bouquet is now its own transparent layer.
   { ...snap2, type: "floral", usage: "bouquet", id: "jcs-floral-bouquet", label: "Floral bouquet", sourceFile: "floral-bouquet.png", sha1: "57b03db65e1c35cd0687beb308995cc10211e9ba", url: floralBouquet, size: { w: 2479, h: 1593 } },
@@ -179,6 +234,8 @@ export const DESIGN_ASSETS: DesignAsset[] = RAW_ASSETS.map((a) => {
   const withThumb =
     a.type === "accent"
       ? a
+      : a.type === "watercolor"
+        ? { ...a, thumb: a.layers[0].thumb }
       : {
           ...a,
           thumb: thumbOf(a.sourceFile),
@@ -188,20 +245,6 @@ export const DESIGN_ASSETS: DesignAsset[] = RAW_ASSETS.map((a) => {
   return { ...withThumb, capabilities, placements: placementsForCapabilities(capabilities) } as DesignAsset;
 });
 
-/**
- * Watercolor wash — JCS's deterministic bloom layout (page-fraction centre,
- * radius as a fraction of the long side, role, alpha). Pure design data.
- */
-export const WATERCOLOR_BLOOMS: { cx: number; cy: number; r: number; role: "base" | "highlight" | "vein"; alpha: number }[] = [
-  { cx: 0.28, cy: 0.22, r: 0.62, role: "base", alpha: 0.3 },
-  { cx: 0.78, cy: 0.68, r: 0.58, role: "base", alpha: 0.26 },
-  { cx: 0.15, cy: 0.78, r: 0.4, role: "highlight", alpha: 0.4 },
-  { cx: 0.85, cy: 0.18, r: 0.36, role: "highlight", alpha: 0.38 },
-  { cx: 0.55, cy: 0.48, r: 0.3, role: "highlight", alpha: 0.3 },
-  { cx: 0.4, cy: 0.1, r: 0.16, role: "vein", alpha: 0.5 },
-  { cx: 0.9, cy: 0.5, r: 0.14, role: "vein", alpha: 0.45 },
-  { cx: 0.2, cy: 0.95, r: 0.15, role: "vein", alpha: 0.4 },
-];
 export const WATERCOLOR_PLACEMENTS: DecorativePlacement[] = ["header-band", "border-frame", "footer-band", "edge-strip", "full-page"];
 export const SOLID_PLACEMENTS: DecorativePlacement[] = ["header-band", "footer-band", "edge-strip", "border-frame", "full-page"];
 

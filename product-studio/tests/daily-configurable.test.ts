@@ -177,3 +177,16 @@ describe("daily notepads", () => {
     expect(problems(pad("3x5", "notepad-daily")).some((x) => /Too many daily sections/.test(x.message))).toBe(true);
   });
 });
+
+describe("a final month made only of the previous month's last week", () => {
+  it("is valid: Feb 1 2027 rides with January's week (no false 'Every week' error), and its daily page still exists", () => {
+    const p = createProject("planner", {
+      name: "Shared week",
+      calendar: { startDate: "2027-01-01", endDate: "2027-02-01", weekStart: 0, sixRowMonths: true },
+      recipe: { items: [], ordering: "chronological", structure: dailyPlannerBook() },
+    });
+    const doc = resolveDocument(p);
+    expect(doc.recipe.diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+    expect(doc.recipe.pages.filter((x) => x.layoutId === "planner-daily").length).toBe(32);
+  });
+});

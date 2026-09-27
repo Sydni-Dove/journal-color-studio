@@ -23,7 +23,7 @@
  * instead of being cropped. BLEED runs the artwork `edgeBleedAmount` past the
  * trim on purpose — the only mode that crops.
  */
-import { DESIGN_ASSETS, SOLID_PLACEMENTS, WATERCOLOR_BLOOMS, WATERCOLOR_PLACEMENTS, findAsset, type DesignAsset } from "../design-library/library";
+import { DESIGN_ASSETS, SOLID_PLACEMENTS, WATERCOLOR_PLACEMENTS, findAsset, type DesignAsset } from "../design-library/library";
 import {
   ACCENT_BAND_TILE_FACTOR,
   ACCENT_CAPS,
@@ -61,10 +61,9 @@ const EDGE_ART_INSIDE_TOP = 0.55;
 
 export type DecorPiece =
   | { kind: "solid"; rect: Rect; color: ColorToken }
-  | { kind: "raster"; assetId: string; rect: Rect; request: RasterRequest; fallback: ColorToken | null; transform?: ArtTransform }
+  | { kind: "raster"; assetId: string; rect: Rect; request: RasterRequest; fallback: ColorToken | null; transform?: ArtTransform; clip?: Rect }
   | { kind: "mask"; assetId: string; url: string; rect: Rect; color: ColorToken; transform?: ArtTransform; clip?: Rect }
-  | { kind: "tile"; assetId: string; url: string; region: Rect; tile: { w: number; h: number; ox: number; oy: number }; color: ColorToken }
-  | { kind: "watercolor"; rect: Rect; paper: ColorToken; blooms: { cx: number; cy: number; r: number; color: ColorToken; alpha: number }[] };
+  | { kind: "tile"; assetId: string; url: string; region: Rect; tile: { w: number; h: number; ox: number; oy: number }; color: ColorToken };
 
 /** What happened to each decorative piece (validation + editor feedback). Rects in MEDIA coordinates. */
 export type PieceReport = {
@@ -175,7 +174,8 @@ export function normalizeDecoration(t: DecorativeTheme): DecorativeTheme {
   const styles = ["none", "solid", "marble", "pattern", "watercolor", "floral", "accent"];
   if (!styles.includes(t.style)) return { ...t, style: "none" };
   let assetId = t.assetId;
-  if (t.style === "marble" || t.style === "pattern" || t.style === "floral" || t.style === "accent") {
+  // A watercolor without artwork is the retired procedural wash (JCS retired it: never Sydni's artwork) → the Abstract watercolor.
+  if (t.style === "marble" || t.style === "pattern" || t.style === "floral" || t.style === "accent" || t.style === "watercolor") {
     if (!findAsset(assetId) || findAsset(assetId)!.type !== t.style) assetId = assetsFor(t.style)[0].id;
   }
   let placement: string = t.placement;
@@ -217,6 +217,7 @@ function rasterFor(asset: DesignAsset, rect: Rect, theme: DecorativeTheme, color
       highlight: hexOf(colors, theme.colorC, "#FDFDFD"),
       deep: hexOf(colors, "primary", "#630000"),
       paper: hexOf(colors, "background", "#FDFDFD"),
+      ...(asset.type === "watercolor" ? { accent: hexOf(colors, "lineArt", "#B8471C") } : {}),
     },
   };
 }
@@ -575,14 +576,10 @@ export function planDecoration(g: PageGeometry, input: DecorativeTheme, colors: 
     const reports = [fieldReport(region, theme.placement === "full-page")];
     if (theme.style === "solid") return plan([{ kind: "solid", rect: region, color: theme.colorA }], knock, reports, feather);
     if (theme.style === "watercolor") {
-      const blooms = WATERCOLOR_BLOOMS.map((b) => ({
-        cx: region.x + b.cx * region.w,
-        cy: region.y + b.cy * region.h,
-        r: b.r * Math.max(region.w, region.h),
-        color: b.role === "base" ? theme.colorA : b.role === "vein" ? theme.colorB : theme.colorC,
-        alpha: b.alpha,
-      }));
-      return plan([{ kind: "watercolor", rect: region, paper: "background", blooms }], knock, reports, feather);
+      // A full-page painting: every region shows ITS part of the page-sized artwork (never a squashed miniature).
+      const painting = findAsset(theme.assetId)!;
+      const page: Rect = { x: 0, y: 0, w: W, h: H };
+      return plan([{ kind: "raster", assetId: painting.id, rect: page, clip: region, request: rasterFor(painting, page, theme, colors, "cover"), fallback: "background" }], knock, reports, feather);
     }
     // Marble and pattern artwork is cover-fitted to its region: cropped, never stretched.
     const surface = findAsset(theme.assetId)!;
