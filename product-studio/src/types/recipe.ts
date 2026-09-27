@@ -57,9 +57,14 @@ export type PageModuleType =
   | "project-planning"
   | "review"
   | "reflection"
+  | "devotional"
+  | "guided"
   | "tracker"
   | "worksheet"
   | "custom";
+
+/** The cadence kinds (RecipeCadence["type"]); each module declares which of them make sense for it. */
+export type CadenceKind = "once" | "copies" | "yearly" | "quarterly" | "monthly" | "weekly" | "daily" | "after-module" | "end-of-period";
 
 /** Where a module's first page may fall in a bound book. */
 export type PageStartRule = "any" | "recto" | "verso" | "spread";

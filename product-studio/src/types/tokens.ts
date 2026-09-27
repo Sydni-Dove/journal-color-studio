@@ -183,6 +183,21 @@ export type WordingKey =
   | "household"
   | "meetingWithGod"
   | "whatGodSaid"
-  | "responseAction";
+  | "responseAction"
+  // Luxury Daily Execution (Meetings With God Luxury Planner daily page)
+  | "dailyExecutionPage"
+  | "brandHeading"
+  | "versePlaceholder"
+  | "themeLabel"
+  | "timeBlocks"
+  | "timeColumn"
+  | "scheduleColumn"
+  | "topInstructions"
+  | "dailyChecklist"
+  /** Daily checklist items, separated by ";" — rename, add or remove items without touching the layout. */
+  | "dailyChecklistItems"
+  | "endOfDayReflection"
+  | "notesGratitude"
+  | "dailyPlannerFooter";
 
 export type Wording = Record<WordingKey, string>;

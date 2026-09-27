@@ -44,6 +44,19 @@ export const DEFAULT_WORDING: Wording = {
   meetingWithGod: "Meeting With God",
   whatGodSaid: "What did God say?",
   responseAction: "Response / action steps",
+  dailyExecutionPage: "Daily Execution Page",
+  brandHeading: "Meetings With God",
+  versePlaceholder: "[Verse Placeholder]",
+  themeLabel: "Theme:",
+  timeBlocks: "Time Blocks",
+  timeColumn: "Time",
+  scheduleColumn: "Schedule / Tasks / Notes",
+  topInstructions: "Top Instructions",
+  dailyChecklist: "Daily Checklist",
+  dailyChecklistItems: "Scripture / Prayer; Water ○○○○○○○○; Meals on track; Fitness; Daily cleaning; Ministry task; Business task",
+  endOfDayReflection: "End-of-Day Reflection",
+  notesGratitude: "Notes / Gratitude",
+  dailyPlannerFooter: "Daily Planner",
 };
 
 export const WORDING_LABELS: Partial<Record<WordingKey, string>> = {
@@ -56,6 +69,8 @@ export const WORDING_LABELS: Partial<Record<WordingKey, string>> = {
   morning: "Morning section",
   afternoon: "Afternoon section",
   evening: "Evening section",
+  dailyChecklistItems: "Daily checklist items (separate with ;)",
+  dailyPlannerFooter: "Daily footer (after the month)",
 };
 
 export function resolveWording(overrides: Partial<Wording> = {}): Wording {

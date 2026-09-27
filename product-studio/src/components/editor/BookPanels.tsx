@@ -9,9 +9,9 @@ import { addNode, bookOutline, duplicateNode, moveNode, newSection, newStep, rem
 import { getLayout } from "../../layouts/registry";
 import { BOOK_PRESETS } from "../../presets/bookRecipes";
 import { MONTH_NAMES } from "../../engines/calendar/calendar";
-import { getModule, moduleTitle, PAGE_MODULES } from "../../presets/modules";
+import { getModule, moduleTitle, PAGE_MODULES, supportsCadence } from "../../presets/modules";
 import type { ProductProject } from "../../types/project";
-import type { BookGroup, BookNode, BookStep, PageStartRule, RecipeCadence } from "../../types/recipe";
+import type { BookGroup, CadenceKind, BookNode, BookStep, PageStartRule, RecipeCadence } from "../../types/recipe";
 import { Field, NumberField, Section, Select } from "./ui";
 
 type Update = (fn: (p: ProductProject) => ProductProject) => void;
@@ -58,13 +58,17 @@ function StepCard({ s, siblings, scope, props, first, last }: { s: BookStep; sib
   const layout = getLayout(s.layoutId);
   const two = layout.pages === 2;
   const word = SCOPE_WORD[scope];
-  const cadenceOptions = [
-    { value: "once", label: word ? `Once each ${word}` : "Once" },
-    { value: "copies", label: "A number of copies" },
-    ...SMALLER[scope].map((k) => ({ value: EVERY[k], label: `Every ${k}${word ? ` of the ${word}` : ""}` })),
-    ...ENDS[scope].map((k) => ({ value: `end:${k}`, label: `End of each ${k}` })),
-    ...siblings.filter((x): x is BookStep => x.kind === "step" && x.id !== s.id).map((x) => ({ value: `after:${x.id}`, label: `After “${stepName(x, scope)}”` })),
+  // Only the cadences this purpose declares (presets/modules.ts MODULE_CADENCES). A saved cadence outside that
+  // list (older books) is kept and shown, never silently changed.
+  const ok = (k: CadenceKind) => supportsCadence(s.module, k);
+  const allCadences = [
+    { kind: "once" as CadenceKind, value: "once", label: word ? `Once each ${word}` : "Once" },
+    { kind: "copies" as CadenceKind, value: "copies", label: "A number of copies" },
+    ...SMALLER[scope].map((k) => ({ kind: EVERY[k] as CadenceKind, value: EVERY[k], label: `Every ${k}${word ? ` of the ${word}` : ""}` })),
+    ...ENDS[scope].map((k) => ({ kind: "end-of-period" as CadenceKind, value: `end:${k}`, label: `End of each ${k}` })),
+    ...siblings.filter((x): x is BookStep => x.kind === "step" && x.id !== s.id).map((x) => ({ kind: "after-module" as CadenceKind, value: `after:${x.id}`, label: `After “${stepName(x, scope)}”` })),
   ];
+  const cadenceOptions = allCadences.filter((o) => ok(o.kind) || o.value === cadenceValue(s.cadence)).map((o) => (ok(o.kind) ? o : { ...o, label: `${o.label} (saved — not offered for this page)` }));
   const guided = s.layoutId === "guided-page";
   return (
     <details className="card book-step" data-step={s.id}>
@@ -80,7 +84,9 @@ function StepCard({ s, siblings, scope, props, first, last }: { s: BookStep; sib
           options={PAGE_MODULES.map((m) => ({ value: m.type, label: m.label }))}
           onChange={(module) => {
             const m = getModule(module);
-            set({ module, layoutId: m.layouts.includes(s.layoutId) ? s.layoutId : m.layouts[0], title: undefined, prompts: undefined });
+            // A cadence the new purpose does not support falls back to that purpose's default.
+            const cadence = m.cadences.includes(s.cadence.type) ? s.cadence : m.defaultCadence;
+            set({ module, layoutId: m.layouts.includes(s.layoutId) ? s.layoutId : m.layouts[0], title: undefined, prompts: undefined, cadence });
           }}
         />
         <Select

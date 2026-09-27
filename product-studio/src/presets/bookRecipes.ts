@@ -36,8 +36,21 @@ export function meetingsWithGodBook(): BookNode[] {
   ];
 }
 
+/** Month → week → day: a monthly calendar, the week's plan + Meeting With God spread, then a daily page for each day. */
+export function dailyPlannerBook(): BookNode[] {
+  const spread = step("weekly-planner", { type: "once" }, { layoutId: "weekly-plan-mwg-spread" });
+  return [
+    section(
+      "Every Month",
+      [step("monthly-calendar", { type: "once" }), section("Every Week", [spread, step("daily-planner", { type: "daily" })], "week"), step("review", { type: "end-of-period", period: "month" })],
+      "month",
+    ),
+  ];
+}
+
 export const BOOK_PRESETS: { id: string; label: string; build: () => BookNode[] }[] = [
   { id: "meetings-with-god", label: "Meetings With God planner (plan + journal)", build: meetingsWithGodBook },
+  { id: "daily-planner", label: "Daily planner (month · week + Meeting With God · every day)", build: dailyPlannerBook },
   {
     id: "planner-journal",
     label: "Monthly + weekly planner with journal pages",

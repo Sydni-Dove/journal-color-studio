@@ -4,6 +4,7 @@ import { weeklyDeskPad } from "./deskpad/weeklyDeskPad";
 import { linedJournal, notesPage } from "./journal/linedJournal";
 import { groceryNotepad } from "./notepad/groceryNotepad";
 import { todoNotepad } from "./notepad/todoNotepad";
+import { luxuryDailyExecution } from "./planner/dailyPlanner";
 import { monthlyCalendar } from "./planner/monthlyCalendar";
 import { weeklySpread } from "./planner/weeklySpread";
 import type { LayoutDefinition } from "./shared/types";
@@ -13,7 +14,7 @@ import type { LayoutDefinition } from "./shared/types";
  * the shared notes page (used as spread filler). The full template library
  * is Phase 6 — added only after these validate.
  */
-export const LAYOUTS: LayoutDefinition[] = [todoNotepad, groceryNotepad, linedJournal, notesPage, monthlyCalendar, weeklySpread, weeklyDeskPad, guidedPage, weeklyPlanMwgSpread];
+export const LAYOUTS: LayoutDefinition[] = [todoNotepad, groceryNotepad, linedJournal, notesPage, monthlyCalendar, weeklySpread, weeklyDeskPad, guidedPage, weeklyPlanMwgSpread, luxuryDailyExecution];
 
 export const FILLER_LAYOUT_ID = notesPage.id;
 

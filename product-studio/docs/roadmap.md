@@ -32,6 +32,24 @@ The studio home names what can be made today and what comes next
 
 A "next" family is shown on the home screen but is never clickable.
 
+## Daily pages
+
+- **Luxury Daily Execution** (`src/layouts/planner/dailyPlanner.ts`) is the
+  daily page of the Meetings With God Luxury Planner 2026, built from the shape
+  geometry measured in `Sydni_Howard_LuxuryPlanner_2026_WhitePurple_Edit.pptx`
+  (8.5 × 11): dated header, verse + theme band, 15 time blocks (6 AM – 8 PM),
+  top instructions, to-do, daily checklist, end-of-day reflection, notes /
+  gratitude. Every label, and the checklist items, are wording keys.
+- It needs Letter. Smaller trims report it incompatible. A compact daily
+  design for 7 × 9, Half Letter and inserts is a separate, explicitly
+  designed layout (not built yet).
+- **Cadences are declared per page purpose** (`MODULE_CADENCES` in
+  `src/presets/modules.ts`). Daily is offered for daily planner, Meeting With
+  God, journal, notes, prayer, reflection, devotional, guided and custom pages
+  (and declared for tracker / worksheet, which await layouts). It is not
+  offered for monthly calendars, weekly planners, vision, mission, goals or
+  reviews.
+
 ## Content Template Engine (planned — not built)
 
 Devotionals, workbooks, guided and prompt journals, and course companions

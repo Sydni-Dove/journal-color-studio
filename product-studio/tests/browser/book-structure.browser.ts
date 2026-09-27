@@ -82,6 +82,26 @@ describe("Book Structure editor", () => {
     await page.context().close();
   });
 
+  it("How often offers only the cadences a page purpose supports; a daily devotional adds a dated page per day", async () => {
+    const page = await open({ width: 1400, height: 1000 });
+    // Pin the card by its step id: its title changes with the purpose.
+    const id = await page.locator("details.book-step", { hasText: /Journal × 2/ }).first().getAttribute("data-step");
+    const step = page.locator(`details.book-step[data-step="${id}"]`);
+    await step.locator(":scope > summary").click();
+    const often = () => step.getByLabel("How often").locator("option").allTextContents();
+    await expect(often()).resolves.toContain("Every day of the week");
+    await step.getByLabel("Page purpose").selectOption("monthly-calendar");
+    await expect.poll(async () => (await often()).some((o) => /Every day/.test(o))).toBe(false);
+    await step.getByLabel("Page purpose").selectOption("devotional");
+    await expect.poll(async () => (await often()).includes("Every day of the week")).toBe(true);
+    await step.getByLabel("How often").selectOption({ label: "Every day of the week" });
+    const outline = section(page, /^Book outline/);
+    await outline.locator(":scope > summary").click();
+    // Jan 1 – Mar 31 2027: 90 dated devotional pages.
+    await expect.poll(() => outline.locator("button", { hasText: /Devotional/ }).count()).toBe(90);
+    await page.context().close();
+  });
+
   it("phone: structure + outline panels never widen the page", async () => {
     const page = await open({ width: 393, height: 852 });
     await section(page, /^Book outline/).locator(":scope > summary").click();
