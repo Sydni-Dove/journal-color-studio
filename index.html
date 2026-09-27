@@ -2217,6 +2217,17 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     // The title circle (inside the gold ring).
     warring: (lvl) => { const k = [.92, .96, 1][lvl]; return { ellipse: [261.71 + 554.29 / 2, 175.88 + 547.57 / 2, 554.29 / 2 * k, 547.57 / 2 * k] }; },
   };
+  // The Canva gold frame and embellishments are one raster layer. Widen that layer
+  // around its measured interior so the reading surface ends at the gold, not beyond it.
+  // Off/zero opacity retains the exact original art placement.
+  function pinkTitleArt(s, row) {
+    if (!titleFillColor(s) || !['coverWash', 'coverGold'].includes(row[0])) return row;
+    const [x, , width] = PR_TITLE_REGION.prayer(FILL_PAD[s.titleFill?.pad] ?? 1).rect;
+    const scale = width / 439.4, out = [...row];
+    out[1] = x + (row[1] - 205.9) * scale;
+    out[3] = row[3] * scale;
+    return out;
+  }
   // Builds the fill's path on ctx (canvas px). L = the cover's plate layout.
   function titleFillPath(ctx, W, H, s, L) {
     const lvl = FILL_PAD[s.titleFill?.pad] ?? 1;
@@ -2261,7 +2272,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     // The Prayer cover's gold frame, glitter swipe and dots stay above the fill: its gold layer is drawn again, clipped to the fill.
     if (s.journal === 'prayer') {
       ctx.save(); titleFillPath(ctx, W, H, s, L); ctx.clip();
-      drawPr(ctx, W, H, s, [['coverGold', ...PINK.cover.find((r) => r[0] === 'coverWash').slice(1)]]);
+      drawPr(ctx, W, H, s, [pinkTitleArt(s, ['coverGold', ...PINK.cover.find((r) => r[0] === 'coverWash').slice(1)])]);
       ctx.restore();
     }
   }
@@ -3684,7 +3695,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   const PILL_R = 46;                              // Canva corner rounding 98 on the 64-unit shape
   function renderCoverPink(ctx, W, H, s) {
     paintPageBackground(ctx, W, H, s);
-    drawPr(ctx, W, H, s, composeArt(s, PINK.cover, true));
+    drawPr(ctx, W, H, s, composeArt(s, PINK.cover, true).map((row) => pinkTitleArt(s, row)));
     const onPlate = prCoverExtras(ctx, W, H, s);
     drawLetter(ctx, W, H, s, 'pink-prayer', onPlate); drawLetter(ctx, W, H, s, 'pink-journal', onPlate);
   }

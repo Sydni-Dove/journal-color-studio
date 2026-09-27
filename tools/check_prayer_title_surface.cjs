@@ -12,12 +12,20 @@ const sandbox = { rgba: (hex, alpha) => `${hex}:${alpha}`,
   PINK: { cover: [['coverWash', 81.6, 188.44, 652.8, 679.12]] },
   drawPr: (ctx, W, H, s, rows) => { assert.equal(rows[0][0], 'coverGold'); events.push('gold'); } };
 vm.createContext(sandbox);
-vm.runInContext(source + '\nthis.path = titleFillPath; this.draw = drawTitleFill;', sandbox);
+vm.runInContext(source + '\nthis.path = titleFillPath; this.draw = drawTitleFill; this.art = pinkTitleArt;', sandbox);
 let checks = 0;
 for (const [pad, padding] of [['tight', 12], ['normal', 24], ['generous', 36]]) {
   for (const W of [375, 393, 430, 816, 2550]) {
     for (const kind of ['none', 'rect', 'ellipse', 'bevel', 'ring']) {
       const s = { journal: 'prayer', palette: { paper: '#FFFFFF' }, titleFill: { on: true, opacity: 100, color: 'paper', pad } };
+      const row = ['coverGold', 81.6, 188.44, 652.8, 679.12];
+      const widened = sandbox.art(s, row), scale = widened[3] / row[3];
+      const left = widened[1] + (205.9 - row[1]) * scale;
+      const right = widened[1] + (645.3 - row[1]) * scale;
+      assert.ok(Math.abs(left - (145.67 - padding)) < 1e-8);
+      assert.ok(Math.abs(right - (719.67 + padding)) < 1e-8);
+      assert.equal(widened[2], row[2]); assert.equal(widened[4], row[4]);
+      assert.deepEqual(row, ['coverGold', 81.6, 188.44, 652.8, 679.12]);
       sandbox.path(ctx, W, W * 1056 / 816, s, { kind });
       const r = ctx.region.map(v => v * 816 / W);
       assert.ok(Math.abs(r[0] - (145.67 - padding)) < 1e-8);
@@ -35,6 +43,8 @@ for (const journal of ['dream', 'prayer', 'warrior', 'warring']) {
     events.length = 0;
     sandbox.draw(ctx, 816, 1056, { journal, palette: {}, titleFill: fill }, {});
     assert.deepEqual(events, []);
+    const row = ['coverGold', 81.6, 188.44, 652.8, 679.12];
+    assert.equal(sandbox.art({ journal, palette: {}, titleFill: fill }, row), row);
     checks++;
   }
 }
