@@ -2612,7 +2612,9 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   const readingPanel = (p, s) => (isOriginalColorway(s) ? p.line : blendHex(p.paper, '#7F7A78', .13));
   const textOn = (c, bg, ratio = 4.5) => readableTone(c, bg, ratio);
   // Lettering on a decorative colored panel: the design's own lettering color if it reads, else the most readable same-family option.
-  const textOnPanel = (s, c, bg) => (isOriginalColorway(s) ? c : readableOn(bg, [c, s.palette.paper, '#FFFFFF', tone(bg, 18), tone(bg, 96)]));
+  // (The design's own colors keep their lettering color only where it actually reads: e.g. the Abstract watercolor palette
+  // letters in the same burgundy as its header blocks, which would leave those titles invisible.)
+  const textOnPanel = (s, c, bg) => (isOriginalColorway(s) && contrast(c, bg) >= 3 ? c : readableOn(bg, [c, s.palette.paper, '#FFFFFF', tone(bg, 18), tone(bg, 96)]));
   // The design's own colors, unchanged (its original panels/lettering are kept exactly as Sydni designed them).
   function isOriginalColorway(s) {
     const p = s.palette; if (!p || p.v) return false;
@@ -2662,6 +2664,15 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       ['optionLabels', 'Choices (types + involvement)', 'body'], ['involvementHeading', 'Involvement heading', 'body']],
     interp: [['pageTitle', 'Page title', 'head']],
     app: [['pageTitle', 'Page title', 'head']],
+    dream: [['pageTitle', 'Page title', 'head']], brainstorm: [['pageTitle', 'Page title', 'head']], notes: [['pageTitle', 'Page title', 'head']],
+    draw: [['pageTitle', 'Page title', 'head']], summaryDream: [['pageTitle', 'Page title + subtitle', 'head']], summaryIA: [['pageTitle', 'Page title + subtitle', 'head']],
+    belongs: [['fieldLabels', 'Belongs to / Date labels', 'body']],
+    scripture: [['bodyText', 'Scripture', 'body']],
+    howto1: [['pageTitle', 'Page title', 'body'], ['bodyText', 'Steps', 'body'], ['stepNumbers', 'Step numbers', 'body']],
+    howto2: [['pageTitle', 'Page title', 'body'], ['bodyText', 'Steps', 'body'], ['stepNumbers', 'Step numbers', 'body']],
+    howto3: [['pageTitle', 'Page title', 'body'], ['boxHeadings', 'Box headings', 'body'], ['bodyText', 'Box text', 'body']],
+    summaryTable: [['pageTitle', 'Page title', 'body'], ['columnHeadings', 'Column headings', 'body']],
+    pwBelongs: [['fieldLabels', 'Belongs to / Date labels', 'body']],
     pinkSug1: [['pageTitle', 'Page heading', 'head'], ['bodyText', 'Suggestions', 'body']],
     pinkLetter: [['recurringLabels', 'Dear / Date labels', 'head'], ['footerText', 'Footer scripture', 'body']],
     pwLined: [['recurringLabels', 'Date label', 'head']],
@@ -3106,19 +3117,20 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     if (fl) {
       // Canva page 56: title over a thin gold line flanked by bouquets; burgundy badges down the left, text at x 212.
       drawCanvaArt(ctx, W, H, s, FLORAL_CANVA.howto);
-      canvaText(ctx, W, H, T(s, 'howtoTitle'), { cx: 416.3, top: 100, h: 62.5, size: 52.5, italic: true, weight: 600, color: p.plate, shadow: true, fitW: 636, s, id: 'howtoTitle' });
+      withRole(ctx, s, 'pageTitle', () => canvaText(ctx, W, H, T(s, 'howtoTitle'), { cx: 416.3, top: 100, h: 62.5, size: 52.5, italic: true, weight: 600, color: p.plate, shadow: true, fitW: 636, s, id: 'howtoTitle' }));
       const { k } = canvaFit(W, H);
       tx = cX(W, H, 212); tw = 507 * k; bodyPx = 16.44 * k; lh = bodyPx * 1.4; r = 42.7 * k; cx = cX(W, H, 137.5); y = cY(W, H, 259.3);
     } else {
       if (s.footer === 'on') stoneBar(ctx, 0, 0, W, H * .022, s);
-      ctx.fillStyle = ink; ctx.font = font(H * .042, { weight: 700 }); ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
-      fillFit(ctx, s, 'howtoTitle', T(s, 'howtoTitle'), W * .09, H * .125, W * .82);
+      ctx.fillStyle = ink; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+      withRole(ctx, s, 'pageTitle', () => { ctx.font = font(H * .042, { weight: 700 }); fillFit(ctx, s, 'howtoTitle', T(s, 'howtoTitle'), W * .09, H * .125, W * .82); });
     }
     const textInk = bodyInk(s, fl ? p.plate : ink), badge = fl ? p.plate : p.stone;
-    ctx.font = font(bodyPx);
-    const centers = [];
+    const centers = [], bodyScale = withRole(ctx, s, 'bodyText', () => tyScale());
+    lh *= bodyScale;
+    withRole(ctx, s, 'bodyText', () => { ctx.font = font(bodyPx); });
     steps.forEach(([num, text]) => {
-      const end = wrapText(ctx, text, tx, y, tw, lh, 'left', false);
+      const end = withRole(ctx, s, 'bodyText', () => { ctx.font = font(bodyPx); return wrapText(ctx, text, tx, y, tw, lh, 'left', false); });
       centers.push([num, text, y, Math.max(y + (end - y) / 2 + lh * .3, y + r + lh * .2)]);
       y = Math.max(end, y + r * 2 + lh * .4) + H * .02;
     });
@@ -3128,8 +3140,9 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     centers.forEach(([num, text, top, cy]) => {
       ctx.fillStyle = badge; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
       if (s.showTrim && !fl) { ctx.strokeStyle = p.trim; ctx.lineWidth = Math.max(1, W * .002); ctx.stroke(); }
-      ctx.fillStyle = p.title; ctx.font = font(r * 1.15); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(num, cx, cy + r * .05);
-      ctx.fillStyle = textInk; ctx.font = font(bodyPx); wrapText(ctx, text, tx, top, tw, lh);
+      ctx.fillStyle = textOnPanel(s, p.title, badge); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      withRole(ctx, s, 'stepNumbers', () => { ctx.font = font(r * 1.15); ctx.fillText(num, cx, cy + r * .05); });
+      ctx.fillStyle = textInk; withRole(ctx, s, 'bodyText', () => { ctx.font = font(bodyPx); wrapText(ctx, text, tx, top, tw, lh); });
     });
     return bottom;
   }
@@ -3152,8 +3165,10 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
         const { k } = canvaFit(W, H), bx = cX(W, H, 134.71), by = cY(W, H, 321.12), bw = 546.58 * k, bh = 413.24 * k;
         ctx.fillStyle = p.highlight; ctx.fillRect(bx, by, bw, bh);
         ctx.strokeStyle = p.paper; ctx.lineWidth = 8 * k; ctx.strokeRect(bx, by, bw, bh);
-        canvaText(ctx, W, H, withColon(s, 'belongsLabel'), { cx: 159.9, top: 387.8, h: 57.5, size: 48.4, italic: true, weight: 400, align: 'left', color: p.title, fitW: 500, s, onBox: true, bg: p.highlight, id: 'belongsLabel', orig: 'This Journal Belongs To:' });
-        canvaText(ctx, W, H, withColon(s, 'dateLabel'), { cx: 159.9, top: 550.3, h: 57.5, size: 48.4, italic: true, weight: 400, align: 'left', color: p.title, fitW: 500, s, onBox: true, bg: p.highlight, id: 'dateLabel', orig: 'Date:' });
+        withRole(ctx, s, 'fieldLabels', () => {
+          canvaText(ctx, W, H, withColon(s, 'belongsLabel'), { cx: 159.9, top: 387.8, h: 57.5, size: 48.4, italic: true, weight: 400, align: 'left', color: p.title, fitW: 500, s, onBox: true, bg: p.highlight, id: 'belongsLabel', orig: 'This Journal Belongs To:' });
+          canvaText(ctx, W, H, withColon(s, 'dateLabel'), { cx: 159.9, top: 550.3, h: 57.5, size: 48.4, italic: true, weight: 400, align: 'left', color: p.title, fitW: 500, s, onBox: true, bg: p.highlight, id: 'dateLabel', orig: 'Date:' });
+        });
         return;
       } else if (s.marble === 'floral') {
         // Floral colors with a non-floral header style: keep the simple corner treatment.
@@ -3167,23 +3182,28 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       if (s.marble === 'floral') {
         const bx = W * .13, by = H * .24, bw = W * .74, bh = H * .42;
         ctx.fillStyle = rgba(p.highlight, .82); roundRect(ctx, bx, by, bw, bh, W * .012); ctx.fill();
-        ctx.fillStyle = textOnPanel(s, p.title, p.highlight); ctx.font = font(H * .026, { italic: true }); ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
-        fillFit(ctx, s, 'belongsLabel', withColon(s, 'belongsLabel'), bx + W * .06, by + bh * .38, bw - W * .12);
-        fillFit(ctx, s, 'dateLabel', withColon(s, 'dateLabel'), bx + W * .06, by + bh * .72, bw - W * .12);
+        ctx.fillStyle = textOnPanel(s, p.title, p.highlight); ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+        withRole(ctx, s, 'fieldLabels', () => {
+          ctx.font = font(H * .026, { italic: true });
+          fillFit(ctx, s, 'belongsLabel', withColon(s, 'belongsLabel'), bx + W * .06, by + bh * .38, bw - W * .12);
+          fillFit(ctx, s, 'dateLabel', withColon(s, 'dateLabel'), bx + W * .06, by + bh * .72, bw - W * .12);
+        });
       } else {
-        ctx.font = font(H * .034, { italic: true });
         [['belongsLabel', .395], ['dateLabel', .655]].forEach(([id, y]) => {
           ctx.fillStyle = inkColor(p); ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
-          fillFit(ctx, s, id, T(s, id), W / 2, H * y - H * .012, W * .86);
+          withRole(ctx, s, 'fieldLabels', () => { ctx.font = font(H * .034, { italic: true }); fillFit(ctx, s, id, T(s, id), W / 2, H * y - H * .012, W * .86); });
           if (s.showTrim) goldRule(ctx, W * .05, H * y, W * .9, Math.max(1.5, H * .0028), p.trim);
         });
       }
     },
     scripture(ctx, W, H, s) {
       ctx.fillStyle = s.palette.paper; ctx.fillRect(0, 0, W, H);
-      ctx.fillStyle = inkColor(s.palette); ctx.font = font(H * .025, { italic: true });
-      const end = wrapText(ctx, '“In the Last Days,” God says, “I will pour out my Spirit on every kind of people: Your sons will prophesy, also your daughters; Your young men will see visions, your old men dream dreams.”', W * .2, H * .4, W * .6, H * .033, 'center');
-      ctx.fillText('Acts 2:17', W / 2, end + H * .033);
+      ctx.fillStyle = inkColor(s.palette);
+      withRole(ctx, s, 'bodyText', () => {
+        ctx.font = font(H * .025, { italic: true });
+        const end = wrapText(ctx, '“In the Last Days,” God says, “I will pour out my Spirit on every kind of people: Your sons will prophesy, also your daughters; Your young men will see visions, your old men dream dreams.”', W * .2, H * .4, W * .6, H * .033 * tyScale(), 'center');
+        ctx.fillText('Acts 2:17', W / 2, end + H * .033 * tyScale());
+      });
     },
     howto1: (ctx, W, H, s) => howToSteps(ctx, W, H, s, HOW_TO_STEPS.slice(0, 4)),
     howto2: (ctx, W, H, s) => howToSteps(ctx, W, H, s, HOW_TO_STEPS.slice(4)),
@@ -3193,13 +3213,15 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       if (fl) {
         drawFloralArt(ctx, W, H, s, FLORAL_ART.howto3);
         ctx.fillStyle = p.plate; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
-        ctx.font = headFont(H * .06, { weight: 600, italic: true });
-        const title = T(s, 'howtoTitle'), sc = textEdited(s, 'howtoTitle') ? 1 : Math.min(1, W * .77 / Math.max(1, ctx.measureText(title).width));
-        ctx.font = headFont(H * .06 * sc, { weight: 600, italic: true }); fillFit(ctx, s, 'howtoTitle', title, W / 2, H * .118, W * .77);
+        withRole(ctx, s, 'pageTitle', () => {
+          ctx.font = headFont(H * .06, { weight: 600, italic: true });
+          const title = T(s, 'howtoTitle'), sc = textEdited(s, 'howtoTitle') ? 1 : Math.min(1, W * .77 / Math.max(1, ctx.measureText(title).width));
+          ctx.font = headFont(H * .06 * sc, { weight: 600, italic: true }); fillFit(ctx, s, 'howtoTitle', title, W / 2, H * .118, W * .77);
+        });
       } else {
         if (s.footer === 'on') stoneBar(ctx, 0, 0, W, H * .022, s);
-        ctx.fillStyle = ink; ctx.font = font(H * .036, { weight: 700 }); ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
-        fillFit(ctx, s, 'howtoTitle', T(s, 'howtoTitle'), W * .07, H * .09, W * .86);
+        ctx.fillStyle = ink; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+        withRole(ctx, s, 'pageTitle', () => { ctx.font = font(H * .036, { weight: 700 }); fillFit(ctx, s, 'howtoTitle', T(s, 'howtoTitle'), W * .07, H * .09, W * .86); });
       }
       const cols = [W * .07, W * .545], bw = fl ? 220.3 * canvaToPage(W, H).k : W * .385, rows = [[H * .205, H * .25], [H * .6, H * .245]];
       const boxes = [
@@ -3219,31 +3241,33 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
           x = fx(W, H, bx); y = fy(W, H, by); h = bh * k;
           lx = fx(W, H, FL_LABEL[i][0]); ly = fy(W, H, FL_LABEL[i][1]) + H * .012;
         }
-        ctx.fillStyle = ink; ctx.font = fl ? headFont(H * .032) : font(H * .036); ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
-        ctx.fillText(label, lx, ly);
+        ctx.fillStyle = ink; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+        withRole(ctx, s, 'boxHeadings', () => { ctx.font = fl ? headFont(H * .032) : font(H * .036); ctx.fillText(label, lx, ly); });
         if (fl) { ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.3)'; ctx.shadowBlur = W * .02; ctx.shadowOffsetX = W * .006; ctx.shadowOffsetY = W * .008; }
         // Reading surface: white box; the palette color is the frame (the floral box keeps its soft drop shadow).
         ctx.fillStyle = readingSurface(p); roundRect(ctx, x, y, bw, h, W * .035); ctx.fill();
         if (fl) ctx.restore();
         ctx.strokeStyle = fl ? p.plate : (s.showTrim ? p.trim : p.stone); ctx.lineWidth = Math.max(1.5, W * .003); roundRect(ctx, x, y, bw, h, W * .035); ctx.stroke();
         const boxInk = bodyInk(s, fl ? p.plate : inkColor(p), readingSurface(p));
-        ctx.fillStyle = boxInk; ctx.font = font(H * .0175);
-        if (text) {
-          const lines = wrapText(ctx, text, 0, 0, bw * .8, H * .024, 'center', false) / (H * .024);
-          wrapText(ctx, text, x + bw * .1, y + h / 2 - lines * H * .012 - H * .006, bw * .8, H * .024, 'center');
-        } else {
+        ctx.fillStyle = boxInk;
+        if (text) withRole(ctx, s, 'bodyText', () => {
+          ctx.font = font(H * .0175);
+          const lh2 = H * .024 * tyScale(), lines = wrapText(ctx, text, 0, 0, bw * .8, lh2, 'center', false) / lh2;
+          wrapText(ctx, text, x + bw * .1, y + h / 2 - lines * lh2 / 2 - H * .006, bw * .8, lh2, 'center');
+        });
+        else {
           // Steps: numbers, a gold bar, and the four words.
           const bx = x + bw * .22;
           ctx.save(); roundRect(ctx, x, y, bw, h, W * .035); ctx.clip();
           const gr = ctx.createLinearGradient(0, y, 0, y + h), [r, g, b] = hexRgb(p.trim);
           gr.addColorStop(0, `rgb(${r * .6},${g * .6},${b * .6})`); gr.addColorStop(.5, `rgb(${mix(r, 255, .5)},${mix(g, 255, .5)},${mix(b, 255, .5)})`); gr.addColorStop(1, p.trim);
           ctx.fillStyle = gr; ctx.fillRect(bx, y, bw * .11, h); ctx.restore();
-          ctx.fillStyle = boxInk; ctx.font = font(H * .023);
-          ['Pray', 'Brainstorm', 'Interpret', 'Apply'].forEach((word, k) => {
+          ctx.fillStyle = boxInk;
+          withRole(ctx, s, 'bodyText', () => { ctx.font = font(H * .023); ['Pray', 'Brainstorm', 'Interpret', 'Apply'].forEach((word, k) => {
             const yy = y + h * (k + .6) / 4.2;
             ctx.textAlign = 'center'; ctx.fillText(String(k + 1), x + bw * .11, yy + H * .008);
             ctx.fillText(word, x + bw * .66, yy + H * .008);
-          });
+          }); });
         }
       });
     },
@@ -3254,29 +3278,28 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
         // Canva page 58: rotated peony, gold bar under the title, burgundy header cells over a gold band.
         const { k } = canvaFit(W, H), c = p.plate;
         drawCanvaArt(ctx, W, H, s, FLORAL_CANVA.summaryTable);
-        canvaText(ctx, W, H, T(s, 'summaryTableTitle'), { ...FL_TITLE.summaryTable, cx: 401.3, color: c, shadow: true, fitW: 720, s, id: 'summaryTableTitle' });
+        withRole(ctx, s, 'pageTitle', () => canvaText(ctx, W, H, T(s, 'summaryTableTitle'), { ...FL_TITLE.summaryTable, cx: 401.3, color: c, shadow: true, fitW: 720, s, id: 'summaryTableTitle' }));
         const cols = [['Count', 83.3, 191], ['Date', 191, 274], ['Name', 274, 436], ['Type', 436, 527], ['Interpretation', 527, 735.6]];
         cols.forEach(([t, x0, x1]) => {
           ctx.fillStyle = c; ctx.fillRect(cX(W, H, x0 + 2), cY(W, H, 177.3), (x1 - x0 - 4) * k, 138 * k);
-          canvaText(ctx, W, H, t, { cx: (x0 + x1) / 2, top: 222, h: 36, size: 29.2, color: p.title, fitW: x1 - x0 - 10, s, onBox: true, bg: c });
+          withRole(ctx, s, 'columnHeadings', () => canvaText(ctx, W, H, t, { cx: (x0 + x1) / 2, top: 222, h: 36, size: 29.2, color: p.title, fitW: x1 - x0 - 10, s, onBox: true, bg: c }));
         });
         ctx.fillStyle = p.paper; ctx.fillRect(cX(W, H, 83.3), cY(W, H, 315.3), 652.3 * k, 736.7 * k);
         ctx.strokeStyle = p.line; ctx.lineWidth = Math.max(1, 1.2 * k); ctx.strokeRect(cX(W, H, 83.3), cY(W, H, 315.3), 652.3 * k, 736.7 * k);
         return;
       } else {
         if (s.footer === 'on') stoneBar(ctx, 0, 0, W, H * .022, s);
-        ctx.fillStyle = ink; ctx.font = font(H * .05); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        fillFit(ctx, s, 'summaryTableTitle', T(s, 'summaryTableTitle'), W / 2, H * .08, W * .88);
+        ctx.fillStyle = ink; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        withRole(ctx, s, 'pageTitle', () => { ctx.font = font(H * .05); fillFit(ctx, s, 'summaryTableTitle', T(s, 'summaryTableTitle'), W / 2, H * .08, W * .88); });
       }
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       const x0 = W * .055, x1 = W * .945, y0 = H * (fl ? .135 : .13), hh = H * .075;
       ctx.fillStyle = fl ? p.plate : p.stone; ctx.fillRect(x0, y0, x1 - x0, hh);
       const cols = [['Count', .09], ['Date', .13], ['Name', .26], ['Type', .14], ['Interpretation', .38]];
       let x = x0;
-      ctx.font = font(H * .017);
       cols.forEach(([label, f], i) => {
         const cw = (x1 - x0) * f;
-        ctx.fillStyle = textOnPanel(s, p.title, fl ? p.plate : p.stone); ctx.fillText(label, x + cw / 2, y0 + hh / 2);
+        ctx.fillStyle = textOnPanel(s, p.title, fl ? p.plate : p.stone); withRole(ctx, s, 'columnHeadings', () => { ctx.font = font(H * .017); ctx.fillText(label, x + cw / 2, y0 + hh / 2); });
         if (i && s.showTrim) goldRule(ctx, x - W * .002, y0, W * .004, hh, p.trim);
         x += cw;
       });
@@ -3865,8 +3888,10 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     const label = readableOn(p.stone, [p.paper, '#FFFFFF', prInk(p)]);
     prRect(ctx, W, H, [165.19, 344.13, 486.4, 367.74], p.stone, { stroke: p.paper, strokeW: 3 });
     // Typed wording keeps the label's designed size and shrinks only to fit the card (fitW = the original words' width).
-    prText(ctx, W, H, s, T(s, 'belongsLabel'), { l: 190.5, t: 408.5, w: 440, size: 43.1, color: label, italic: true, align: 'left', lh: 1, fitW: textEdited(s, 'belongsLabel') ? 0 : 422, maxW: 440, id: 'belongsLabel', onBox: true });
-    prText(ctx, W, H, s, T(s, 'belongsDateLabel'), { l: 354.59, t: 550.8, w: 280, size: 43.1, color: label, italic: true, align: 'left', lh: 1, fitW: textEdited(s, 'belongsDateLabel') ? 0 : 91, maxW: 280, id: 'belongsDateLabel', onBox: true });
+    withRole(ctx, s, 'fieldLabels', () => {
+      prText(ctx, W, H, s, T(s, 'belongsLabel'), { l: 190.5, t: 408.5, w: 440, size: 43.1, color: label, italic: true, align: 'left', lh: 1, fitW: textEdited(s, 'belongsLabel') ? 0 : 422, maxW: 440, id: 'belongsLabel', onBox: true });
+      prText(ctx, W, H, s, T(s, 'belongsDateLabel'), { l: 354.59, t: 550.8, w: 280, size: 43.1, color: label, italic: true, align: 'left', lh: 1, fitW: textEdited(s, 'belongsDateLabel') ? 0 : 91, maxW: 280, id: 'belongsDateLabel', onBox: true });
+    });
     prLine(ctx, W, H, 187.62, 524.57, 629.16, 524.57, label, 1.33);
     prLine(ctx, W, H, 181.33, 666.97, 622.88, 666.97, label, 1.33);
   }
@@ -3996,7 +4021,9 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     const ctx = canvas.getContext('2d');
     ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
     if (type === 'back' && BACKS[s.journal]) return BACKS[s.journal](ctx, canvas.width, canvas.height, { ...s, _W: canvas.width });
-    (TEMPLATES[type] || TEMPLATES.dream)(ctx, canvas.width, canvas.height, { ...s, _W: canvas.width, _type: type });
+    const sx = { ...s, _W: canvas.width, _type: type };
+    // "All text on this page" applies across the whole page; each section scope inside it can override it.
+    withRole(ctx, sx, null, () => (TEMPLATES[type] || TEMPLATES.dream)(ctx, canvas.width, canvas.height, sx));
   }
 
   // ---------- UI ----------
