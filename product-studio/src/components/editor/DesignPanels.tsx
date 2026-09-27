@@ -26,6 +26,7 @@ import { BACKGROUND_GROUPS, ELEMENT_GROUPS, defaultRoles, designValue, groupOf, 
 import { jcsPaletteId } from "../../design-library/palettes";
 import { isSurfaceStyle, NO_LAYER, splitLayers } from "../../themes/layers";
 import { DesignThumb } from "./DesignThumb";
+import { TechnicalDetails, Visual } from "../help/visuals";
 
 type Update = (fn: (p: ProductProject) => ProductProject) => void;
 type PanelProps = { project: ProductProject; update: Update; usage: ProjectUsage; nav: EditorNav };
@@ -38,16 +39,16 @@ export function LayoutPanel({ project, update, usage, nav }: PanelProps) {
   const any = usage.datePlacement || usage.sidebar.supported || usage.sectionsPerDay || usage.writingRows || usage.dailySections || usage.scheduleTimes || usage.pageNumbers || usage.footer;
   if (!any) return null;
   return (
-    <Section title="Layout options">
+    <Section title="Page options">
       {usage.layouts.map(({ layout, fit }) => (
         <p key={layout.id} className="hint">
-          {layout.label}: {fit.ok ? fit.variantLabel : `unavailable — ${fit.reason}`}
+          {layout.label}: {fit.ok ? (fit.variantLabel === layout.label ? "fits this size" : `using the ${fit.variantLabel} version for this size`) : "not enough room at this size"}
         </p>
       ))}
       {usage.datePlacement && <AppliesTo ids={usage.consumers.datePlacement} nav={nav} />}
       {usage.datePlacement && (
         <Segmented
-          label="Date placement in calendar cells"
+          label="Where dates sit in calendar boxes"
           value={o.datePlacement}
           options={[{ value: "top-left", label: "Top left" }, { value: "top-center", label: "Center" }, { value: "top-right", label: "Top right" }]}
           onChange={(datePlacement) => set({ datePlacement })}
@@ -60,12 +61,17 @@ export function LayoutPanel({ project, update, usage, nav }: PanelProps) {
             <input type="checkbox" checked={o.showSidebar && usage.sidebar.available} disabled={!usage.sidebar.available} onChange={(e) => set({ showSidebar: e.target.checked })} />
             <span>Sidebar{!usage.sidebar.available ? " (not available at this size)" : ""}</span>
           </label>
-          {!usage.sidebar.available && usage.sidebar.reason && <p className="hint">{usage.sidebar.reason}</p>}
+          {!usage.sidebar.available && usage.sidebar.reason && (
+            <>
+              <p className="hint">There isn't room for a sidebar at this page size.</p>
+              <TechnicalDetails label="Show details">{usage.sidebar.reason}</TechnicalDetails>
+            </>
+          )}
           {o.showSidebar && usage.sidebar.available && (
             <>
               <Select label="Sidebar heading" value={o.sidebarContent} options={SIDEBAR_HEADINGS.map((k) => ({ value: k, label: DEFAULT_WORDING[k] }))} onChange={(sidebarContent) => set({ sidebarContent })} />
               {usage.layouts.some((l) => l.layout.id !== "planner-weekly-spread" && l.layout.capability.supportsSidebar) && (
-                <NumberField label="Sidebar width" suffix="in" step={0.05} min={0.5} value={o.sidebarWidthIn} onChange={(sidebarWidthIn) => set({ sidebarWidthIn })} />
+                <NumberField label="Sidebar width" suffix="inches" step={0.05} min={0.5} value={o.sidebarWidthIn} onChange={(sidebarWidthIn) => set({ sidebarWidthIn })} />
               )}
             </>
           )}
@@ -73,7 +79,7 @@ export function LayoutPanel({ project, update, usage, nav }: PanelProps) {
       )}
       {usage.sectionsPerDay && <AppliesTo ids={usage.consumers.sectionsPerDay} nav={nav} />}
       {usage.sectionsPerDay && <NumberField label="Sections per day" step={1} min={1} max={6} value={o.sectionsPerDay} onChange={(v) => set({ sectionsPerDay: Math.max(1, Math.round(v)) })} />}
-      {usage.writingRows && <NumberField label="Writing rows per day" step={1} min={1} max={8} value={o.writingRowsPerDay} onChange={(v) => set({ writingRowsPerDay: Math.max(1, Math.round(v)) })} />}
+      {usage.writingRows && <NumberField label="Writing lines per day" step={1} min={1} max={8} value={o.writingRowsPerDay} onChange={(v) => set({ writingRowsPerDay: Math.max(1, Math.round(v)) })} />}
       {usage.dailySections && <DailySectionsControl project={project} set={set} />}
       {usage.scheduleTimes && !usage.dailySections && (
         <Segmented
@@ -84,7 +90,7 @@ export function LayoutPanel({ project, update, usage, nav }: PanelProps) {
         />
       )}
       {usage.pageNumbers && <Check label="Page numbers" checked={o.showPageNumbers} onChange={(showPageNumbers) => set({ showPageNumbers })} />}
-      {usage.footer && <Check label="Footer (product title)" checked={o.showFooter} onChange={(showFooter) => set({ showFooter })} />}
+      {usage.footer && <Check label="Footer with the product name" checked={o.showFooter} onChange={(showFooter) => set({ showFooter })} />}
     </Section>
   );
 }
@@ -142,20 +148,20 @@ function DailySectionsControl({ project, set }: { project: ProductProject; set: 
       )}
       {chosen.includes("schedule") && o.scheduleTimes !== "blank" && (
         <div className="row">
-          <NumberField label="Schedule starts (hour, 0–23)" step={1} min={0} max={22} value={o.hourStart} onChange={(v) => set({ hourStart: Math.max(0, Math.min(Math.round(v), o.hourEnd)) })} />
-          <NumberField label="Schedule ends (hour, 0–23)" step={1} min={1} max={23} value={o.hourEnd} onChange={(v) => set({ hourEnd: Math.min(23, Math.max(Math.round(v), o.hourStart)) })} />
+          <NumberField label="First hour (0–23, e.g. 6 = 6 AM)" step={1} min={0} max={22} value={o.hourStart} onChange={(v) => set({ hourStart: Math.max(0, Math.min(Math.round(v), o.hourEnd)) })} />
+          <NumberField label="Last hour (0–23, e.g. 21 = 9 PM)" step={1} min={1} max={23} value={o.hourEnd} onChange={(v) => set({ hourEnd: Math.min(23, Math.max(Math.round(v), o.hourStart)) })} />
         </div>
       )}
-      {chosen.includes("schedule") && o.scheduleTimes !== "blank" && <Check label="Half-hour rows" checked={o.halfHours} onChange={(halfHours) => set({ halfHours })} />}
+      {chosen.includes("schedule") && o.scheduleTimes !== "blank" && <Check label="Add half-hour rows" checked={o.halfHours} onChange={(halfHours) => set({ halfHours })} />}
     </div>
   );
 }
 
 const PATTERN_LABELS: Record<FunctionalPatternKind, string> = {
-  ruled: "Ruled",
-  "margin-ruled": "Ruled + margin line",
+  ruled: "Lined",
+  "margin-ruled": "Lined with a margin line",
   "dot-grid": "Dot grid",
-  "graph-grid": "Graph grid",
+  "graph-grid": "Graph paper (squares)",
   blank: "Blank",
   checklist: "Checklist",
   cornell: "Cornell",
@@ -171,32 +177,33 @@ export function PatternPanel({ project, update, usage, nav }: PanelProps) {
   const isGrid = kind === "dot-grid" || kind === "graph-grid";
   const drawsLines = isRuled || isGrid || !usage.patterns.length;
   return (
-    <Section title={usage.patterns.length ? "Writing surface" : "Line style"}>
+    <Section title={usage.patterns.length ? "Writing lines" : "Line style"}>
       {usage.patterns.length > 0 && <AppliesTo ids={usage.consumers.pattern} nav={nav} />}
       {usage.patterns.length ? (
-        <Select label="Pattern" value={kind} options={usage.patterns.map((k) => ({ value: k, label: PATTERN_LABELS[k] }))} onChange={(k) => set({ kind: k })} />
+        <Select label="Writing style" value={kind} options={usage.patterns.map((k) => ({ value: k, label: PATTERN_LABELS[k] }))} onChange={(k) => set({ kind: k })} />
       ) : (
-        <p className="hint">This layout uses fixed checklist rows; only the line style applies.</p>
+        <p className="hint">This page uses fixed checklist rows, so only the line look can change.</p>
       )}
       {isRuled && (
         <>
-          <Select label="Ruling" value={f.rulingPreset} options={RULING_PRESETS.map((r) => ({ value: r.id, label: r.label }))} onChange={(rulingPreset) => set({ rulingPreset })} />
-          {f.rulingPreset === "custom" && <NumberField label="Line spacing" suffix="in" step={0.01} min={0.15} value={f.customLineSpacingIn} onChange={(customLineSpacingIn) => set({ customLineSpacingIn })} />}
+          <Select label="Space between lines" value={f.rulingPreset} options={RULING_PRESETS.map((r) => ({ value: r.id, label: r.label }))} onChange={(rulingPreset) => set({ rulingPreset })} />
+          <Visual kind="line-spacing" caption="Space between writing lines. Wide suits bigger handwriting; narrow fits more lines." />
+          {f.rulingPreset === "custom" && <NumberField label="Space between lines" suffix="inches" step={0.01} min={0.15} value={f.customLineSpacingIn} onChange={(customLineSpacingIn) => set({ customLineSpacingIn })} />}
         </>
       )}
       {isGrid && (
         <>
-          <Select label="Grid" value={f.gridPreset} options={GRID_PRESETS.map((g) => ({ value: g.id, label: g.label }))} onChange={(gridPreset) => set({ gridPreset })} />
-          {f.gridPreset === "custom" && <NumberField label="Pitch" suffix="in" step={0.01} min={0.05} value={f.customPitchIn} onChange={(customPitchIn) => set({ customPitchIn })} />}
+          <Select label="Grid size" value={f.gridPreset} options={GRID_PRESETS.map((g) => ({ value: g.id, label: g.label }))} onChange={(gridPreset) => set({ gridPreset })} />
+          {f.gridPreset === "custom" && <NumberField label="Space between dots / grid lines" suffix="inches" step={0.01} min={0.05} value={f.customPitchIn} onChange={(customPitchIn) => set({ customPitchIn })} />}
         </>
       )}
-      {kind === "dot-grid" && <NumberField label="Dot size" suffix="pt" step={0.1} min={0.2} value={f.dotSizePt} onChange={(dotSizePt) => set({ dotSizePt })} />}
-      {kind === "graph-grid" && <NumberField label="Major line every N cells (0 = off)" step={1} min={0} value={f.majorEvery} onChange={(v) => set({ majorEvery: Math.max(0, Math.round(v)) })} />}
-      {kind === "margin-ruled" && <NumberField label="Margin line from inside edge" suffix="in" step={0.05} value={f.marginLineIn} onChange={(marginLineIn) => set({ marginLineIn })} />}
+      {kind === "dot-grid" && <NumberField label="Dot size" suffix="points" step={0.1} min={0.2} value={f.dotSizePt} onChange={(dotSizePt) => set({ dotSizePt })} />}
+      {kind === "graph-grid" && <NumberField label="Darker line every … squares (0 = none)" step={1} min={0} value={f.majorEvery} onChange={(v) => set({ majorEvery: Math.max(0, Math.round(v)) })} />}
+      {kind === "margin-ruled" && <NumberField label="Margin line distance from the binding side" suffix="inches" step={0.05} value={f.marginLineIn} onChange={(marginLineIn) => set({ marginLineIn })} />}
       {drawsLines && usage.lineStyle && (
         <div className="row">
-          {kind !== "dot-grid" && <NumberField label="Line weight" suffix="pt" step={0.1} min={0.1} value={f.lineWeightPt} onChange={(lineWeightPt) => set({ lineWeightPt })} />}
-          <NumberField label="Opacity" step={0.05} min={0.05} max={1} value={f.opacity} onChange={(opacity) => set({ opacity: Math.min(1, Math.max(0.05, opacity)) })} />
+          {kind !== "dot-grid" && <NumberField label="Line thickness" suffix="points" step={0.1} min={0.1} value={f.lineWeightPt} onChange={(lineWeightPt) => set({ lineWeightPt })} />}
+          <NumberField label="Line strength (0.05 faint – 1 full)" step={0.05} min={0.05} max={1} value={f.opacity} onChange={(opacity) => set({ opacity: Math.min(1, Math.max(0.05, opacity)) })} />
         </div>
       )}
     </Section>
@@ -207,7 +214,7 @@ export function SpacingPanel({ project, update }: PanelProps) {
   return (
     <Section title="Spacing">
       <Segmented
-        label="Density"
+        label="Overall spacing"
         value={project.spacing.density}
         options={(Object.keys(SPACING_LABELS) as SpacingDensity[]).map((d) => ({ value: d, label: d[0].toUpperCase() + d.slice(1) }))}
         onChange={(density) => update((p) => ({ ...p, spacing: { ...p.spacing, density } }))}
@@ -226,7 +233,7 @@ export function TypographyPanel({ project, update, usage }: PanelProps) {
   return (
     <Section title="Typography">
       <Select
-        label="Design pairing"
+        label="Font pairing"
         value={DESIGN_TYPE_PAIRINGS.find((t) => Object.entries(t.fonts).every(([g, f]) => fonts[g as FontGroup] === f))?.id ?? "__custom"}
         options={[{ value: "__custom", label: "Custom — choose each font below" }, ...DESIGN_TYPE_PAIRINGS.map((t) => ({ value: t.id, label: t.label }))]}
         onChange={(id) => {
@@ -247,7 +254,7 @@ export function TypographyPanel({ project, update, usage }: PanelProps) {
           </select>
         </Field>
       ))}
-      <div className="field-label">Sizes (pt)</div>
+      <div className="field-label">Text sizes (points)</div>
       <div className="row">
         {usage.textRoles.map((r) => (
           <NumberField
@@ -260,7 +267,7 @@ export function TypographyPanel({ project, update, usage }: PanelProps) {
           />
         ))}
       </div>
-      <p className="hint">Text that no longer fits is reported by validation — type is never shrunk silently.</p>
+      <p className="hint">If text no longer fits, Page check tells you — text is never made smaller without telling you.</p>
     </Section>
   );
 }
@@ -301,19 +308,19 @@ function setLook(update: Update, patch: LookPatch) {
 
 const TOKEN_LABEL: Record<ColorToken, string> = {
   primary: "Headings",
-  secondary: "Secondary",
+  secondary: "Secondary color",
   accent: "Accent",
   background: "Paper",
   text: "Text",
-  mutedText: "Muted text",
+  mutedText: "Soft text",
   line: "Writing lines",
-  border: "Rules & boxes",
-  decorativeAccent: "Decoration veins / line art",
-  decorBase: "Decoration base",
+  border: "Divider lines & boxes",
+  decorativeAccent: "Decoration accent (veins, gold)",
+  decorBase: "Decoration main color",
   decorHighlight: "Decoration highlights",
   lineArt: "Line art",
-  patternGround: "Pattern ground",
-  patternInk: "Pattern stripes",
+  patternGround: "Stripe background",
+  patternInk: "Stripes",
 };
 const HEX = /^#[0-9a-f]{6}$/i;
 
@@ -326,7 +333,7 @@ export function ColorPanel({ project, update, usage }: PanelProps) {
     { label: "Dove Expressions brand", list: PALETTES.filter((p) => p.brandPalette) },
     { label: "Journal Color Studio palettes", list: PALETTES.filter((p) => p.source && p.group !== "family") },
     { label: "Journal Color Studio color families", list: PALETTES.filter((p) => p.source && p.group === "family") },
-    { label: "Variants (pending approval)", list: PALETTES.filter((p) => !p.brandPalette && !p.source) },
+    { label: "Draft palettes (pending approval)", list: PALETTES.filter((p) => !p.brandPalette && !p.source) },
   ];
   const editable = usage.colorTokens.filter((t) => HEX.test(effective[t]));
   return (
@@ -343,7 +350,7 @@ export function ColorPanel({ project, update, usage }: PanelProps) {
         </select>
       </Field>
       {palette.note && <p className="hint">{palette.brandPalette ? "" : "⚠ "}{palette.note}</p>}
-      {active && <p className="hint">Editing colors of variant “{active.name}”.</p>}
+      {active && <p className="hint">Editing the colors of the design option “{active.name}”.</p>}
       <div className="row">
         {editable.map((t) => (
           <label key={t} className="field" style={{ flex: "0 0 auto" }}>
@@ -366,7 +373,7 @@ export function WordingPanel({ project, update, usage }: PanelProps) {
   if (!usage.wordingKeys.length) return null;
   return (
     <Section title="Wording">
-      <p className="hint">Labels are semantic: renaming one updates every page that uses it.</p>
+      <p className="hint">Renaming a label here changes it on every page that uses it.</p>
       {usage.wordingKeys.map((k) => (
         <Field key={k} label={DEFAULT_WORDING[k] || k}>
           <input type="text" value={project.wording[k] ?? DEFAULT_WORDING[k]} onChange={(e) => update((p) => ({ ...p, wording: { ...p.wording, [k]: e.target.value } }))} />
@@ -377,19 +384,19 @@ export function WordingPanel({ project, update, usage }: PanelProps) {
 }
 
 const PLACEMENT_LABEL: Record<DecorativePlacement, string> = {
-  "full-page": "Full background (behind content, soft)",
-  "header-band": "Header band",
-  "footer-band": "Footer band",
-  "edge-strip": "Edge strip (outer edge)",
-  "border-frame": "Margin frame (around content)",
-  corners: "Corner flourish",
-  "table-corner": "Table corner — needs space around the table",
-  "title-accent": "Title & rule ornament",
-  "top-bottom": "Top + bottom edge flourish",
+  "full-page": "Whole page (soft, behind the writing)",
+  "header-band": "Band across the top",
+  "footer-band": "Band across the bottom",
+  "edge-strip": "Strip along the outer edge",
+  "border-frame": "Frame around the page",
+  corners: "In the corners",
+  "table-corner": "On the corner of a table (needs space around it)",
+  "title-accent": "Beside the title",
+  "top-bottom": "Top and bottom edges",
   "behind-title": "Behind the title (subtle)",
-  "edge-accent": "Edge flourish (enters from the side)",
-  "header-flourish": "Header flourish (on the title rule)",
-  "footer-flourish": "Footer flourish",
+  "edge-accent": "Coming in from the side edge",
+  "header-flourish": "On the line under the title",
+  "footer-flourish": "At the bottom of the page",
 };
 const CORNER_LABEL: Record<CornerSet, string> = {
   "opposite-tl-br": "Upper-left + lower-right",
@@ -403,8 +410,8 @@ const CORNER_LABEL: Record<CornerSet, string> = {
   br: "Lower-right only",
 };
 const EDGE_LABEL: Record<EdgeTreatment, string> = {
-  contained: "Contained — whole artwork visible (default)",
-  bleed: "Bleed off the edge — intentional crop",
+  contained: "Keep the whole artwork on the page (default)",
+  bleed: "Let it run off the edge (trimmed on purpose)",
 };
 const TITLE_POSITION_LABEL: Record<TitleAccentPosition, string> = {
   "title-left": "Left of title",
@@ -427,14 +434,15 @@ const ROLE_NAMES: Record<string, [string, string, string]> = {
   accent: ["", "Line color", ""],
 };
 const DECOR_TOKENS: ColorToken[] = ["decorBase", "decorativeAccent", "decorHighlight", "lineArt", "patternGround", "patternInk", "primary", "accent", "border", "background", "text"];
-const ALIGN_LABEL = { start: "Start", center: "Center", end: "End" } as const;
+const ALIGN_X_LABEL = { start: "Left", center: "Center", end: "Right" } as const;
+const ALIGN_Y_LABEL = { start: "Top", center: "Middle", end: "Bottom" } as const;
 /** Behind-content backgrounds above this strength compete with writing (JCS soft interiors use 0.16). */
 const BEHIND_CONTENT_HINT = 0.3;
 
 /** What the Size control scales, per design (null = the design has no size). */
 function sizeControl(d: DecorativeTheme): { label: string; min: number; max: number } | null {
   if (d.style === "marble") return { label: "Zoom", min: 1, max: 3 };
-  if (d.style === "pattern") return { label: "Stripe scale", min: 1, max: 3 };
+  if (d.style === "pattern") return { label: "Stripe size", min: 1, max: 3 };
   if (d.style === "floral") return { label: "Size", min: 0.3, max: 2 };
   if (d.style === "accent" && d.placement !== "behind-title") return { label: d.placement === "header-band" || d.placement === "border-frame" ? "Pattern size" : "Size", min: 0.3, max: 3 };
   return null;
@@ -529,11 +537,13 @@ export function BackgroundPanel({ project, update, colors }: PanelProps & { colo
   const usingOwn = ownPalette === project.colors.paletteId && !Object.keys(project.colors.overrides).length && d.colorA === "decorBase" && d.colorB === "decorativeAccent" && d.colorC === "decorHighlight";
   return (
     <Section title="Background">
-      <p className="hint">The surface the page is printed on — a full background, a header or footer band, an edge strip or a margin frame. Content always stays on clean paper unless you choose the full background.</p>
+      <p className="hint">A background covers an area of the page — the whole page, a band across the top or bottom, a strip along the edge, or a frame. Your writing stays on clean paper unless you choose the whole page.</p>
+      <Visual kind="background-vs-element" caption="Background (left) covers an area. A decorative element (right, next section) is one piece of art placed on the page." />
       <DesignPicker label="Background" groups={BACKGROUND_GROUPS} value={designValue(d)} colors={colors} roles={d} onPick={(c) => set(pickDesign(d, c))} />
       {d.style !== "none" && (
         <>
-          {placements.length > 1 && <Select label="Covers" value={d.placement} options={placements.map((p) => ({ value: p, label: PLACEMENT_LABEL[p] }))} onChange={(placement) => set(normalizeDecoration({ ...d, placement }))} />}
+          {placements.length > 1 && <Select label="Where it goes" value={d.placement} options={placements.map((p) => ({ value: p, label: PLACEMENT_LABEL[p] }))} onChange={(placement) => set(normalizeDecoration({ ...d, placement }))} />}
+          <Visual kind={`placement:${d.placement}`} caption={PLACEMENT_LABEL[d.placement]} />
           {ownPalette && (
             <div className="as-designed">
               {usingOwn ? (
@@ -547,9 +557,9 @@ export function BackgroundPanel({ project, update, colors }: PanelProps & { colo
           )}
           <div className="row">
             {size && <NumberField label={size.label} step={0.1} min={size.min} max={size.max} value={d.scale} onChange={(scale) => set({ scale })} />}
-            <NumberField label="Opacity" step={0.05} min={0.05} max={1} value={d.opacity} onChange={(opacity) => set({ opacity })} />
+            <NumberField label="Strength (0.05 faint – 1 full)" step={0.05} min={0.05} max={1} value={d.opacity} onChange={(opacity) => set({ opacity })} />
           </div>
-          {d.placement === "full-page" && d.opacity > BEHIND_CONTENT_HINT && <p className="hint">Behind writing, keep opacity ≤ {BEHIND_CONTENT_HINT} for legibility (Journal Color Studio interiors use 0.16).</p>}
+          {d.placement === "full-page" && d.opacity > BEHIND_CONTENT_HINT && <p className="hint">Behind writing, keep the strength at {BEHIND_CONTENT_HINT} or lower so writing stays easy to read (Journal Color Studio pages use 0.16).</p>}
           <div className="row">
             {names[0] && <Select label={names[0]} value={d.colorA} options={tokenOptions} onChange={(colorA) => set({ colorA })} />}
             {names[1] && <Select label={names[1]} value={d.colorB} options={tokenOptions} onChange={(colorB) => set({ colorB })} />}
@@ -588,15 +598,14 @@ export function DecorationPanel({ project, update, usage, decor }: PanelProps & 
   const tokenOptions = DECOR_TOKENS.map((c) => ({ value: c, label: decor?.colors[c] ? `${TOKEN_LABEL[c]} · ${decor.colors[c]}` : TOKEN_LABEL[c] }));
   return (
     <Section title="Decorative elements">
-      <p className="hint">
-        Artwork from Journal Color Studio (snapshot {JCS_SNAPSHOT.commit}), placed against the page's structure — the title rule, corners, edges, header and footer. It never moves
-        lines, grids or calendars, and keeps a clearance from them unless you allow overlap.
-      </p>
+      <p className="hint">One piece of artwork placed on a part of the page — beside the title, in the corners, along an edge, or at the top or bottom. It never moves your writing lines or calendars, and keeps a little space from them.</p>
+      <TechnicalDetails>Artwork snapshot from Journal Color Studio, commit {JCS_SNAPSHOT.commit}.</TechnicalDetails>
       <DesignPicker label="Decorative element" groups={ELEMENT_GROUPS} value={designValue(d)} colors={decor?.colors} roles={d} original={original} onPick={(c) => set(pickDesign(d, c))} />
       {designRoles.length > 0 && <p className="hint decor-roles">Designed for: {designRoles.map((r) => ROLE_LABEL[r]).join(" · ")}</p>}
       {d.style !== "none" && (
         <>
-          {placements.length > 1 && <Select label="Use as" value={d.placement} options={placements.map((p) => ({ value: p, label: PLACEMENT_LABEL[p] }))} onChange={(placement) => set(normalizeDecoration({ ...d, placement, layout: undefined }))} />}
+          {placements.length > 1 && <Select label="Where it goes" value={d.placement} options={placements.map((p) => ({ value: p, label: PLACEMENT_LABEL[p] }))} onChange={(placement) => set(normalizeDecoration({ ...d, placement, layout: undefined }))} />}
+          <Visual kind={`placement:${d.placement}`} caption={PLACEMENT_LABEL[d.placement]} />
           {(d.placement === "corners" || d.placement === "table-corner") && (
             <Select
               label="Corners"
@@ -609,7 +618,10 @@ export function DecorationPanel({ project, update, usage, decor }: PanelProps & 
             />
           )}
           {d.placement === "corners" && edges.length > 1 && (
-            <Select label="Edge" value={d.edge ?? "contained"} options={edges.map((e) => ({ value: e, label: EDGE_LABEL[e] }))} onChange={(v) => set({ edge: v === "contained" ? undefined : (v as EdgeTreatment), layout: undefined })} />
+            <>
+              <Select label="At the page edge" value={d.edge ?? "contained"} options={edges.map((e) => ({ value: e, label: EDGE_LABEL[e] }))} onChange={(v) => set({ edge: v === "contained" ? undefined : (v as EdgeTreatment), layout: undefined })} />
+              <Visual kind="contained-vs-bleed" />
+            </>
           )}
           {d.placement === "title-accent" && (
             <Select
@@ -624,22 +636,24 @@ export function DecorationPanel({ project, update, usage, decor }: PanelProps & 
               {decor.reports.map((r) => (
                 <li key={r.id} className={r.rect ? "" : "decor-status--off"}>
                   <strong>{pieceName(r)}</strong> (page {decor.pageNumber}):{" "}
-                  {r.rect ? `${r.scale < 0.999 ? `placed at ${Math.round(r.scale * 100)}% of its size to stay ${r.mode === "contained" ? "fully visible and " : ""}clear of content` : "placed at full size"}${r.mode === "bleed" && r.intentionalClip && r.clippedShare > 0 ? " — bleeds off the edge on purpose" : ""}` : `not placed — ${r.reason}`}
+                  {r.rect ? `${r.scale < 0.999 ? `placed at ${Math.round(r.scale * 100)}% of its size to stay ${r.mode === "contained" ? "fully visible and " : ""}clear of your writing` : "placed at full size"}${r.mode === "bleed" && r.intentionalClip && r.clippedShare > 0 ? " — runs off the edge on purpose" : ""}` : "not placed — there isn't room here without covering your writing. Try other corners, a smaller size or another position."}
+                  {!r.rect && r.reason && <TechnicalDetails label="Show details">{r.reason}</TechnicalDetails>}
                 </li>
               ))}
             </ul>
           )}
           <div className="row">
             {size && <NumberField label={size.label} step={0.1} min={size.min} max={size.max} value={d.scale} onChange={(scale) => set({ scale })} />}
-            <NumberField label={cap < 1 ? `Opacity (max ${cap})` : "Opacity"} step={0.05} min={0.05} max={cap} value={d.opacity} onChange={(opacity) => set({ opacity })} />
+            <NumberField label={cap < 1 ? `Strength (up to ${cap})` : "Strength (0.05 faint – 1 full)"} step={0.05} min={0.05} max={cap} value={d.opacity} onChange={(opacity) => set({ opacity })} />
           </div>
+          {object && <Visual kind="move" caption="Nudge the artwork from its automatic spot." />}
           {object && (
             <div className="row">
-              <NumberField label="Offset X" suffix="in" step={0.05} min={-3} max={3} value={o.offsetXIn ?? 0} onChange={(offsetXIn) => setLayout({ offsetXIn })} />
-              <NumberField label="Offset Y" suffix="in" step={0.05} min={-3} max={3} value={o.offsetYIn ?? 0} onChange={(offsetYIn) => setLayout({ offsetYIn })} />
+              <NumberField label="Move left / right" suffix="inches" step={0.05} min={-3} max={3} value={o.offsetXIn ?? 0} onChange={(offsetXIn) => setLayout({ offsetXIn })} />
+              <NumberField label="Move up / down" suffix="inches" step={0.05} min={-3} max={3} value={o.offsetYIn ?? 0} onChange={(offsetYIn) => setLayout({ offsetYIn })} />
             </div>
           )}
-          {d.placement === "full-page" && d.opacity > BEHIND_CONTENT_HINT && <p className="hint">Behind writing, keep opacity ≤ {BEHIND_CONTENT_HINT} for legibility (Journal Color Studio interiors use 0.16).</p>}
+          {d.placement === "full-page" && d.opacity > BEHIND_CONTENT_HINT && <p className="hint">Behind writing, keep the strength at {BEHIND_CONTENT_HINT} or lower so writing stays easy to read (Journal Color Studio pages use 0.16).</p>}
           {d.style === "floral" && (
             <Segmented
               label="Artwork colors"
@@ -656,31 +670,30 @@ export function DecorationPanel({ project, update, usage, decor }: PanelProps & 
           </div>
           {object && (
             <details className="subsection">
-              <summary>Advanced composition</summary>
+              <summary>Advanced placement</summary>
               <p className="hint">
-                The system places the artwork against its target (title, rule, corner, edge) with the spacing tokens, and shrinks it — never crops it — to stay clear of content unless
-                bleed is chosen. These settings are fine adjustments; the page rules still apply.
+                Product Studio places the artwork automatically and shrinks it (never crops it) to keep it clear of your writing. Use these only for fine adjustments.
               </p>
               <Select
-                label="Anchor"
+                label="What this is attached to"
                 value={o.anchor ?? "__default"}
-                options={[{ value: "__default", label: "Default for this placement" }, ...COMPOSITION_ANCHORS.filter((a) => usage.compositionAnchors.includes(a.value))]}
+                options={[{ value: "__default", label: "Automatic (best for this position)" }, ...COMPOSITION_ANCHORS.filter((a) => usage.compositionAnchors.includes(a.value))]}
                 onChange={(v) => setLayout({ anchor: v === "__default" ? undefined : (v as CompositionAnchor) })}
               />
               <div className="row">
-                <Select label="Align X" value={o.alignX ?? "__default"} options={[{ value: "__default", label: "Default" }, ...(["start", "center", "end"] as const).map((v) => ({ value: v, label: ALIGN_LABEL[v] }))]} onChange={(v) => setLayout({ alignX: v === "__default" ? undefined : (v as AlignX) })} />
-                <Select label="Align Y" value={o.alignY ?? "__default"} options={[{ value: "__default", label: "Default" }, ...(["start", "center", "end"] as const).map((v) => ({ value: v, label: ALIGN_LABEL[v] }))]} onChange={(v) => setLayout({ alignY: v === "__default" ? undefined : (v as AlignY) })} />
+                <Select label="Left / right position" value={o.alignX ?? "__default"} options={[{ value: "__default", label: "Automatic" }, ...(["start", "center", "end"] as const).map((v) => ({ value: v, label: ALIGN_X_LABEL[v] }))]} onChange={(v) => setLayout({ alignX: v === "__default" ? undefined : (v as AlignX) })} />
+                <Select label="Up / down position" value={o.alignY ?? "__default"} options={[{ value: "__default", label: "Automatic" }, ...(["start", "center", "end"] as const).map((v) => ({ value: v, label: ALIGN_Y_LABEL[v] }))]} onChange={(v) => setLayout({ alignY: v === "__default" ? undefined : (v as AlignY) })} />
               </div>
               <div className="row">
-                <NumberField label="Max width" suffix="in" step={0.1} min={0} max={20} value={o.maxWidthIn ?? 0} onChange={(v) => setLayout({ maxWidthIn: v > 0 ? v : undefined })} />
-                <NumberField label="Max height" suffix="in" step={0.1} min={0} max={20} value={o.maxHeightIn ?? 0} onChange={(v) => setLayout({ maxHeightIn: v > 0 ? v : undefined })} />
+                <NumberField label="Largest width" suffix="inches" step={0.1} min={0} max={20} value={o.maxWidthIn ?? 0} onChange={(v) => setLayout({ maxWidthIn: v > 0 ? v : undefined })} />
+                <NumberField label="Largest height" suffix="inches" step={0.1} min={0} max={20} value={o.maxHeightIn ?? 0} onChange={(v) => setLayout({ maxHeightIn: v > 0 ? v : undefined })} />
               </div>
               <p className="hint">0 = no limit.</p>
-              <Check label="Allow overlap with content" checked={o.allowContentOverlap ?? d.placement === "behind-title"} onChange={(allowContentOverlap) => setLayout({ allowContentOverlap })} />
+              <Check label="Allow it to overlap writing and text" checked={o.allowContentOverlap ?? d.placement === "behind-title"} onChange={(allowContentOverlap) => setLayout({ allowContentOverlap })} />
               {d.placement !== "corners" && (
                 <>
-                  <Check label="Allow bleed past the trim" checked={o.allowBleed ?? (d.placement === "top-bottom" || d.placement === "edge-accent")} onChange={(allowBleed) => setLayout({ allowBleed })} />
-                  <Check label="Allow cropping at the page edge" checked={o.allowClipping ?? false} onChange={(allowClipping) => setLayout({ allowClipping })} />
+                  <Check label="Allow it to extend past the cut edge" checked={o.allowBleed ?? (d.placement === "top-bottom" || d.placement === "edge-accent")} onChange={(allowBleed) => setLayout({ allowBleed })} />
+                  <Check label="Allow it to be cut off at the page edge" checked={o.allowClipping ?? false} onChange={(allowClipping) => setLayout({ allowClipping })} />
                 </>
               )}
               <button type="button" className="btn" onClick={() => set({ layout: undefined })}>
@@ -728,8 +741,8 @@ export function TextPlacementPanel({ project, update, usage, nav }: PanelProps) 
       return { ...p, layoutOptions: { ...p.layoutOptions, textPositions: next } };
     });
   return (
-    <Section title="Text placement">
-      <p className="hint">Move titles and headings between the positions each layout supports. Offsets are fine nudges; text always stays inside the print-safe area.</p>
+    <Section title="Where titles and headings sit">
+      <p className="hint">Move titles and headings to another spot this page supports. The “Move” fields nudge them a little; text always stays inside the printable area.</p>
       {usage.semanticText.map(({ key, example, anchors, layoutIds, anchor, defaultAnchor }) => {
         const cur = positions[key];
         const anchorLabel = key === "sectionHeading" ? SECTION_ANCHOR_LABEL : ANCHOR_LABEL;
@@ -739,12 +752,12 @@ export function TextPlacementPanel({ project, update, usage, nav }: PanelProps) 
             <Select
               label={`${TEXT_LABEL[key]} — “${example.length > 24 ? example.slice(0, 23) + "…" : example}”`}
               value={anchor}
-              options={anchors.map((a) => ({ value: a, label: `${anchorLabel[a] ?? a}${a === defaultAnchor ? " (layout default)" : ""}` }))}
+              options={anchors.map((a) => ({ value: a, label: `${anchorLabel[a] ?? a}${a === defaultAnchor ? " (default)" : ""}` }))}
               onChange={(v) => setPos(key, v === defaultAnchor && !cur?.offsetXIn && !cur?.offsetYIn ? undefined : { anchor: v as TextAnchor, offsetXIn: cur?.offsetXIn ?? 0, offsetYIn: cur?.offsetYIn ?? 0 })}
             />
             <div className="row">
-              <NumberField label="Offset X" suffix="in" step={0.05} min={-5} max={5} value={cur?.offsetXIn ?? 0} onChange={(offsetXIn) => setPos(key, { anchor, offsetYIn: cur?.offsetYIn ?? 0, offsetXIn })} />
-              <NumberField label="Offset Y" suffix="in" step={0.05} min={-5} max={5} value={cur?.offsetYIn ?? 0} onChange={(offsetYIn) => setPos(key, { anchor, offsetXIn: cur?.offsetXIn ?? 0, offsetYIn })} />
+              <NumberField label="Move left / right" suffix="inches" step={0.05} min={-5} max={5} value={cur?.offsetXIn ?? 0} onChange={(offsetXIn) => setPos(key, { anchor, offsetYIn: cur?.offsetYIn ?? 0, offsetXIn })} />
+              <NumberField label="Move up / down" suffix="inches" step={0.05} min={-5} max={5} value={cur?.offsetYIn ?? 0} onChange={(offsetYIn) => setPos(key, { anchor, offsetXIn: cur?.offsetXIn ?? 0, offsetYIn })} />
             </div>
           </div>
         );
@@ -755,12 +768,12 @@ export function TextPlacementPanel({ project, update, usage, nav }: PanelProps) 
 
 export function VariantsPanel({ project, update }: PanelProps) {
   return (
-    <Section title={`Variants · ${project.variants.length}`}>
-      <p className="hint">Variants share geometry, layout and recipe. They override colors, decoration and title only.</p>
+    <Section title={`Design options · ${project.variants.length}`}>
+      <p className="hint">Design options share the same pages and layout. Each can have its own colors, decoration and title — for example, one journal in several colorways.</p>
       <Select
-        label="Active look"
+        label="Showing"
         value={project.activeVariantId ?? "__base"}
-        options={[{ value: "__base", label: "Base design" }, ...project.variants.map((v) => ({ value: v.id, label: v.name }))]}
+        options={[{ value: "__base", label: "Original design" }, ...project.variants.map((v) => ({ value: v.id, label: v.name }))]}
         onChange={(id) => update((p) => ({ ...p, activeVariantId: id === "__base" ? null : id }))}
       />
       {project.variants.map((v) => (
@@ -768,7 +781,7 @@ export function VariantsPanel({ project, update }: PanelProps) {
           <input
             type="text"
             value={v.name}
-            aria-label="Variant name"
+            aria-label="Design option name"
             style={{ flex: 1, border: "1px solid var(--ui-line)", borderRadius: 8, padding: "0 10px" }}
             onChange={(e) => update((p) => ({ ...p, variants: p.variants.map((x) => (x.id === v.id ? { ...x, name: e.target.value } : x)) }))}
           />
@@ -782,13 +795,13 @@ export function VariantsPanel({ project, update }: PanelProps) {
         onClick={() =>
           update((p) => {
             const look = applyVariant(p);
-            const next = addVariantFromCurrent({ ...p, decorativeTheme: look.decorativeTheme, backgroundTheme: look.backgroundTheme }, `Variant ${p.variants.length + 1}`, { ...findPalette(p.colors.paletteId).colors, ...look.colors.overrides });
+            const next = addVariantFromCurrent({ ...p, decorativeTheme: look.decorativeTheme, backgroundTheme: look.backgroundTheme }, `Design option ${p.variants.length + 1}`, { ...findPalette(p.colors.paletteId).colors, ...look.colors.overrides });
             // The base design is untouched; only the new variant captures the look.
             return { ...next, decorativeTheme: p.decorativeTheme, backgroundTheme: p.backgroundTheme };
           })
         }
       >
-        Add variant from current look
+        Save current look as a design option
       </button>
     </Section>
   );

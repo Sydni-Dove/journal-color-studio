@@ -103,7 +103,7 @@ export function Editor({ project, onChange, onBack, saveStatus }: Props) {
         <span className="spacer" />
         {check && (
           <span className={`badge ${check.errorCount ? "badge--error" : check.warningCount ? "badge--warning" : "badge--ok"}`}>
-            {check.errorCount ? `${check.errorCount} errors` : check.warningCount ? `${check.warningCount} warnings` : "Page OK"}
+            {check.errorCount ? `${check.errorCount} to fix` : check.warningCount ? `${check.warningCount} to check` : "Page OK"}
           </span>
         )}
         <button className="btn btn--primary" disabled={!doc} onClick={() => setExporting(true)}>
@@ -135,11 +135,12 @@ export function Editor({ project, onChange, onBack, saveStatus }: Props) {
             </>
           )}
 
-          <Section title={`Page check${check ? ` · ${check.errorCount}E ${check.warningCount}W` : ""}`}>
+          <Section title={`Page check${check ? ` · ${check.errorCount} to fix · ${check.warningCount} to check` : ""}`}>
             {check ? <IssueList issues={check.issues} onGoTo={goToPage} /> : <p className="hint">—</p>}
           </Section>
 
-          <Section title="Debug geometry overlay">
+          <Section title="Developer: page guides">
+            <p className="hint">Draws print guides over the preview for checking a layout. Never printed.</p>
             <div className="row">
               <button className="btn" onClick={() => setDebug(DEBUG_ALL)}>All on</button>
               <button className="btn" onClick={() => setDebug(DEBUG_OFF)}>All off</button>
@@ -150,12 +151,12 @@ export function Editor({ project, onChange, onBack, saveStatus }: Props) {
                 {DEBUG_LABELS[k]}
               </label>
             ))}
-            <p className="hint">The overlay is editor-only and never prints.</p>
+
           </Section>
 
           {doc && doc.recipe.pages.length > 0 && (
             <details className="section">
-              <summary>Geometry info</summary>
+              <summary>Developer: exact measurements</summary>
               <GeometryInfo doc={doc} geometry={geometryFor(doc, doc.recipe.pages[current])} solved={solvePage(doc, current)} />
             </details>
           )}

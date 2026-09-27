@@ -4,6 +4,7 @@
  * how often, and in what design. Structure only: page design (wording, type,
  * colour, surface, decoration, spacing) stays in the design panels.
  */
+import { Visual } from "../help/visuals";
 import { layoutAvailability, type ResolvedDocument } from "../../engines/document/resolve";
 import { addNode, bookOutline, duplicateNode, moveNode, newSection, newStep, removeNode, structureFromItems, updateNode } from "../../engines/recipe/bookEdit";
 import { getLayout } from "../../layouts/registry";
@@ -34,8 +35,8 @@ const ENDS: Record<Scope, ("week" | "month" | "quarter" | "year")[]> = {
   week: ["week"],
 };
 const EVERY: Record<string, RecipeCadence["type"]> = { year: "yearly", quarter: "quarterly", month: "monthly", week: "weekly", day: "daily" };
-const SECTION_LABEL: Record<Scope, string> = { none: "Section (no repeat)", year: "Every year", quarter: "Every quarter", month: "Every month", week: "Every week" };
-const START_LABEL: Record<PageStartRule, string> = { any: "Any page", recto: "Right-hand page", verso: "Left-hand page", spread: "Full spread (opens on the left)" };
+const SECTION_LABEL: Record<Scope, string> = { none: "Once (doesn't repeat)", year: "Every year", quarter: "Every quarter", month: "Every month", week: "Every week" };
+const START_LABEL: Record<PageStartRule, string> = { any: "Either side", recto: "Right-hand page", verso: "Left-hand page", spread: "Two-page spread (starts on a left-hand page)" };
 
 const cadenceValue = (c: RecipeCadence): string => (c.type === "after-module" ? `after:${c.moduleId}` : c.type === "end-of-period" ? `end:${c.period}` : c.type);
 
@@ -94,23 +95,29 @@ function StepCard({ s, siblings, scope, props, first, last }: { s: BookStep; sib
           value={s.layoutId}
           options={mod.layouts.map((id) => {
             const a = avail.find((x) => x.layoutId === id);
-            return { value: id, label: `${getLayout(id).label}${a && !a.fit.ok ? " — doesn't fit this size" : ""}` };
+            return { value: id, label: `${getLayout(id).label}${a && !a.fit.ok ? " — not enough room at this size" : ""}` };
           })}
           onChange={(layoutId) => set({ layoutId, start: getLayout(layoutId).pages === 2 ? undefined : s.start })}
         />
       </div>
       <div className="row">
-        <Select label="How often" value={cadenceValue(s.cadence)} options={cadenceOptions} onChange={(v) => set({ cadence: cadenceFrom(v, s.cadence) })} />
+        <Select label="How often this page repeats" value={cadenceValue(s.cadence)} options={cadenceOptions} onChange={(v) => set({ cadence: cadenceFrom(v, s.cadence) })} />
         {s.cadence.type === "copies" ? (
-          <NumberField label="Copies" step={1} min={1} value={s.cadence.count} onChange={(count) => set({ cadence: { type: "copies", count: Math.max(1, Math.round(count)) } })} />
+          <NumberField label="Number of copies" step={1} min={1} value={s.cadence.count} onChange={(count) => set({ cadence: { type: "copies", count: Math.max(1, Math.round(count)) } })} />
         ) : (
-          <NumberField label="Pages each time" step={1} min={1} value={s.copies ?? 1} onChange={(c) => set({ copies: Math.max(1, Math.round(c)) === 1 ? undefined : Math.max(1, Math.round(c)) })} />
+          <NumberField label="Pages each time it repeats" step={1} min={1} value={s.copies ?? 1} onChange={(c) => set({ copies: Math.max(1, Math.round(c)) === 1 ? undefined : Math.max(1, Math.round(c)) })} />
         )}
       </div>
       {two ? (
-        <p className="hint">Two-page spread: always opens on a left-hand page (an intentional notes page is added when needed).</p>
+        <>
+          <p className="hint">Two-page spread: it always starts on a left-hand page so both pages face each other. A notes page is added before it when needed.</p>
+          <Visual kind="page-sides" side="both" caption="A two-page spread fills both pages of an open book." />
+        </>
       ) : (
-        <Select label="Starts on" value={s.start ?? "any"} options={(["any", "recto", "verso"] as const).map((v) => ({ value: v, label: START_LABEL[v] }))} onChange={(start) => set({ start: start === "any" ? undefined : start })} />
+        <>
+          <Select label="Which side should this page start on?" value={s.start ?? "any"} options={(["any", "recto", "verso"] as const).map((v) => ({ value: v, label: START_LABEL[v] }))} onChange={(start) => set({ start: start === "any" ? undefined : start })} />
+          {s.start && <Visual kind="page-sides" side={s.start === "recto" ? "right" : "left"} caption={s.start === "recto" ? "Starts on the right-hand page of an open book." : "Starts on the left-hand page of an open book."} />}
+        </>
       )}
       {mod.type !== "monthly-calendar" && mod.type !== "weekly-planner" && (
         <Field label="Page title">
@@ -173,7 +180,7 @@ function GroupCard({ g, scope, props, first, last, edit }: { g: BookGroup; scope
           <Field label="Section name">
             <input type="text" value={g.label ?? ""} placeholder={SECTION_LABEL[g.period ?? "none"]} onChange={(e) => set({ label: e.target.value })} />
           </Field>
-          <Select label="Repeats" value={g.period ?? "none"} options={periods.map((p) => ({ value: p, label: SECTION_LABEL[p] }))} onChange={(v) => set({ period: v === "none" ? undefined : (v as BookGroup["period"]) })} />
+          <Select label="How often this section repeats" value={g.period ?? "none"} options={periods.map((p) => ({ value: p, label: SECTION_LABEL[p] }))} onChange={(v) => set({ period: v === "none" ? undefined : (v as BookGroup["period"]) })} />
         </div>
         <div className="card-actions">
           <button className="btn" disabled={first} onClick={() => edit((n) => moveNode(n, g.id, -1))}>Move section up</button>

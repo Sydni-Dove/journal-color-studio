@@ -26,21 +26,21 @@ export type CompositionAnchor =
   | "bottomRightAccent";
 
 export const COMPOSITION_ANCHORS: { value: CompositionAnchor; label: string }[] = [
-  { value: "page", label: "Page" },
-  { value: "safeArea", label: "Safe area" },
-  { value: "header", label: "Header" },
+  { value: "page", label: "The whole page" },
+  { value: "safeArea", label: "Printable area (inside the margins)" },
+  { value: "header", label: "Top of the page (header)" },
   { value: "title", label: "Title" },
-  { value: "titleRule", label: "Title rule" },
-  { value: "mainContent", label: "Main content" },
+  { value: "titleRule", label: "Line under the title" },
+  { value: "mainContent", label: "Main writing area" },
   { value: "calendar", label: "Calendar / grid" },
   { value: "notes", label: "Notes" },
   { value: "sidebar", label: "Sidebar" },
   { value: "writingArea", label: "Writing area" },
-  { value: "footer", label: "Footer" },
-  { value: "topLeftAccent", label: "Top-left accent zone" },
-  { value: "topRightAccent", label: "Top-right accent zone" },
-  { value: "bottomLeftAccent", label: "Bottom-left accent zone" },
-  { value: "bottomRightAccent", label: "Bottom-right accent zone" },
+  { value: "footer", label: "Bottom of the page (footer)" },
+  { value: "topLeftAccent", label: "Top-left corner area" },
+  { value: "topRightAccent", label: "Top-right corner area" },
+  { value: "bottomLeftAccent", label: "Bottom-left corner area" },
+  { value: "bottomRightAccent", label: "Bottom-right corner area" },
 ];
 
 /** Regions a layout declares for its page (the rest are derived from nodes/geometry). */

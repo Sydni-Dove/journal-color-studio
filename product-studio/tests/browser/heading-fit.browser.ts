@@ -87,7 +87,7 @@ describe("weekly sidebar heading fits with real fonts", () => {
         expect(m.overflow, "text wider than its solved box").toBeLessThanOrEqual(0);
         expect(m.ink.l).toBeGreaterThanOrEqual(m.box.l - tol);
         expect(m.ink.r).toBeLessThanOrEqual(m.box.r + tol);
-        await expect.poll(async () => (await page.locator(".badge").first().textContent()) ?? "").not.toMatch(/error/);
+        await expect.poll(async () => (await page.locator(".badge").first().textContent()) ?? "").not.toMatch(/to fix/);
         await page.context().close();
       });
     }
@@ -101,7 +101,7 @@ describe("weekly sidebar heading fits with real fonts", () => {
           expect(m.overflow, `${heading}: text wider than its solved box`).toBeLessThanOrEqual(0);
           expect(m.ink.l).toBeGreaterThanOrEqual(m.box.l - 0.5);
           expect(m.ink.r).toBeLessThanOrEqual(m.box.r + 0.5);
-          await expect.poll(async () => (await page.locator(".badge").first().textContent()) ?? "").not.toMatch(/error/);
+          await expect.poll(async () => (await page.locator(".badge").first().textContent()) ?? "").not.toMatch(/to fix/);
           await page.context().close();
         }
       });
@@ -109,7 +109,7 @@ describe("weekly sidebar heading fits with real fonts", () => {
   }
   it("wording that cannot fit reports the specific heading-fit error (not a generic collision)", async () => {
     const page = await open(weekly("Important Things To Remember Before Sunday Service"), VIEWPORTS.desktop);
-    await expect.poll(async () => (await page.locator(".badge").first().textContent()) ?? "").toMatch(/1 errors?/);
+    await expect.poll(async () => (await page.locator(".badge").first().textContent()) ?? "").toMatch(/1 to fix/);
     await page.evaluate(() => document.querySelectorAll("aside details").forEach((d) => ((d as HTMLDetailsElement).open = true)));
     await expect(page.locator(".issue--error", { hasText: /Sidebar heading "IMPORTANT THINGS TO REMEMBER BEFORE SUNDAY SERVICE" exceeds the available heading width by \d\.\d\d"/ }).count()).resolves.toBeGreaterThan(0);
     await expect(page.locator(".issue", { hasText: /overlaps/ }).count()).resolves.toBe(0);

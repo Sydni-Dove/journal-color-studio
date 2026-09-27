@@ -69,21 +69,21 @@ export const PALETTES: ColorPalette[] = [
   //    OUTSIDE the approved brand palette and require designer approval. ──
   {
     id: "variant-sage",
-    label: "Sage (variant — pending approval)",
+    label: "Sage (draft — pending approval)",
     brandPalette: false,
     colors: { ...brandBase, primary: "#56644F", border: "#56644F", decorBase: "#56644F", decorativeAccent: "#A9B8A0" },
     note: "Non-brand hex values — pending designer approval.",
   },
   {
     id: "variant-purple",
-    label: "Purple (variant — pending approval)",
+    label: "Purple (draft — pending approval)",
     brandPalette: false,
     colors: { ...brandBase, primary: "#4A2C5E", border: "#4A2C5E", decorBase: "#4A2C5E", decorativeAccent: "#B9A3C9" },
     note: "Non-brand hex values — pending designer approval.",
   },
   {
     id: "variant-blue",
-    label: "Blue (variant — pending approval)",
+    label: "Blue (draft — pending approval)",
     brandPalette: false,
     colors: { ...brandBase, primary: "#1E3A5C", border: "#1E3A5C", decorBase: "#1E3A5C", decorativeAccent: "#9FB6CE" },
     note: "Non-brand hex values — pending designer approval.",

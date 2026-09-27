@@ -219,7 +219,7 @@ export function ProjectList({ projects, meta, onStart, onOpen, onDuplicate, onDu
             <p>Build the structure once, then change wording, colors, typography, dates, writing surfaces, decoration, size and page sequence — without rebuilding the product by hand.</p>
             <ul>
               <li>
-                <strong>Geometry</strong> is solved from the trim, binding and printer, so margins and gutters stay print-safe.
+                <strong>Measurements</strong> are worked out from the page size, binding and printer, so margins and binding space are always print-safe.
               </li>
               <li>
                 <strong>Structure</strong> repeats pages across your dates: months, weeks, reviews and journal pages.
@@ -247,7 +247,7 @@ export function ProjectList({ projects, meta, onStart, onOpen, onDuplicate, onDu
                   <div className="card-actions">
                     <button className="btn btn--primary" onClick={() => onOpen(p.id)}>Open</button>
                     <button className="btn" onClick={() => onDuplicate(p.id)}>Duplicate</button>
-                    <button className="btn" onClick={() => onDuplicateAsVariant(p.id)}>Duplicate as variant</button>
+                    <button className="btn" onClick={() => onDuplicateAsVariant(p.id)}>Duplicate as a design option</button>
                     <button
                       className="btn btn--danger"
                       onClick={() => {

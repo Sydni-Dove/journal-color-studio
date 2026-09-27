@@ -11,6 +11,7 @@ import type { Edge, LogicalEdge } from "../../types/geometry";
 import type { ProductProject } from "../../types/project";
 import type { RecipeItem, RepeatRule } from "../../types/recipe";
 import { Check, Field, LabeledNumeric, NumberField, Section, Segmented, Select, type EditorNav } from "./ui";
+import { Advanced, TechnicalDetails, Visual } from "../help/visuals";
 
 /** Upper bound for a user margin entry (inches); larger values leave no usable page. */
 const MAX_USER_MARGIN_IN = 3;
@@ -26,7 +27,7 @@ export function ProductPanel({ project, update }: PanelProps) {
     <Section title="Size" open>
       <p className="hint">{PRODUCT_TYPES[project.productType].label} — {PRODUCT_TYPES[project.productType].description}</p>
       <Select
-        label="Trim size"
+        label="Page size (after trimming)"
         value={d.sizePresetId}
         options={[...sizePresetsFor(project.productType).map((s) => ({ value: s.id, label: s.label })), { value: CUSTOM_SIZE_ID, label: "Custom…" }]}
         onChange={(sizePresetId) => set({ sizePresetId, custom: sizePresetId === CUSTOM_SIZE_ID ? d.custom ?? { width: 6, height: 9, unit: "in" } : d.custom })}
@@ -38,12 +39,14 @@ export function ProductPanel({ project, update }: PanelProps) {
           <Select label="Unit" value={d.custom.unit} options={[{ value: "in", label: "in" }, { value: "mm", label: "mm" }]} onChange={(unit) => set({ custom: { ...d.custom!, unit } })} />
         </div>
       )}
-      <Segmented label="Orientation" value={d.orientation} options={[{ value: "portrait", label: "Portrait" }, { value: "landscape", label: "Landscape" }]} onChange={(orientation) => set({ orientation })} />
+      <Segmented label="Orientation" value={d.orientation} options={[{ value: "portrait", label: "Portrait (tall)" }, { value: "landscape", label: "Landscape (wide)" }]} onChange={(orientation) => set({ orientation })} />
+      <Visual kind="orientation" />
     </Section>
   );
 }
 
 const EDGE_LABEL: Record<Edge, string> = { top: "Top", bottom: "Bottom", left: "Left", right: "Right" };
+const MARGIN_LABEL: Record<LogicalEdge, string> = { top: "Top (inches)", bottom: "Bottom (inches)", inside: "Binding side (inches)", outside: "Outer edge (inches)" };
 
 export function ProductionPanel({ project, update, doc, nav }: PanelProps & { doc: ResolvedDocument | null; nav: EditorNav | null }) {
   const prod = project.production;
@@ -56,7 +59,7 @@ export function ProductionPanel({ project, update, doc, nav }: PanelProps & { do
   const setMargin = (edge: LogicalEdge, v: number | undefined) => set({ userMargins: { ...(prod.userMargins ?? {}), [edge]: v } });
 
   return (
-    <Section title="Binding & printer" open>
+    <Section title="Binding & printing" open>
       {choices.length > 1 && (
         <Select
           label="Binding"
@@ -72,37 +75,45 @@ export function ProductionPanel({ project, update, doc, nav }: PanelProps & { do
       )}
       {binding.allowedBoundEdges.length > 1 && (
         <Segmented
-          label={binding.boundEdgeMode === "glued-edge" ? "Glue edge" : "Bound edge"}
+          label={binding.boundEdgeMode === "glued-edge" ? "Which edge is glued" : "Which edge is bound"}
           value={prod.boundEdge ?? binding.defaultBoundEdge ?? "left"}
           options={binding.allowedBoundEdges.map((e) => ({ value: e, label: EDGE_LABEL[e] }))}
           onChange={(boundEdge) => set({ boundEdge })}
         />
       )}
+      {binding.boundEdgeMode === "glued-edge" ? (
+        <Visual kind="glue" />
+      ) : prod.bindingType !== "none" && prod.bindingType !== "digital" ? (
+        <Visual kind="binding" caption="Binding space: Product Studio keeps this strip clear for the rings, coil or spine automatically." />
+      ) : null}
       {profiles.length > 1 ? (
-        <Select label="Printer profile" value={prod.printProfileId} options={profiles.map((p) => ({ value: p.id, label: p.label }))} onChange={(printProfileId) => set({ printProfileId })} />
+        <Select label="Printer" value={prod.printProfileId} options={profiles.map((p) => ({ value: p.id, label: p.label }))} onChange={(printProfileId) => set({ printProfileId })} />
       ) : (
         <p className="hint">Printer: {profiles[0]?.label}</p>
       )}
       <p className="hint">{PRINT_PROFILES.find((p) => p.id === prod.printProfileId)?.description}</p>
       {doc && <RequirementSummary doc={doc} />}
-      {prod.bindingType === "case-bound" && <p className="hint">Case binding shares the perfect-bound interior geometry; it changes printer compatibility (validated) and the cover.</p>}
-      <Check label="Include bleed" checked={prod.includeBleed} onChange={(includeBleed) => set({ includeBleed })} />
+      {prod.bindingType === "case-bound" && <p className="hint">Hardcover uses the same inside pages as a paperback. It changes which printers can make it, and the cover.</p>}
+      <Check label="Extend background past the cut edge" checked={prod.includeBleed} onChange={(includeBleed) => set({ includeBleed })} />
+      <p className="hint">Turn this on when color or artwork runs to the edge of the page, so no white line shows after trimming. Printers call this “bleed”.</p>
+      <Visual kind="bleed" />
       {binding.boundEdgeMode === "punched-leaf" && (
         <>
-          <Check label="Printed double-sided (back mirrors punched edge)" checked={prod.duplex} onChange={(duplex) => set({ duplex })} />
+          <Check label="Printed on both sides" checked={prod.duplex} onChange={(duplex) => set({ duplex })} />
+          <Visual kind="page-sides" side="left" caption="On the back of each sheet (a left-hand page) the binding space is on the right." />
           <p className="hint">
-            Changes the back (left-hand) pages: the punched-edge margin moves to the right.
+            The back of each sheet gets its binding space on the other side.
             {nav && prod.duplex && (
               <>
                 {" "}
-                <button type="button" className="btn btn--ghost" style={{ minHeight: 44, padding: "0 10px" }} onClick={() => nav.goToSide("verso")}>Show a back page</button>
+                <button type="button" className="btn btn--ghost" style={{ minHeight: 44, padding: "0 10px" }} onClick={() => nav.goToSide("verso")}>Show a left-hand page</button>
               </>
             )}
           </p>
         </>
       )}
       {binding.sheetCountIsMetadata && (
-        <Field label="Sheets per pad (manufacturing metadata — sets pad count and home-print repeats, not the page design)">
+        <Field label="Sheets per pad">
           <select
             value={String(prod.sheetsPerPad ?? STUDIO_PAD.defaultSheets)}
             onChange={(e) => {
@@ -120,12 +131,15 @@ export function ProductionPanel({ project, update, doc, nav }: PanelProps & { do
           </select>
         </Field>
       )}
-      <div className="field-label">Margins (blank = studio default; never below required)</div>
+      {binding.sheetCountIsMetadata && <p className="hint">How many tear-off sheets each pad has. Every sheet uses the same design, so this doesn't change the page.</p>}
+      <Advanced label="Custom margins (advanced)">
+        <Visual kind="margins" caption="Margins: the empty space around the page. Product Studio sets them for your printer and binding automatically." />
+        <p className="hint">Leave these blank to use the automatic margins. A number you enter is never allowed below what the printer and binding need.</p>
       <div className="row">
         {(["top", "bottom", "inside", "outside"] as LogicalEdge[]).map((e) => (
           <LabeledNumeric
             key={e}
-            label={e}
+            label={MARGIN_LABEL[e]}
             step={0.05}
             placeholder="auto"
             rules={{ min: 0, max: MAX_USER_MARGIN_IN, allowEmpty: true }}
@@ -134,19 +148,20 @@ export function ProductionPanel({ project, update, doc, nav }: PanelProps & { do
           />
         ))}
       </div>
+      </Advanced>
     </Section>
   );
 }
 
 const REPEAT_LABELS: Record<RepeatRule["kind"], string> = {
   once: "Once",
-  count: "Copies",
+  count: "A number of copies",
   "every-year": "Every year",
   "every-quarter": "Every quarter",
   "every-month": "Every month",
   "every-week": "Every week",
   "every-day": "Every day",
-  "repeated-sheet": "Pad master sheet",
+  "repeated-sheet": "The same design on every pad sheet",
 };
 
 function repeatFor(kind: RepeatRule["kind"], prev: RepeatRule, sheets: number): RepeatRule {
@@ -189,35 +204,41 @@ export function PagesPanel({ project, update, doc, usage, nav }: PanelProps & { 
 
   return (
     <Section title={`Pages${isPad ? "" : ` · ${doc.recipe.pageCount} page${doc.recipe.pageCount === 1 ? "" : "s"}`}`} open>
-      {project.recipe.structure && <p className="hint">This product uses a book structure (below). Its date range and week start are set here.</p>}
+      {project.recipe.structure && <p className="hint">This product's pages are arranged under Book structure (below). Set its dates and the first day of the week here.</p>}
       {!project.recipe.structure && items.map((it, i) => {
         const a = avail.find((x) => x.layoutId === it.layoutId);
         const kinds = repeatsFor(it.layoutId, isPad);
         return (
           <div key={it.id} className="card">
-            <Field label={isPad ? "Sheet layout" : `Step ${i + 1} layout`}>
+            <Field label={isPad ? "Sheet design" : items.length > 1 ? `Page type ${i + 1}` : "Page type"}>
               <select value={it.layoutId} onChange={(e) => changeLayout(it, e.target.value)}>
                 {avail.map((x) => (
                   <option key={x.layoutId} value={x.layoutId} disabled={!x.fit.ok}>
                     {x.label}
-                    {x.fit.ok ? (x.fit.variant !== "standard" ? ` — ${x.fit.variantLabel}` : "") : " — doesn't fit this size"}
+                    {x.fit.ok ? (x.fit.variant !== "standard" && x.fit.variantLabel !== x.label ? ` — ${x.fit.variantLabel}` : "") : " — not enough room at this size"}
                   </option>
                 ))}
               </select>
             </Field>
-            {a && !a.fit.ok && <div className="issue issue--error">{a.fit.reason}</div>}
+            {a && !a.fit.ok && (
+              <div className="issue issue--error">
+                <div className="issue-title">This page type doesn't have enough room at this size.</div>
+                <div className="issue-advice">Choose a larger page size or a different page type.</div>
+                <TechnicalDetails label="Show details">{a.fit.reason}</TechnicalDetails>
+              </div>
+            )}
             {items.length > 1 && nav.currentLayoutId !== it.layoutId && (
-              <button type="button" className="btn btn--ghost" style={{ justifySelf: "start" }} onClick={() => nav.goToItem(it.id)}>Show this step's first page</button>
+              <button type="button" className="btn btn--ghost" style={{ justifySelf: "start" }} onClick={() => nav.goToItem(it.id)}>Show its first page</button>
             )}
             {kinds.length > 1 ? (
               <div className="row">
-                <Select label="Repeat" value={it.repeat.kind} options={kinds.map((k) => ({ value: k, label: REPEAT_LABELS[k] }))} onChange={(kind) => setItems(items.map((x) => (x.id === it.id ? { ...x, repeat: repeatFor(kind, x.repeat, sheets) } : x)))} />
+                <Select label="How often this page repeats" value={it.repeat.kind} options={kinds.map((k) => ({ value: k, label: REPEAT_LABELS[k] }))} onChange={(kind) => setItems(items.map((x) => (x.id === it.id ? { ...x, repeat: repeatFor(kind, x.repeat, sheets) } : x)))} />
                 {it.repeat.kind === "count" && (
-                  <NumberField label="Copies" step={1} min={1} value={it.repeat.count} onChange={(count) => setItems(items.map((x) => (x.id === it.id ? { ...x, repeat: { kind: "count", count: Math.max(1, Math.round(count)) } } : x)))} />
+                  <NumberField label="Number of copies" step={1} min={1} value={it.repeat.count} onChange={(count) => setItems(items.map((x) => (x.id === it.id ? { ...x, repeat: { kind: "count", count: Math.max(1, Math.round(count)) } } : x)))} />
                 )}
               </div>
             ) : (
-              <p className="hint">Repeats: {REPEAT_LABELS[kinds[0]]}{it.repeat.kind === "repeated-sheet" ? ` (${sheets} sheets, one master design)` : ""}</p>
+              <p className="hint">How often it repeats: {REPEAT_LABELS[kinds[0]]}{it.repeat.kind === "repeated-sheet" ? ` (${sheets} sheets)` : ""}</p>
             )}
             {!isPad && items.length > 1 && (
               <div className="card-actions">
@@ -229,13 +250,13 @@ export function PagesPanel({ project, update, doc, usage, nav }: PanelProps & { 
         );
       })}
       {!isPad && !project.recipe.structure && (
-        <button className="btn" onClick={() => setItems([...items, { id: newId("r"), layoutId: "notes-page", repeat: { kind: "count", count: 1 } }])}>Add page step</button>
+        <button className="btn" onClick={() => setItems([...items, { id: newId("r"), layoutId: "notes-page", repeat: { kind: "count", count: 1 } }])}>Add another page type</button>
       )}
       {!isPad && !project.recipe.structure && items.length > 1 && usage.calendar && (
         <Segmented
           label="Page order"
           value={project.recipe.ordering}
-          options={[{ value: "chronological", label: "Chronological" }, { value: "sequential", label: "As listed" }]}
+          options={[{ value: "chronological", label: "By date" }, { value: "sequential", label: "In the order listed" }]}
           onChange={(ordering) => update((p) => ({ ...p, recipe: { ...p.recipe, ordering } }))}
         />
       )}
@@ -252,9 +273,9 @@ export function PagesPanel({ project, update, doc, usage, nav }: PanelProps & { 
           </div>
           {usage.datePlacement && (
             <>
-              <Check label="Six-row month grids (universal)" checked={cal?.sixRowMonths ?? true} onChange={(sixRowMonths) => setCal({ sixRowMonths })} />
+              <Check label="Make every month calendar the same shape (6 week rows)" checked={cal?.sixRowMonths ?? true} onChange={(sixRowMonths) => setCal({ sixRowMonths })} />
               <p className="hint">
-                Only changes months that need 4 or 5 rows; cell heights then follow the month.
+                When this is off, months that need only 4 or 5 weeks get fewer, taller boxes.
                 {(() => {
                   const m = doc.calendar?.months.find((x) => x.naturalRows < 6);
                   return m ? (
@@ -296,6 +317,8 @@ function RequirementSummary({ doc }: { doc: ResolvedDocument }) {
   const ring = doc.project.production.bindingType.startsWith("ring");
   return (
     <div className="hint" data-testid="requirement-summary">
+      <p style={{ margin: 0 }}>Margins, binding space and the area past the cut edge are set for this printer and binding automatically.</p>
+      <TechnicalDetails>
       <p style={{ margin: 0 }}>
         {`On this page: ${g.margins.map((m) => `${m.logicalEdge} ${+m.effectiveIn.toFixed(3)}" (needs ≥ ${+m.requiredIn.toFixed(3)}")`).join(" · ")}. Bleed: ${bleed}.${binding ? ` Binding clearance: ${binding}.` : ""}${glue ? ` Glue zone: ${glue}.` : ""}`}
       </p>
@@ -306,6 +329,7 @@ function RequirementSummary({ doc }: { doc: ResolvedDocument }) {
       </p>
       {twins.length > 0 && <p style={{ margin: "4px 0 0" }}>{`${twins.join(", ")} ${twins.length > 1 ? "have" : "has"} the same requirements for this product — the choice records which printer the file is for.`}</p>}
       {ring && <p style={{ margin: "4px 0 0" }}>6-ring and 7-ring share the same page clearance; the ring count sets the punch pattern (production), not the page.</p>}
+      </TechnicalDetails>
     </div>
   );
 }

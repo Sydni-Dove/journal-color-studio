@@ -20,13 +20,13 @@ export type DebugFlags = {
 };
 
 export const DEBUG_LABELS: Record<keyof DebugFlags, string> = {
-  trim: "Trim",
-  bleed: "Bleed",
-  safe: "Safe area",
-  bindingKeepOut: "Binding keep-out",
-  glueKeepOut: "Glue keep-out",
-  grid: "Grid / punch",
-  bounds: "Component bounds",
+  trim: "Cut edge (trim)",
+  bleed: "Area past the cut edge (bleed)",
+  safe: "Printable area (safe area)",
+  bindingKeepOut: "Binding space (binding keep-out)",
+  glueKeepOut: "Glued strip (glue keep-out)",
+  grid: "Grid / punch holes",
+  bounds: "Outline of every page element",
   centerLines: "Center lines",
   rowLines: "Row lines",
   columnLines: "Column lines",

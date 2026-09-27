@@ -106,17 +106,17 @@ export const CAPABILITY_ROLE: Record<DecorationCapability, DecorationRole> = {
 };
 
 export const ROLE_LABEL: Record<DecorationRole, string> = {
-  background: "background",
-  frame: "margin frame",
-  band: "header / footer band",
-  edge: "edge flourish",
-  corner: "corner flourish",
-  "table-corner": "table-corner accent",
-  divider: "divider ornament",
-  "rule-accent": "rule-end ornament",
-  "heading-accent": "heading accent",
-  "header-flourish": "header flourish",
-  "footer-flourish": "footer flourish",
+  background: "whole-page background",
+  frame: "frame around the page",
+  band: "band across the top or bottom",
+  edge: "along the side edge",
+  corner: "corners",
+  "table-corner": "the corner of a table",
+  divider: "between sections",
+  "rule-accent": "the ends of the line under the title",
+  "heading-accent": "beside a heading",
+  "header-flourish": "the line under the title",
+  "footer-flourish": "the bottom of the page",
 };
 
 export function rolesFor(caps: DecorationCapability[]): DecorationRole[] {

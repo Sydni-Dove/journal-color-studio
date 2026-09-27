@@ -24,6 +24,7 @@ import type { ProductProject } from "../../types/project";
 import type { SpacingDensity } from "../../types/tokens";
 import type { WeekStart } from "../../types/calendar";
 import { Field, NumberField } from "../editor/ui";
+import { TechnicalDetails } from "../help/visuals";
 import { layoutAvailability, resolveDocument } from "../../engines/document/resolve";
 
 function Choices<T extends string>({ value, options, onChange }: { value: T; options: { value: T; label: string }[]; onChange: (v: T) => void }) {
@@ -155,7 +156,7 @@ export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: 
         <h1 style={{ flex: 1 }}>New product</h1>
         <button className="btn" onClick={onCancel}>Cancel</button>
       </div>
-      <p className="lede">You decide the product. Product Studio solves the geometry.</p>
+      <p className="lede">You choose the product. Product Studio works out the measurements.</p>
 
       <h2 id="wizard-templates">Starter templates</h2>
       <div className="card-grid">
@@ -176,8 +177,8 @@ export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: 
         </section>
 
         <section className="step">
-          <h3>2 · Size & orientation</h3>
-          <Field label="Trim size">
+          <h3>2 · Page size & orientation</h3>
+          <Field label="Page size (after trimming)">
             <select value={sizeId} onChange={(e) => {
               setSizeId(e.target.value);
               const sp = sizes.find((s) => s.id === e.target.value);
@@ -201,13 +202,13 @@ export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: 
               </Field>
             </div>
           )}
-          <Choices value={orientation} options={[{ value: "portrait", label: "Portrait" }, { value: "landscape", label: "Landscape" }]} onChange={setOrientation} />
+          <Choices value={orientation} options={[{ value: "portrait", label: "Portrait (tall)" }, { value: "landscape", label: "Landscape (wide)" }]} onChange={setOrientation} />
         </section>
 
         <section className="step">
-          <h3>3 · Binding & printer</h3>
+          <h3>3 · Binding & printing</h3>
           <Choices value={bindingChoice} options={bindingChoices.map((c) => ({ value: c.id, label: c.label }))} onChange={pickBinding} />
-          <Field label="Printer profile">
+          <Field label="Printer">
             <select value={profileId} onChange={(e) => setProfileId(e.target.value)}>
               {profiles.map((p) => (
                 <option key={p.id} value={p.id}>{p.label}</option>
@@ -217,19 +218,25 @@ export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: 
         </section>
 
         <section className="step">
-          <h3>4 · Layout</h3>
+          <h3>4 · Page type</h3>
           <div className="choice-row" role="group">
             {recipes.map((r) => {
               const problem = recipeFit(r);
               return (
                 <button key={r.id} type="button" className="choice" aria-pressed={r.id === recipeId} disabled={!!problem} title={problem ?? undefined} onClick={() => setRecipeId(r.id)}>
                   {r.label}
-                  {problem ? " (doesn't fit this size)" : ""}
+                  {problem ? " (not enough room at this size)" : ""}
                 </button>
               );
             })}
           </div>
-          {recipeProblem && <div className="issue issue--error">{recipeProblem}</div>}
+          {recipeProblem && (
+            <div className="issue issue--error">
+              <div className="issue-title">This page type doesn't have enough room at this size.</div>
+              <div className="issue-advice">Choose a larger page size or another page type.</div>
+              <TechnicalDetails label="Show details">{recipeProblem}</TechnicalDetails>
+            </div>
+          )}
           {recipe.needsCalendar && (
             <div className="row">
               <NumberField label="Year" step={1} value={year} onChange={(y) => setYear(Math.round(y))} />
@@ -242,7 +249,7 @@ export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: 
             </div>
           )}
           {(recipe.id === "journal-lined" || stationery) && <NumberField label="Pages" step={1} min={1} value={count} onChange={(c) => setCount(Math.max(1, Math.round(c)))} />}
-          {stationery && <p className="hint">Margins, section heights, writing lines and table columns are solved from the trim — nothing to measure.</p>}
+          {stationery && <p className="hint">Margins, section sizes, writing lines and table columns are worked out for this page size — nothing to measure.</p>}
           {isPad && (
             <Field label="Sheets per pad">
               <select value={sheets} onChange={(e) => setSheets(+e.target.value)}>
@@ -256,6 +263,7 @@ export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: 
 
         <section className="step">
           <h3>5 · Look</h3>
+          <p className="hint">Overall spacing, colors and heading font. Everything here can be changed later.</p>
           <Choices value={density} options={(Object.keys(SPACING_LABELS) as SpacingDensity[]).map((d) => ({ value: d, label: d[0].toUpperCase() + d.slice(1) }))} onChange={setDensity} />
           <Field label="Colors">
             <select value={paletteId} onChange={(e) => setPaletteId(e.target.value)}>

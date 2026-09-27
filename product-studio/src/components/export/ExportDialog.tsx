@@ -1,3 +1,5 @@
+import { plainIssue, SEVERITY_LABEL } from "../help/plainIssues";
+import { TechnicalDetails } from "../help/visuals";
 import { useEffect, useMemo, useState } from "react";
 import type { ResolvedDocument } from "../../engines/document/resolve";
 import { planPrint } from "../../engines/print/printPlan";
@@ -25,36 +27,46 @@ function groupIssues(issues: ValidationIssue[]): { issue: ValidationIssue; pages
 }
 
 export function IssueList({ issues, onGoTo }: { issues: ValidationIssue[]; onGoTo?: (page: number) => void }) {
-  if (!issues.length) return <p className="hint">No issues.</p>;
+  if (!issues.length) return <p className="hint">Everything checks out.</p>;
   return (
     <ul className="issues">
-      {groupIssues(issues).map(({ issue: i, pages }, k) => (
-        <li key={k} className={`issue issue--${i.severity}`}>
-          <div className="issue-meta">
-            {i.severity} · {i.rule}
-            {pages.length > 0 && (
-              <>
-                {" · "}
-                {onGoTo ? (
-                  <button className="btn btn--ghost" style={{ minHeight: 44, padding: "0 10px" }} onClick={() => onGoTo(pages[0])}>
-                    page {pages[0]}
-                  </button>
-                ) : (
-                  `page ${pages[0]}`
-                )}
-                {pages.length > 1 ? ` and ${pages.length - 1} more page${pages.length > 2 ? "s" : ""}` : ""}
-              </>
-            )}
-            {i.componentId ? ` · ${i.componentId}` : ""}
-          </div>
-          <div>{i.message}</div>
-          {i.measurement && (
-            <div className="hint">
-              measured {+i.measurement.actual.toFixed(4)} vs limit {+i.measurement.limit.toFixed(4)} {i.measurement.unit}
+      {groupIssues(issues).map(({ issue: i, pages }, k) => {
+        const plain = plainIssue(i);
+        return (
+          <li key={k} className={`issue issue--${i.severity}`} data-rule={i.rule}>
+            <div className="issue-meta">
+              {SEVERITY_LABEL[i.severity]}
+              {pages.length > 0 && (
+                <>
+                  {" · "}
+                  {onGoTo ? (
+                    <button className="btn btn--ghost" style={{ minHeight: 44, padding: "0 10px" }} onClick={() => onGoTo(pages[0])}>
+                      page {pages[0]}
+                    </button>
+                  ) : (
+                    `page ${pages[0]}`
+                  )}
+                  {pages.length > 1 ? ` and ${pages.length - 1} more page${pages.length > 2 ? "s" : ""}` : ""}
+                </>
+              )}
             </div>
-          )}
-        </li>
-      ))}
+            <div className="issue-title">{plain.title}</div>
+            {plain.advice && <div className="issue-advice">{plain.advice}</div>}
+            <TechnicalDetails label="Show details">
+              <div>{i.message}</div>
+              {i.measurement && (
+                <div>
+                  measured {+i.measurement.actual.toFixed(4)} vs limit {+i.measurement.limit.toFixed(4)} {i.measurement.unit}
+                </div>
+              )}
+              <div>
+                <code>{i.rule}</code>
+                {i.componentId ? <> · <code>{i.componentId}</code></> : null}
+              </div>
+            </TechnicalDetails>
+          </li>
+        );
+      })}
     </ul>
   );
 }
@@ -125,10 +137,10 @@ export function ExportDialog({ doc, currentIndex, fontsReady, onClose, onGoTo, o
       <div className="modal">
         <h2>Print / Save PDF</h2>
         <Segmented
-          label="Scope"
+          label="What to export"
           value={settings.scope}
           options={[
-            { value: "full", label: "Full project" },
+            { value: "full", label: "Whole product" },
             { value: "current-page", label: "Current page" },
             { value: "page-range", label: "Page range" },
           ]}
@@ -154,19 +166,19 @@ export function ExportDialog({ doc, currentIndex, fontsReady, onClose, onGoTo, o
         )}
         {isPad && (
           <Check
-            label={`Repeat each master sheet ${doc.recipe.pages[0]?.physicalSheets ?? ""}× (home printing). Off = one master sheet for the pad printer.`}
+            label={`Print every sheet of the pad (${doc.recipe.pages[0]?.physicalSheets ?? ""} copies of the design) — for printing at home. Off: one design page for a pad printer.`}
             checked={settings.repeatSheets}
             onChange={(repeatSheets) => onSettings({ ...settings, repeatSheets })}
           />
         )}
         <p className="hint">
-          Output: {plan.sequence.length} page(s) at {plan.mediaWidthIn}" × {plan.mediaHeightIn}" media
-          {doc.project.production.includeBleed ? " (trim + bleed)" : " (trim)"}. In the print dialog choose “Save as PDF”, margins “None”, scale 100%, and enable background graphics.
+          Output: {plan.sequence.length} page(s), {plan.mediaWidthIn}" × {plan.mediaHeightIn}"
+          {doc.project.production.includeBleed ? " (page size plus the area past the cut edge)" : " (page size)"}. In the print dialog choose “Save as PDF”, margins “None”, scale 100%, and enable background graphics.
         </p>
         <div className="row">
-          <span className={`badge ${report.errorCount ? "badge--error" : "badge--ok"}`}>{report.errorCount} errors</span>
-          <span className={`badge ${report.warningCount ? "badge--warning" : ""}`}>{report.warningCount} warnings</span>
-          <span className="hint">{report.checkedPages} page(s) checked · {fontsReady ? "measured with loaded fonts" : "waiting for fonts…"}</span>
+          <span className={`badge ${report.errorCount ? "badge--error" : "badge--ok"}`}>{report.errorCount} to fix</span>
+          <span className={`badge ${report.warningCount ? "badge--warning" : ""}`}>{report.warningCount} to check</span>
+          <span className="hint">{report.checkedPages} page(s) checked · {fontsReady ? "checked with your fonts" : "waiting for fonts…"}</span>
         </div>
         {plan.errors.map((e) => (
           <div key={e} className="issue issue--error">{e}</div>
@@ -179,7 +191,7 @@ export function ExportDialog({ doc, currentIndex, fontsReady, onClose, onGoTo, o
           }}
         />
         {prepError && <div className="issue issue--error">{prepError}</div>}
-        {!report.exportAllowed && <p className="hint">Export is blocked until every error is fixed. Nothing is exported silently.</p>}
+        {!report.exportAllowed && <p className="hint">Fix the items marked “Needs fixing before export” to export. Nothing is exported with a known problem.</p>}
         <div className="row" style={{ justifyContent: "flex-end" }}>
           <button className="btn" onClick={onClose}>Close</button>
           <button className="btn btn--primary" disabled={blocked || printing || preparing} onClick={startPrint}>

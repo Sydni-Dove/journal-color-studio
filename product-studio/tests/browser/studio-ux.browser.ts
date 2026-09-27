@@ -98,7 +98,7 @@ describe("Studio home", () => {
     await page.locator("button.family-card", { hasText: "Devotional" }).click();
     await page.waitForSelector("#wizard-build");
     await expect(page.locator('button.choice[aria-pressed="true"]', { hasText: /^Devotional$/ }).count()).resolves.toBe(1);
-    await page.locator("label.field", { hasText: "Trim size" }).locator("select").selectOption("6x9");
+    await page.locator("label.field", { hasText: "Page size" }).locator("select").selectOption("6x9");
     await page.locator("button.choice", { hasText: /^SOAP$/ }).click();
     await page.getByRole("button", { name: "Generate" }).click();
     await page.waitForSelector(".ps-page--editor");
@@ -116,7 +116,7 @@ describe("Studio home", () => {
     const page = await home([], DESKTOP);
     await page.locator("button.family-card", { hasText: "Devotional" }).click();
     await page.waitForSelector("#wizard-build");
-    await page.locator("label.field", { hasText: "Trim size" }).locator("select").selectOption("5.5x8.5");
+    await page.locator("label.field", { hasText: "Page size" }).locator("select").selectOption("5.5x8.5");
     const choice = page.locator("button.choice", { hasText: /^Daily Reflection/ });
     await expect(choice.isDisabled()).resolves.toBe(false);
     await choice.click();

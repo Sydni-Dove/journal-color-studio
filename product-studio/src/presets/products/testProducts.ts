@@ -17,7 +17,7 @@ export const TEST_PRODUCTS: ProductTemplate[] = [
   {
     id: "tp1-notepad-5x7-todo",
     label: "5 × 7 Top-Glued To-Do Notepad",
-    summary: "Glue keep-out · header · checklist rows · dynamic row count",
+    summary: "Tear-off to-do pad: a title and as many checklist rows as the sheet holds",
     build: () =>
       createProject("notepad", {
         name: "5×7 To-Do Notepad",
@@ -31,7 +31,7 @@ export const TEST_PRODUCTS: ProductTemplate[] = [
   {
     id: "tp2-journal-6x9-lined",
     label: "6 × 9 Lined Journal (KDP)",
-    summary: "Perfect-bound gutter · mirrored pages · calculated line count",
+    summary: "Paperback lined journal: binding space on the spine side of every page",
     build: () =>
       createProject("journal", {
         name: "6×9 Lined Journal",
@@ -45,7 +45,7 @@ export const TEST_PRODUCTS: ProductTemplate[] = [
   {
     id: "tp3-planner-7x9-monthly",
     label: "7 × 9 Monthly Coil Planner",
-    summary: "Coil keep-out · title · weekday row · 7 × 6 grid · month generation",
+    summary: "Coil monthly planner: one calendar page for every month of the year",
     build: () =>
       createProject("planner", {
         name: "7×9 Monthly Planner 2027",
@@ -59,7 +59,7 @@ export const TEST_PRODUCTS: ProductTemplate[] = [
   {
     id: "tp4-planner-7x9-weekly",
     label: "7 × 9 Weekly Planner Spread",
-    summary: "Two-page spread · equal day columns · weekly generation · sidebar",
+    summary: "Weekly planner: each week across two facing pages, with a sidebar",
     build: () =>
       createProject("planner", {
         name: "7×9 Weekly Planner 2027",
@@ -74,7 +74,7 @@ export const TEST_PRODUCTS: ProductTemplate[] = [
   {
     id: "tp5-deskpad-11x17-weekly",
     label: "11 × 17 Weekly Desk Pad",
-    summary: "Landscape · glue zone · 7 columns · writing rows · large format",
+    summary: "Large landscape desk pad: seven day columns with writing lines",
     build: () =>
       createProject("deskpad", {
         name: "11×17 Weekly Desk Pad",

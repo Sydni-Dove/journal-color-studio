@@ -12,6 +12,7 @@ import { variantStructure } from "../../layouts/stationery/stationeryLayout";
 import type { ProductProject } from "../../types/project";
 import type { SectionSpace, StationeryCustomization, StationeryRecipe } from "../../types/stationery";
 import { Field, Section, Segmented } from "./ui";
+import { TechnicalDetails } from "../help/visuals";
 
 type Update = (fn: (p: ProductProject) => ProductProject) => void;
 
@@ -26,7 +27,7 @@ function RecipeSections({ recipe, custom, set }: { recipe: StationeryRecipe; cus
   return (
     <div className="stationery-recipe" data-recipe={recipe.comboId}>
       <p className="hint">
-        <strong>{recipe.label}</strong> — {recipe.description} Margins, section heights, lines and columns are solved from the trim.
+        <strong>{recipe.label}</strong> — {recipe.description} Margins, section sizes and writing lines are worked out for this page size.
       </p>
       {can.adjustSpace && (
         <Segmented
@@ -116,7 +117,13 @@ export function StationeryPanel({ project, update, usage }: { project: ProductPr
         const left = v ? v.omit.map((k) => r.pages.flatMap((p) => p.zones).find((z) => z.key === k)?.label ?? k) : [];
         return (
           <div key={r.comboId}>
-            {fit && !fit.ok && <div className="issue issue--error">{fit.reason}</div>}
+            {fit && !fit.ok && (
+              <div className="issue issue--error">
+                <div className="issue-title">This page doesn't have enough room at this size.</div>
+                <div className="issue-advice">Choose a larger page size, turn off an optional section, or give a section Less space.</div>
+                <TechnicalDetails label="Show details">{fit.reason}</TechnicalDetails>
+              </div>
+            )}
             {v && (
               <div className="issue issue--info" data-testid="size-variant-notice">
                 <strong>Using the {v.label}.</strong> The full {r.label} page is not available at this size: with every section it would not leave enough room to write. The compact version keeps the most important sections and leaves out {left.join(" and ")}.

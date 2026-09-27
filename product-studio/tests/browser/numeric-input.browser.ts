@@ -79,13 +79,13 @@ describe("numeric fields edit naturally (real keystrokes)", () => {
     const field = page.getByLabel("Page number", { exact: true });
     await replace33with120(field, "Enter");
     await expect.poll(() => field.inputValue()).toBe("120");
-    await expect.poll(() => page.locator(".preview-caption").innerText()).toContain("p.120");
+    await expect.poll(() => page.locator(".preview-caption").innerText()).toContain("Page 120");
     await page.context().close();
   }, 60_000);
 
   it("page count (Copies): 33 → ⌫ ⌫ → 120 commits 120 pages", async () => {
     await open(journal());
-    const field = page.getByLabel("Copies", { exact: true });
+    const field = page.getByLabel("Number of copies", { exact: true });
     await replace33with120(field, "Tab");
     await expect.poll(() => field.inputValue()).toBe("120");
     await expect.poll(() => page.locator(".page-counter").innerText()).toContain("of 120");
@@ -109,7 +109,7 @@ describe("numeric fields edit naturally (real keystrokes)", () => {
 
   it("decoration opacity: 1 → ⌫ → '' → '.5' commits 0.5", async () => {
     await open(journal());
-    const field = page.locator("details", { has: page.locator("summary", { hasText: /^Background$/ }) }).getByLabel("Opacity", { exact: true });
+    const field = page.locator("details", { has: page.locator("summary", { hasText: /^Background$/ }) }).getByLabel("Strength (0.05 faint – 1 full)", { exact: true });
     await caretToEnd(field);
     await field.press("Backspace");
     expect(await field.inputValue()).toBe("");
@@ -122,7 +122,7 @@ describe("numeric fields edit naturally (real keystrokes)", () => {
 
   it("text offset: '-' is a valid in-between state; '-0.25' commits", async () => {
     await open(weekly());
-    const field = page.getByLabel("Offset X (in)").first();
+    const field = page.getByLabel("Move left / right (inches)").first();
     await caretToEnd(field);
     await field.press("Backspace");
     await field.pressSequentially("-");
@@ -135,7 +135,9 @@ describe("numeric fields edit naturally (real keystrokes)", () => {
 
   it("margins: blank means studio default (allowed); a value commits on blur", async () => {
     await open(journal());
-    const top = page.getByLabel("top", { exact: true });
+    // Custom margins live under "Custom margins (advanced)"; open() expands every section, including it.
+    await expect(page.locator("details.advanced", { has: page.locator("summary", { hasText: "Custom margins (advanced)" }) }).evaluate((e) => (e as HTMLDetailsElement).open)).resolves.toBe(true);
+    const top = page.getByLabel("Top (inches)", { exact: true });
     await top.click();
     await top.pressSequentially("0.9");
     await top.press("Tab");
@@ -150,7 +152,7 @@ describe("numeric fields edit naturally (real keystrokes)", () => {
 
   it("invalid commit (empty required field) is reported and reverts; Escape cancels", async () => {
     await open(journal());
-    const field = page.getByLabel("Copies", { exact: true });
+    const field = page.getByLabel("Number of copies", { exact: true });
     const original = await field.inputValue();
     await caretToEnd(field);
     for (let i = 0; i < original.length; i++) await field.press("Backspace");

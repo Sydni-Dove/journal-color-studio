@@ -902,3 +902,26 @@ button.family-card:focus-visible {
 .daily-sections__row { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .daily-sections__row .check { flex: 1; min-width: 0; }
 .daily-sections__row--off { opacity: 0.75; }
+
+/* ── Visual help (components/help/visuals.tsx) ── */
+.help-visual { margin: 4px 0 8px; display: grid; grid-template-columns: 96px 1fr; gap: 10px; align-items: center; }
+.help-visual svg { width: 96px; height: 64px; display: block; }
+.help-visual figcaption { font-size: 12px; color: var(--ui-muted); line-height: 1.35; }
+.help-page { fill: #fff; stroke: #b9b2ac; stroke-width: 0.8; }
+.help-area { fill: var(--ui-accent, #630000); fill-opacity: 0.22; }
+.help-safe { fill: none; stroke: var(--ui-accent, #630000); stroke-width: 0.8; stroke-dasharray: 2 1.5; }
+.help-cut { fill: none; stroke: #333; stroke-width: 0.8; stroke-dasharray: 3 2; }
+.help-line { stroke: #cfc7c0; stroke-width: 0.7; }
+.help-ink { fill: #6b6461; }
+.help-hole { fill: #fff; stroke: #8a817c; stroke-width: 0.6; }
+.help-spine { stroke: #8a817c; stroke-width: 1; }
+.help-arrow { stroke: #6b6461; stroke-width: 0.9; }
+.help-art circle { fill: var(--ui-accent, #630000); fill-opacity: 0.55; }
+.help-art-line { fill: none; stroke: var(--ui-accent, #630000); stroke-width: 1; }
+.tech-details, .advanced { margin-top: 6px; border-top: 1px dashed var(--ui-line); padding-top: 6px; }
+.tech-details > summary, .advanced > summary { cursor: pointer; font-size: 12px; color: var(--ui-muted); min-height: 32px; display: flex; align-items: center; }
+.tech-details__body { font-size: 12px; color: var(--ui-muted); display: grid; gap: 4px; }
+.tech-details__body code { font-size: 11px; }
+.advanced__body { display: grid; gap: 8px; }
+.issue-title { font-weight: 600; }
+.issue-advice { color: var(--ui-muted); }

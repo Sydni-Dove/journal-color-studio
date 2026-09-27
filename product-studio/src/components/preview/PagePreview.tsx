@@ -127,7 +127,7 @@ export function PagePreview({ doc, index, onIndex, debug, issueIds }: Props) {
         )}
         {paged && (
           <label className="check">
-            <input type="checkbox" checked={spread} onChange={(e) => setSpread(e.target.checked)} /> Spread view
+            <input type="checkbox" checked={spread} onChange={(e) => setSpread(e.target.checked)} /> Show facing pages
           </label>
         )}
       </div>
@@ -155,11 +155,11 @@ export function PagePreview({ doc, index, onIndex, debug, issueIds }: Props) {
         </div>
       </div>
       <div className="preview-caption">
-        {shown.map((i) => `p.${pages[i].pageNumber} ${pages[i].side}`).join("  ·  ")}
+        {shown.map((i) => `Page ${pages[i].pageNumber}${pages[i].side === "recto" ? " (right-hand)" : pages[i].side === "verso" ? " (left-hand)" : ""}`).join("  ·  ")}
         {"  ·  "}
-        {doc.trim.widthIn}" × {doc.trim.heightIn}" trim
-        {current.physicalSheets ? `  ·  master sheet × ${current.physicalSheets} sheets (manufacturing metadata)` : ""}
-        {current.filler ? "  ·  filler page (keeps spreads on a left-hand page)" : ""}
+        {doc.trim.widthIn}" × {doc.trim.heightIn}" page
+        {current.physicalSheets ? `  ·  one design, printed on ${current.physicalSheets} sheets` : ""}
+        {current.filler ? "  ·  extra notes page (keeps two-page spreads facing each other)" : ""}
       </div>
     </>
   );

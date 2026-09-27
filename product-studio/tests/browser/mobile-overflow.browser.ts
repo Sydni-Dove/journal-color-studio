@@ -144,7 +144,7 @@ for (const [w, h] of WIDTHS) {
               await page.locator(".card", { hasText: product.name }).first().getByRole("button", { name: "Open" }).click();
               await page.waitForSelector(".ps-page--editor");
               if (view === "spread") {
-                await page.getByLabel("Spread view").check();
+                await page.getByLabel("Show facing pages").check();
                 // Step onto a real two-page spread (a monthly opens on a lone recto).
                 await page.getByRole("button", { name: "Next page" }).click();
               }
@@ -185,7 +185,7 @@ for (const [w, h] of WIDTHS) {
         await page.goto(base);
         await page.locator(".card", { hasText: PRODUCTS[0].name }).first().getByRole("button", { name: "Open" }).click();
         await page.waitForSelector(".ps-page--editor");
-        await page.getByLabel("Spread view").check();
+        await page.getByLabel("Show facing pages").check();
         await page.getByRole("group", { name: "Fit" }).getByRole("button").nth(2).click({ timeout: 5000 });
         await page.locator(".preview-toolbar > button.btn:not(.btn--icon)").click({ timeout: 5000 });
         await page.waitForTimeout(150);
