@@ -540,13 +540,14 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       </div>
       <div class="field"><span>Back cover</span><select id="includeBack"><option value="yes">Include</option><option value="no">Leave out</option></select></div>
       <div class="role" style="margin-top:8px"><label><input type="checkbox" id="showGuides"> Show trim and safe area</label></div>
-      <span class="hint">Inside pages export as their own PDF: page 1 is the first inside page (odd pages bind on the left, even on the right). The covers are a separate file.</span>
+      <span class="hint">Inside pages export as their own PDF: page 1 is the first inside page (odd pages bind on the left, even on the right). The covers are a separate file. "Whole journal PDF" puts the included covers and the inside pages in one file.</span>
       <div class="actions" style="margin-top:12px">
         <button class="btn primary" id="exportPdf">Export interior PDF</button>
         <div class="row2">
           <button class="btn" id="exportCoverPdf">Cover PDF</button>
           <button class="btn" id="exportCover">Cover PNG</button>
         </div>
+        <button class="btn" id="exportBookPdf">Whole journal PDF</button>
         <button class="btn" id="exportLined">This page PNG</button>
       </div>
     </div>
@@ -5226,7 +5227,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
 
   function setBusy(on, label) {
     busy = on;
-    for (const id of ['exportPdf', 'exportCoverPdf', 'exportCover', 'exportLined']) $(id).disabled = on;
+    for (const id of ['exportPdf', 'exportCoverPdf', 'exportBookPdf', 'exportCover', 'exportLined']) $(id).disabled = on;
     $('exportPdf').textContent = on ? label : 'Export interior PDF';
   }
 
@@ -5283,6 +5284,18 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     setBusy(true, 'Preparing covers…');
     try { await buildPdf(pages, `${journalSlug()}-cover-${slug()}.pdf`, false); toast('Cover PDF downloaded'); }
     catch (e) { console.error(e); toast('Cover export stopped. Please try again.'); }
+    finally { setBusy(false); }
+  };
+  // Everything in one file, in book order: front cover (if included), the inside pages (same binding sides as the
+  // interior PDF), then the back cover (if included).
+  $('exportBookPdf').onclick = async () => {
+    if (busy) return;
+    if (!window.jspdf) { toast('PDF library did not load. Check your connection and refresh.'); return; }
+    let n = 0;
+    const pages = pageList(state).map((t) => (t === 'cover' || t === 'back' ? [t, null] : [t, bindingSide(++n)]));
+    setBusy(true, 'Building…');
+    try { await buildPdf(pages, `${journalSlug()}-whole-${slug()}.pdf`, true); toast(`Whole journal downloaded (${pages.length} pages)`); }
+    catch (e) { console.error(e); toast('Export stopped. Please try again.'); }
     finally { setBusy(false); }
   };
   $('showGuides').onchange = (e) => { state.showGuides = e.target.checked; commit(false, false); };
