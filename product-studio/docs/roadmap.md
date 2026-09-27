@@ -34,6 +34,18 @@ A "next" family is shown on the home screen but is never clickable.
 
 ## Daily pages
 
+- **Daily Planner product** (studio home → Daily Planner): front matter →
+  each month: calendar → each week: plan + Meeting With God spread → that
+  week's daily pages → monthly review.
+- **Daily planner page** (`src/layouts/planner/dailyConfigurable.ts`), from the
+  original brief: choose any of schedule, top priorities, to-do, notes,
+  gratitude, prayer, scripture, reflection and kingdom assignments, and their
+  order (Layout panel). Default: schedule, top priorities and to-do. Wide
+  pages put the schedule beside the lists, with extra lists in a band below.
+  Narrow pages stack, splitting the schedule into two hour columns. Too many
+  sections for a page is reported, never squeezed.
+- **Daily notepads:** an undated daily planner sheet for larger pads, and a
+  Daily To-Do (date line + to-do) for small pads.
 - **Luxury Daily Execution** (`src/layouts/planner/dailyPlanner.ts`) is the
   daily page of the Meetings With God Luxury Planner 2026, built from the shape
   geometry measured in `Sydni_Howard_LuxuryPlanner_2026_WhitePurple_Edit.pptx`

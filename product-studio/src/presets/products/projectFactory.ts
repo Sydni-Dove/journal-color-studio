@@ -20,7 +20,7 @@ export const DEFAULT_LAYOUT_OPTIONS: LayoutOptions = {
   writingRowsPerDay: STUDIO_PLANNER.deskPadWritingRows,
   showPageNumbers: false,
   showFooter: false,
-  dailySections: ["schedule", "priorities", "toDo", "notes"],
+  dailySections: ["schedule", "topPriorities", "toDo"],
   promptText: "",
 };
 

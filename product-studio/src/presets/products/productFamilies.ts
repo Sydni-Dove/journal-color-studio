@@ -8,7 +8,7 @@
  */
 import type { ProductType } from "../../types/product";
 
-export type ProductFamilyId = "planner" | "journal" | "planner-journal" | "devotional" | "workbook" | "worksheet" | "notepad" | "deskpad" | "custom";
+export type ProductFamilyId = "planner" | "daily-planner" | "journal" | "planner-journal" | "devotional" | "workbook" | "worksheet" | "notepad" | "deskpad" | "custom";
 
 export type WizardStart = { type?: ProductType; recipeId?: string; section?: "templates" | "build" };
 
@@ -25,6 +25,13 @@ export type ProductFamily = {
 
 export const PRODUCT_FAMILIES: ProductFamily[] = [
   { id: "planner", label: "Planner", blurb: "Dated monthly and weekly planners that follow your date range.", status: "ready", start: { type: "planner", section: "build" } },
+  {
+    id: "daily-planner",
+    label: "Daily Planner",
+    blurb: "A dated page for every day — with the month, the week's plan and Meeting With God around it.",
+    status: "ready",
+    start: { type: "planner", recipeId: "book-daily-planner", section: "build" },
+  },
   { id: "journal", label: "Journal", blurb: "Lined, dot, graph and guided writing pages.", status: "ready", start: { type: "journal", section: "build" } },
   {
     id: "planner-journal",

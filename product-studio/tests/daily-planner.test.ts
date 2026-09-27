@@ -24,6 +24,8 @@ type Text = Extract<LayoutNode, { type: "text" }>;
 type Lines = Extract<LayoutNode, { type: "lines" }>;
 
 const LETTER: [string, string, string] = ["8.5x11", "coil", "coil-generic"];
+/** A daily step designed as Luxury Daily Execution. */
+const luxury = () => step("daily-planner", { type: "daily" }, { layoutId: "daily-luxury-execution" });
 function book(structure: BookNode[], opts: { size?: [string, string, string]; start?: string; end?: string; footer?: boolean } = {}) {
   const [size, bindingType, printProfileId] = opts.size ?? LETTER;
   return createProject("planner", {
@@ -50,9 +52,9 @@ describe("Luxury Daily Execution (Meetings With God Luxury Planner daily page)",
     return { doc, i, s: solvePage(doc, i), g: geometryFor(doc, doc.recipe.pages[i]) };
   };
 
-  it("module → layout registry: Daily planner is designed as Luxury Daily Execution, dated per day", () => {
+  it("module → layout registry: Luxury Daily Execution is a Daily planner design, dated per day", () => {
     const m = getModule("daily-planner");
-    expect(m.layouts).toEqual(["daily-luxury-execution"]);
+    expect(m.layouts).toEqual(["planner-daily", "daily-luxury-execution"]);
     expect(m.defaultCadence).toEqual({ type: "daily" });
     expect(getLayout("daily-luxury-execution")).toBe(luxuryDailyExecution);
     expect(luxuryDailyExecution.period).toBe("day");
@@ -60,7 +62,7 @@ describe("Luxury Daily Execution (Meetings With God Luxury Planner daily page)",
   });
 
   it("Letter: the measured source structure inside the print-safe area", () => {
-    const { s, g, doc } = solveFirst(book([step("daily-planner")], { end: "2027-01-02" }));
+    const { s, g, doc } = solveFirst(book([luxury()], { end: "2027-01-02" }));
     const f = luxuryDailyFrame(g, doc.spacing, doc.typography, doc.project.layoutOptions);
     expect(f.ok).toBe(true);
     if (!f.ok) return;
@@ -100,7 +102,7 @@ describe("Luxury Daily Execution (Meetings With God Luxury Planner daily page)",
 
   for (const footer of [false, true]) {
     it(`Letter${footer ? " with the footer on" : ""}: no validation errors or warnings`, () => {
-      const p = book([step("daily-planner")], { end: "2027-01-03", footer });
+      const p = book([luxury()], { end: "2027-01-03", footer });
       const issues = validateProject(p, heuristicMeasurer).issues.filter((x) => x.severity !== "info");
       expect(issues, JSON.stringify(issues.slice(0, 3))).toHaveLength(0);
       if (footer) expect((solveFirst(p).s.nodes.find((n) => n.id === "p0-footer-text") as Text).text).toBe("January Daily Planner");
@@ -108,7 +110,7 @@ describe("Luxury Daily Execution (Meetings With God Luxury Planner daily page)",
   }
 
   it("labels and checklist items are semantic wording: renaming or removing items needs no layout change", () => {
-    const p = book([step("daily-planner")], { end: "2027-01-01" });
+    const p = book([luxury()], { end: "2027-01-01" });
     p.wording = { ...p.wording, dailyChecklistItems: "Scripture; Prayer walk; Water; Rest; Call Mom", topInstructions: "Kingdom Instructions", brandHeading: "Dove Expressions" };
     const { s } = solveFirst(p);
     expect(s.nodes.filter((n): n is Text => /^dl-check-\d+$/.test(n.id)).map((n) => n.text)).toEqual(["Scripture", "Prayer walk", "Water", "Rest", "Call Mom"]);
@@ -118,7 +120,7 @@ describe("Luxury Daily Execution (Meetings With God Luxury Planner daily page)",
 
   for (const size of [["7x9", "coil", "coil-generic"], ["6x9", "perfect-bound", "kdp"], ["5.5x8.5", "discbound", "disc-generic"], ["a5", "ring-6", "ring-insert"]] as [string, string, string][]) {
     it(`${size[0]}: declared incompatible with a reason — never squashed`, () => {
-      const p = book([step("daily-planner")], { size, end: "2027-01-01" });
+      const p = book([luxury()], { size, end: "2027-01-01" });
       const doc = resolveDocument(p);
       const i = doc.recipe.pages.findIndex((x) => x.layoutId === "daily-luxury-execution");
       const fit = luxuryDailyExecution.fit({ page: geometryFor(doc, doc.recipe.pages[i]), spacing: doc.spacing, typography: doc.typography, options: doc.project.layoutOptions });
@@ -176,9 +178,9 @@ describe("daily expansion", () => {
     expect(seq.join("")).toMatch(/^M(WD{1,7})+M(WD{1,7})+$/);
   });
 
-  it("the Luxury daily book: month → week spread → that week's Luxury daily pages", () => {
+  it("the Daily planner book: every day of the range gets its daily page", () => {
     const doc = resolveDocument(book(dailyPlannerBook()));
-    expect(days(doc, "daily-luxury-execution")).toEqual(isoRange("2027-01-01", "2027-01-31"));
+    expect(days(doc, "planner-daily")).toEqual(isoRange("2027-01-01", "2027-01-31"));
   });
 
   it("recto / verso / spread rules hold for daily pages", () => {

@@ -893,3 +893,9 @@ button.family-card:focus-visible {
 .thumb-loading { opacity: 0.6; }
 .thumb-none { width: 60%; height: 2px; background: var(--ui-line); transform: rotate(-35deg); }
 .as-designed { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* ── Daily page sections ── */
+.daily-sections__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.daily-sections__row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.daily-sections__row .check { flex: 1; min-width: 0; }
+.daily-sections__row--off { opacity: 0.75; }

@@ -44,6 +44,12 @@ const GLYPH: Record<ProductFamilyId, ReactNode> = {
       <path d="M5 13h22M11 4v6M21 4v6M10 18h4M18 18h4M10 22h4" />
     </>
   ),
+  "daily-planner": (
+    <>
+      <rect x="7" y="4" width="18" height="24" rx="2" />
+      <path d="M11 9h10M11 13.5h3M16 13.5h5M11 17.5h3M16 17.5h5M11 21.5h3M16 21.5h5" />
+    </>
+  ),
   journal: (
     <>
       <path d="M8 5h15a2 2 0 0 1 2 2v20H10a2 2 0 0 1-2-2z" />

@@ -5,6 +5,7 @@
  * control is a placebo. Usage comes from layout capabilities AND from the
  * solved output (which text roles and color tokens really appear).
  */
+import { dailySectionsOf } from "../../layouts/planner/dailyConfigurable";
 import { recipeSteps } from "../recipe/recipe";
 import type { FitResult, LayoutDefinition } from "../../layouts/shared/types";
 import type { FunctionalPatternKind } from "../../types/theme";
@@ -22,6 +23,8 @@ export type ProjectUsage = {
   datePlacement: boolean;
   sectionsPerDay: boolean;
   writingRows: boolean;
+  /** A daily layout is in the product: its section list and schedule hours apply. */
+  dailySections: boolean;
   pageNumbers: boolean;
   footer: boolean;
   calendar: boolean;
@@ -53,6 +56,9 @@ export function computeUsage(doc: ResolvedDocument): ProjectUsage {
   const showSidebar = doc.project.layoutOptions.showSidebar && sidebarAvailable;
   const wording = new Set<WordingKey>(caps.flatMap((c) => c.wordingKeys));
   if (showSidebar) wording.add(doc.project.layoutOptions.sidebarContent);
+  // Daily pages render the chosen sections' headings.
+  const daily = any((c) => !!c.supportsDailySections);
+  if (daily) for (const k of dailySectionsOf(doc.project.layoutOptions)) wording.add(k);
   // The product title renders through the footer (desk pads also show it in their header).
   if (doc.project.layoutOptions.showFooter) wording.add("productTitle");
 
@@ -128,6 +134,7 @@ export function computeUsage(doc: ResolvedDocument): ProjectUsage {
     lineStyle: any((c) => c.supportsLineStyle),
     sidebar: { supported: sidebarLayouts.length > 0, available: sidebarAvailable, reason: sidebarAvailable ? undefined : sidebarReason },
     datePlacement: any((c) => c.supportsDatePlacement),
+    dailySections: daily,
     sectionsPerDay: layouts.some((l) => l.layout.capability.supportsSectionsPerDay && l.fit.ok && l.fit.variant === "vertical"),
     writingRows: any((c) => c.supportsWritingRows),
     pageNumbers: any((c) => c.supportsPageNumbers),

@@ -6,7 +6,7 @@
  *   Meeting With God  → Guided page · Lined journal page · (future: prompt
  *                       sidebar, two-column conversation, …)
  *   Weekly planner    → Weekly spread · Weekly plan + Meeting With God spread
- *   Daily planner     → Luxury Daily Execution (repeats every day of the range)
+ *   Daily planner     → Daily planner (choose sections) · Luxury Daily Execution (Letter)
  *
  * Only modules with a real layout are registered; the PageModuleType union
  * already reserves the rest (tracker, worksheet, …) for later layouts.
@@ -78,7 +78,7 @@ export const PAGE_MODULES: PageModuleDefinition[] = [
     titles: { none: "Week" },
     prompts: { none: [] },
   },
-  { type: "daily-planner", label: "Daily planner", layouts: ["daily-luxury-execution"], defaultCadence: { type: "daily" }, cadences: MODULE_CADENCES["daily-planner"], titles: { none: "Day" }, prompts: { none: [] } },
+  { type: "daily-planner", label: "Daily planner", layouts: ["planner-daily", "daily-luxury-execution"], defaultCadence: { type: "daily" }, cadences: MODULE_CADENCES["daily-planner"], titles: { none: "Day" }, prompts: { none: [] } },
   {
     type: "meeting-with-god",
     label: "Meeting With God",

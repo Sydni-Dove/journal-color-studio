@@ -3,6 +3,7 @@
  * only when the current product consumes it, so none is a placebo.
  */
 import { ROLE_LABEL, rolesFor } from "../../design-library/placement";
+import { DAILY_SECTIONS, dailySectionsOf, type DailySection } from "../../layouts/planner/dailyConfigurable";
 import { findAsset } from "../../design-library/library";
 import { applyVariant } from "../../engines/document/resolve";
 import type { ProjectUsage } from "../../engines/document/usage";
@@ -34,7 +35,7 @@ const SIDEBAR_HEADINGS: WordingKey[] = ["notes", "priorities", "topPriorities", 
 export function LayoutPanel({ project, update, usage, nav }: PanelProps) {
   const o = project.layoutOptions;
   const set = (patch: Partial<ProductProject["layoutOptions"]>) => update((p) => ({ ...p, layoutOptions: { ...p.layoutOptions, ...patch } }));
-  const any = usage.datePlacement || usage.sidebar.supported || usage.sectionsPerDay || usage.writingRows || usage.pageNumbers || usage.footer;
+  const any = usage.datePlacement || usage.sidebar.supported || usage.sectionsPerDay || usage.writingRows || usage.dailySections || usage.pageNumbers || usage.footer;
   if (!any) return null;
   return (
     <Section title="Layout options">
@@ -73,9 +74,61 @@ export function LayoutPanel({ project, update, usage, nav }: PanelProps) {
       {usage.sectionsPerDay && <AppliesTo ids={usage.consumers.sectionsPerDay} nav={nav} />}
       {usage.sectionsPerDay && <NumberField label="Sections per day" step={1} min={1} max={6} value={o.sectionsPerDay} onChange={(v) => set({ sectionsPerDay: Math.max(1, Math.round(v)) })} />}
       {usage.writingRows && <NumberField label="Writing rows per day" step={1} min={1} max={8} value={o.writingRowsPerDay} onChange={(v) => set({ writingRowsPerDay: Math.max(1, Math.round(v)) })} />}
+      {usage.dailySections && <DailySectionsControl project={project} set={set} />}
       {usage.pageNumbers && <Check label="Page numbers" checked={o.showPageNumbers} onChange={(showPageNumbers) => set({ showPageNumbers })} />}
       {usage.footer && <Check label="Footer (product title)" checked={o.showFooter} onChange={(showFooter) => set({ showFooter })} />}
     </Section>
+  );
+}
+
+/**
+ * Daily sections: tick the sections a daily page carries and put them in order
+ * (original brief: configurable daily sections from semantic wording). The
+ * schedule's hours apply when it is chosen.
+ */
+function DailySectionsControl({ project, set }: { project: ProductProject; set: (patch: Partial<ProductProject["layoutOptions"]>) => void }) {
+  const o = project.layoutOptions;
+  const chosen = dailySectionsOf(o);
+  const name = (k: DailySection) => project.wording[k] ?? DEFAULT_WORDING[k];
+  const move = (k: DailySection, d: -1 | 1) => {
+    const i = chosen.indexOf(k), j = i + d;
+    if (j < 0 || j >= chosen.length) return;
+    const next = [...chosen];
+    [next[i], next[j]] = [next[j], next[i]];
+    set({ dailySections: next });
+  };
+  return (
+    <div className="field-group daily-sections">
+      <div className="field-label">Daily page sections</div>
+      <p className="hint">Tick the sections each daily page carries; arrows set their order. Rename any heading under Wording.</p>
+      <ul className="daily-sections__list">
+        {chosen.map((k, i) => (
+          <li key={k} className="daily-sections__row">
+            <label className="check">
+              <input type="checkbox" checked onChange={() => set({ dailySections: chosen.filter((x) => x !== k) })} disabled={chosen.length === 1} />
+              <span>{name(k)}</span>
+            </label>
+            <button type="button" className="btn btn--icon" aria-label={`Move ${name(k)} up`} disabled={i === 0} onClick={() => move(k, -1)}>↑</button>
+            <button type="button" className="btn btn--icon" aria-label={`Move ${name(k)} down`} disabled={i === chosen.length - 1} onClick={() => move(k, 1)}>↓</button>
+          </li>
+        ))}
+        {DAILY_SECTIONS.filter((k) => !chosen.includes(k)).map((k) => (
+          <li key={k} className="daily-sections__row daily-sections__row--off">
+            <label className="check">
+              <input type="checkbox" checked={false} onChange={() => set({ dailySections: [...chosen, k] })} />
+              <span>{name(k)}</span>
+            </label>
+          </li>
+        ))}
+      </ul>
+      {chosen.includes("schedule") && (
+        <div className="row">
+          <NumberField label="Schedule starts (hour, 0–23)" step={1} min={0} max={22} value={o.hourStart} onChange={(v) => set({ hourStart: Math.max(0, Math.min(Math.round(v), o.hourEnd)) })} />
+          <NumberField label="Schedule ends (hour, 0–23)" step={1} min={1} max={23} value={o.hourEnd} onChange={(v) => set({ hourEnd: Math.min(23, Math.max(Math.round(v), o.hourStart)) })} />
+        </div>
+      )}
+      {chosen.includes("schedule") && <Check label="Half-hour rows" checked={o.halfHours} onChange={(halfHours) => set({ halfHours })} />}
+    </div>
   );
 }
 

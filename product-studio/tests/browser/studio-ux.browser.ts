@@ -52,7 +52,7 @@ describe("Studio home", () => {
       const page = await home([], vp);
       await expect(page.locator("h1").textContent()).resolves.toBe("Dove Expressions Product Studio");
       await expect(page.getByText("Your studio is ready").count()).resolves.toBe(1);
-      await expect(page.locator("button.family-card").count()).resolves.toBe(6);
+      await expect(page.locator("button.family-card").count()).resolves.toBe(7);
       // Families without a foundation are shown, never clickable.
       const next = page.locator(".family-card--next");
       await expect(next.count()).resolves.toBe(3);

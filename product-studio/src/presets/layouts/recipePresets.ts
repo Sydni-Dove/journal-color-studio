@@ -1,7 +1,7 @@
 import type { ProductType } from "../../types/product";
 import type { ProductRecipe } from "../../types/recipe";
 import type { LayoutOptions } from "../../types/project";
-import { BOOK_PRESETS, meetingsWithGodBook } from "../bookRecipes";
+import { BOOK_PRESETS, dailyPlannerBook, meetingsWithGodBook } from "../bookRecipes";
 
 /** Layout / page-recipe choices offered by the New Product flow per product type. */
 export type RecipePreset = {
@@ -36,6 +36,23 @@ export const RECIPE_PRESETS: RecipePreset[] = [
     productTypes: ["notepad"],
     needsCalendar: false,
     build: ({ sheets }) => ({ items: [{ id: "sheet", layoutId: "notes-page", repeat: { kind: "repeated-sheet", sheets } }], ordering: "sequential" }),
+  },
+  {
+    // Small pads (3×5, 4×6, 5×7 …): just the day's to-do list under a date line.
+    id: "notepad-daily-todo",
+    label: "Daily To-Do (small pads)",
+    productTypes: ["notepad"],
+    needsCalendar: false,
+    build: ({ sheets }) => ({ items: [{ id: "sheet", layoutId: "notepad-daily", repeat: { kind: "repeated-sheet", sheets } }], ordering: "sequential" }),
+    layoutOptions: { dailySections: ["toDo"] },
+  },
+  {
+    id: "notepad-daily",
+    label: "Daily Planner (undated)",
+    productTypes: ["notepad"],
+    needsCalendar: false,
+    build: ({ sheets }) => ({ items: [{ id: "sheet", layoutId: "notepad-daily", repeat: { kind: "repeated-sheet", sheets } }], ordering: "sequential" }),
+    layoutOptions: { dailySections: ["schedule", "topPriorities", "toDo"] },
   },
   {
     id: "journal-lined",
@@ -83,6 +100,14 @@ export const RECIPE_PRESETS: RecipePreset[] = [
     needsCalendar: true,
     build: () => ({ items: [], ordering: "chronological", structure: meetingsWithGodBook() }),
     layoutOptions: { showPageNumbers: true },
+  },
+  {
+    id: "book-daily-planner",
+    label: "Book: Daily planner (month · week + Meeting With God · every day)",
+    productTypes: ["planner", "insert"],
+    needsCalendar: true,
+    build: () => ({ items: [], ordering: "chronological", structure: dailyPlannerBook() }),
+    layoutOptions: { showPageNumbers: true, dailySections: ["schedule", "topPriorities", "toDo"] },
   },
   {
     id: "book-planner-journal",

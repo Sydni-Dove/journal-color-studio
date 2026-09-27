@@ -60,6 +60,8 @@ export type LayoutCapability = {
   supportsDatePlacement: boolean;
   supportsSectionsPerDay: boolean;
   supportsWritingRows: boolean;
+  /** Daily pages: the section list / order and schedule hours (LayoutOptions dailySections, hourStart, hourEnd, halfHours). */
+  supportsDailySections?: boolean;
   supportsPageNumbers: boolean;
   supportsFooter: boolean;
   requiresCalendar: boolean;
