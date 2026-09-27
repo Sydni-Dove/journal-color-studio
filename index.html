@@ -64,7 +64,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
 .pal-detail strong { display: block; font-size: 14px; }
 .pal-detail small { display: block; color: var(--muted); font-size: 12px; margin-bottom: 6px; }
 .pal-detail .swatch-row { height: 24px; margin: 0; }
-.m-pager, .rail, .sheet-head, .pages-card { display: none; }
+.m-pager, .rail, .sheet-head, .pages-card, .focus-btn, .focus-exit { display: none; }
 .typo-sec { border-top: 1px dashed var(--line); padding-top: 10px; margin-top: 10px; }
 .typo-sec > summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .typo-sec > summary::-webkit-details-marker { display: none; }
@@ -209,6 +209,14 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   .rail button.active { color: var(--brand); }
   .rail button.active::before { content: ''; position: absolute; top: 0; left: 22%; right: 22%; height: 3px; border-radius: 0 0 3px 3px; background: var(--brand); }
   .typo-sec > summary { min-height: 44px; }
+  /* Preview: only the journal page on screen (a visibility state; the design is untouched). One control returns to editing. */
+  .focus-btn { display: grid; place-items: center; min-width: 44px; min-height: 44px; padding: 0; }
+  .focus-btn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  body.focus header, body.focus .rail, body.focus .workbar, body.focus aside { display: none; }
+  body.focus .workspace { top: 0; bottom: 0; }
+  body.focus .preview canvas { max-height: calc(100dvh - 104px - env(safe-area-inset-bottom)); }
+  body.focus .focus-exit { display: block; position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom)); z-index: 40;
+    min-height: 48px; padding: 0 22px; border-radius: 24px; border: 0; background: var(--ink); color: var(--panel); font: inherit; font-size: 15px; font-weight: 700; box-shadow: 0 8px 24px rgba(0,0,0,.25); }
   /* Touch targets: at least 44px. */
   .btn, .seg button, .field select, .field input, .text-slot input, .palettes button, .accent-tiles button, .upload-item button, .pager .btn, #recommendColors { min-height: 44px; }
   .field select, .field input { font-size: 16px; }
@@ -549,6 +557,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       <div><strong id="viewLabel">Front cover</strong></div>
       <div class="m-pager"><button class="btn" id="mPrev" type="button" aria-label="Previous page">‹</button><button class="btn" id="mNext" type="button" aria-label="Next page">›</button></div>
       <button class="btn" id="compare">Hold to compare<span class="m-long"> original</span></button>
+      <button class="btn focus-btn" id="focusBtn" type="button" aria-label="Preview the page on its own"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
     </div>
     <div class="preview"><canvas id="canvas" width="760" height="974"></canvas>
       <div class="loading" id="loading"><strong>Loading your journal…</strong><small>Preparing the design pieces</small></div>
@@ -558,8 +567,9 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
 </div>
 <div class="toast hidden" id="toast"></div>
 
+<button class="focus-exit" id="focusExit" type="button">Back to editing</button>
 <nav class="rail" id="rail" aria-label="Settings">
-  <button type="button" data-etab="page"><svg viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/></svg>Page</button>
+  <button type="button" data-etab="page"><svg viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/></svg>Edit</button>
   <button type="button" data-etab="design"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1.5"/><circle cx="17" cy="7" r="4"/><path d="M4 21l4-7 4 7zM14 14h7v7h-7z"/></svg>Design</button>
   <button type="button" data-etab="colors"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18c1.2 0 1.8-.9 1.8-1.8 0-1.4-1.3-1.7-1.3-3 0-1 .8-1.7 1.8-1.7H17a4 4 0 0 0 4-4C21 6.4 17 3 12 3z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7" r="1.2"/><circle cx="15" cy="7.5" r="1.2"/></svg>Colors</button>
   <button type="button" data-etab="type"><svg viewBox="0 0 24 24"><path d="M5 6V4h14v2M12 4v16M9 20h6"/></svg>Type</button>
@@ -4970,7 +4980,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   // The page owns the screen. The rail (thumb zone) opens one group of settings in a bottom sheet; the page stays visible
   // above it and redraws with every change. Tapping the same rail item, or Done, closes it. Only the view changes.
   const phoneMQ = window.matchMedia('(max-width: 700px)');
-  const SHEET_TITLES = { page: 'This page', design: 'Design', colors: 'Colors', type: 'Type', pages: 'Pages', book: 'Book & export' };
+  const SHEET_TITLES = { page: 'Edit this page', design: 'Design', colors: 'Colors', type: 'Type', pages: 'Pages', book: 'Book & export' };
   let sheetTab = null;
   function openSheet(tab) {
     if (sheetTab === tab) return closeSheet();
@@ -4991,6 +5001,10 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   const placeStrip = () => { const strip = $('pageStrip'), home = phoneMQ.matches ? $('pagesSlot') : document.querySelector('.workspace'); if (strip.parentElement !== home) home.appendChild(strip); if (!phoneMQ.matches) closeSheet(); };
   phoneMQ.addEventListener?.('change', placeStrip); placeStrip();
   $('pagesSlot').addEventListener('click', (e) => { if (e.target.closest('button')) setTimeout(closeSheet, 150); });
+  // Preview: hide the rail, page bar and any open sheet so only the page shows; "Back to editing" restores them (and the sheet).
+  let focusSheet = null;
+  $('focusBtn').onclick = () => { focusSheet = sheetTab; if (sheetTab) closeSheet(); document.body.classList.add('focus'); };
+  $('focusExit').onclick = () => { document.body.classList.remove('focus'); if (focusSheet) openSheet(focusSheet); focusSheet = null; };
   // Swipe the page left / right for the next / previous page.
   let swipeX = null;
   $('canvas').addEventListener('touchstart', (e) => { swipeX = e.touches.length === 1 ? e.touches[0].clientX : null; }, { passive: true });
