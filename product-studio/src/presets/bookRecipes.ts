@@ -45,3 +45,11 @@ export const BOOK_PRESETS: { id: string; label: string; build: () => BookNode[] 
     build: () => [section("Every Month", [step("monthly-calendar", { type: "once" }), section("Every Week", [step("weekly-planner", { type: "once" }), step("lined-journal", { type: "once" })], "week")], "month")],
   },
 ];
+
+/** Optional coordinating set; never added to existing recipes automatically. */
+export function neutralLuxeDividers(): BookNode[] {
+  const names = ["Prayer", "Vision", "Plan", "Schedule", "Work", "Home", "Wellness", "Finances", "Notes"];
+  const subtitles = ["Draw near", "See clearly", "Make a way", "Be steady", "Build well", "Cultivate peace", "Care for you", "Be a good steward", "Ideas & extras"];
+  const colors = ["secondary", "primary", "decorativeAccent", "decorHighlight", "secondary", "secondary", "primary", "accent", "text"] as const;
+  return [step("cover-page", { type: "once" }, { title: "Plan", cover: { subtitle: "WITH PURPOSE" } }), ...names.map((title, i) => step("divider-page", { type: "once" }, { title, cover: { subtitle: subtitles[i], tab: { show: true, style: "rounded", color: colors[i], leopard: i === 4 } } }))];
+}

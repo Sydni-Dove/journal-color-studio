@@ -356,11 +356,17 @@ export function expandBook(structure: BookNode[], ctx: BookContext): ExpandedRec
         spreadPart: n === 2 ? (part as 0 | 1) : undefined,
         pageNumber,
         side: sideOf(pageNumber),
-        module: { type: step.module, title, subtitle, prompts: step.prompts ?? modulePrompts(step.module, kind) },
+        module: { type: step.module, title, subtitle, cover: step.cover, prompts: step.prompts ?? modulePrompts(step.module, kind) },
       });
       pageNumber++;
     }
   }
+  // Auto-distribute the printed divider tabs across the actual expanded book.
+  const tabPages = pages.filter((p) => p.module?.type === "divider-page" && p.module.cover?.tab?.show);
+  tabPages.forEach((p, i) => {
+    const cover = p.module!.cover!;
+    p.module = { ...p.module!, cover: { ...cover, tab: { ...cover.tab!, order: cover.tab!.order ?? i + 1, count: cover.tab!.count ?? tabPages.length } } };
+  });
   if (fillers) diagnostics.push({ severity: "info", itemId: "recipe", message: `${fillers} intentional notes page(s) inserted so modules start on their required side.` });
   if (!pages.length) diagnostics.push({ severity: "warning", itemId: "recipe", message: "This book structure produces no pages yet." });
   return { pages, diagnostics, pageCount: pages.length };

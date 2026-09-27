@@ -3,7 +3,7 @@
  * They never compute geometry — positions come from the layout solvers —
  * so the editor preview and the print output are the same drawing.
  */
-import { memo, type CSSProperties } from "react";
+import { useId, memo, type CSSProperties } from "react";
 import type { BoxNode, CheckboxNode, DotsNode, LayoutNode, LinesNode, RuleNode, TextNode } from "../types/layout";
 import type { ColorToken, TypographySettings } from "../types/tokens";
 import { ptToIn } from "../engines/units/units";
@@ -124,10 +124,14 @@ export const PatternLayer = memo(function PatternLayer({ nodes }: { nodes: Layou
 
 /** Layer 4 — layout structure (boxes, cells, rules, checkboxes). */
 export const StructureLayer = memo(function StructureLayer({ nodes }: { nodes: LayoutNode[] }) {
+  const patternId = `leopard-${useId().replace(/:/g, "")}`;
   return (
     <>
+      <defs><pattern id={patternId} width="0.34" height="0.3" patternUnits="userSpaceOnUse"><rect width="0.34" height="0.3" style={{ fill: colorVar("secondary") }} /><path d="M.04 .07Q.1 .01 .15 .08L.12 .15 .05 .14Z M.21 .2Q.25 .13 .31 .19L.3 .27 .22 .28Z" style={{ fill: colorVar("primary"), stroke: colorVar("text") }} strokeWidth=".035" /><circle cx=".23" cy=".06" r=".024" style={{ fill: colorVar("text") }}/></pattern></defs>
       {nodes.map((n) => {
         switch (n.type) {
+          case "circle":
+            return <ellipse key={n.id} cx={n.rect.x + n.rect.w / 2} cy={n.rect.y + n.rect.h / 2} rx={n.rect.w / 2} ry={n.rect.h / 2} style={{ fill: n.leopard ? `url(#${patternId})` : n.fill ? colorVar(n.fill) : "none", stroke: n.outline ? colorVar("text") : "none" }} strokeWidth={0.008} data-node={n.id} />;
           case "box":
             return <Box key={n.id} node={n} />;
           case "checkbox":

@@ -34,6 +34,7 @@ const brandBase: ColorTokens = {
 };
 
 export const PALETTES: ColorPalette[] = [
+  { id: "neutral-cheetah-luxe", label: "Neutral Cheetah Luxe", brandPalette: false, colors: { primary: "#482c20", secondary: "#d4bca2", accent: "#a7694e", background: "#f5efe5", text: "#14110f", mutedText: "#5e5148", line: "#14110f", border: "#14110f", decorativeAccent: "#84939c", decorBase: "#482c20", decorHighlight: "#e3d3bf", lineOpacity: 0.3 } },
   { id: "dove-signature", label: "Dove Signature — Burgundy / Soft White / Gold", brandPalette: true, colors: brandBase },
   {
     id: "dove-blush",

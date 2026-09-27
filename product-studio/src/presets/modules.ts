@@ -29,6 +29,8 @@ export type PageModuleDefinition = {
 const GUIDED = ["guided-page", "journal-lined"];
 
 export const PAGE_MODULES: PageModuleDefinition[] = [
+  { type: "cover-page", label: "Cover & Divider Pages · Cover / title page", layouts: ["cover-page"], defaultCadence: { type: "once" }, titles: { none: "Plan" }, prompts: { none: [] } },
+  { type: "divider-page", label: "Cover & Divider Pages · Section divider / tab page", layouts: ["divider-page"], defaultCadence: { type: "once" }, titles: { none: "Prayer" }, prompts: { none: [] } },
   { type: "daily-planner", label: "Daily planner", layouts: ["planner-daily"], defaultCadence: { type: "daily" }, titles: { none: "Daily Plan" }, prompts: { none: [] } },
   { type: "monthly-calendar", label: "Monthly calendar", layouts: ["planner-monthly"], defaultCadence: { type: "monthly" }, titles: { none: "Month" }, prompts: { none: [] } },
   {

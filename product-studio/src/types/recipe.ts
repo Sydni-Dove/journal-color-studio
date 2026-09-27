@@ -42,6 +42,8 @@ export type ProductRecipe = {
 // ─── Composite book recipe ─────────────────────────────────────────────────
 /** A page's PURPOSE. Its design is the step's layout (one purpose, many possible layouts). */
 export type PageModuleType =
+  | "cover-page"
+  | "divider-page"
   | "monthly-calendar"
   | "weekly-planner"
   | "daily-planner"
@@ -96,6 +98,7 @@ export type BookStep = {
   start?: PageStartRule;
   /** Title override (otherwise the module's title for the period). */
   title?: string;
+  cover?: CoverDividerSettings;
   /** Prompt overrides for guided pages. */
   prompts?: string[];
 };
@@ -112,7 +115,7 @@ export type BookGroup = {
 export type BookNode = BookStep | BookGroup;
 
 /** Module content handed to the layout (title for the period + prompts). */
-export type PageModuleContent = { type: PageModuleType; title: string; subtitle?: string; prompts: string[] };
+export type PageModuleContent = { type: PageModuleType; title: string; subtitle?: string; prompts: string[]; cover?: CoverDividerSettings };
 
 export type PeriodRef =
   | { kind: "none" }
@@ -142,4 +145,18 @@ export type PageInstance = {
   module?: PageModuleContent;
   /** Repeated-sheet metadata (pads). */
   physicalSheets?: number;
+};
+
+/** Additive, per-step settings; absent on legacy projects. Tabs are interior printed markers. */
+export type CoverDividerSettings = {
+  preset?: "neutral-cheetah-luxe" | "plain";
+  subtitle?: string;
+  quote?: string;
+  smallLine?: boolean;
+  alignment?: "left" | "center";
+  position?: "upper" | "middle" | "lower";
+  circles?: boolean;
+  outlines?: boolean;
+  leopard?: boolean;
+  tab?: { show: boolean; label?: string; style?: "staggered" | "rounded"; order?: number; count?: number; color?: import("./tokens").ColorToken; leopard?: boolean };
 };
