@@ -2274,9 +2274,10 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   function titleFillPath(ctx, W, H, s, L) {
     const lvl = FILL_PAD[s.titleFill?.pad] ?? 1;
     const rr = (x, y, w, h, r) => { if (r > 0) roundRect(ctx, x, y, w, h, Math.min(r, w / 2, h / 2)); else { ctx.beginPath(); ctx.rect(x, y, w, h); } };
-    // Pink Prayer's lettering is wider than its decorative gold frame. Its fill therefore follows the measured
-    // full title composition instead of being clipped to the chosen plate/frame geometry.
-    if (s.journal === 'prayer') {
+    // Pink Prayer's original gold-frame mode has lettering wider than the frame interior. When no replacement
+    // title plate is selected, the fill follows the measured full title composition so PRAYER/JOURNAL never spill
+    // onto a busy background. Chosen geometric/bevel plates keep their existing fill behavior below.
+    if (s.journal === 'prayer' && L.kind === 'none') {
       const { k, ox, oy } = prFit(W, H), [l, t, w, h] = PR_TITLE_REGION.prayer(lvl).rect;
       rr(ox + l * k, oy + t * k, w * k, h * k, 0);
       return;
