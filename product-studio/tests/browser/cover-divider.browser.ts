@@ -28,7 +28,7 @@ afterAll(async () => {
 
 function project(size = "8.5x11") {
   return createProject("planner", {
-    name: "Cover QA", colors: { paletteId: "neutral-cheetah-luxe" }, typography: { fonts: { cover: "Great Vibes", headings: "Playfair Display", subheadings: "Lato", body: "Lato", accent: "Great Vibes" }, roleOverrides: { coverTitle: { sizePt: 88, transform: "none", weight: 400, trackingEm: 0, color: "text" }, coverSubtitle: { sizePt: 10, trackingEm: 0.22, color: "text" } } }, dimensions: { sizePresetId: size, orientation: "portrait" },
+    name: "Cover QA", colors: { paletteId: "neutral-cheetah-luxe" }, typography: { fonts: { cover: "The Nautigal", headings: "Playfair Display", subheadings: "Lato", body: "Lato", accent: "Great Vibes" }, roleOverrides: { coverTitle: { sizePt: 150, transform: "none", weight: 700, trackingEm: 0, color: "text" }, coverSubtitle: { sizePt: 10, trackingEm: 0.22, color: "text" } } }, dimensions: { sizePresetId: size, orientation: "portrait" },
     production: { bindingType: "coil", printProfileId: "coil-generic", duplex: true },
     calendar: { startDate: "2027-01-29", endDate: "2027-02-03", weekStart: 1, sixRowMonths: true },
     recipe: { items: [], ordering: "chronological", structure: size === "filofax-personal" ? neutralLuxeDividers().slice(0, 4) : neutralLuxeDividers() },
@@ -77,8 +77,10 @@ describe("Cover and divider browser QA", () => {
   });
   it("phone controls persist and do not overflow", async () => {
     const page = await open(project(), true);
+    page.setDefaultTimeout(5000);
     const card = page.locator('.book-step').first();
     await card.locator(':scope > summary').click();
+    await card.getByLabel('Title font').selectOption('Dancing Script');
     await card.getByLabel('Subtitle', { exact: true }).fill('LIVE WITH PURPOSE');
     await page.waitForTimeout(900);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -86,6 +88,8 @@ describe("Cover and divider browser QA", () => {
     await page.locator('.card', { hasText: 'Cover QA' }).first().getByRole('button', { name: 'Open', exact: true }).click();
     await page.locator('.book-step').first().locator(':scope > summary').click();
     expect(await page.locator('.book-step').first().getByLabel('Subtitle', { exact: true }).inputValue()).toBe('LIVE WITH PURPOSE');
+    expect(await page.locator('.book-step').first().getByLabel('Title font').inputValue()).toBe('Dancing Script');
+    expect(await page.locator('[data-node="cover-title"]').first().evaluate((e) => getComputedStyle(e).fontWeight)).toBe('700');
     await page.context().close();
   });
 });

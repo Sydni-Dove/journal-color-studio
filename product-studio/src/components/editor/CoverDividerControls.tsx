@@ -1,6 +1,6 @@
 import type { BookStep, CoverDividerSettings } from "../../types/recipe";
 import { Field, NumberField, Select } from "./ui";
-export function CoverDividerControls({ step, set, applyPreset }: { step: BookStep; set: (p: Partial<BookStep>) => void; applyPreset: () => void }) {
+export function CoverDividerControls({ step, set, applyPreset, titleFont, onTitleFont }: { step: BookStep; set: (p: Partial<BookStep>) => void; applyPreset: () => void; titleFont: string; onTitleFont: (font: string) => void }) {
   const o = step.cover ?? {};
   const change = (p: Partial<CoverDividerSettings>) => set({ cover: { ...o, ...p } });
   const t = o.tab ?? { show: false };
@@ -10,6 +10,8 @@ export function CoverDividerControls({ step, set, applyPreset }: { step: BookSte
     <svg viewBox="0 0 180 100" width="180" height="100" aria-label="Neutral Cheetah Luxe preview"><rect width="180" height="100" fill="#f5efe5"/><circle cx="35" cy="15" r="28" fill="#482c20"/><circle cx="155" cy="30" r="25" fill="#d4bca2"/><circle cx="15" cy="95" r="24" fill="#84939c"/><circle cx="175" cy="95" r="25" fill="#a7694e"/><circle cx="20" cy="10" r="55" fill="none" stroke="black"/><text x="90" y="60" textAnchor="middle" fontFamily="cursive" fontSize="28">Plan</text></svg>
     <button className="btn" onClick={applyPreset}>Use matching palette & script title</button>
     <p className="hint">Edit colors, fonts and paper in Theme, Palette and Background. Shapes below use those same colors.</p>
+    <Select label="Title font" value={titleFont} options={[{ value: "The Nautigal", label: "Dramatic bold script" }, { value: "Dancing Script", label: "Bold handwritten script" }, { value: "Great Vibes", label: "Elegant flowing script" }, { value: "Pinyon Script", label: "Formal calligraphy" }, ...(["The Nautigal", "Dancing Script", "Great Vibes", "Pinyon Script"].includes(titleFont) ? [] : [{ value: titleFont, label: `Current: ${titleFont}` }])]} onChange={onTitleFont}/>
+    <p className="hint">Applies to cover and divider titles throughout this book.</p>
     <Field label="Subtitle"><input value={o.subtitle ?? (step.module === "cover-page" ? "WITH PURPOSE" : "")} onChange={(e) => change({ subtitle: e.target.value })}/></Field>
     <Field label="Optional scripture or quote"><textarea value={o.quote ?? ""} onChange={(e) => change({ quote: e.target.value })}/></Field>
     <label><input type="checkbox" checked={o.smallLine !== false} onChange={(e) => change({ smallLine: e.target.checked })}/> Show small line</label>
