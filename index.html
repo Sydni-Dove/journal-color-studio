@@ -64,7 +64,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
 .pal-detail strong { display: block; font-size: 14px; }
 .pal-detail small { display: block; color: var(--muted); font-size: 12px; margin-bottom: 6px; }
 .pal-detail .swatch-row { height: 24px; margin: 0; }
-.mode-bar, .m-pager, .edit-tabs { display: none; }
+.m-pager, .rail, .sheet-head, .pages-card { display: none; }
 .typo-sec { border-top: 1px dashed var(--line); padding-top: 10px; margin-top: 10px; }
 .typo-sec > summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .typo-sec > summary::-webkit-details-marker { display: none; }
@@ -79,6 +79,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
 .typo-sec .field select { min-width: 0; }
 .typo-sec input[type=color] { width: 100%; height: 36px; padding: 2px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
 .palettes button.selected { border-color: var(--brand); box-shadow: inset 0 0 0 1px var(--brand); }
+.palettes button.selected::after { content: '✓'; position: absolute; top: 4px; left: 4px; width: 20px; height: 20px; border-radius: 50%; background: var(--brand); color: #fff; font-size: 12px; line-height: 20px; text-align: center; font-weight: 700; }
 .swatch-row { display: flex; height: 22px; border-radius: 6px; overflow: hidden; margin-bottom: 4px; }
 .swatch-row i { flex: 1; }
 .thumb { display: block; width: 100%; height: auto; border-radius: 6px; margin-bottom: 4px; background: var(--line); }
@@ -159,52 +160,59 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   .page-strip button { width: 64px; font-size: 10px; }
 }
 @media (max-width: 400px) { header > div:nth-child(2) { display: none; } }
-/* ---------- Phones: one mode at a time (Preview / Edit), switched by the bar at the bottom ---------- */
+/* ---------- Phones: the page owns the screen; one rail in the thumb zone; settings in a bottom sheet ---------- */
 @media (max-width: 700px) {
-  body { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
-  header { padding: 8px 12px; gap: 8px; }
+  :root { --hdr: 56px; --rail: calc(62px + env(safe-area-inset-bottom)); --sheet: 0px; }
+  body.sheet-open { --sheet: 43dvh; }             /* half detent: page ≈ 57%, controls ≈ 43% */
+  body.sheet-open.sheet-full { --sheet: calc(100dvh - var(--hdr) - var(--rail) - 150px); }
+  html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
+  header { position: fixed; top: 0; left: 0; right: 0; height: var(--hdr); padding: 6px 12px; gap: 8px; z-index: 30; }
   header strong { font-size: 17px; white-space: nowrap; }
-  header small { display: none; }
+  header small, .saved, .intro, .m-long { display: none; }
   .brand-mark { width: 30px; height: 30px; }
   .head-btn { margin-left: 0; padding: 0 10px; min-height: 44px; white-space: nowrap; }
-  .intro { display: none; }
-  .m-long { display: none; }
-  .layout { padding: 12px; gap: 12px; grid-template-columns: minmax(0, 1fr); }
-  aside, aside .card { min-width: 0; }
-  .field select, .field input:not([type=color]):not([type=checkbox]) { width: 100%; min-width: 0; }
-  .mode-bar { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); background: var(--panel); border-top: 1px solid var(--line); box-shadow: 0 -6px 20px rgba(0,0,0,.08); }
-  .mode-bar button { min-height: 48px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); font: inherit; font-weight: 700; font-size: 15px; }
-  .mode-bar button.active { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .layout { display: block; padding: 0; }
+  /* The page: everything between the header and the rail (and the sheet, when one is open). */
+  .workspace { position: fixed; top: var(--hdr); left: 0; right: 0; bottom: calc(var(--rail) + var(--sheet)); max-height: none; min-height: 0; border: 0; border-radius: 0; box-shadow: none; z-index: 1; transition: bottom .22s ease; }
+  .preview { order: 1; padding: 10px 12px; }
+  .preview { min-height: 0; overflow: hidden; }
+  /* Sized from the space left between the header, the page bar, the rail and any open sheet. */
+  .preview canvas { max-width: 100%; max-height: calc(100dvh - var(--hdr) - var(--rail) - var(--sheet) - 84px); transition: max-height .22s ease; }
+  .workbar { order: 2; padding: 6px 10px; border-top: 1px solid var(--line); border-bottom: 0; flex-wrap: nowrap; gap: 6px; }
+  .workbar > div:first-child { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .m-pager { display: flex; gap: 6px; }
   .m-pager .btn { min-width: 44px; min-height: 44px; font-size: 20px; text-align: center; padding: 0; }
-  .workbar { padding: 8px 10px; flex-wrap: nowrap; }
-  .workbar > div:first-child { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #compare { min-height: 44px; padding: 0 10px; font-size: 13px; white-space: nowrap; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
-  /* Preview mode: the page large, every page thumbnail in a grid below it (vertical scrolling only). */
-  body.m-preview aside { display: none; }
-  body.m-preview .workspace { position: static; order: -1; }
-  body.m-preview .layout { padding: 8px; }
-  body.m-preview .preview { padding: 6px; }
-  body.m-preview .preview canvas { max-height: calc(100dvh - 200px); }
-  body.m-preview .page-strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); overflow: visible; padding: 10px; }
-  body.m-preview .page-strip button { width: auto; min-height: 44px; font-size: 11px; }
-  /* Edit mode: settings take the screen under a small live preview that stays in view (in the page flow, so it never covers a control). */
-  body.m-edit .workspace { position: sticky; top: 0; z-index: 4; order: -1; border-radius: 0 0 14px 14px; margin: -12px -12px 0; }
-  body.m-edit .page-strip { display: none; }
-  body.m-edit .preview { padding: 6px; }
-  body.m-edit .preview canvas { max-height: min(38vh, 340px); box-shadow: 0 6px 16px rgba(0,0,0,.2); }
-  body.m-edit .edit-tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; padding: 6px 8px 8px; border-top: 1px solid var(--line); background: var(--panel); }
-  .edit-tabs button { min-height: 44px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--ink); font: inherit; font-size: 13px; font-weight: 600; padding: 0 2px; }
-  .edit-tabs button.active { background: var(--ink); color: var(--panel); border-color: var(--ink); }
-  body.m-edit[data-etab=page] aside .card:not([data-tab=page]), body.m-edit[data-etab=design] aside .card:not([data-tab=design]),
-  body.m-edit[data-etab=colors] aside .card:not([data-tab=colors]), body.m-edit[data-etab=type] aside .card:not([data-tab=type]),
-  body.m-edit[data-etab=book] aside .card:not([data-tab=book]) { display: none; }
+  /* The settings sheet: one group at a time, slides up above the rail; the page stays visible above it. */
+  aside { position: fixed; left: 0; right: 0; bottom: var(--rail); height: var(--sheet); overflow-y: auto; overscroll-behavior: contain; background: var(--panel);
+    border-radius: 18px 18px 0 0; box-shadow: 0 -10px 30px rgba(0,0,0,.18); z-index: 20; padding: 0 12px 16px; gap: 6px; transition: height .22s ease; }
+  body:not(.sheet-open) aside { display: none; }
+  aside .card { border: 0; box-shadow: none; padding: 10px 4px; border-radius: 0; min-width: 0; }
+  aside .card + .card { border-top: 1px solid var(--line); }
+  .sheet-head { display: flex; position: sticky; top: 0; z-index: 3; background: var(--panel); align-items: center; justify-content: space-between; gap: 8px; min-height: 56px; margin: 0 -12px; padding: 0 12px; border-bottom: 1px solid var(--line); }
+  .sheet-head strong { font-size: 16px; }
+  .sheet-grab { width: 64px; min-height: 44px; border: 0; background: none; position: relative; cursor: pointer; }
+  .sheet-grab::before { content: ''; position: absolute; left: 14px; right: 14px; top: 50%; height: 5px; margin-top: -2px; border-radius: 3px; background: var(--line); }
+  .sheet-done { min-height: 44px; min-width: 64px; border: 0; background: none; color: var(--brand); font: inherit; font-weight: 700; font-size: 16px; cursor: pointer; }
+  body[data-etab=page] aside .card:not([data-tab=page]), body[data-etab=design] aside .card:not([data-tab=design]),
+  body[data-etab=colors] aside .card:not([data-tab=colors]), body[data-etab=type] aside .card:not([data-tab=type]),
+  body[data-etab=pages] aside .card:not([data-tab=pages]), body[data-etab=book] aside .card:not([data-tab=book]) { display: none; }
+  .pages-card { display: block; }
+  .pages-card .page-strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); overflow: visible; border: 0; padding: 4px 0; }
+  .pages-card .page-strip button { width: auto; min-height: 44px; font-size: 11px; }
+  /* The rail: the one control surface in the thumb zone. */
+  .rail { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); position: fixed; left: 0; right: 0; bottom: 0; height: var(--rail); padding: 0 4px env(safe-area-inset-bottom);
+    background: var(--panel); border-top: 1px solid var(--line); z-index: 31; }
+  .rail button { min-height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border: 0; background: none; color: var(--muted); font: inherit; font-size: 11px; font-weight: 600; cursor: pointer; }
+  .rail button svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .rail button { position: relative; }
+  .rail button.active { color: var(--brand); }
+  .rail button.active::before { content: ''; position: absolute; top: 0; left: 22%; right: 22%; height: 3px; border-radius: 0 0 3px 3px; background: var(--brand); }
   .typo-sec > summary { min-height: 44px; }
-  body.m-edit .workbar { display: none; }
-  body.m-edit .workspace .m-pager { display: none; }
   /* Touch targets: at least 44px. */
   .btn, .seg button, .field select, .field input, .text-slot input, .palettes button, .accent-tiles button, .upload-item button, .pager .btn, #recommendColors { min-height: 44px; }
   .field select, .field input { font-size: 16px; }
+  .field select, .field input:not([type=color]):not([type=checkbox]) { width: 100%; min-width: 0; }
   .role { min-height: 44px; }
   .role label { min-height: 44px; }
   .role input[type=checkbox] { width: 22px; height: 22px; }
@@ -215,7 +223,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   .pal-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .palettes .swatch-row { height: 34px; }
   .pal-detail canvas { width: 72px; }
-  .toast { bottom: calc(84px + env(safe-area-inset-bottom)); }
+  .toast { bottom: calc(var(--rail) + var(--sheet) + 12px); }
 }
 </style>
 </head>
@@ -231,6 +239,8 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
 
 <div class="layout">
   <aside>
+    <div class="sheet-head"><button class="sheet-grab" id="sheetGrab" type="button" aria-label="Taller or shorter"></button><strong id="sheetTitle"></strong><button class="sheet-done" id="sheetDone" type="button">Done</button></div>
+    <div data-tab="pages" class="card pages-card"><div id="pagesSlot"></div></div>
     <div class="card intro">
       <h1>Your journal, your colors.</h1>
       <p class="lead">Choose a journal, then swap the marble, colors and elements. Every page of the book changes together, so you never rebuild a layout.</p>
@@ -544,16 +554,17 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       <div class="loading" id="loading"><strong>Loading your journal…</strong><small>Preparing the design pieces</small></div>
     </div>
     <div class="page-strip" id="pageStrip"></div>
-    <nav class="edit-tabs" id="editTabs" aria-label="Settings">
-      <button type="button" data-etab="page">Page</button><button type="button" data-etab="design">Design</button><button type="button" data-etab="colors">Colors</button><button type="button" data-etab="type">Type</button><button type="button" data-etab="book">Book</button>
-    </nav>
   </article>
 </div>
 <div class="toast hidden" id="toast"></div>
 
-<nav class="mode-bar" id="modeBar" aria-label="Phone view">
-  <button type="button" data-mode="preview">Preview</button>
-  <button type="button" data-mode="edit">Edit</button>
+<nav class="rail" id="rail" aria-label="Settings">
+  <button type="button" data-etab="page"><svg viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/></svg>Page</button>
+  <button type="button" data-etab="design"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1.5"/><circle cx="17" cy="7" r="4"/><path d="M4 21l4-7 4 7zM14 14h7v7h-7z"/></svg>Design</button>
+  <button type="button" data-etab="colors"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18c1.2 0 1.8-.9 1.8-1.8 0-1.4-1.3-1.7-1.3-3 0-1 .8-1.7 1.8-1.7H17a4 4 0 0 0 4-4C21 6.4 17 3 12 3z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7" r="1.2"/><circle cx="15" cy="7.5" r="1.2"/></svg>Colors</button>
+  <button type="button" data-etab="type"><svg viewBox="0 0 24 24"><path d="M5 6V4h14v2M12 4v16M9 20h6"/></svg>Type</button>
+  <button type="button" data-etab="pages"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="7" height="8" rx="1"/><rect x="13" y="3" width="7" height="8" rx="1"/><rect x="4" y="13" width="7" height="8" rx="1"/><rect x="13" y="13" width="7" height="8" rx="1"/></svg>Pages</button>
+  <button type="button" data-etab="book"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Export</button>
 </nav>
 <script>
 (() => {
@@ -4271,7 +4282,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     const slots = (TEMPLATE_REGISTRY[state.journal] || TEMPLATE_REGISTRY.dream).cover;
     // Swapping the background keeps every color the user picked; recommended colors are a separate, explicit button.
     const bgIds = state.journal === 'dream' ? slots.backgroundSlot : ['bg-journal', ...slots.backgroundSlot];
-    buildSlotSeg('marbleSeg', [...bgIds, ...uploadIds()], currentBackgroundAsset(), (id, asset) => { state.marble = asset.textureKey || asset.renderer; goTo('cover'); commit(true); });
+    buildSlotSeg('marbleSeg', [...bgIds, ...uploadIds()], currentBackgroundAsset(), (id, asset) => { state.marble = asset.textureKey || asset.renderer; commit(true); });   // stays on the page you're on
     buildDecorSlots(slots);
     buildSlotSeg('plateSeg', slots.titlePlateSlot, currentPlateAsset(), (id, asset) => { state.plateStyle = asset.shape; commit(true); });
   }
@@ -4955,32 +4966,35 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     refreshThumbs();
   }
 
-  // ---------- Phone workspace: Preview / Edit ----------
-  // Phones show one mode at a time: Preview (the page large, every page thumbnail, compare) or Edit (the settings under a
-  // small live preview that redraws with each change). Switching only changes the view; the journal's state is untouched,
-  // and Edit returns to where you were in the settings.
-  let phoneMode = 'preview', editScroll = 0;
-  try { phoneMode = localStorage.getItem('dove-studio-phone-mode') === 'edit' ? 'edit' : 'preview'; } catch {}
-  function setPhoneMode(m) {
-    if (m === phoneMode && document.body.classList.contains(`m-${m}`)) return;
-    if (phoneMode === 'edit' && document.body.classList.contains('m-edit')) editScroll = window.scrollY;
-    phoneMode = m;
-    document.body.classList.toggle('m-preview', m === 'preview'); document.body.classList.toggle('m-edit', m === 'edit');
-    document.querySelectorAll('#modeBar button').forEach((b) => { b.classList.toggle('active', b.dataset.mode === m); b.setAttribute('aria-pressed', b.dataset.mode === m); });
-    try { localStorage.setItem('dove-studio-phone-mode', m); } catch {}
-    window.scrollTo(0, m === 'edit' ? editScroll : 0);
+  // ---------- Phones: rail + bottom sheet ----------
+  // The page owns the screen. The rail (thumb zone) opens one group of settings in a bottom sheet; the page stays visible
+  // above it and redraws with every change. Tapping the same rail item, or Done, closes it. Only the view changes.
+  const phoneMQ = window.matchMedia('(max-width: 700px)');
+  const SHEET_TITLES = { page: 'This page', design: 'Design', colors: 'Colors', type: 'Type', pages: 'Pages', book: 'Book & export' };
+  let sheetTab = null;
+  function openSheet(tab) {
+    if (sheetTab === tab) return closeSheet();
+    sheetTab = tab; document.body.dataset.etab = tab;
+    document.body.classList.add('sheet-open');
+    $('sheetTitle').textContent = SHEET_TITLES[tab] || '';
+    document.querySelectorAll('#rail button').forEach((b) => { b.classList.toggle('active', b.dataset.etab === tab); b.setAttribute('aria-pressed', b.dataset.etab === tab); });
+    document.querySelector('aside').scrollTop = 0;
   }
-  document.querySelectorAll('#modeBar button').forEach((b) => b.onclick = () => setPhoneMode(b.dataset.mode));
-  // Edit mode shows one group of settings at a time; "Page" holds everything for the page on screen.
-  function setEditTab(tab) {
-    document.body.dataset.etab = tab;
-    document.querySelectorAll('#editTabs button').forEach((b) => { b.classList.toggle('active', b.dataset.etab === tab); b.setAttribute('aria-pressed', b.dataset.etab === tab); });
-    try { localStorage.setItem('dove-studio-edit-tab', tab); } catch {}
+  function closeSheet() {
+    sheetTab = null; document.body.classList.remove('sheet-open', 'sheet-full');
+    document.querySelectorAll('#rail button').forEach((b) => { b.classList.remove('active'); b.setAttribute('aria-pressed', false); });
   }
-  document.querySelectorAll('#editTabs button').forEach((b) => b.onclick = () => { setEditTab(b.dataset.etab); editScroll = 0; window.scrollTo(0, 0); });
-  let startTab = 'page'; try { startTab = localStorage.getItem('dove-studio-edit-tab') || 'page'; } catch {}
-  setEditTab(['page', 'design', 'colors', 'type', 'book'].includes(startTab) ? startTab : 'page');
-  setPhoneMode(phoneMode);
+  document.querySelectorAll('#rail button').forEach((b) => b.onclick = () => openSheet(b.dataset.etab));
+  $('sheetDone').onclick = closeSheet;
+  $('sheetGrab').onclick = () => document.body.classList.toggle('sheet-full');
+  // Page thumbnails live in the Pages sheet on phones (and under the page on larger screens); picking one shows it.
+  const placeStrip = () => { const strip = $('pageStrip'), home = phoneMQ.matches ? $('pagesSlot') : document.querySelector('.workspace'); if (strip.parentElement !== home) home.appendChild(strip); if (!phoneMQ.matches) closeSheet(); };
+  phoneMQ.addEventListener?.('change', placeStrip); placeStrip();
+  $('pagesSlot').addEventListener('click', (e) => { if (e.target.closest('button')) setTimeout(closeSheet, 150); });
+  // Swipe the page left / right for the next / previous page.
+  let swipeX = null;
+  $('canvas').addEventListener('touchstart', (e) => { swipeX = e.touches.length === 1 ? e.touches[0].clientX : null; }, { passive: true });
+  $('canvas').addEventListener('touchend', (e) => { if (swipeX == null) return; const dx = e.changedTouches[0].clientX - swipeX; swipeX = null; if (Math.abs(dx) > 50) $(dx < 0 ? 'nextPage' : 'prevPage').click(); });
   $('mPrev').onclick = () => $('prevPage').click();
   $('mNext').onclick = () => $('nextPage').click();
   $('prevPage').onclick = () => { state.page = Math.max(0, state.page - 1); commit(false); };
@@ -5093,9 +5107,9 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       showPlate: true, showFrame: true, showTrim: true, coverFontColorAuto: !pr.coverFontColor, coverFontColor: pr.coverFontColor || state.coverFontColor, headerStyle: 'mixed' });
     for (const f of ['bodyFont', 'headingFont']) if (pr[f]) { state[f] = pr[f]; ensureFont(pr[f]).then(() => commit(false)); }
     for (const [k, id] of Object.entries(pr.decor)) Object.assign(state.decor[k], { asset: id, show: true, colorMode: 'original', scale: 100 });
-    goTo('cover'); commit(true);
+    commit(true);
   });
-  $('bgArt').onchange = (e) => { state.bgArt = e.target.value; goTo('cover'); commit(false); };
+  $('bgArt').onchange = (e) => { state.bgArt = e.target.value; commit(false); };
   $('savePalette').onclick = () => {
     const name = (prompt('Name your palette:', 'My palette') || '').trim();
     if (!name) return;
