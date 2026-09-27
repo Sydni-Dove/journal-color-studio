@@ -77,6 +77,35 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
 .typo-sec .head .btn:disabled { opacity: .4; cursor: default; }
 .typo-sec .field { margin-top: 6px; }
 .typo-sec .field select { min-width: 0; }
+/* Click-to-edit text: a small editor next to the text you clicked on the page (bottom card on phones). */
+.text-pop { position: fixed; z-index: 45; width: 300px; max-width: calc(100vw - 24px); background: var(--panel); color: var(--ink); border: 1px solid var(--line);
+  border-radius: 14px; box-shadow: 0 14px 40px rgba(40,10,5,.22); padding: 12px; }
+.text-pop.hidden { display: none; }
+.tp-head { display: flex; align-items: flex-start; gap: 8px; }
+.tp-head div { flex: 1; min-width: 0; }
+.tp-head strong { display: block; font-size: 14px; }
+.tp-head small { color: var(--muted); font-size: 12px; }
+.tp-x { border: 0; background: none; color: var(--muted); font-size: 22px; line-height: 1; width: 36px; height: 36px; margin: -6px -6px 0 0; cursor: pointer; border-radius: 8px; }
+.tp-label { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 10px 0 6px; }
+.tp-sw { display: flex; flex-wrap: wrap; gap: 6px; }
+.tp-sw button, .tp-sw label { width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--line); padding: 2px; background: var(--panel); cursor: pointer; position: relative; display: grid; place-items: center; }
+.tp-sw span { display: block; width: 100%; height: 100%; border-radius: 50%; background: var(--c); box-shadow: inset 0 0 0 1px rgba(0,0,0,.12); }
+.tp-sw .def { background: none; box-shadow: none; font: 600 13px Georgia, serif; line-height: 24px; text-align: center; }
+.tp-sw .custom { background: conic-gradient(#e33, #ee3, #3e3, #3ee, #33e, #e3e, #e33); }
+.tp-sw label.on .custom { background: var(--c); }
+.tp-sw input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+.tp-sw .on { border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand); }
+.tp-row { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
+.tp-row select { flex: 1; min-width: 0; height: 36px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); padding: 0 6px; }
+.tp-row button { height: 36px; min-width: 36px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); cursor: pointer; font: 600 13px Georgia, serif; }
+.tp-row .tp-b { font-weight: 800; font-size: 15px; }
+.tp-row .tp-b.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+.tp-row input[type=range] { flex: 1; min-width: 0; accent-color: var(--brand); }
+.tp-row b { width: 42px; text-align: right; font-size: 12px; color: var(--muted); font-weight: 600; }
+.tp-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }
+.tp-foot .btn { font-size: 12px; padding: 6px 10px; }
+.tp-foot .btn:disabled { opacity: .4; cursor: default; }
+.tp-warn { font-size: 12px; color: #9a3412; margin-top: 8px; }
 .typo-sec input[type=color] { width: 100%; height: 36px; padding: 2px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
 .palettes button.selected { border-color: var(--brand); box-shadow: inset 0 0 0 1px var(--brand); }
 .palettes button.selected::after { content: '✓'; position: absolute; top: 4px; left: 4px; width: 20px; height: 20px; border-radius: 50%; background: var(--brand); color: #fff; font-size: 12px; line-height: 20px; text-align: center; font-weight: 700; }
@@ -162,6 +191,8 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
 @media (max-width: 400px) { header > div:nth-child(2) { display: none; } }
 /* ---------- Phones: the page owns the screen; one rail in the thumb zone; settings in a bottom sheet ---------- */
 @media (max-width: 700px) {
+  .text-pop { left: 8px !important; right: 8px; top: auto !important; bottom: calc(var(--rail) + 8px); width: auto; max-width: none; }
+  body.focus .text-pop { bottom: calc(76px + env(safe-area-inset-bottom)); }
   :root { --hdr: 56px; --rail: calc(62px + env(safe-area-inset-bottom)); --sheet: 0px; }
   body.sheet-open { --sheet: 43dvh; }             /* half detent: page ≈ 57%, controls ≈ 43% */
   body.sheet-open.sheet-full { --sheet: calc(100dvh - var(--hdr) - var(--rail) - 150px); }
@@ -2182,6 +2213,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   function typesetInBox(ctx, s, id, text, x, y, w, h, fam, color, scale = 1, { orig = text, growLeft = 0, growUp = 0, weight = 500, designLines = 1 } = {}) {
     if (!text) return;
     const rule = fitRule(s, id), GAP = .35;               // gap between wrapped lines, in cap heights
+    weight = tyWeight(weight);
     ctx.save(); ctx.fillStyle = color; ctx.textBaseline = 'alphabetic';
     ctx.font = `${weight} 100px "${fam}", Georgia, serif`;
     const capOf = (t) => (ctx.measureText(t).actualBoundingBoxAscent || 70) / 100;          // cap height per px
@@ -2624,6 +2656,25 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   // letters in the same burgundy as its header blocks, which would leave those titles invisible.)
   const textOnPanel = (s, c, bg) => (isOriginalColorway(s) && contrast(c, bg) >= 3 ? c : readableOn(bg, [c, s.palette.paper, '#FFFFFF', tone(bg, 18), tone(bg, 96)]));
   // The design's own colors, unchanged (its original panels/lettering are kept exactly as Sydni designed them).
+  // Text over a marble bar or strip: the flat stone color says little about what is really behind the letters (the
+  // marble can run from near-black to near-white), so the painted area is sampled. The design color stays while it
+  // reads on most of that area; otherwise the candidate that reads on the most of it is used. Solid fills: textOnPanel.
+  function textOnArea(ctx, s, c, bg, x, y, w, h) {
+    if (s.headerFill === 'solid') return textOnPanel(s, c, bg);
+    let d;
+    try { d = ctx.getImageData(Math.round(x), Math.round(y), Math.max(1, Math.round(w)), Math.max(1, Math.round(h))).data; } catch { return textOnPanel(s, c, bg); }
+    const cands = [c, s.palette.paper, '#FFFFFF', tone(bg, 18), tone(bg, 96)].map((hex) => ({ hex, L: relLum(hex), ok: 0 }));
+    const n = d.length / 4, step = Math.max(1, Math.floor(n / 4000));
+    const lin = (v) => { v /= 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; };
+    let total = 0;
+    for (let i = 0; i < n; i += step) {
+      const L = .2126 * lin(d[i * 4]) + .7152 * lin(d[i * 4 + 1]) + .0722 * lin(d[i * 4 + 2]);
+      for (const k of cands) if ((Math.max(k.L, L) + .05) / (Math.min(k.L, L) + .05) >= 3) k.ok++;
+      total++;
+    }
+    if (!total || cands[0].ok / total >= .75) return c;
+    return cands.reduce((a, b) => (b.ok > a.ok ? b : a)).hex;
+  }
   function isOriginalColorway(s) {
     const p = s.palette; if (!p || p.v) return false;
     if (s.journal && s.journal !== 'dream') return p.name === JOURNALS[s.journal]?.palette;
@@ -2661,7 +2712,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   // JOURNAL DEFAULT (the Typography card: heading/body fonts, sizes, text color) → PAGE OVERRIDE (all text on one page)
   // → SECTION OVERRIDE (one semantic text role on that page). The most specific setting wins; anything left unset falls
   // through, down to the original design. Stored per journal in state.typography[journal][pageKey][role | '_page'] as
-  // { font, size (% of the design size), color: { mode: 'palette', role } | { mode: 'custom', hex } } — overrides only.
+  // { font, size (% of the design size), color: { mode: 'palette', role } | { mode: 'custom', hex }, bold: true | false } — overrides only.
   // Roles are the renderer's own text sections (withRole scopes below); wording lives in state.text and never here.
   const TYPO_PAGES = {
     brainstormQ: [['pageTitle', 'Brainstorm title', 'head'], ['questionsHeading', 'Questions heading', 'body'], ['questionsBody', 'Questions body', 'body']],
@@ -2694,13 +2745,15 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     const a = pg._page || {}, b = (role && pg[role]) || {};
     const c = b.color || a.color;
     const color = !c ? null : c.mode === 'custom' ? c.hex : s.palette[c.role] || null;
-    const out = { font: b.font || a.font || '', size: b.size ?? a.size ?? 100, color };
-    return out.font || out.size !== 100 || out.color ? out : null;
+    const out = { font: b.font || a.font || '', size: b.size ?? a.size ?? 100, color, bold: b.bold ?? a.bold ?? null };
+    return out.font || out.size !== 100 || out.color || out.bold != null ? out : null;
   }
   // The section being drawn (null: nothing overridden, so every font/color/size below is exactly the design's).
   let TY = null;
   const tyScale = () => (TY ? TY.size / 100 : 1);
   const tyFam = (fam) => (TY && TY.font ? TY.font : fam);
+  // Bold override: true → 700, false → 400, unset → the design's own weight.
+  const tyWeight = (w) => (TY && TY.bold != null ? (TY.bold ? 700 : 400) : w);
   // Draws fn() as one semantic section. Fonts and sizes come from font()/headFont()/canvaText()/prText()/drawLetter()
   // (they read TY before measuring, so fitting and wrapping stay proportional); a color override is applied to the text
   // only (non-text fills keep their color). In the preview each section's text boxes are recorded for its contrast check.
@@ -2727,9 +2780,9 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     try { return fn(); } finally { if (own === undefined) delete ctx.fillText; else ctx.fillText = own; TY = prev; }
   }
 
-  const font = (px, { weight = 500, italic = false } = {}) => `${italic ? 'italic ' : ''}${weight} ${Math.round(px * (state.bodyFontScale / 100) * tyScale())}px "${tyFam(state.bodyFont)}", Georgia, serif`;
+  const font = (px, { weight = 500, italic = false } = {}) => `${italic ? 'italic ' : ''}${tyWeight(weight)} ${Math.round(px * (state.bodyFontScale / 100) * tyScale())}px "${tyFam(state.bodyFont)}", Georgia, serif`;
   // Section-heading text (page titles drawn by drawHeader) can use its own typeface, independent of body text.
-  const headFont = (px, { weight = 500, italic = false } = {}) => `${italic ? 'italic ' : ''}${weight} ${Math.round(px * (state.headingFontScale / 100) * tyScale())}px "${tyFam(state.headingFont || state.bodyFont)}", Georgia, serif`;
+  const headFont = (px, { weight = 500, italic = false } = {}) => `${italic ? 'italic ' : ''}${tyWeight(weight)} ${Math.round(px * (state.headingFontScale / 100) * tyScale())}px "${tyFam(state.headingFont || state.bodyFont)}", Georgia, serif`;
 
   // Draws text wrapped to maxW. Returns the y just below the last line.
   function wrapText(ctx, text, x, y, maxW, lineH, align = 'left', draw = true) {
@@ -2846,6 +2899,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     const { k } = canvaFit(W, H), scale = family === 'head' ? s.headingFontScale : s.bodyFontScale;
     const fam = tyFam(family === 'head' ? (s.headingFont || s.bodyFont) : s.bodyFont);
     let px = size * k * scale / 100 * tyScale();
+    weight = tyWeight(weight);
     ctx.save();
     ctx.font = `${italic ? 'italic ' : ''}${weight} ${px}px "${fam}", Georgia, serif`;
     const edited = id && textEdited(s, id), ref = edited ? (orig ?? textSlot(s.journal, id)?.text ?? text) : text;
@@ -2940,7 +2994,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     } else if (style === 'block') {                       // dark block, light lettering, gold rule (Interpretation, Application, Summary)
       const hb = H * .1;
       stoneBar(ctx, x0, 0, w, hb, s);
-      ctx.fillStyle = textOnPanel(s, p.title, p.stone); ctx.font = headFont(H * .045); fillFit(ctx, s, id, title, cx, hb * .56, maxW);
+      ctx.fillStyle = textOnArea(ctx, s, p.title, p.stone, cx - maxW * .3, hb * .3, maxW * .6, hb * .5); ctx.font = headFont(H * .045); fillFit(ctx, s, id, title, cx, hb * .56, maxW);
       headerRule(ctx, x0, hb, w, H * .011, s);
       bottom = hb + H * .011;
     } else if (style === 'bar') {                  // title on paper, thick dark bar beneath (Dream)
@@ -3356,7 +3410,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
         const iy = [lh * .16, lh * .08, 0][panel.lvl + 1];
         ctx.fillStyle = rgba(panel.hex, panel.alpha); ctx.fillRect(0, ly + iy, W, lh - 2 * iy);
       }
-      ctx.fillStyle = panel ? panelInk(s, panel.hex) : textOnPanel(s, p.title, p.stone); ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+      ctx.fillStyle = panel ? panelInk(s, panel.hex) : textOnArea(ctx, s, p.title, p.stone, 0, ly + lh * .2, W, lh * .6); ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
       withRole(ctx, s, 'legendText', () => { ctx.font = font(H * .015, { italic: true }); [['Status', .1], ['N = Not Interpreted', .3], ['I = Interpreted', .6], ['A = Application', .8]].forEach(([t, f]) => ctx.fillText(t, W * f, ly + lh / 2)); });
       ctx.fillRect(W * .175, ly + lh * .2, Math.max(1, W * .002), lh * .6);
       ctx.fillStyle = ink; withRole(ctx, s, 'pageTitle', () => { ctx.font = font(H * .045); fillFit(ctx, s, 'contentsTitle', T(s, 'contentsTitle'), W / 2, H * .135, W * .88); });
@@ -3679,7 +3733,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     // Real type in the artwork's own box: cover titles in Custom font, and any lettering whose wording was edited (the
     // artwork can only say its original words). Titles use the cover font; labels and headings use the heading font.
     const slot = LETTER_SLOT[name];
-    const typed = TY && (TY.font || TY.size !== 100);           // a page/section font or size: set this lettering as type
+    const typed = TY && (TY.font || TY.size !== 100 || TY.bold != null);           // a page/section font or size: set this lettering as type
     if ((s.titleStyle === 'custom' && isTitle) || (slot && textEdited(s, slot)) || typed) {
       const text = slot ? T(s, slot) : LETTER_TEXT[name], orig = slot ? textSlot(s.journal, slot)?.text ?? text : text;
       const fam = tyFam(isTitle ? s.coverFont : (s.headingFont || s.bodyFont)), scale = (isTitle ? s.coverFontScale : s.headingFontScale) / 100 * tyScale();
@@ -3700,7 +3754,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     const { k, ox, oy } = prFit(W, H), scale = (family === 'head' ? s.headingFontScale : s.bodyFontScale) / 100 * tyScale();
     const fam = tyFam(family === 'head' ? (s.headingFont || s.bodyFont) : s.bodyFont);
     let px = size * k * scale;
-    const setFont = () => { ctx.font = `${italic ? 'italic ' : ''}400 ${px}px "${fam}", Georgia, serif`; };
+    const setFont = () => { ctx.font = `${italic ? 'italic ' : ''}${tyWeight(400)} ${px}px "${fam}", Georgia, serif`; };
     ctx.save(); ctx.fillStyle = color; setFont();
     // Single-line labels: match the width the words take in the Canva design, whatever the font.
     if (fitW) { px *= fitW * k * scale / Math.max(1, ctx.measureText(text).width); setFont(); }
@@ -4662,7 +4716,13 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       // dimensions together under max-height and the page distorts.
       const dpr = Math.min(2, window.devicePixelRatio || 1);
       const type = currentType(), side = bindingSide(insideNumber(state, state.page));
-      try { renderPage(canvas, Math.round(760 * dpr), s, type, side); if (!comparing) showTypoWarnings(typoContrast(canvas, s._typoProbe)); if (state.showGuides) drawGuides(canvas, type, side); }
+      try {
+        renderPage(canvas, Math.round(760 * dpr), s, type, side);
+        hitBoxes = s._typoProbe ? { boxes: s._typoProbe.boxes, off: s._typoProbe.offset } : null;
+        if (!comparing) showTypoWarnings(typoContrast(canvas, s._typoProbe));
+        if (state.showGuides) drawGuides(canvas, type, side);
+        if (!comparing && popRole) outlineRole(canvas, popRole);
+      }
       catch (e) { console.error(e); showBlocked(e); }
       showTextWarnings(s._warn);
       if (!comparing && currentType() === 'cover') showContrastWarning(s._probe);
@@ -4794,7 +4854,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
 
   // ---------- Page settings: per-page / per-section typography ----------
   const TYPO_COLORS = [['', 'Journal default'], ['palette:title', 'Palette · lettering'], ['palette:plate', 'Palette · plate'], ['palette:frame', 'Palette · frame'],
-    ['palette:trim', 'Palette · gold / trim'], ['palette:stone', 'Palette · stone'], ['palette:highlight', 'Palette · highlight'], ['custom', 'Custom color']];
+    ['palette:trim', 'Palette · gold / trim'], ['palette:stone', 'Palette · stone'], ['palette:highlight', 'Palette · highlight'], ['palette:paper', 'Palette · paper'], ['custom', 'Custom color']];
   let typoKeyShown = '';
   const wideScreen = () => !window.matchMedia('(max-width: 700px)').matches;
   const typoPage = () => typoKey(currentType());
@@ -4803,6 +4863,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     const j = state.journal, pk = typoPage(), cur = { ...typoOf(role), ...patch };
     if (!cur.font) delete cur.font;
     if (!cur.color) delete cur.color;
+    if (cur.bold == null) delete cur.bold;
     if (cur.size == null || cur.size === 100) delete cur.size;
     const jt = { ...(state.typography[j] || {}) }, pg = { ...(jt[pk] || {}) };
     if (Object.keys(cur).length) pg[role] = cur; else delete pg[role];
@@ -4814,13 +4875,14 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   function buildPageTypo() {
     const type = currentType(), pk = typoKey(type), roles = TYPO_PAGES[pk], box = $('pageTypoFields');
     typoKeyShown = `${state.journal}|${pk}`;
+    closePop();
     const guide = pk === 'pwGuide';
     $('pageTypoCard').classList.toggle('hidden', !roles && !guide);
     $('pageTypoName').textContent = PAGE_LABELS[type] || '';
     box.innerHTML = '';
     $('pageTypoReset').classList.toggle('hidden', !roles);
     $('pageTypoNote').textContent = guide ? 'The wording on this page is part of its Canva artwork, so it has no separate text settings.'
-      : 'Fonts, colors and sizes for the text on this page only. Anything on “Journal default” follows Typography.';
+      : 'Fonts, colors, sizes and bold for the text on this page only. Tip: click any text on the page to change it right there. Anything on “Journal default” follows Typography.';
     if (!roles) return;
     const fonts = [...$('bodyFont').options].map((o) => [o.value, o.textContent]);
     [['_page', 'All text on this page', 'page'], ...roles].forEach(([role, label, fam]) => {
@@ -4833,8 +4895,10 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
         <label class="field"><span>Color</span><select data-k="color">${TYPO_COLORS.map(([v, n]) => `<option value="${v}">${n}</option>`).join('')}</select></label></div>
         <label class="field custom-row"><span>Custom color</span><input type="color" data-k="hex"></label>
         <label class="slider"><span>Size <b></b></span><input type="range" min="60" max="160" step="5" data-k="size"></label>
+        <div class="role"><label><input type="checkbox" data-k="bold"> Bold</label></div>
         <span class="hint warn hidden"></span>`;
-      sec.querySelector('.reset').onclick = () => { setTypo(role, { font: '', color: null, size: 100 }); };
+      sec.querySelector('.reset').onclick = () => { setTypo(role, { font: '', color: null, size: 100, bold: null }); };
+      sec.querySelector('[data-k=bold]').onchange = (e) => setTypo(role, { bold: e.target.checked ? true : null });
       sec.querySelector('[data-k=font]').onchange = (e) => setTypo(role, { font: e.target.value });
       sec.querySelector('[data-k=color]').onchange = (e) => {
         const v = e.target.value;
@@ -4854,11 +4918,13 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       sec.querySelector('[data-k=color]').value = !c ? '' : c.mode === 'custom' ? 'custom' : `palette:${c.role}`;
       sec.querySelector('[data-k=hex]').value = c?.mode === 'custom' ? c.hex : (c ? state.palette[c.role] : '#2A1A18') || '#2A1A18';
       sec.querySelector('.custom-row').classList.toggle('hidden', c?.mode !== 'custom');
+      sec.querySelector('[data-k=bold]').checked = !!o.bold;
       const sz = o.size ?? 100; sec.querySelector('[data-k=size]').value = sz; sec.querySelector('.slider b').textContent = `${sz}%`;
       sec.querySelector('.reset').disabled = !Object.keys(o).length;
       const cn = !c ? '' : c.mode === 'custom' ? 'custom color' : (TYPO_COLORS.find(([v]) => v === `palette:${c.role}`)?.[1] || '').replace('Palette · ', '');
-      sec.querySelector('.sum').textContent = [o.font, cn, sz !== 100 ? `${sz}%` : ''].filter(Boolean).join(' · ') || 'Journal default';
+      sec.querySelector('.sum').textContent = [o.font, cn, sz !== 100 ? `${sz}%` : '', o.bold ? 'bold' : ''].filter(Boolean).join(' · ') || 'Journal default';
     });
+    if (popRole && !pop.contains(document.activeElement)) renderPop();   // changes made elsewhere (Page settings, undo)
   }
   $('pageTypoReset').onclick = () => {
     const j = state.journal, jt = { ...(state.typography[j] || {}) };
@@ -4892,13 +4958,112 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     }
     return out;
   }
+  let lastTypoRes = {};
   function showTypoWarnings(res) {
+    lastTypoRes = res; popWarn();
     document.querySelectorAll('#pageTypoFields .typo-sec').forEach((sec) => {
       const r = res[sec.dataset.role], el = sec.querySelector('.warn'), low = r && r.bg > 40 && r.low / r.bg > .35;
       el.classList.toggle('hidden', !low);
       if (low) el.textContent = `Low contrast: ${Math.round(r.low / r.bg * 100)}% of what’s behind this text is hard to read against its color. Try a darker or lighter color, or a reading panel.`;
     });
   }
+
+  // ---------- Click-to-edit text on the page ----------
+  // Every text section the page draws (its withRole scopes, recorded in the preview) can be clicked or tapped: a small
+  // editor opens for that section on this page, with the same overrides as Page settings (color, font, size, bold).
+  let hitBoxes = null, popRole = null;
+  const pop = document.createElement('div');
+  pop.className = 'text-pop hidden'; pop.id = 'textPop'; pop.setAttribute('role', 'dialog'); pop.setAttribute('aria-label', 'Text style');
+  document.body.appendChild(pop);
+  const POP_SWATCHES = [['title', 'Lettering'], ['plate', 'Plate'], ['frame', 'Frame'], ['trim', 'Gold / trim'], ['stone', 'Stone'], ['highlight', 'Highlight'], ['paper', 'Paper']];
+  const popRoleInfo = (role) => (TYPO_PAGES[typoPage()] || []).find(([r]) => r === role);
+  // The editable section under a pointer (the smallest text box it falls in, with a little slack for thin lettering).
+  function hitRole(e) {
+    if (!hitBoxes || comparing) return null;
+    const r = canvas.getBoundingClientRect(), k = canvas.width / r.width, x = (e.clientX - r.left) * k, y = (e.clientY - r.top) * k;
+    const pad = 6 * k, [ox, oy] = hitBoxes.off;
+    let best = null, area = Infinity;
+    for (const { role, box: [x0, y0, x1, y1] } of hitBoxes.boxes) {
+      if (!popRoleInfo(role) || x < x0 + ox - pad || x > x1 + ox + pad || y < y0 + oy - pad || y > y1 + oy + pad) continue;
+      const a = (x1 - x0) * (y1 - y0);
+      if (a < area) { area = a; best = role; }
+    }
+    return best;
+  }
+  // Preview only: a dashed outline around the section being edited.
+  function outlineRole(c, role) {
+    if (!hitBoxes) return;
+    const ctx = c.getContext('2d'), [ox, oy] = hitBoxes.off, pad = c.width * .006;
+    ctx.save(); ctx.lineWidth = Math.max(1.5, c.width * .0025);
+    for (const { role: r, box: [x0, y0, x1, y1] } of hitBoxes.boxes) {
+      if (r !== role) continue;
+      const rect = [x0 + ox - pad, y0 + oy - pad, x1 - x0 + 2 * pad, y1 - y0 + 2 * pad];
+      ctx.setLineDash([]); ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.strokeRect(...rect);
+      ctx.setLineDash([c.width * .008, c.width * .006]); ctx.strokeStyle = '#630000'; ctx.strokeRect(...rect);
+    }
+    ctx.restore();
+  }
+  function popWarn() {
+    const el = pop.querySelector('.tp-warn');
+    if (!el || !popRole) return;
+    const r = lastTypoRes[popRole], low = r && r.bg > 40 && r.low / r.bg > .35;
+    el.classList.toggle('hidden', !low);
+    if (low) el.textContent = 'Hard to read here: try a darker or lighter color.';
+  }
+  function renderPop() {
+    const info = popRoleInfo(popRole);
+    if (!info) { closePop(); return; }
+    const [role, label, fam] = info, o = typoOf(role), c = o.color, sz = o.size ?? 100;
+    const def = fam === 'head' ? (state.headingFont || state.bodyFont) : state.bodyFont;
+    const fonts = [...$('bodyFont').options].map((x) => [x.value, x.textContent]);
+    const esc = (t) => String(t).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+    const custom = c?.mode === 'custom' ? c.hex : '';
+    pop.innerHTML = `<div class="tp-head"><div><strong>${esc(label)}</strong><small>${esc(PAGE_LABELS[currentType()] || '')} · this page only</small></div><button class="tp-x" type="button" aria-label="Close">×</button></div>
+      <div class="tp-label">Color</div>
+      <div class="tp-sw">
+        <button type="button" data-c="" class="${!c ? 'on' : ''}" title="Design color" aria-label="Design color"><span class="def">A</span></button>
+        ${POP_SWATCHES.map(([r, n]) => `<button type="button" data-c="${r}" class="${c?.mode === 'palette' && c.role === r ? 'on' : ''}" title="${n}" aria-label="${n}" style="--c:${state.palette[r]}"><span></span></button>`).join('')}
+        <label class="${custom ? 'on' : ''}" title="Custom color" style="--c:${custom || '#ffffff'}"><input type="color" value="${custom || '#2A1A18'}" aria-label="Custom color"><span class="custom"></span></label>
+      </div>
+      <div class="tp-row"><select data-k="font" aria-label="Font"><option value="">${esc(def)} (default)</option>${fonts.map(([v, n]) => `<option value="${esc(v)}"${o.font === v ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select>
+        <button type="button" class="tp-b${o.bold ? ' on' : ''}" data-k="bold" aria-pressed="${!!o.bold}" title="Bold">B</button></div>
+      <div class="tp-row"><button type="button" data-k="minus" aria-label="Smaller">A−</button><input type="range" min="60" max="160" step="5" value="${sz}" data-k="size" aria-label="Size"><button type="button" data-k="plus" aria-label="Larger">A+</button><b>${sz}%</b></div>
+      <div class="tp-warn hidden"></div>
+      <div class="tp-foot"><small class="hint">More in Edit → Page settings</small><button class="btn" type="button" data-k="reset"${Object.keys(o).length ? '' : ' disabled'}>Reset</button></div>`;
+    const set = (patch, rerender = true) => { setTypo(role, patch); if (rerender) renderPop(); };
+    pop.querySelector('.tp-x').onclick = closePop;
+    pop.querySelectorAll('.tp-sw button').forEach((b) => b.onclick = () => set({ color: b.dataset.c ? { mode: 'palette', role: b.dataset.c } : null }));
+    pop.querySelector('.tp-sw input').oninput = (e) => { e.target.parentElement.style.setProperty('--c', e.target.value); set({ color: { mode: 'custom', hex: e.target.value } }, false); };
+    pop.querySelector('.tp-sw input').onchange = () => renderPop();
+    pop.querySelector('[data-k=font]').onchange = (e) => set({ font: e.target.value });
+    pop.querySelector('[data-k=bold]').onclick = () => set({ bold: o.bold ? null : true });
+    const size = pop.querySelector('[data-k=size]');
+    size.oninput = () => { pop.querySelector('.tp-row b').textContent = `${size.value}%`; set({ size: Number(size.value) }, false); };
+    size.onchange = () => renderPop();
+    pop.querySelector('[data-k=minus]').onclick = () => set({ size: Math.max(60, sz - 5) });
+    pop.querySelector('[data-k=plus]').onclick = () => set({ size: Math.min(160, sz + 5) });
+    pop.querySelector('[data-k=reset]').onclick = () => set({ font: '', color: null, size: 100, bold: null });
+    popWarn();
+  }
+  function placePop(e) {
+    if (!wideScreen()) return;                         // phones: a card above the rail (CSS)
+    const r = pop.getBoundingClientRect(), vw = window.innerWidth, vh = window.innerHeight;
+    let x = e.clientX + 14, y = e.clientY + 14;
+    if (x + r.width > vw - 12) x = e.clientX - r.width - 14;
+    if (y + r.height > vh - 12) y = vh - r.height - 12;
+    pop.style.left = `${Math.max(12, x)}px`; pop.style.top = `${Math.max(12, y)}px`;
+  }
+  function openPop(role, e) {
+    popRole = role; renderPop(); pop.classList.remove('hidden'); placePop(e); draw();
+  }
+  function closePop() {
+    if (!popRole) return;
+    popRole = null; pop.classList.add('hidden'); pop.innerHTML = ''; draw();
+  }
+  canvas.addEventListener('click', (e) => { const role = hitRole(e); if (role) openPop(role, e); else closePop(); });
+  canvas.addEventListener('pointermove', (e) => { if (e.pointerType === 'mouse') canvas.style.cursor = hitRole(e) ? 'pointer' : ''; });
+  document.addEventListener('pointerdown', (e) => { if (popRole && !pop.contains(e.target) && e.target !== canvas) closePop(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePop(); });
 
   // ---------- Reading panel controls (Brainstorm + questions) ----------
   let panelPage = 'brainstormQ';
