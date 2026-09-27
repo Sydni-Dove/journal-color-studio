@@ -402,6 +402,9 @@ input[type="color"] {
 .issue--warning {
   border-left-color: var(--ui-warn);
 }
+.issue--info {
+  border-left-color: var(--ui-accent, var(--ui-line));
+}
 .issue-meta {
   font-size: 11px;
   color: var(--ui-muted);

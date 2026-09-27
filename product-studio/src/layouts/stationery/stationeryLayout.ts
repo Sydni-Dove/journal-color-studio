@@ -18,7 +18,7 @@ import { STATIONERY_RECIPES, stationeryLayoutId } from "../../presets/stationery
 import type { PageGeometry } from "../../types/geometry";
 import type { LayoutDiagnostic, LayoutMetric, LayoutNode, SolvedPage, TextNode } from "../../types/layout";
 import type { ProductType } from "../../types/product";
-import type { StationeryCustomization, StationeryRecipe } from "../../types/stationery";
+import type { StationeryCustomization, StationeryRecipe, StationerySizeVariant } from "../../types/stationery";
 import { fitHeading, headerTitle, pageFrame } from "../shared/components";
 import { group, lineBoxIn, text } from "../shared/nodes";
 import type { FitContext, FitResult, LayoutContext, LayoutDefinition } from "../shared/types";
@@ -140,8 +140,61 @@ function probe(recipe: StationeryRecipe, f: FitContext): LayoutContext {
   };
 }
 
+/** The structure a size variant produces: the recipe with the variant's sections left out. */
+export function variantStructure(recipe: StationeryRecipe, v: StationerySizeVariant): StationeryRecipe {
+  const pages = recipe.pages.map((p) => ({ ...p, zones: p.zones.filter((z) => !v.omit.includes(z.key)) }));
+  const names = pages.flatMap((p) => p.zones.map((z) => (z.fields?.length ? z.fields.join(" and ") : z.label))).filter(Boolean);
+  return {
+    ...recipe,
+    variant: v.id,
+    label: v.label,
+    description: `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]} — sized for smaller pages.`,
+    supportedTrims: v.supportedTrims,
+    pages,
+  };
+}
+
+type Choice = { structure: StationeryRecipe; ok: true } | { ok: false; reason: string };
+
+/**
+ * Size-aware structure choice (the same fit → variant mechanism every layout
+ * uses): the full recipe when it fits this trim, otherwise the first size
+ * variant that does. The full structure's reason is kept so the editor can
+ * say why it was not used.
+ */
+function chooseStructure(recipe: StationeryRecipe, f: FitContext): Choice & { fullReason?: string } {
+  const attempt = (r: StationeryRecipe): string | null => {
+    const trim = trimSupported(r, f.page);
+    if (trim) return trim;
+    const problems = r.pages.map((_, i) => solveRecipePage(r, i, probe(r, f))).flatMap((p) => p.diagnostics.filter((d) => d.rule === "stationery-fit").map((d) => d.message));
+    return problems[0] ?? null;
+  };
+  const fullReason = attempt(recipe);
+  if (!fullReason) return { ok: true, structure: recipe };
+  for (const v of recipe.sizeVariants ?? []) {
+    const structure = variantStructure(recipe, v);
+    if (!attempt(structure)) return { ok: true, structure, fullReason };
+  }
+  return { ok: false, reason: fullReason };
+}
+
 export function stationeryLayout(recipe: StationeryRecipe): LayoutDefinition {
-  const solve = (ctx: LayoutContext) => recipe.pages.map((_, i) => solveRecipePage(recipe, i, ctx));
+  const solve = (ctx: LayoutContext) => {
+    const choice = chooseStructure(recipe, { page: ctx.pages[0], spacing: ctx.spacing, typography: ctx.typography, options: ctx.options });
+    // Nothing fits: solve the full structure so its problems are reported (never squeezed).
+    const structure = choice.ok ? choice.structure : recipe;
+    const pages = structure.pages.map((_, i) => solveRecipePage(structure, i, ctx));
+    if (choice.ok && structure !== recipe) {
+      const left = recipe.sizeVariants!.find((v) => v.id === structure.variant)!.omit.map((k) => recipe.pages.flatMap((p) => p.zones).find((z) => z.key === k)?.label ?? k);
+      pages[0].diagnostics.push({
+        severity: "info",
+        rule: "stationery-variant",
+        componentId: "st0",
+        message: `The full ${recipe.label} page doesn't leave enough writing room at this size, so the ${structure.label} is used (without ${left.join(" and ")}). ${choice.fullReason}`,
+      });
+    }
+    return pages;
+  };
   return {
     id: stationeryLayoutId(recipe.comboId),
     label: recipe.label,
@@ -167,10 +220,9 @@ export function stationeryLayout(recipe: StationeryRecipe): LayoutDefinition {
       defaultRepeat: "count",
     },
     fit: (f): FitResult => {
-      const trim = trimSupported(recipe, f.page);
-      if (trim) return { ok: false, reason: trim };
-      const problems = solve(probe(recipe, f)).flatMap((p) => p.diagnostics.filter((d) => d.rule === "stationery-fit").map((d) => d.message));
-      return problems.length ? { ok: false, reason: problems[0] } : { ok: true, variant: recipe.variant, variantLabel: recipe.label, sidebarAvailable: false };
+      const choice = chooseStructure(recipe, f);
+      if (!choice.ok) return { ok: false, reason: choice.reason };
+      return { ok: true, variant: choice.structure.variant, variantLabel: choice.structure.label, sidebarAvailable: false };
     },
     solve,
   };

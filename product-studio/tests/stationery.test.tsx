@@ -5,7 +5,9 @@
  *   planner / journal regression
  */
 import { describe, expect, it } from "vitest";
-import { layoutAvailability, resolveDocument, solvePage } from "../src/engines/document/resolve";
+import { renderToStaticMarkup } from "react-dom/server";
+import { geometryFor, layoutAvailability, resolveDocument, solvePage } from "../src/engines/document/resolve";
+import { PrintablePage } from "../src/primitives/PrintablePage";
 import { effectiveZones, resolveColumns, shareWithMinimums } from "../src/engines/stationery/geometry";
 import { getLayout, LAYOUTS } from "../src/layouts/registry";
 import { recipePresetsFor } from "../src/presets/layouts/recipePresets";
@@ -269,5 +271,56 @@ describe("Daily Reflection composition: one open-line writing language", () => {
   it("other devotional pages keep their framed Scripture (only Daily Reflection changed)", () => {
     expect(pages(project("devotional-soap.four-band", "6x9"))[0].nodes.some((n) => n.id === "st0-scripture-surface-frame" && n.type === "box")).toBe(true);
     expect(pages(project("devotional-verse-mapping.spread", "6x9"))[0].nodes.some((n) => n.id === "st0-verse-surface-frame" && n.type === "box")).toBe(true);
+  });
+});
+
+describe("Compact Daily Reflection (size-aware version for 5.5 × 8.5 and A5)", () => {
+  const DR = "devotional-daily-reflection.stacked";
+  const lines = (s: SolvedPage) => Object.fromEntries(s.nodes.filter((n): n is Extract<LayoutNode, { type: "lines" }> => n.type === "lines").map((n) => [n.id.split("-")[1], n]));
+  it("is chosen automatically when the full page fails the 1 : 5 writing-space rule — and says so", () => {
+    for (const size of ["5.5x8.5", "a5"]) {
+      const p = project(DR, size);
+      const fit = fitOf(p, DR);
+      expect(fit.ok, size).toBe(true);
+      if (fit.ok) expect([fit.variant, fit.variantLabel]).toEqual(["compact", "Compact Daily Reflection"]);
+      const s = pages(p)[0];
+      expect(s.diagnostics.filter((d) => d.severity === "error"), size).toEqual([]);
+      expect(s.diagnostics.find((d) => d.rule === "stationery-variant")?.message).toMatch(/full Daily Reflection page doesn't leave enough writing room.*Compact Daily Reflection.*without Stand Out Verse and Thankful For/);
+      expect(sectionOrder(s), size).toEqual(["date", "scripture", "reflection", "application", "prayer"]);
+    }
+  });
+  it("keeps the full page's writing language, spacing and priorities (Reflection, Application, Prayer lead)", () => {
+    const pitch = (l: Extract<LayoutNode, { type: "lines" }>) => l.positions[1] - l.positions[0];
+    const fullPitch = pitch(Object.values(lines(pages(project(DR, "6x9"))[0]))[0]);
+    for (const size of ["5.5x8.5", "a5"]) {
+      const s = pages(project(DR, size))[0];
+      const l = lines(s);
+      expect(s.nodes.filter((n) => n.type === "box"), size).toEqual([]);
+      for (const n of Object.values(l)) {
+        expect(pitch(n), size).toBeCloseTo(fullPitch, 9);
+        expect(n.rect.y + n.rect.h, size).toBeCloseTo(n.positions[n.positions.length - 1], 6);
+      }
+      for (const k of ["reflection", "application", "prayer"]) expect(l[k].positions.length, `${size} ${k}`).toBeGreaterThanOrEqual(Math.max(l.scripture.positions.length, 4));
+      // Research ratio kept, not weakened.
+      const writing = Object.values(writingHeights(s)).reduce((a, b) => a + b, 0);
+      const headings = s.nodes.filter((n) => n.type === "text" && /^st0-[A-Za-z]+-title$/.test(n.id) && n.id !== "st0-header-title").reduce((a, n) => a + n.rect.h, 0);
+      expect(writing / headings, size).toBeGreaterThanOrEqual(5);
+    }
+  });
+  it("the full version is unchanged at 8.5 × 11, 7 × 9 and 6 × 9", () => {
+    for (const size of ["8.5x11", "7x9", "6x9"]) {
+      const fit = fitOf(project(DR, size), DR);
+      expect(fit.ok && fit.variant, size).toBe("stacked");
+      expect(sectionOrder(pages(project(DR, size))[0])).toEqual(["date", "scripture", "reflection", "application", "standOutVerse", "thankfulFor", "prayer"]);
+    }
+    expect(fitOf(project(DR, "a6"), DR).ok).toBe(false);
+  });
+  it("print output is the same page as the preview", () => {
+    for (const size of ["5.5x8.5", "a5"]) {
+      const doc = resolveDocument(project(DR, size));
+      const props = { geometry: geometryFor(doc, doc.recipe.pages[0]), solved: solvePage(doc, 0), colors: doc.colors, typography: doc.typography, decorative: doc.decorative };
+      const strip = (s: string) => s.replace("ps-page--editor", "").replace("ps-page--print", "");
+      expect(strip(renderToStaticMarkup(<PrintablePage {...props} mode="editor" />))).toBe(strip(renderToStaticMarkup(<PrintablePage {...props} mode="print" />)));
+    }
   });
 });

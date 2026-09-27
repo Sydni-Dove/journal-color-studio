@@ -11,24 +11,38 @@ import type { ValidationIssue } from "../../types/validation";
 import { Check, LabeledNumeric, Segmented } from "../editor/ui";
 import { PrintDocument } from "./PrintDocument";
 
+/** Identical issues on many pages are listed once, with the pages they occur on. */
+function groupIssues(issues: ValidationIssue[]): { issue: ValidationIssue; pages: number[] }[] {
+  const byKey = new Map<string, { issue: ValidationIssue; pages: number[] }>();
+  for (const i of issues) {
+    const key = `${i.severity}|${i.rule}|${i.componentId ?? ""}|${i.message}`;
+    const g = byKey.get(key);
+    if (g) {
+      if (i.page !== null) g.pages.push(i.page);
+    } else byKey.set(key, { issue: i, pages: i.page !== null ? [i.page] : [] });
+  }
+  return [...byKey.values()];
+}
+
 export function IssueList({ issues, onGoTo }: { issues: ValidationIssue[]; onGoTo?: (page: number) => void }) {
   if (!issues.length) return <p className="hint">No issues.</p>;
   return (
     <ul className="issues">
-      {issues.map((i, k) => (
+      {groupIssues(issues).map(({ issue: i, pages }, k) => (
         <li key={k} className={`issue issue--${i.severity}`}>
           <div className="issue-meta">
             {i.severity} · {i.rule}
-            {i.page !== null && (
+            {pages.length > 0 && (
               <>
                 {" · "}
                 {onGoTo ? (
-                  <button className="btn btn--ghost" style={{ minHeight: 44, padding: "0 10px" }} onClick={() => onGoTo(i.page!)}>
-                    page {i.page}
+                  <button className="btn btn--ghost" style={{ minHeight: 44, padding: "0 10px" }} onClick={() => onGoTo(pages[0])}>
+                    page {pages[0]}
                   </button>
                 ) : (
-                  `page ${i.page}`
+                  `page ${pages[0]}`
                 )}
+                {pages.length > 1 ? ` and ${pages.length - 1} more page${pages.length > 2 ? "s" : ""}` : ""}
               </>
             )}
             {i.componentId ? ` · ${i.componentId}` : ""}

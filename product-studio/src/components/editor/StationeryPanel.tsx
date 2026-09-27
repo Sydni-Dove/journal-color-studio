@@ -8,6 +8,7 @@
 import type { ProjectUsage } from "../../engines/document/usage";
 import { effectiveZones } from "../../engines/stationery/geometry";
 import { getStationeryRecipe } from "../../presets/stationery/catalog";
+import { variantStructure } from "../../layouts/stationery/stationeryLayout";
 import type { ProductProject } from "../../types/project";
 import type { SectionSpace, StationeryCustomization, StationeryRecipe } from "../../types/stationery";
 import { Field, Section, Segmented } from "./ui";
@@ -110,10 +111,18 @@ export function StationeryPanel({ project, update, usage }: { project: ProductPr
     <Section title="Page sections" open>
       {recipes.map((r) => {
         const fit = fits.get(`stationery:${r.comboId}`);
+        // Size-aware version in use (e.g. Compact Daily Reflection on small trims): say so, and show its sections only.
+        const v = fit?.ok ? r.sizeVariants?.find((x) => x.id === fit.variant) : undefined;
+        const left = v ? v.omit.map((k) => r.pages.flatMap((p) => p.zones).find((z) => z.key === k)?.label ?? k) : [];
         return (
           <div key={r.comboId}>
             {fit && !fit.ok && <div className="issue issue--error">{fit.reason}</div>}
-            <RecipeSections recipe={r} custom={all[r.comboId] ?? {}} set={setFor(r.comboId)} />
+            {v && (
+              <div className="issue issue--info" data-testid="size-variant-notice">
+                <strong>Using the {v.label}.</strong> The full {r.label} page is not available at this size: with every section it would not leave enough room to write. The compact version keeps the most important sections and leaves out {left.join(" and ")}.
+              </div>
+            )}
+            <RecipeSections recipe={v ? variantStructure(r, v) : r} custom={all[r.comboId] ?? {}} set={setFor(r.comboId)} />
           </div>
         );
       })}

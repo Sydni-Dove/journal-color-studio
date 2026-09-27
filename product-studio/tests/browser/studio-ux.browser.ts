@@ -112,6 +112,21 @@ describe("Studio home", () => {
     await page.context().close();
   });
 
+  it("Devotional → Daily Reflection → 5.5 × 8.5 uses the Compact Daily Reflection and says so", async () => {
+    const page = await home([], DESKTOP);
+    await page.locator("button.family-card", { hasText: "Devotional" }).click();
+    await page.waitForSelector("#wizard-build");
+    await page.locator("label.field", { hasText: "Trim size" }).locator("select").selectOption("5.5x8.5");
+    const choice = page.locator("button.choice", { hasText: /^Daily Reflection/ });
+    await expect(choice.isDisabled()).resolves.toBe(false);
+    await choice.click();
+    await page.getByRole("button", { name: "Generate" }).click();
+    await page.waitForSelector(".ps-page--editor");
+    await expect(page.getByTestId("size-variant-notice").textContent()).resolves.toMatch(/Using the Compact Daily Reflection.*not available at this size.*leaves out Stand Out Verse and Thankful For/);
+    await expect(page.locator(".badge--error").count()).resolves.toBe(0);
+    await page.context().close();
+  });
+
   it("starter templates are real: creating one opens the editor", async () => {
     const page = await home([], DESKTOP);
     await page.getByRole("button", { name: /Start from a starter template/ }).click();

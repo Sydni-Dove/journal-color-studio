@@ -31,6 +31,9 @@ export const STATIONERY_RECIPES: StationeryRecipe[] = [
     // Research: prompt : response ≈ 1 : 5 — a prompt label may never crowd its answer.
     minResponseToPromptRatio: 5,
     composition: { lineSnap: true },
+    // Smaller trims: the full seven parts would break the 1 : 5 prompt : response rule, so the compact page keeps
+    // Date / Day, Scripture, Reflection, Application and Prayer — meaningful writing room over fitting every section.
+    sizeVariants: [{ id: "compact", label: "Compact Daily Reflection", omit: ["standOutVerse", "thankfulFor"], supportedTrims: ["5.5x8.5", "a5"] }],
     pages: [
       {
         title: "Daily Reflection",

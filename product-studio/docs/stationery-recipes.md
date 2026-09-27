@@ -52,6 +52,18 @@ stationery recipe            presets/stationery/catalog.ts        WHAT: sections
   sections, so there is no dead strip under a last line. Smaller trims get fewer
   lines; the line spacing never shrinks. Minimum: 2 lines per section.
 
+## Size-aware versions
+
+A recipe may declare `sizeVariants`, tried in order when the full structure does
+not fit a trim (it fails the writing-space rules, or the trim is not its own).
+This uses the same fit → variant mechanism as every layout (the monthly
+calendar's full / compact / micro). The editor names the version in use and why
+the full one is unavailable.
+
+- Daily Reflection → **Compact Daily Reflection** on 5.5 × 8.5 and A5: Date / Day,
+  Scripture, Reflection, Application, Prayer (no Stand Out Verse, no Thankful
+  For). Same open lines, line snapping, spacing and 1 : 5 rule as the full page.
+
 ## Creator customization (semantic only)
 
 Stored per combo id in `layoutOptions.stationery`: rename, prompts, hide

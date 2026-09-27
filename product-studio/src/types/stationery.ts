@@ -91,8 +91,24 @@ export type StationeryRecipe = {
    * bottom with even rhythm.
    */
   composition?: { lineSnap?: boolean };
+  /**
+   * Size-aware structural variants, tried in order when the full structure
+   * does not fit a trim (it fails the writing-space rules, or the trim is not
+   * one of its own). A variant leaves out named sections; everything else
+   * (surfaces, weights, composition, customization) is the recipe's own.
+   */
+  sizeVariants?: StationerySizeVariant[];
   /** What the creator may change (semantic controls only). */
   customization: { rename: boolean; reorder: boolean; adjustSpace: boolean; editPrompts: boolean };
+};
+
+export type StationerySizeVariant = {
+  id: string;
+  label: string;
+  /** Section keys this variant leaves out. */
+  omit: string[];
+  /** Trims this variant is engineered for. */
+  supportedTrims: string[];
 };
 
 /** Semantic space choice per section (translated to weights by the geometry layer). */
