@@ -54,12 +54,12 @@ export function dailyPlannerBook(): BookNode[] {
 }
 
 export const BOOK_PRESETS: { id: string; label: string; build: () => BookNode[] }[] = [
-  { id: "meetings-with-god", label: "Meetings With God planner (plan + journal)", build: meetingsWithGodBook },
-  { id: "meetings-with-god-daily", label: "Meetings With God planner + daily pages", build: () => meetingsWithGodBook(true) },
-  { id: "daily-planner", label: "Daily planner (front matter · month · week + Meeting With God · every day · review)", build: dailyPlannerBook },
+  { id: "meetings-with-god", label: "Meetings With God Planner", build: meetingsWithGodBook },
+  { id: "meetings-with-god-daily", label: "Meetings With God Planner + Daily Pages", build: () => meetingsWithGodBook(true) },
+  { id: "daily-planner", label: "Daily Planner + Meetings With God", build: dailyPlannerBook },
   {
     id: "planner-journal",
-    label: "Monthly + weekly planner with journal pages",
+    label: "Monthly + Weekly Journal Planner",
     build: () => [section("Every Month", [step("monthly-calendar", { type: "once" }), section("Every Week", [step("weekly-planner", { type: "once" }), step("lined-journal", { type: "once" })], "week")], "month")],
   },
 ];

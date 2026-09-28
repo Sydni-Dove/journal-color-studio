@@ -1,6 +1,6 @@
 # Meetings With God: weekly capacity and daily planner
 
-> **Status (merged with `codex/reusable-covers-dividers`):** this note describes a draft (commit `4aa5ff1`). Its shared-week fix and its "Meetings With God planner + daily pages" preset are in Product Studio. Its weekly-spread allocation and its daily page were not merged. The current weekly spread is a 2 × 4 grid (seven days + Priorities), and `planner-daily` is the configurable daily page in `layouts/planner/dailyConfigurable.ts`. See `tests/daily-planner.test.ts` and `tests/daily-configurable.test.ts`.
+> **Status (merged with `codex/reusable-covers-dividers`):** this note describes a draft (commit `4aa5ff1`). Its shared-week fix and its "Meetings With God Planner + Daily Pages" template are in Product Studio. Its weekly-spread allocation and its daily page were not merged. The current weekly plan page is open rows (seven days + a Priorities checklist, no boxes), and `planner-daily` is the configurable daily page in `layouts/planner/dailyConfigurable.ts`. See `tests/daily-planner.test.ts` and `tests/daily-configurable.test.ts`.
 
 ## Source and scope
 
@@ -22,7 +22,7 @@ Project dates + flat/composite recipe -> existing calendar/recipe expansion -> p
 - `layouts/book/weeklyPlanMwgSpread.ts`: changes only the planning body's allocation.
 - `layouts/planner/dailyPlanner.ts`: new pure daily solver and fit contract.
 - `layouts/registry.ts` and `presets/modules.ts`: register daily layout/purpose/cadence.
-- `presets/bookRecipes.ts`: optional daily pages inside each owned weekly cycle; adds "Meetings With God planner + daily pages" without changing the original preset's page recipe.
+- `presets/bookRecipes.ts`: optional daily pages inside each owned weekly cycle; adds "Meetings With God Planner + Daily Pages" without changing the original preset's page recipe.
 - `engines/recipe/bookEdit.ts`: flat-to-composite daily purpose mapping.
 - `engines/recipe/bookRecipe.ts`: narrow shared-week diagnostic correction.
 - `components/editor/DesignPanels.tsx`: daily-only start/end hours and half-hour controls.

@@ -1,6 +1,8 @@
 /**
  * New Product flow: the user makes product decisions; the system solves the
  * geometry. Every step is a choice — nothing is positioned by hand.
+ * Complete planners & books are templates (BookTemplates); "Page type"
+ * lists single page layouts only.
  *   Type → Size → Orientation → Binding → Printer → Layout → Spacing →
  *   Theme → Fonts → Dates / sheets / pages → Generate
  */
@@ -26,6 +28,7 @@ import type { WeekStart } from "../../types/calendar";
 import { Field, NumberField } from "../editor/ui";
 import { TechnicalDetails } from "../help/visuals";
 import { layoutAvailability, resolveDocument } from "../../engines/document/resolve";
+import { BookTemplates } from "./BookTemplates";
 
 function Choices<T extends string>({ value, options, onChange }: { value: T; options: { value: T; label: string }[]; onChange: (v: T) => void }) {
   return (
@@ -88,7 +91,9 @@ export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: 
       pickType(start.type);
       if (start.recipeId) setRecipeId(start.recipeId);
     }
-    const target = start?.section === "templates" ? "wizard-templates" : start?.section === "build" ? "wizard-build" : null;
+    const target = start?.section === "templates" ? "wizard-templates" : start?.section === "books" ? "wizard-books" : start?.section === "build" ? "wizard-build" : null;
+    // An opened template scrolls itself into view.
+    if (start?.template) return;
     if (target) document.getElementById(target)?.scrollIntoView({ block: "start" });
   }, []);
 
@@ -167,6 +172,8 @@ export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: 
           </button>
         ))}
       </div>
+
+      <BookTemplates onCreate={onCreate} focusId={start?.template} />
 
       <h2 id="wizard-build">Build your own</h2>
       <div className="wizard">

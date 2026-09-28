@@ -84,12 +84,36 @@ describe("Studio home", () => {
     await page.context().close();
   });
 
-  it("Planner + Journal starts the wizard on a book structure", async () => {
+  it("Planner + Journal opens its full book template: real page previews, then Use this template makes an editable book", async () => {
     const page = await home([], DESKTOP);
     await page.locator("button.family-card", { hasText: "Planner + Journal" }).click();
-    await page.waitForSelector("#wizard-build");
-    await expect(page.locator('button.choice[aria-pressed="true"]', { hasText: /Meetings With God/ }).count()).resolves.toBe(1);
-    await expect(page.locator('button.choice[aria-pressed="true"]', { hasText: /^Planner$/ }).count()).resolves.toBe(1);
+    const view = page.getByRole("region", { name: "Meetings With God Planner" });
+    await view.waitFor();
+    // Previews are the real renderer (PrintablePage), not pictures.
+    await expect.poll(() => view.locator(".page-thumb .ps-page").count()).toBeGreaterThanOrEqual(3);
+    await expect(view.locator("img").count()).resolves.toBe(0);
+    // Page type lists page layouts only — no complete books.
+    const pageTypes = await page.locator("#wizard-build ~ .wizard button.choice").allInnerTexts();
+    expect(pageTypes.join(" | ")).not.toMatch(/Book:|Meetings With God|Journal Planner|Daily Planner \+/);
+    await view.getByRole("button", { name: "Use this template" }).click();
+    await page.waitForSelector(".ps-page--editor");
+    await expect(page.locator("details.section > summary", { hasText: /^Book structure/ }).count()).resolves.toBe(1);
+    await expect(page.locator(".badge--error").count()).resolves.toBe(0);
+    await page.context().close();
+  });
+
+  it("phone: Full planners & books cards and Page type choices fit — no page overflow, no multi-line pills", async () => {
+    const page = await home([], PHONE);
+    await page.getByRole("button", { name: /Start with a complete planner or book/ }).click();
+    await page.waitForSelector("#wizard-books");
+    await expect.poll(() => page.locator(".book-card .ps-page").count()).toBeGreaterThanOrEqual(8);
+    await page.locator(".book-card", { hasText: "Daily Planner + Meetings With God" }).getByRole("button", { name: "View template" }).click();
+    await page.getByRole("region", { name: "Daily Planner + Meetings With God" }).waitFor();
+    await page.locator("button.choice", { hasText: /^Planner$/ }).click();
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
+    const pills = await page.locator("button.choice").evaluateAll((els) => els.map((e) => ({ t: e.textContent, over: e.scrollWidth > e.clientWidth + 1, tall: e.getBoundingClientRect().height > 60 })));
+    expect(pills.filter((p) => p.over || p.tall)).toEqual([]);
     await page.context().close();
   });
 

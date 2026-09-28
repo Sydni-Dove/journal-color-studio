@@ -10,7 +10,8 @@ import type { ProductType } from "../../types/product";
 
 export type ProductFamilyId = "planner" | "daily-planner" | "journal" | "planner-journal" | "devotional" | "workbook" | "worksheet" | "notepad" | "deskpad" | "custom";
 
-export type WizardStart = { type?: ProductType; recipeId?: string; section?: "templates" | "build" };
+/** `template` opens that full planner / book template (Full planners & books) instead of a page type. */
+export type WizardStart = { type?: ProductType; recipeId?: string; template?: string; section?: "templates" | "books" | "build" };
 
 export type ProductFamily = {
   id: ProductFamilyId;
@@ -30,7 +31,7 @@ export const PRODUCT_FAMILIES: ProductFamily[] = [
     label: "Daily Planner",
     blurb: "A dated page for every day — with the month, the week's plan and Meeting With God around it.",
     status: "ready",
-    start: { type: "planner", recipeId: "book-daily-planner", section: "build" },
+    start: { type: "planner", template: "book-daily-planner", section: "books" },
   },
   {
     id: "devotional",
@@ -52,7 +53,7 @@ export const PRODUCT_FAMILIES: ProductFamily[] = [
     label: "Planner + Journal",
     blurb: "One book that plans the week and holds the journal — sections that repeat every month and week.",
     status: "ready",
-    start: { type: "planner", recipeId: "book-meetings-with-god", section: "build" },
+    start: { type: "planner", template: "book-meetings-with-god", section: "books" },
   },
   { id: "notepad", label: "Notepad", blurb: "Tear-off pads: to-do, lists and notes.", status: "ready", start: { type: "notepad", section: "build" } },
   { id: "deskpad", label: "Desk Pad", blurb: "Large-format weekly desk planners.", status: "ready", start: { type: "deskpad", section: "build" } },

@@ -34,6 +34,14 @@ export type RecipePreset = {
   /** Build the recipe; `count` is pages/copies where relevant, `sheets` for pads. */
   build: (opts: { count: number; sheets: number }) => ProductRecipe;
   layoutOptions?: Partial<LayoutOptions>;
+  /**
+   * Set on a complete book (a multi-section recipe that makes the whole
+   * product). Those are offered as full product templates — not as a page
+   * type — with a plain name, a one-line summary and the page layouts to
+   * show as a preview (in order; `#1` names the right-hand page of a spread)
+   * — the card shows `card`, or the first two.
+   */
+  template?: { summary: string; preview: string[]; card?: string[] };
 };
 
 export const RECIPE_PRESETS: RecipePreset[] = [
@@ -101,6 +109,22 @@ export const RECIPE_PRESETS: RecipePreset[] = [
     layoutOptions: { showSidebar: true, sidebarContent: "weeklyFocus" },
   },
   {
+    id: "planner-daily-page",
+    label: "Daily Planner Page",
+    productTypes: ["planner", "insert"],
+    needsCalendar: true,
+    build: () => ({ items: [{ id: "day", layoutId: "planner-daily", repeat: { kind: "every-day" } }], ordering: "chronological" }),
+    layoutOptions: { showPageNumbers: true, dailySections: ["schedule", "topPriorities", "toDo"] },
+  },
+  {
+    id: "planner-weekly-mwg",
+    label: "Weekly Plan + Meeting With God",
+    productTypes: ["planner", "insert"],
+    needsCalendar: true,
+    build: () => ({ items: [{ id: "week", layoutId: "weekly-plan-mwg-spread", repeat: { kind: "every-week" } }], ordering: "chronological" }),
+    layoutOptions: { showPageNumbers: true },
+  },
+  {
     id: "planner-monthly-weekly",
     label: "Monthly + Weekly + Notes",
     productTypes: ["planner"],
@@ -116,28 +140,40 @@ export const RECIPE_PRESETS: RecipePreset[] = [
     layoutOptions: { showSidebar: true, sidebarContent: "weeklyFocus" },
   },
   {
-    id: "book-meetings-with-god",
-    label: "Book: Meetings With God planner (plan + journal)",
-    productTypes: ["planner", "journal"],
-    needsCalendar: true,
-    build: () => ({ items: [], ordering: "chronological", structure: meetingsWithGodBook() }),
-    layoutOptions: { showPageNumbers: true },
-  },
-  {
     id: "book-daily-planner",
-    label: "Book: Daily planner (month · week + Meeting With God · every day)",
+    label: "Daily Planner + Meetings With God",
     productTypes: ["planner", "insert"],
     needsCalendar: true,
     build: () => ({ items: [], ordering: "chronological", structure: dailyPlannerBook() }),
     layoutOptions: { showPageNumbers: true, dailySections: ["schedule", "topPriorities", "toDo"] },
+    template: { summary: "Includes monthly, weekly, daily and Meetings With God pages.", preview: ["weekly-plan-mwg-spread", "weekly-plan-mwg-spread#1", "planner-daily", "planner-monthly"], card: ["weekly-plan-mwg-spread", "planner-daily"] },
+  },
+  {
+    id: "book-meetings-with-god",
+    label: "Meetings With God Planner",
+    productTypes: ["planner", "journal"],
+    needsCalendar: true,
+    build: () => ({ items: [], ordering: "chronological", structure: meetingsWithGodBook() }),
+    layoutOptions: { showPageNumbers: true },
+    template: { summary: "Monthly and weekly planning with Meetings With God journal pages.", preview: ["weekly-plan-mwg-spread", "weekly-plan-mwg-spread#1", "planner-monthly", "journal-lined"] },
+  },
+  {
+    id: "book-meetings-with-god-daily",
+    label: "Meetings With God Planner + Daily Pages",
+    productTypes: ["planner", "journal"],
+    needsCalendar: true,
+    build: () => ({ items: [], ordering: "chronological", structure: BOOK_PRESETS.find((b) => b.id === "meetings-with-god-daily")!.build() }),
+    layoutOptions: { showPageNumbers: true, dailySections: ["schedule", "topPriorities", "toDo"] },
+    template: { summary: "Monthly, weekly, Meetings With God and journal pages, plus a page for every day.", preview: ["weekly-plan-mwg-spread", "weekly-plan-mwg-spread#1", "planner-daily", "journal-lined"], card: ["weekly-plan-mwg-spread#1", "planner-daily"] },
   },
   {
     id: "book-planner-journal",
-    label: "Book: Monthly + weekly planner with journal pages",
+    label: "Monthly + Weekly Journal Planner",
     productTypes: ["planner", "journal"],
     needsCalendar: true,
     build: () => ({ items: [], ordering: "chronological", structure: BOOK_PRESETS.find((b) => b.id === "planner-journal")!.build() }),
     layoutOptions: { showPageNumbers: true },
+    template: { summary: "Monthly planning, weekly planning and a journal page every week.", preview: ["planner-weekly-spread", "planner-weekly-spread#1", "planner-monthly", "journal-lined"] },
   },
   {
     id: "deskpad-weekly",
@@ -151,7 +187,12 @@ export const RECIPE_PRESETS: RecipePreset[] = [
 
 RECIPE_PRESETS.push(...STATIONERY_PRESETS);
 
+/** Page types for a product: single page layouts only — complete books are templates (below). */
 export function recipePresetsFor(t: ProductType): RecipePreset[] {
-  const own = RECIPE_PRESETS.filter((r) => r.productTypes.includes(t));
-  return own.length ? own : RECIPE_PRESETS;
+  const pages = RECIPE_PRESETS.filter((r) => !r.template);
+  const own = pages.filter((r) => r.productTypes.includes(t));
+  return own.length ? own : pages;
 }
+
+/** Full planners & books: complete products to start from (same recipes, same expansion — just offered whole). */
+export const BOOK_TEMPLATES: RecipePreset[] = RECIPE_PRESETS.filter((r) => r.template);

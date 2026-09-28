@@ -925,3 +925,42 @@ button.family-card:focus-visible {
 .advanced__body { display: grid; gap: 8px; }
 .issue-title { font-weight: 600; }
 .issue-advice { color: var(--ui-muted); }
+
+/* Full planners & books: real-renderer page previews */
+.page-thumb {
+  overflow: hidden;
+  flex: none;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.18);
+  background: #fff;
+}
+.book-card-preview {
+  display: flex;
+  justify-content: center;
+  gap: 0;
+  padding: 10px 0;
+  background: var(--ui-bg, #f4f1ee);
+  border-radius: calc(var(--ui-radius) - 2px);
+  overflow: hidden;
+}
+.book-card h3,
+.book-view h3 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.book-card p {
+  margin: 0;
+}
+.book-view {
+  margin-top: 12px;
+  scroll-margin-top: 12px;
+}
+.book-view-controls {
+  flex-wrap: wrap;
+}
+.book-view-pages {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 8px 2px 12px;
+  max-width: 100%;
+}

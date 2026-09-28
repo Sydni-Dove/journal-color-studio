@@ -114,10 +114,10 @@ describe("configurable daily page", () => {
 });
 
 describe("Daily Planner product", () => {
-  it("a Daily Planner family on the studio home starts the wizard on the daily planner book", () => {
+  it("a Daily Planner family on the studio home opens the daily planner book template", () => {
     const f = PRODUCT_FAMILIES.find((x) => x.id === "daily-planner")!;
     expect(f.status).toBe("ready");
-    expect(f.start).toMatchObject({ type: "planner", recipeId: "book-daily-planner" });
+    expect(f.start).toMatchObject({ type: "planner", template: "book-daily-planner", section: "books" });
     expect(RECIPE_PRESETS.find((r) => r.id === "book-daily-planner")!.layoutOptions?.dailySections).toEqual(["schedule", "topPriorities", "toDo"]);
   });
   it("book: front matter → each month: calendar → each week: plan + Meeting With God, then that week's days → monthly review", () => {
