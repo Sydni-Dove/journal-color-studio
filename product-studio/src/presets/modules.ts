@@ -11,7 +11,7 @@
  * Only modules with a real layout are registered; the PageModuleType union
  * already reserves the rest (tracker, worksheet, …) for later layouts.
  */
-import type { CadenceKind, PageModuleType, RecipeCadence, RecipePeriod } from "../types/recipe";
+import type { CadenceKind, PageModuleType, PageStartRule, RecipeCadence, RecipePeriod } from "../types/recipe";
 
 export type PeriodKind = RecipePeriod | "none";
 
@@ -27,6 +27,8 @@ export type PageModuleDefinition = {
   titles: Partial<Record<PeriodKind, string>> & { none: string };
   /** Guided prompts per period (falls back to `none`). */
   prompts: Partial<Record<PeriodKind, string[]>> & { none: string[] };
+  /** Side a single page of this purpose starts on unless the step says otherwise (default "any"). */
+  defaultStart?: PageStartRule;
 };
 
 const GUIDED = ["guided-page", "journal-lined"];
@@ -72,8 +74,10 @@ export const MODULE_CADENCES: Record<PageModuleType, CadenceKind[]> = {
 export const supportsCadence = (type: PageModuleType, kind: CadenceKind) => MODULE_CADENCES[type].includes(kind);
 
 export const PAGE_MODULES: PageModuleDefinition[] = [
-  { type: "cover-page", label: "Cover & Divider Pages · Cover / title page", layouts: ["cover-page"], defaultCadence: { type: "once" }, cadences: MODULE_CADENCES["cover-page"], titles: { none: "Plan" }, prompts: { none: [] } },
-  { type: "divider-page", label: "Cover & Divider Pages · Section divider / tab page", layouts: ["divider-page"], defaultCadence: { type: "once" }, cadences: MODULE_CADENCES["divider-page"], titles: { none: "Prayer" }, prompts: { none: [] } },
+  // Covers and dividers open on a right-hand page, as in a bound book: a divider never
+  // prints on the back of the previous one, and its tab sits on the outer edge.
+  { type: "cover-page", label: "Cover & Divider Pages · Cover / title page", layouts: ["cover-page"], defaultCadence: { type: "once" }, cadences: MODULE_CADENCES["cover-page"], titles: { none: "Plan" }, prompts: { none: [] }, defaultStart: "recto" },
+  { type: "divider-page", label: "Cover & Divider Pages · Section divider / tab page", layouts: ["divider-page"], defaultCadence: { type: "once" }, cadences: MODULE_CADENCES["divider-page"], titles: { none: "Prayer" }, prompts: { none: [] }, defaultStart: "recto" },
   { type: "monthly-calendar", label: "Monthly calendar", layouts: ["planner-monthly"], defaultCadence: { type: "monthly" }, cadences: MODULE_CADENCES["monthly-calendar"], titles: { none: "Month" }, prompts: { none: [] } },
   {
     type: "weekly-planner",
@@ -128,6 +132,11 @@ export const PAGE_MODULES: PageModuleDefinition[] = [
 
 export function getModule(type: PageModuleType): PageModuleDefinition {
   return PAGE_MODULES.find((m) => m.type === type) ?? PAGE_MODULES[PAGE_MODULES.length - 1];
+}
+
+/** Where a single page of this purpose starts when its step sets no side. */
+export function moduleStart(type: PageModuleType): PageStartRule {
+  return getModule(type).defaultStart ?? "any";
 }
 
 export function moduleTitle(type: PageModuleType, period: PeriodKind): string {

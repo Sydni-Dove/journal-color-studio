@@ -7,14 +7,21 @@ import { fitHeading } from "../shared/components";
 import { guidedPage } from "./guidedPage";
 import { minimumAreaFit, type LayoutContext, type LayoutDefinition } from "../shared/types";
 
-/** Interior printed tabs: fixed physical width, all edges inside the resolved live area. */
+/**
+ * The edge a tab prints on: the outer (fore) edge, away from the binding — the
+ * left edge of a page bound on its right (a left-hand page), otherwise the right.
+ */
+export const tabEdge = (g: PageGeometry): "left" | "right" => (g.boundEdge === "right" ? "left" : "right");
+
+/** Interior printed tabs: fixed physical width, on the outer edge, all edges inside the resolved live area. */
 export function tabGeometry(g: PageGeometry, tab: NonNullable<CoverDividerSettings["tab"]>): Rect | null {
   const count = tab.count ?? 9, order = tab.order ?? 1;
   if (!Number.isInteger(count) || count < 1 || count > 24 || !Number.isInteger(order) || order < 1 || order > count) return null;
   const s = g.safeRect, slot = s.h / count;
   const h = tab.style === "rounded" ? Math.min(0.6, slot - 0.04) : slot - 0.04;
   if (h < 0.24 || s.w < 1.5) return null;
-  return { x: s.x + s.w - (tab.style === "staggered" ? 0.52 : 0.9), y: s.y + (order - 1) * slot + (slot - h) / 2, w: tab.style === "staggered" ? 0.52 : 0.9, h };
+  const w = tab.style === "staggered" ? 0.52 : 0.9;
+  return { x: tabEdge(g) === "left" ? s.x : s.x + s.w - w, y: s.y + (order - 1) * slot + (slot - h) / 2, w, h };
 }
 
 function solve(ctx: LayoutContext, divider: boolean): SolvedPage[] {
@@ -23,7 +30,8 @@ function solve(ctx: LayoutContext, divider: boolean): SolvedPage[] {
   const title = ctx.module?.title ?? (divider ? "Prayer" : "Plan");
   const tab = opt.tab?.show ? tabGeometry(g, opt.tab) : null;
   if (opt.tab?.show && !tab) diagnostics.push({ severity: "error", rule: "tab-fit", componentId: "tab", message: "These tabs do not fit comfortably. Use fewer tabs or a larger page." });
-  const content = { ...s, w: s.w - (tab ? tab.w + 0.16 : 0) };
+  const tabRoom = tab ? tab.w + 0.16 : 0;
+  const content = { ...s, x: tab && tabEdge(g) === "left" ? s.x + tabRoom : s.x, w: s.w - tabRoom };
   const w = g.trimWidthIn, h = g.trimHeightIn;
   // Wide and narrow trims recompose their corner elements; physical tab width never scales.
   const narrow = s.w < 4;

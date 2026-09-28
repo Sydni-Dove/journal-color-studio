@@ -22,7 +22,7 @@
  * next page is on the wrong side. Spreads always open on a verso.
  */
 import { formatWeekRange, MONTH_NAMES } from "../calendar/calendar";
-import { modulePrompts, moduleTitle, type PeriodKind } from "../../presets/modules";
+import { modulePrompts, moduleStart, moduleTitle, type PeriodKind } from "../../presets/modules";
 import type { CalendarData } from "../../types/calendar";
 import type { PageSide } from "../../types/geometry";
 import type { BookGroup, BookNode, BookStep, PageInstance, PageStartRule, PeriodRef, RecipePeriod } from "../../types/recipe";
@@ -322,7 +322,7 @@ export function expandBook(structure: BookNode[], ctx: BookContext): ExpandedRec
       continue;
     }
     const n = ctx.pagesPerInstance(step.layoutId);
-    const start: PageStartRule = step.start ?? (n === 2 ? "spread" : "any");
+    const start: PageStartRule = step.start ?? (n === 2 ? "spread" : moduleStart(step.module));
     if (n === 2 && start !== "spread" && start !== "verso") {
       diagnostics.push({ severity: "error", itemId: step.id, message: `"${ctx.layoutLabel(step.layoutId)}" is a two-page spread; it must start on a left-hand page (start rule "${start}").` });
     }

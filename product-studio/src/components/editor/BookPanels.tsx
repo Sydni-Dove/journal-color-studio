@@ -14,7 +14,7 @@ import { addNode, bookOutline, duplicateNode, moveNode, newSection, newStep, rem
 import { getLayout } from "../../layouts/registry";
 import { BOOK_PRESETS } from "../../presets/bookRecipes";
 import { MONTH_NAMES } from "../../engines/calendar/calendar";
-import { getModule, moduleTitle, PAGE_MODULES, supportsCadence } from "../../presets/modules";
+import { getModule, moduleStart, moduleTitle, PAGE_MODULES, supportsCadence } from "../../presets/modules";
 import type { ProductProject } from "../../types/project";
 import type { BookGroup, CadenceKind, BookNode, BookStep, PageStartRule, RecipeCadence } from "../../types/recipe";
 import { Field, NumberField, Section, Select } from "./ui";
@@ -72,6 +72,8 @@ function StepCard({ s, siblings, scope, props, first, last }: { s: BookStep; sib
   const avail = layoutAvailability(doc);
   const layout = getLayout(s.layoutId);
   const two = layout.pages === 2;
+  /** The side this page actually starts on: its own choice, else its purpose's default. */
+  const start: PageStartRule = s.start ?? moduleStart(s.module);
   const word = SCOPE_WORD[scope];
   // Only the cadences this purpose declares (presets/modules.ts MODULE_CADENCES). A saved cadence outside that
   // list (older books) is kept and shown, never silently changed.
@@ -129,8 +131,8 @@ function StepCard({ s, siblings, scope, props, first, last }: { s: BookStep; sib
         </>
       ) : (
         <>
-          <Select label="Which side should this page start on?" value={s.start ?? "any"} options={(["any", "recto", "verso"] as const).map((v) => ({ value: v, label: START_LABEL[v] }))} onChange={(start) => set({ start: start === "any" ? undefined : start })} />
-          {s.start && <Visual kind="page-sides" side={s.start === "recto" ? "right" : "left"} caption={s.start === "recto" ? "Starts on the right-hand page of an open book." : "Starts on the left-hand page of an open book."} />}
+          <Select label="Which side should this page start on?" value={start} options={(["any", "recto", "verso"] as const).map((v) => ({ value: v, label: START_LABEL[v] }))} onChange={(v) => set({ start: v === moduleStart(s.module) ? undefined : v })} />
+          {start !== "any" && <Visual kind="page-sides" side={start === "recto" ? "right" : "left"} caption={start === "recto" ? "Starts on the right-hand page of an open book." : "Starts on the left-hand page of an open book."} />}
         </>
       )}
       {mod.type !== "monthly-calendar" && mod.type !== "weekly-planner" && (
