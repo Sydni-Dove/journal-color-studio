@@ -3056,9 +3056,17 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   // lead: where the first line sits below the header, in line spacings (0.9 = the Canva master). Snug spacing starts it
   // sooner under thin-border headers (0.6) and a little later under the heavy block / band headers (1.25), so the
   // lines don't crowd a big marble block.
-  function writingLines(ctx, W, H, s, x0, x1, top, bottom, lead = .9) {
+  // balanceTo: the edge the lines run toward (the footer rule, or the page's bottom margin). When given, the lines are
+  // centred between the header and that edge — the same gap above the first line as below the last, each at least
+  // lead line spacings — instead of starting at the top and leaving the leftover space at the bottom.
+  function writingLines(ctx, W, H, s, x0, x1, top, bottom, lead = .9, balanceTo = null) {
     const p = s.palette, pt = H / TRIM_H, spacing = Number(s.lineSpacing) * pt;
-    const first = top + spacing * lead;
+    let first = top + spacing * lead;
+    if (balanceTo != null) {
+      const room = balanceTo - top, n = Math.max(1, Math.floor((room - 2 * lead * spacing) / spacing) + 1);
+      first = top + (room - (n - 1) * spacing) / 2;
+      bottom = first + (n - 1) * spacing + .5;
+    }
     if (s.lineStyle === 'hand' && ASSETS.handLines) {
       // Cycle through the 11 hand-drawn strokes so neighbouring lines never repeat.
       const img = ASSETS.handLines, sh = img.naturalHeight / HAND_LINE_COUNT, lw = x1 - x0, dh = sh * lw / img.naturalWidth;
@@ -3082,7 +3090,10 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     const bottom = pageBase(ctx, W, H, s);
     const top = drawHeader(ctx, W, H, s, T(s, id), { pref, sub: subId ? T(s, subId) : '', id, subId });
     const style = s.headerStyle === 'mixed' ? pref : s.headerStyle;
-    writingLines(ctx, W, H, s, W * .045, W * .955, top, bottom, !snugHeader(s) ? .9 : (style === 'rule' || style === 'bar') && !subId ? .6 : 1.25);
+    // Snug: lines centred between the header and the footer's gold rule (or the bottom margin without a footer).
+    const edge = s.footer === 'on' && !floralDesign(s) ? H - H * .035 - (s.showTrim ? H * .01 : 0) : bottom;
+    if (!snugHeader(s)) writingLines(ctx, W, H, s, W * .045, W * .955, top, bottom);
+    else writingLines(ctx, W, H, s, W * .045, W * .955, top, bottom, (style === 'rule' || style === 'bar') && !subId ? .6 : 1.25, edge);
   };
 
   // Dark sidebar used on the first Dream and first Brainstorm page of each cycle.
@@ -3124,7 +3135,8 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     if (s.accent !== 'none' && s.accentLined) drawAccent(ctx, W, H, s, true);
     const sx = W * .6;
     const top = drawHeader(ctx, W, H, s, T(s, id), { pref: 'bar', x1: sx, id });
-    writingLines(ctx, W, H, s, W * .045, sx - W * .03, top, H * .965, snugHeader(s) && ['mixed', 'rule', 'bar'].includes(s.headerStyle) ? .6 : .9);
+    if (snugHeader(s)) writingLines(ctx, W, H, s, W * .045, sx - W * .03, top, H * .965, ['mixed', 'rule', 'bar'].includes(s.headerStyle) ? .6 : 1.25, H * .975);
+    else writingLines(ctx, W, H, s, W * .045, sx - W * .03, top, H * .965);
     if (floralDesign(s)) { const [r, g, b] = hexRgb(s.palette.paper); ctx.fillStyle = `rgb(${r * .945},${g * .945},${b * .945})`; ctx.fillRect(sx, 0, W - sx, H); }
     else stoneBar(ctx, sx, 0, W - sx, H, s);
     // Busy backgrounds: sidebar content sits on a soft reading panel (automatic on art backgrounds; see sidebarPanel).
