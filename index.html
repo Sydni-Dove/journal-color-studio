@@ -3006,10 +3006,14 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   // Snug (default): the title sits closer to its top border and its rule/bar, and the first writing line or box follows
   // the header sooner. 'designed' keeps the original Canva master spacing.
   const snugHeader = (s) => s.headerSpacing !== 'designed' && !floralDesign(s);   // the floral pages keep their Canva placement
+  // The header style a page uses. "As designed" gives each page its Canva style, except that on photo / image
+  // backgrounds the heavy title blocks become a strip of the art with the title on the page underneath (like Dream,
+  // Brainstorm and Keys): lettering set on a busy photo texture doesn't read.
+  const headerStyleFor = (s, pref) => (s.headerStyle !== 'mixed' ? s.headerStyle : pref === 'block' && photoBg(s) && s.headerFill !== 'solid' ? 'rule' : pref);
   function drawHeader(ctx, W, H, s, title, opts = {}) { return withRole(ctx, s, 'pageTitle', () => drawHeaderTitle(ctx, W, H, s, title, opts)); }
   function drawHeaderTitle(ctx, W, H, s, title, { sub = '', pref = 'rule', x0 = 0, x1 = W, id = null, subId = null } = {}) {
     const p = s.palette, w = x1 - x0, cx = x0 + w / 2, maxW = w * .9;
-    const style = s.headerStyle === 'mixed' ? pref : s.headerStyle;
+    const style = headerStyleFor(s, pref);
     const ink = inkColor(p);
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     let bottom;
@@ -3018,8 +3022,10 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     } else if (style === 'block') {                       // dark block, light lettering, gold rule (Interpretation, Application, Summary)
       const hb = H * .1;
       stoneBar(ctx, x0, 0, w, hb, s);
-      const area = [cx - maxW * .3, hb * .3, maxW * .6, hb * .5], ink = textOnArea(ctx, s, p.title, p.stone, ...area);
-      ctx.fillStyle = ink; ctx.font = headFont(H * .045); withHalo(ctx, s, ink, area, () => fillFit(ctx, s, id, title, cx, hb * .56, maxW));
+      const area = [cx - maxW * .3, hb * .3, maxW * .6, hb * .5];
+      ctx.font = headFont(H * .045);
+      const ink = textOnArea(ctx, s, p.title, p.stone, ...area);
+      ctx.fillStyle = ink; withHalo(ctx, s, ink, area, () => fillFit(ctx, s, id, title, cx, hb * .56, maxW));
       headerRule(ctx, x0, hb, w, H * .011, s);
       bottom = hb + H * .011;
     } else if (style === 'bar') {                  // title on paper, thick dark bar beneath (Dream)
@@ -3114,7 +3120,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   const linedPage = (id, pref, subId = null) => (ctx, W, H, s) => {
     const bottom = pageBase(ctx, W, H, s);
     const top = drawHeader(ctx, W, H, s, T(s, id), { pref, sub: subId ? T(s, subId) : '', id, subId });
-    const style = s.headerStyle === 'mixed' ? pref : s.headerStyle;
+    const style = headerStyleFor(s, pref);
     // Snug: lines centred between the header and the footer's gold rule (or the bottom margin without a footer).
     const edge = s.footer === 'on' && !floralDesign(s) ? H - H * .035 - (s.showTrim ? H * .01 : 0) : bottom;
     if (!snugHeader(s)) writingLines(ctx, W, H, s, W * .045, W * .955, top, bottom);
@@ -3131,7 +3137,10 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   //   contents    – the Table of Contents legend strip. Automatic: off (as before).
   // The user can force a page's panel on or off and choose its color, opacity and padding. Dream + legend stays automatic.
   const READING_PANEL_PAGES = { brainstormQ: 'behind Questions to Consider', contents: 'behind the contents legend strip' };
-  const readingPanelAuto = (s, type = 'brainstormQ') => type === 'brainstormQ' && !floralDesign(s) && s.headerFill !== 'solid' && (s.marble === 'abstract' || s.marble.startsWith('img:'));
+  // Photo / image backgrounds (and uploads): textured art that small text can't sit on directly.
+  const photoBg = (s) => s.marble.startsWith('img:') || s.marble.startsWith('upload:');
+  const readingPanelAuto = (s, type = 'brainstormQ') => !floralDesign(s) && s.headerFill !== 'solid'
+    && type === 'brainstormQ' && (s.marble === 'abstract' || s.marble.startsWith('img:'));
   const RP_PAD = { tight: -1, normal: 0, generous: 1 };
   // A page's panel: null, or { hex, alpha, lvl }.
   function pagePanel(s, type) {
@@ -3443,27 +3452,30 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
         return;
       }
       const ly = H * .055, lh = H * .04;
-      stoneBar(ctx, 0, ly, W, lh, s);
-      // Optional reading panel behind the legend (off unless the user turns it on); its lettering then reads on the panel.
-      const panel = pagePanel(s, 'contents');
+      // Photo / image backgrounds (unless a reading panel is chosen): the legend line sits on the page and the art is a
+      // strip right under it, like the bar under the Dream title — small lettering on a busy photo texture doesn't read.
+      const LEGEND = [['Status', .1], ['N = Not Interpreted', .3], ['I = Interpreted', .6], ['A = Application', .8]];
+      const panel = pagePanel(s, 'contents'), onPage = !panel && photoBg(s) && s.headerFill !== 'solid';
+      const legendY = onPage ? H * .05 : ly + lh / 2;                           // the legend line's centre
+      if (onPage) stoneBar(ctx, 0, H * .072, W, H * .022, s); else stoneBar(ctx, 0, ly, W, lh, s);
       if (panel) {
         // Edge to edge (bleeds off both sides like the strip); padding sets how much of the strip's height it covers.
         const iy = [lh * .16, lh * .08, 0][panel.lvl + 1];
         ctx.fillStyle = rgba(panel.hex, panel.alpha); ctx.fillRect(0, ly + iy, W, lh - 2 * iy);
       }
-      const legendArea = [0, ly + lh * .2, W, lh * .6], legendInk = panel ? panelInk(s, panel.hex) : textOnArea(ctx, s, p.title, p.stone, ...legendArea);
+      const legendArea = [0, ly + lh * .2, W, lh * .6], legendInk = onPage ? inkColor(p) : panel ? panelInk(s, panel.hex) : textOnArea(ctx, s, p.title, p.stone, ...legendArea);
       ctx.fillStyle = legendInk; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
       withRole(ctx, s, 'legendText', () => {
         ctx.font = font(H * .015, { italic: true });
         // Each label reads on the artwork right behind it (a strip can run from deep to pale across the page).
-        [['Status', .1], ['N = Not Interpreted', .3], ['I = Interpreted', .6], ['A = Application', .8]].forEach(([t, f]) => {
+        LEGEND.forEach(([t, f]) => {
           const tw = ctx.measureText(t).width, area = [W * f - tw / 2, ly + lh * .2, tw, lh * .6];
-          const ink = panel ? legendInk : textOnArea(ctx, s, p.title, p.stone, ...area), draw = () => ctx.fillText(t, W * f, ly + lh / 2);
+          const ink = panel || onPage ? legendInk : textOnArea(ctx, s, p.title, p.stone, ...area), draw = () => ctx.fillText(t, W * f, legendY);
           ctx.fillStyle = ink;
-          if (panel) draw(); else withHalo(ctx, s, ink, area, draw);
+          if (panel || onPage) draw(); else withHalo(ctx, s, ink, area, draw);
         });
       });
-      ctx.fillRect(W * .175, ly + lh * .2, Math.max(1, W * .002), lh * .6);
+      ctx.fillRect(W * .175, legendY - lh * .3, Math.max(1, W * .002), lh * .6);
       ctx.fillStyle = ink; withRole(ctx, s, 'pageTitle', () => { ctx.font = font(H * .045); fillFit(ctx, s, 'contentsTitle', T(s, 'contentsTitle'), W / 2, H * .135, W * .88); });
       headerRule(ctx, 0, H * .17, W, H * .011, s);
       ctx.fillStyle = ink; withRole(ctx, s, 'columnHeadings', () => { ctx.font = font(H * .028, { italic: true }); [['#', .07], ['Date', .23], ['Title', .44], ['Type', .66], ['Status', .87]].forEach(([t, f]) => ctx.fillText(t, W * f, H * .207)); });
