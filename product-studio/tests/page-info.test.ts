@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { resolveDocument } from "../src/engines/document/resolve";
 import { allPageInfo, jumpTargets, pageSummary, PAGE_CATEGORIES } from "../src/engines/document/pageInfo";
 import { dailyPlannerBook, meetingsWithGodBook, neutralLuxeDividers, step } from "../src/presets/bookRecipes";
-import { RECIPE_PRESETS } from "../src/presets/layouts/recipePresets";
+import { GUIDED_LINED_PRESET, RECIPE_PRESETS } from "../src/presets/layouts/recipePresets";
 import { createProject } from "../src/presets/products/projectFactory";
 import { LAYOUTS } from "../src/layouts/registry";
 
@@ -86,4 +86,10 @@ it("Meetings With God planner labels its journal pages", () => {
   const d = resolveDocument(createProject("planner", { calendar: { startDate: "2027-01-01", endDate: "2027-01-31", weekStart: 1, sixRowMonths: true }, recipe: { items: [], ordering: "chronological", structure: [...meetingsWithGodBook(), step("notes", { type: "once" })] } }));
   const cats = new Set(allPageInfo(d).map((i) => i.category));
   expect([...cats]).toEqual(expect.arrayContaining(["weekly", "meeting", "journal", "monthly", "notes"]));
+});
+
+it("Guided Lined Page is named in the preview and Pages filter", () => {
+  const d = resolveDocument(createProject("journal", { recipe: GUIDED_LINED_PRESET.build({ count: 2, sheets: 1 }) }));
+  expect(allPageInfo(d).map((i) => i.typeLabel)).toEqual(["Guided Lined Page", "Guided Lined Page"]);
+  expect(jumpTargets(d).some((t) => t.label === "First guided lined page")).toBe(true);
 });

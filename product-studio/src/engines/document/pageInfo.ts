@@ -19,6 +19,7 @@ export type PageCategory =
   | "weekly"
   | "daily"
   | "journal"
+  | "guided"
   | "meeting"
   | "reflection"
   | "devotional"
@@ -32,6 +33,7 @@ export const PAGE_CATEGORIES: { id: PageCategory; label: string; plural: string 
   { id: "weekly", label: "Weekly Planner", plural: "Weekly" },
   { id: "daily", label: "Daily Planner", plural: "Daily" },
   { id: "journal", label: "Journal Page", plural: "Journal" },
+  { id: "guided", label: "Guided Lined Page", plural: "Guided Lined" },
   { id: "meeting", label: "Meeting With God", plural: "Meeting With God" },
   { id: "reflection", label: "Reflection", plural: "Reflection" },
   { id: "devotional", label: "Devotional", plural: "Devotional" },
@@ -86,6 +88,7 @@ const MODULE_CATEGORY: Partial<Record<string, PageCategory>> = {
   devotional: "devotional",
   prayer: "journal",
   "lined-journal": "journal",
+  guided: "guided",
   notes: "notes",
   "daily-planner": "daily",
   "monthly-calendar": "monthly",
@@ -102,6 +105,7 @@ function categoryOf(p: PageInstance): PageCategory {
   if (byLayout && byLayout !== "journal" && byLayout !== "notes") return byLayout;
   const byModule = p.module && MODULE_CATEGORY[p.module.type];
   if (byModule) return byModule;
+  if (p.layoutId === "guided-page") return "guided";
   if (byLayout) return byLayout;
   const st = stationery.get(p.layoutId);
   if (st) return STATIONERY_CATEGORY[st.family] ?? "other";
@@ -199,7 +203,10 @@ export function jumpTargets(doc: ResolvedDocument): JumpTarget[] {
   for (const i of info) if (i.category === "divider") out.push({ label: i.title ?? `Divider (page ${i.pageNumber})`, index: i.index, group: "Sections" });
   for (const c of PAGE_CATEGORIES) {
     const first = info.find((i) => i.category === c.id);
-    if (first) out.push({ label: `First ${c.label.toLowerCase().replace("meeting with god", "Meeting With God")} page`, index: first.index, group: "Page types" });
+    if (first) {
+      const type = c.label.toLowerCase().replace("meeting with god", "Meeting With God");
+      out.push({ label: `First ${type}${type.endsWith("page") ? "" : " page"}`, index: first.index, group: "Page types" });
+    }
   }
   return out;
 }

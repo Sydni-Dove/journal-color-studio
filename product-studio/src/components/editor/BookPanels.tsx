@@ -91,7 +91,7 @@ function StepCard({ s, siblings, scope, props, first, last }: { s: BookStep; sib
   const cadenceOptions = allCadences.filter((o) => ok(o.kind) || o.value === cadenceValue(s.cadence)).map((o) => (ok(o.kind) ? o : { ...o, label: `${o.label} (saved — not offered for this page)` }));
   const guided = s.layoutId === "guided-page";
   return (
-    <details className="card book-step" data-step={s.id}>
+    <details className="card book-step" data-step={s.id} open={guided || undefined}>
       <summary className="book-step__title">
         <strong>{stepName(s, scope)}</strong>
         {(s.copies ?? 1) > 1 ? ` × ${s.copies}` : s.cadence.type === "copies" && s.cadence.count > 1 ? ` × ${s.cadence.count}` : ""}

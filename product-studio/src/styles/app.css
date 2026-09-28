@@ -1001,6 +1001,7 @@ button.family-card:focus-visible {
 .page-mark--weekly { border-radius: 2px; background: var(--ui-muted); height: 5px; }
 .page-mark--daily { background: var(--ui-muted); }
 .page-mark--journal,
+.page-mark--guided,
 .page-mark--notes { border-radius: 1px; width: 7px; height: 9px; }
 .page-mark--meeting,
 .page-mark--reflection,
