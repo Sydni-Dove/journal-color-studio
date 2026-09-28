@@ -9,6 +9,8 @@ import { CSS_PX_PER_IN } from "../../engines/units/units";
 import { PrintablePage } from "../../primitives/PrintablePage";
 import { DebugOverlay, type DebugFlags } from "../debug/DebugOverlay";
 import { NumericInput } from "../editor/ui";
+import { allPageInfo, PAGE_CATEGORIES } from "../../engines/document/pageInfo";
+import { CategoryMark, PageNavigator, type PageFilter } from "./PageNavigator";
 
 export type FitMode = "page" | "width" | "zoom";
 
@@ -51,6 +53,8 @@ export function PagePreview({ doc, index, onIndex, debug, issueIds }: Props) {
   const [spread, setSpread] = useState(false);
   const [fit, setFit] = useState<FitMode>("page");
   const [zoom, setZoom] = useState(1);
+  const [sheet, setSheet] = useState(false);
+  const [filter, setFilter] = useState<PageFilter>("all");
   const viewportRef = useRef<HTMLDivElement>(null);
   const [avail, setAvail] = useState({ w: 800, h: 700 });
 
@@ -88,6 +92,13 @@ export function PagePreview({ doc, index, onIndex, debug, issueIds }: Props) {
 
   if (!pages.length) return <div className="preview-caption">This recipe produces no pages yet.</div>;
   const current = pages[Math.min(index, pages.length - 1)];
+  const infos = allPageInfo(doc);
+  const info = infos[Math.min(index, pages.length - 1)];
+  // With a page-type filter: previous / next page of that type (navigation only; the book is unchanged).
+  const filterLabel = filter === "all" ? null : PAGE_CATEGORIES.find((c) => c.id === filter)!.plural;
+  let prevOf = -1;
+  if (filter !== "all") for (let i = index - 1; i >= 0; i--) if (infos[i].category === filter) { prevOf = i; break; }
+  const nextOf = filter === "all" ? -1 : infos.findIndex((x, i) => i > index && x.category === filter);
 
   return (
     <>
@@ -105,6 +116,18 @@ export function PagePreview({ doc, index, onIndex, debug, issueIds }: Props) {
           <span>of {pages.length}</span>
         </div>
         <button className="btn btn--icon" onClick={() => step(1)} disabled={index >= pages.length - 1} aria-label="Next page">›</button>
+        <div className="page-label" data-testid="page-label" data-category={info.category}>
+          <span className="page-label__type"><CategoryMark category={info.category} />{info.typeLabel}</span>
+          {(info.title || info.dateLabel) && <span className="page-label__detail">{[info.title, info.dateLabel].filter(Boolean).join(" · ")}</span>}
+        </div>
+        <button className="btn" onClick={() => setSheet(true)} aria-haspopup="dialog">Pages</button>
+        {filterLabel && (
+          <div className="segmented page-filter-steps" role="group" aria-label={`${filterLabel} pages`}>
+            <button onClick={() => prevOf >= 0 && onIndex(prevOf)} disabled={prevOf < 0} aria-label={`Previous ${filterLabel} page`}>‹ {filterLabel}</button>
+            <button onClick={() => nextOf >= 0 && onIndex(nextOf)} disabled={nextOf < 0} aria-label={`Next ${filterLabel} page`}>{filterLabel} ›</button>
+            <button onClick={() => setFilter("all")} aria-label="Show all pages">✕</button>
+          </div>
+        )}
         <div className="segmented" role="group" aria-label="Fit">
           <button aria-pressed={fit === "page"} onClick={() => setFit("page")}>Fit page</button>
           <button aria-pressed={fit === "width"} onClick={() => setFit("width")}>Fit width</button>
@@ -161,6 +184,7 @@ export function PagePreview({ doc, index, onIndex, debug, issueIds }: Props) {
         {current.physicalSheets ? `  ·  one design, printed on ${current.physicalSheets} sheets` : ""}
         {current.filler ? "  ·  extra notes page (keeps two-page spreads facing each other)" : ""}
       </div>
+      {sheet && <PageNavigator doc={doc} index={index} onIndex={onIndex} filter={filter} onFilter={setFilter} onClose={() => setSheet(false)} />}
     </>
   );
 }

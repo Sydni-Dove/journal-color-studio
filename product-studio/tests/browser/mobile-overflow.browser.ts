@@ -187,7 +187,7 @@ for (const [w, h] of WIDTHS) {
         await page.waitForSelector(".ps-page--editor");
         await page.getByLabel("Show facing pages").check();
         await page.getByRole("group", { name: "Fit" }).getByRole("button").nth(2).click({ timeout: 5000 });
-        await page.locator(".preview-toolbar > button.btn:not(.btn--icon)").click({ timeout: 5000 });
+        await page.locator(".preview-toolbar").getByRole("button", { name: "100%", exact: true }).click({ timeout: 5000 });
         await page.waitForTimeout(150);
         const m = await measure(page);
         expect(m.doc).toBe(0);

@@ -964,3 +964,135 @@ button.family-card:focus-visible {
   padding: 8px 2px 12px;
   max-width: 100%;
 }
+
+/* Page navigation: the page's type beside the page number, and the Pages sheet */
+.page-label {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  max-width: 100%;
+  line-height: 1.2;
+}
+.page-label__type {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ui-ink);
+}
+.page-label__detail {
+  font-size: 13px;
+  color: var(--ui-muted);
+  overflow-wrap: anywhere;
+}
+/* Quiet markers: a small shape per page type; the words carry the meaning. */
+.page-mark {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1.5px solid var(--ui-muted);
+  background: transparent;
+}
+.page-mark--monthly { border-radius: 2px; }
+.page-mark--weekly { border-radius: 2px; background: var(--ui-muted); height: 5px; }
+.page-mark--daily { background: var(--ui-muted); }
+.page-mark--journal,
+.page-mark--notes { border-radius: 1px; width: 7px; height: 9px; }
+.page-mark--meeting,
+.page-mark--reflection,
+.page-mark--devotional { border-color: var(--ui-brand); }
+.page-mark--cover,
+.page-mark--divider { border-color: var(--ui-gold); background: var(--ui-gold); }
+.page-filter-steps button { min-height: var(--ui-touch); }
+
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(27, 23, 23, 0.32);
+  display: flex;
+  justify-content: flex-end;
+}
+.sheet {
+  background: var(--ui-panel);
+  width: min(420px, 100vw);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.14);
+  min-width: 0;
+}
+.sheet__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px 6px;
+}
+.sheet__head h2 { margin: 0; }
+.sheet__controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 0 16px;
+}
+.sheet__controls select { width: 100%; min-height: var(--ui-touch); }
+.sheet__count { padding: 6px 16px 8px; margin: 0; }
+.page-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 8px 16px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  flex: 1;
+  min-height: 0;
+}
+.page-row {
+  display: grid;
+  grid-template-columns: 58px 36px 1fr;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 84px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--ui-radius);
+  background: transparent;
+  text-align: left;
+  color: var(--ui-ink);
+  cursor: pointer;
+}
+.page-row:hover { background: rgba(27, 23, 23, 0.04); }
+.page-row[aria-current="page"] { background: rgba(99, 0, 0, 0.07); box-shadow: inset 3px 0 0 var(--ui-brand); }
+.page-row__thumb {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 58px;
+  height: 72px;
+}
+.page-row__num { font-variant-numeric: tabular-nums; color: var(--ui-muted); font-size: 14px; text-align: right; }
+.page-row__text { display: grid; gap: 2px; min-width: 0; }
+.page-row__type { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 14px; overflow-wrap: anywhere; }
+.page-row__date { color: var(--ui-muted); font-size: 13px; }
+
+/* Phones: a bottom sheet instead of a drawer. */
+@media (max-width: 720px) {
+  .sheet-backdrop { align-items: flex-end; }
+  .sheet {
+    width: 100%;
+    height: min(82vh, 100%);
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.16);
+  }
+  .sheet__controls { grid-template-columns: 1fr; }
+  /* The page's type sits right under the page number; fit and facing-page controls follow. */
+  .page-label { flex: 1 1 100%; order: 1; }
+  .preview-toolbar > .segmented:not(.page-filter-steps),
+  .preview-toolbar > .check,
+  .preview-toolbar > .btn--icon[aria-label^="Zoom"] { order: 2; }
+}

@@ -6,9 +6,8 @@
  * the same book recipe the Book structure editor works on.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { geometryFor, layoutAvailability, resolveDocument, solvePage, type ResolvedDocument } from "../../engines/document/resolve";
-import { CSS_PX_PER_IN } from "../../engines/units/units";
-import { PrintablePage } from "../../primitives/PrintablePage";
+import { layoutAvailability, resolveDocument, type ResolvedDocument } from "../../engines/document/resolve";
+import { PageThumb } from "../preview/PageThumb";
 import { BINDING_CHOICES, getBindingProfile } from "../../presets/bindingProfiles/bindingProfiles";
 import { BOOK_TEMPLATES, type RecipePreset } from "../../presets/layouts/recipePresets";
 import { PRINT_PROFILES } from "../../presets/printProfiles/printProfiles";
@@ -50,21 +49,6 @@ export function previewPages(doc: ResolvedDocument, keys: string[]): number[] {
       return doc.recipe.pages.findIndex((p) => !p.filler && p.layoutId === layoutId && (part == null || p.spreadPart === +part));
     })
     .filter((i) => i >= 0);
-}
-
-/** One page drawn by the real renderer, scaled to `heightPx`. */
-export function PageThumb({ doc, index, heightPx }: { doc: ResolvedDocument; index: number; heightPx: number }) {
-  const page = doc.recipe.pages[index];
-  const g = geometryFor(doc, page);
-  const solved = useMemo(() => solvePage(doc, index), [doc, index]);
-  const scale = heightPx / (g.mediaHeightIn * CSS_PX_PER_IN);
-  return (
-    <div className="page-thumb" style={{ width: g.mediaWidthIn * CSS_PX_PER_IN * scale, height: heightPx }} data-trim={`${doc.trim.widthIn}x${doc.trim.heightIn}`}>
-      <div style={{ transform: `scale(${scale})`, transformOrigin: "0 0", width: g.mediaWidthIn * CSS_PX_PER_IN }}>
-        <PrintablePage geometry={g} solved={solved} colors={doc.colors} typography={doc.typography} decorative={doc.decorative} background={doc.background} spacing={doc.spacing} mode="print" />
-      </div>
-    </div>
-  );
 }
 
 /** A month is enough to show every page a template makes (and resolves in milliseconds). */
@@ -163,3 +147,5 @@ export function BookTemplates({ onCreate, focusId }: { onCreate: (p: ProductProj
     </>
   );
 }
+
+export { PageThumb };
