@@ -898,6 +898,8 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     'bg-img-marble-black-gold': { type: 'background', renderer: 'image', textureKey: 'img:marble-black-gold', image: 'canva:marble-black-gold', colorRoles: ['paper'], label: 'Black + gold photo', hint: 'Black marble, gold veins' },
     'bg-img-marble-blue-gold': { type: 'background', renderer: 'image', textureKey: 'img:marble-blue-gold', image: 'canva:marble-blue-gold', colorRoles: ['paper'], label: 'Blue watercolor marble', hint: 'Navy ink + gold' },
     'bg-img-marble-pink-gold': { type: 'background', renderer: 'image', textureKey: 'img:marble-pink-gold', image: 'canva:marble-pink-gold', colorRoles: ['paper'], label: 'Pink watercolor marble', hint: 'Blush ink + gold' },
+    // Sydni's violet + peach watercolor cloud (Sept 25 export). It keeps its transparent edges, so the paper color shows through.
+    'bg-img-cloud-violet-peach': { type: 'background', renderer: 'image', textureKey: 'img:cloud-violet-peach', image: 'canva:cloud-violet-peach', colorRoles: ['paper'], label: 'Violet + peach cloud', hint: 'Watercolor cloud on your paper color' },
     'bg-img-stripes-blue-cream': { type: 'background', renderer: 'image', textureKey: 'img:stripes-blue-cream', image: 'canva:stripes-blue-cream', colorRoles: ['paper'], label: 'Blue stripes', hint: 'Wide cabana stripe' },
     'bg-img-stripes-navy-thin': { type: 'background', renderer: 'image', textureKey: 'img:stripes-navy-thin', image: 'canva:stripes-navy-thin', colorRoles: ['paper'], label: 'Navy pinstripe', hint: 'Thin stripes' },
     'bg-img-stripes-diagonal': { type: 'background', renderer: 'image', textureKey: 'img:stripes-diagonal', image: 'canva:stripes-diagonal', colorRoles: ['paper'], label: 'Diagonal stripes', hint: 'Black + white' },
@@ -958,6 +960,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     'decor-scribble':       { type: 'decor', image: 'canva:scribble-charcoal', art: 'wash', placement: 'center', label: 'Charcoal scribble' },
     'decor-stripes-yellow': { type: 'decor', image: 'canva:stripes-yellow', art: 'wash', placement: 'center', label: 'Stripe block' },
     'decor-boho':           { type: 'decor', image: 'canva:boho-abstract', art: 'color', placement: 'center', label: 'Boho abstract' },
+    'decor-cloud':          { type: 'decor', image: 'canva:cloud-violet-peach', art: 'color', placement: 'center', label: 'Violet + peach cloud' },
     'divider-none':         { type: 'divider', label: 'None' },
     'divider-canva-gold':   { type: 'divider', image: 'canva:divider-gold-ornament', art: 'wash', paletteRole: 'trim', label: 'Gold ornament (Canva)' },
     'divider-ornament':     { type: 'divider', image: 'divider', art: 'mask', label: 'Gold ornament (above + below title)' },
@@ -966,11 +969,11 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     dream: {
       cover: {
         // 'bg-watercolor' (procedural blobs) is retired from the picker: it was never Sydni's artwork.
-        backgroundSlot: ['bg-solid', 'bg-marble-veined', 'bg-marble-boldgold', 'bg-abstract', 'bg-marble-goldleaf', 'bg-marble-white', 'bg-marble-rose', 'bg-marble-burgundy', 'bg-marble-ember', 'bg-marble-peach', 'bg-floral', 'bg-cabana', 'bg-pinstripe', 'bg-bias', 'bg-candy', 'bg-scribble', 'bg-arches', 'bg-img-marble-white', 'bg-img-gold-leaf-veins', 'bg-img-marble-black-gold', 'bg-img-marble-blue-gold', 'bg-img-marble-pink-gold', 'bg-img-stripes-blue-cream', 'bg-img-stripes-navy-thin', 'bg-img-stripes-diagonal', 'bg-img-notebook-paper', 'bg-img-leather-tan', 'bg-img-leather-black', 'bg-img-leather-brown', 'bg-img-leather-croc-brown', 'bg-img-leather-orange', 'bg-img-leather-croc-white', 'bg-img-leather-suede-beige', 'bg-img-abstract-white-ribbons', 'bg-img-abstract-white-chevron'],
+        backgroundSlot: ['bg-solid', 'bg-marble-veined', 'bg-marble-boldgold', 'bg-abstract', 'bg-marble-goldleaf', 'bg-marble-white', 'bg-marble-rose', 'bg-marble-burgundy', 'bg-marble-ember', 'bg-marble-peach', 'bg-floral', 'bg-cabana', 'bg-pinstripe', 'bg-bias', 'bg-candy', 'bg-scribble', 'bg-arches', 'bg-img-marble-white', 'bg-img-gold-leaf-veins', 'bg-img-marble-black-gold', 'bg-img-marble-blue-gold', 'bg-img-marble-pink-gold', 'bg-img-cloud-violet-peach', 'bg-img-stripes-blue-cream', 'bg-img-stripes-navy-thin', 'bg-img-stripes-diagonal', 'bg-img-notebook-paper', 'bg-img-leather-tan', 'bg-img-leather-black', 'bg-img-leather-brown', 'bg-img-leather-croc-brown', 'bg-img-leather-orange', 'bg-img-leather-croc-white', 'bg-img-leather-suede-beige', 'bg-img-abstract-white-ribbons', 'bg-img-abstract-white-chevron'],
         titlePlateSlot: ['plate-rectangle', 'plate-rounded', 'plate-oval', 'plate-circle', 'plate-bevel', 'plate-ring', 'plate-none'],
         // Uploaded elements are appended to every decor slot (and the background slot) at runtime.
-        decorTopSlot: ['decor-none', 'decor-floral', 'decor-wash-pink', 'decor-wash-beige', 'decor-wash-orange', 'decor-wash-cream', 'decor-blob-purple', 'decor-scribble', 'decor-stripes-yellow', 'decor-boho', 'decor-bouquet', 'decor-corner', 'decor-topo', 'decor-waves', 'decor-arcs', 'decor-ribbon', 'decor-dots', 'decor-stripes'],
-        decorBottomSlot: ['decor-none', 'decor-floral', 'decor-wash-pink', 'decor-wash-beige', 'decor-wash-orange', 'decor-wash-cream', 'decor-blob-purple', 'decor-scribble', 'decor-stripes-yellow', 'decor-boho', 'decor-bouquet', 'decor-corner', 'decor-topo', 'decor-waves', 'decor-arcs', 'decor-ribbon', 'decor-dots', 'decor-stripes'],
+        decorTopSlot: ['decor-none', 'decor-floral', 'decor-wash-pink', 'decor-wash-beige', 'decor-wash-orange', 'decor-wash-cream', 'decor-blob-purple', 'decor-scribble', 'decor-stripes-yellow', 'decor-boho', 'decor-cloud', 'decor-bouquet', 'decor-corner', 'decor-topo', 'decor-waves', 'decor-arcs', 'decor-ribbon', 'decor-dots', 'decor-stripes'],
+        decorBottomSlot: ['decor-none', 'decor-floral', 'decor-wash-pink', 'decor-wash-beige', 'decor-wash-orange', 'decor-wash-cream', 'decor-blob-purple', 'decor-scribble', 'decor-stripes-yellow', 'decor-boho', 'decor-cloud', 'decor-bouquet', 'decor-corner', 'decor-topo', 'decor-waves', 'decor-arcs', 'decor-ribbon', 'decor-dots', 'decor-stripes'],
         dividerSlot: ['divider-none', 'divider-ornament', 'divider-canva-gold'],
       },
     },
@@ -1306,7 +1309,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     'marble-black-gold.jpg', 'marble-blue-gold.jpg', 'marble-pink-gold.jpg', 'stripes-blue-cream.jpg', 'divider-gold-ornament.png', 'stripes-navy-thin.jpg',
     'stripes-diagonal.jpg', 'notebook-paper.png', 'stripes-yellow.png', 'scribble-charcoal.png', 'boho-abstract.jpg', 'leather-tan.jpg', 'leather-black.jpg',
     'leather-brown.jpg', 'leather-croc-brown.jpg', 'leather-orange.jpg', 'leather-croc-white.jpg', 'leather-suede-beige.jpg', 'blob-purple.png',
-    'abstract-white-ribbons.jpg', 'abstract-white-chevron.png'];
+    'abstract-white-ribbons.jpg', 'abstract-white-chevron.png', 'cloud-violet-peach.png'];
   // Page 64 abstract watercolor, as its original Canva layers (SVG export): transform m is in points on the 612×792
   // Canva page (y down); avg = the layer's mean color, used to recolor it while keeping its brush texture.
   const ABSTRACT_LAYERS = [
@@ -1681,6 +1684,26 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     return out;
   }
 
+  // The vertical centre (fraction of the page) of an artwork's fullest horizontal band, or null when the art already
+  // fills its page edges (then a bar keeps the slice at its own spot). Measured once per image on a small copy.
+  const bandCache = new Map();
+  function artBand(img, key) {
+    if (bandCache.has(key)) return bandCache.get(key);
+    let out = null;
+    try {
+      const w = 60, h = Math.round(w * TRIM_H / TRIM_W), c = document.createElement('canvas'); c.width = w; c.height = h;
+      const ctx = c.getContext('2d'); drawCover(ctx, img, 0, 0, w, h);
+      const d = ctx.getImageData(0, 0, w, h).data, row = [];
+      for (let y = 0; y < h; y++) { let t = 0; for (let x = 0; x < w; x++) { const i = (y * w + x) * 4; t += d[i + 3] / 255 * (765 - d[i] - d[i + 1] - d[i + 2]) / 765; } row.push(t / w); }
+      const win = Math.max(1, Math.round(h * .08)), sums = row.map((_, y) => row.slice(y, y + win).reduce((a, b) => a + b, 0) / win);
+      const edge = Math.max(sums[0], sums[h - win]), best = Math.max(...sums), at = sums.indexOf(best);
+      // Only airy art: the page edges hold much less ink than its fullest band.
+      if (best > .08 && edge < best * .45) out = (at + win / 2) / h;
+    } catch { out = null; }
+    bandCache.set(key, out);
+    return out;
+  }
+
   // Rebuild the marble from its separated layers with the chosen colors.
   // soft = true washes the marble toward the paper color (used for the soft header).
   function paintMarble(ctx, x, y, w, h, s, soft = false) {
@@ -1701,7 +1724,10 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
       else {
         const key = `canva:${s.marble.slice(4)}`, img = ASSETS[key];
         ctx.fillStyle = s.palette.paper; ctx.fillRect(x, y, w, h);
-        if (!img) ensureAsset(key).catch(() => {}); else drawCover(ctx, img, ax, ay, PW, PH);
+        // A thin bar on a page shows the fullest band of an airy artwork (a cloud that leaves the page edges blank),
+        // centred on the bar, instead of the near-empty slice at the page edge.
+        const band = part && img && h <= w * .25 ? artBand(img, key) : null;
+        if (!img) ensureAsset(key).catch(() => {}); else drawCover(ctx, img, ax, band === null ? ay : y + h / 2 - band * PH, PW, PH);
       }
       if (soft) { ctx.fillStyle = rgba(s.palette.paper, .55); ctx.fillRect(x, y, w, h); }     // "Soft marble wash" header
       ctx.restore();
