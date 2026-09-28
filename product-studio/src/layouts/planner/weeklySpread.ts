@@ -12,10 +12,11 @@
  *   sidebar OFF: verso = [Mon … Thu]                recto = [Fri, Sat, Sun, notes]
  * The extra slot always sits on the OUTER edge. Slots are equal on both pages.
  *
- * Both pages are ONE connected grid (connectedTracks, zero gap): the grid
- * draws its outer border and one shared rule between neighbouring slots;
- * the header rule and section dividers are drawn once across each run of
- * neighbouring days. Days and sections never draw their own boxes.
+ * Both pages are ONE open connected grid (connectedTracks, zero gap): one
+ * shared rule between neighbouring slots and no border around the page; the
+ * header rule is drawn once across the grid and the morning / afternoon /
+ * evening dividers once per run of neighbouring days, in the light
+ * writing-line color. Days and sections never draw their own boxes.
  */
 import { formatWeekRange, formatWeekRangeShort, MONTH_NAMES, parseIso } from "../../engines/calendar/calendar";
 import { distributeEqual } from "../../engines/layout/math";
@@ -197,7 +198,8 @@ export const weeklySpread: LayoutDefinition = {
       const grid = connectedTracks(`wk${p}-grid`, frame.body, SLOTS_PER_PAGE, horizontal ? "rows" : "columns");
       const tracks = grid.tracks;
       sizes.push(tracks.size);
-      nodes.push(...grid.nodes);
+      // An open grid: the shared rules between days stay (they are the structure); no box around the page.
+      nodes.push(...grid.nodes.filter((n) => n.id !== `wk${p}-grid-border`));
       const isDay = (i: number) => slots[p][i].kind === "day";
       const strokePt = STUDIO_STROKES.gridRulePt;
       const headH = STUDIO_PLANNER.dayHeader.valueIn;
@@ -248,7 +250,8 @@ export const weeklySpread: LayoutDefinition = {
         runsOf(SLOTS_PER_PAGE, isDay).forEach(([a, z], k) => {
           for (let j = 1; j < n; j++) {
             const y = secRows.starts[j];
-            nodes.push(rule(`wk${p}-sec${j}-run${k}`, tracks.starts[a], y, tracks.starts[z] + tracks.size, y, { strokePt, component: "Grid" }));
+            // Morning / afternoon / evening: light dividers in the writing-line color, not borders.
+            nodes.push(rule(`wk${p}-sec${j}-run${k}`, tracks.starts[a], y, tracks.starts[z] + tracks.size, y, { strokePt, color: "line", component: "Grid" }));
           }
         });
       }

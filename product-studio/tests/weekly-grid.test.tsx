@@ -53,10 +53,10 @@ describe("weekly spread = one connected planner grid", () => {
           for (let i = 0; i < 3; i++) expect(start(slots[i]) + size(slots[i])).toBeCloseTo(start(slots[i + 1]), 9);
           expect(start(slots[3]) + size(slots[3])).toBeCloseTo(start(grid) + size(grid), 9);
 
-          // The ONLY box on the page is the grid's square outer border — no day or section cards.
-          const boxes = nodes.filter((n) => n.type === "box");
-          expect(boxes.map((b) => b.id)).toEqual([`wk${p}-grid-border`]);
-          expect(boxes[0].type === "box" && boxes[0].radiusIn).toBe(0);
+          // An open grid: no box on the page at all — no outer border, no day or section cards.
+          expect(nodes.filter((n) => n.type === "box")).toEqual([]);
+          // Morning / afternoon / evening dividers are light (writing-line color), not borders.
+          for (const r of ruleNodes(nodes, new RegExp(`^wk${p}-sec\\d-run\\d$`))) expect(r.type === "rule" && r.color).toBe("line");
 
           // One shared rule on each of the 3 interior slot boundaries.
           const shared = ruleNodes(nodes, new RegExp(`^wk${p}-grid-[vh]\\d$`));
@@ -97,13 +97,13 @@ describe("weekly spread = one connected planner grid", () => {
       });
 
       [0, 1].forEach((p) => {
-        it(`${p === 0 ? "left" : "right"} page, rendered SVG: one border, shared rules once, no card rects`, () => {
+        it(`${p === 0 ? "left" : "right"} page, rendered SVG: no border, shared rules once, no card rects`, () => {
           const html = renderToStaticMarkup(
             <PrintablePage geometry={geometryFor(doc, doc.recipe.pages[first + p])} solved={solvePage(doc, first + p)} colors={doc.colors} typography={doc.typography} decorative={doc.decorative} background={doc.background} mode="print" />,
           );
-          // Every stroked rectangle drawn is either the grid border or a checklist checkbox.
+          // The only rectangles drawn are checklist checkboxes (the grid is open: no border).
           const rects = [...html.matchAll(/<rect[^>]*data-node="([^"]+)"/g)].map((m) => m[1]);
-          expect(rects.filter((id) => !/-cb\d+$/.test(id))).toEqual([`wk${p}-grid-border`]);
+          expect(rects.filter((id) => !/-cb\d+$/.test(id))).toEqual([]);
           expect(html).not.toMatch(/rx="[1-9]/);
           // Exactly 3 shared slot rules in the markup, at 3 distinct positions.
           const shared = [...html.matchAll(new RegExp(`<line[^>]*data-node="wk${p}-grid-[vh]\\d"[^>]*>`, "g"))].map((m) => m[0]);

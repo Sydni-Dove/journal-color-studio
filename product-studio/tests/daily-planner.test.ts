@@ -209,22 +209,40 @@ describe("daily expansion", () => {
   });
 });
 
-describe("Weekly Plan + Meeting With God: writing space for every day", () => {
-  for (const [size, min] of [
-    [["7x9", "coil", "coil-generic"], 4],
-    [["6x9", "coil", "coil-generic"], 4],
-    [["5.5x8.5", "discbound", "disc-generic"], 3],
-    [LETTER, 5],
+describe("Weekly Plan + Meeting With God: open days with more writing room", () => {
+  // Writing line per weekday (lines × length, inches) the old boxed 2 × 4 grid gave; the open rows must beat it.
+  for (const [size, oldGrid] of [
+    [["7x9", "coil", "coil-generic"], 13.6],
+    [["6x9", "coil", "coil-generic"], 11.1],
+    [["5.5x8.5", "discbound", "disc-generic"], 7.9],
+    [LETTER, 20.8],
   ] as [[string, string, string], number][]) {
-    it(`${size[0]}: each of the seven days has ≥ ${min} writing lines, plus a priorities list`, () => {
-      const doc = resolveDocument(book([section("Every Week", [step("weekly-planner", { type: "once" }, { layoutId: "weekly-plan-mwg-spread" })], "week")], { size, end: "2027-01-16" }));
-      const i = doc.recipe.pages.findIndex((p) => p.layoutId === "weekly-plan-mwg-spread" && p.spreadPart === 0);
-      const s = solvePage(doc, i);
-      for (let d = 0; d < 7; d++) {
-        const lines = s.nodes.filter((n): n is Lines => n.id.startsWith(`mw0-days-d${d}`) && n.type === "lines");
-        expect(lines.reduce((a, l) => a + l.positions.length, 0), `day ${d}`).toBeGreaterThanOrEqual(min);
-      }
-      expect(s.nodes.some((n) => n.id.startsWith("mw0-days-priorities") && n.type === "lines")).toBe(true);
-    });
+    for (const weekStart of [0, 1] as const) {
+      it(`${size[0]}, ${weekStart ? "Monday" : "Sunday"}-start week: no boxes; weekdays get more writing line than the old grid (${oldGrid}"), all equal; weekend ≥ 2 lines; priorities checklist`, () => {
+        const p = book([section("Every Week", [step("weekly-planner", { type: "once" }, { layoutId: "weekly-plan-mwg-spread" })], "week")], { size, end: "2027-01-16" });
+        p.calendar = { ...p.calendar!, weekStart };
+        const doc = resolveDocument(p);
+        const i = doc.recipe.pages.findIndex((x) => x.layoutId === "weekly-plan-mwg-spread" && x.spreadPart === 0);
+        const s = solvePage(doc, i);
+        expect(s.nodes.filter((n) => n.type === "box" && n.stroke)).toEqual([]); // no rectangles anywhere on the plan page
+        const period = doc.recipe.pages[i].period;
+        const week = doc.calendar!.weeks.find((w) => period.kind === "week" && w.key === period.key)!;
+        const rules = s.nodes.filter((n) => n.type === "rule" && /^mw0-days-rule-/.test(n.id));
+        const perDay = week.days.map((day, d) => {
+          const surf = s.nodes.find((n): n is Lines => n.id === `mw0-days-d${d}-surface` && n.type === "lines")!;
+          // The day's last line is its full-width divider, one pitch below the last drawn writing line.
+          const pitch = surf.positions.length > 1 ? surf.positions[1] - surf.positions[0] : surf.positions[0] - surf.rect.y;
+          const last = (surf.positions.at(-1) ?? surf.rect.y) + pitch;
+          expect(rules.some((r) => r.type === "rule" && Math.abs(r.y1 - last) < 1e-6 && r.x1 <= surf.rect.x && r.x2 >= surf.rect.x + surf.rect.w), `day ${d} divider`).toBe(true);
+          return { weekend: day.weekday === 0 || day.weekday === 6, lines: surf.positions.length + 1, room: (surf.positions.length + 1) * surf.rect.w };
+        });
+        const weekdays = perDay.filter((x) => !x.weekend);
+        for (const x of weekdays) expect(x.room, "weekday writing line").toBeGreaterThan(oldGrid);
+        expect(new Set(weekdays.map((x) => x.lines)).size).toBe(1);
+        for (const x of perDay.filter((x) => x.weekend)) expect(x.lines).toBeGreaterThanOrEqual(2);
+        expect(s.nodes.filter((n) => n.type === "checkbox" && n.id.startsWith("mw0-days-priorities")).length).toBeGreaterThanOrEqual(3);
+        expect(validateProject(p, heuristicMeasurer, { pageIndices: [i] }).issues.filter((x) => x.severity !== "info")).toEqual([]);
+      });
+    }
   }
 });

@@ -27,8 +27,9 @@ import type { Rect } from "../../types/geometry";
 import type { LayoutDiagnostic, LayoutMetric, LayoutNode, SolvedPage } from "../../types/layout";
 import type { LayoutOptions } from "../../types/project";
 import type { SpacingTokens, TypographySettings, WordingKey } from "../../types/tokens";
-import { connectedTracks, headerTitle, pageFrame, section } from "../shared/components";
-import { lineBoxIn, rule, text } from "../shared/nodes";
+import { headerTitle, pageFrame, section } from "../shared/components";
+import { group, lineBoxIn, rule, text } from "../shared/nodes";
+import { distributeEqual } from "../../engines/layout/math";
 import type { FitContext, FitResult, LayoutContext, LayoutDefinition } from "../shared/types";
 
 /** The sections a daily page can carry (each is also its heading's wording key). */
@@ -54,7 +55,8 @@ const SECTION_SPEC: Record<DailySection, { kind: Kind; weight: number; fixedRows
 export const DAILY_MIN_HOUR_ROW_IN = 0.26;
 /** Two columns (schedule | lists) from this body width; narrower pages stack. */
 const TWO_COLUMN_MIN_W = 4.4;
-const SCHEDULE_SHARE = 0.55;
+// The schedule is the page's main writing area: it takes most of the width; the lists keep about 2" of line.
+const SCHEDULE_SHARE = 0.62;
 /** Each column of a split schedule needs at least this width (time label + writing). */
 const SPLIT_COL_MIN_W = 1.7;
 /** Every section keeps room for its heading plus this many rows. */
@@ -241,9 +243,14 @@ function scheduleNodes(rect: Rect, f: Frame, ctx: LayoutContext): { nodes: Layou
     const part = labels.slice(c * perCol, (c + 1) * perCol);
     const g: Rect = { x: grid.x + c * (colW + gap), y: grid.y, w: colW, h: f.rowH * part.length };
     const id = c ? `dy-hours${c + 1}` : "dy-hours";
-    const t = connectedTracks(id, g, part.length, "rows");
+    // Open schedule: no box around it. Each hour is a writing line of its own (a hairline under the slot,
+    // in the writing-line color), and a light rule sets the times apart — the time divisions stay, the table goes.
+    const tracks = distributeEqual(g.y, g.h, part.length, 0);
+    const t = { trackRects: tracks.starts.map((y): Rect => ({ x: g.x, y, w: g.w, h: tracks.size })) };
     const labelW = Math.min(g.w * 0.4, Math.max(STUDIO_PLANNER.timeColumn.valueIn * 0.7, Math.max(...labels.map((l) => measure(l, style))) + 2 * s.labelToBorderInset + 0.02));
-    nodes.push(...t.nodes, rule(`${id}-label-rule`, g.x + labelW, g.y, g.x + labelW, g.y + g.h, { strokePt: STUDIO_STROKES.gridRulePt, component: "Grid" }));
+    nodes.push(group(id, "Grid", g, { rowEdges: tracks.edges }));
+    t.trackRects.forEach((r, i) => nodes.push(rule(`${id}-h${i + 1}`, g.x, r.y + r.h, g.x + g.w, r.y + r.h, { strokePt: STUDIO_STROKES.writingLinePt, color: "line", component: "Grid" })));
+    nodes.push(rule(`${id}-label-rule`, g.x + labelW, g.y, g.x + labelW, g.y + g.h, { strokePt: STUDIO_STROKES.gridRulePt, color: "line", component: "Grid" }));
     // Blank schedules keep the (empty) time column for handwritten times.
     if (!blank) t.trackRects.forEach((r, i) => {
       nodes.push(text(`dy-hour-${c * perCol + i}`, { x: r.x + s.labelToBorderInset, y: r.y + Math.max(0, (r.h - lh) / 2), w: labelW - 2 * s.labelToBorderInset, h: Math.min(lh, r.h) }, part[i], "time", { component: "SectionHeader", align: "left", vAlign: "middle" }));
