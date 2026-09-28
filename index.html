@@ -2657,23 +2657,39 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   const textOnPanel = (s, c, bg) => (isOriginalColorway(s) && contrast(c, bg) >= 3 ? c : readableOn(bg, [c, s.palette.paper, '#FFFFFF', tone(bg, 18), tone(bg, 96)]));
   // The design's own colors, unchanged (its original panels/lettering are kept exactly as Sydni designed them).
   // Text over a marble bar or strip: the flat stone color says little about what is really behind the letters (the
-  // marble can run from near-black to near-white), so the painted area is sampled. The design color stays while it
-  // reads on most of that area; otherwise the candidate that reads on the most of it is used. Solid fills: textOnPanel.
+  // marble can run from near-black to near-white), so the painted area is sampled (luminances, subsampled; null when the
+  // canvas can't be read). areaReads: the share of that area a color reads on (3:1).
+  function sampleArea(ctx, x, y, w, h) {
+    let d;
+    try { d = ctx.getImageData(Math.round(x), Math.round(y), Math.max(1, Math.round(w)), Math.max(1, Math.round(h))).data; } catch { return null; }
+    const n = d.length / 4, step = Math.max(1, Math.floor(n / 4000)), out = [];
+    const lin = (v) => { v /= 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; };
+    for (let i = 0; i < n; i += step) out.push(.2126 * lin(d[i * 4]) + .7152 * lin(d[i * 4 + 1]) + .0722 * lin(d[i * 4 + 2]));
+    return out.length ? out : null;
+  }
+  const areaReads = (Ls, hex) => { const k = relLum(hex); return Ls.filter((L) => (Math.max(k, L) + .05) / (Math.min(k, L) + .05) >= 3).length / Ls.length; };
+  // The design color stays while it reads on most of the area; otherwise the candidate that reads on the most of it.
+  // Solid fills: textOnPanel.
   function textOnArea(ctx, s, c, bg, x, y, w, h) {
     if (s.headerFill === 'solid') return textOnPanel(s, c, bg);
-    let d;
-    try { d = ctx.getImageData(Math.round(x), Math.round(y), Math.max(1, Math.round(w)), Math.max(1, Math.round(h))).data; } catch { return textOnPanel(s, c, bg); }
-    const cands = [c, s.palette.paper, '#FFFFFF', tone(bg, 18), tone(bg, 96)].map((hex) => ({ hex, L: relLum(hex), ok: 0 }));
-    const n = d.length / 4, step = Math.max(1, Math.floor(n / 4000));
-    const lin = (v) => { v /= 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; };
-    let total = 0;
-    for (let i = 0; i < n; i += step) {
-      const L = .2126 * lin(d[i * 4]) + .7152 * lin(d[i * 4 + 1]) + .0722 * lin(d[i * 4 + 2]);
-      for (const k of cands) if ((Math.max(k.L, L) + .05) / (Math.min(k.L, L) + .05) >= 3) k.ok++;
-      total++;
-    }
-    if (!total || cands[0].ok / total >= .75) return c;
-    return cands.reduce((a, b) => (b.ok > a.ok ? b : a)).hex;
+    const Ls = sampleArea(ctx, x, y, w, h);
+    if (!Ls) return textOnPanel(s, c, bg);
+    if (areaReads(Ls, c) >= .75) return c;
+    const best = [c, s.palette.paper, '#FFFFFF', tone(bg, 18), tone(bg, 96)].reduce((a, b) => (areaReads(Ls, b) > areaReads(Ls, a) ? b : a));
+    // Nothing reads on most of it (black-and-white marble): light lettering, which withHalo backs with a dark glow.
+    return areaReads(Ls, best) >= .75 ? best : relLum(s.palette.paper) > .8 ? s.palette.paper : '#FFFFFF';
+  }
+  // Marble that runs from very dark to very light behind the letters: no single color reads everywhere, so the lettering
+  // gets a soft halo in the opposite tone (dark around light letters, light around dark ones). Only when the color
+  // actually drawn (a section color override included) reads on less than 90% of the area; otherwise just fn().
+  function withHalo(ctx, s, ink, rect, fn) {
+    const col = (TY && TY.color) || ink, Ls = s.headerFill === 'solid' ? null : sampleArea(ctx, ...rect);
+    if (!Ls || areaReads(Ls, col) >= .9) return fn();
+    ctx.save();
+    ctx.shadowColor = relLum(col) > .3 ? 'rgba(0,0,0,.85)' : 'rgba(255,255,255,.92)';
+    ctx.shadowBlur = Math.max(3, ctx.canvas.height * .007);
+    fn(); fn();                                            // two passes: a halo strong enough to carry the letters
+    ctx.restore();
   }
   function isOriginalColorway(s) {
     const p = s.palette; if (!p || p.v) return false;
@@ -2994,7 +3010,8 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     } else if (style === 'block') {                       // dark block, light lettering, gold rule (Interpretation, Application, Summary)
       const hb = H * .1;
       stoneBar(ctx, x0, 0, w, hb, s);
-      ctx.fillStyle = textOnArea(ctx, s, p.title, p.stone, cx - maxW * .3, hb * .3, maxW * .6, hb * .5); ctx.font = headFont(H * .045); fillFit(ctx, s, id, title, cx, hb * .56, maxW);
+      const area = [cx - maxW * .3, hb * .3, maxW * .6, hb * .5], ink = textOnArea(ctx, s, p.title, p.stone, ...area);
+      ctx.fillStyle = ink; ctx.font = headFont(H * .045); withHalo(ctx, s, ink, area, () => fillFit(ctx, s, id, title, cx, hb * .56, maxW));
       headerRule(ctx, x0, hb, w, H * .011, s);
       bottom = hb + H * .011;
     } else if (style === 'bar') {                  // title on paper, thick dark bar beneath (Dream)
@@ -3426,8 +3443,13 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
         const iy = [lh * .16, lh * .08, 0][panel.lvl + 1];
         ctx.fillStyle = rgba(panel.hex, panel.alpha); ctx.fillRect(0, ly + iy, W, lh - 2 * iy);
       }
-      ctx.fillStyle = panel ? panelInk(s, panel.hex) : textOnArea(ctx, s, p.title, p.stone, 0, ly + lh * .2, W, lh * .6); ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
-      withRole(ctx, s, 'legendText', () => { ctx.font = font(H * .015, { italic: true }); [['Status', .1], ['N = Not Interpreted', .3], ['I = Interpreted', .6], ['A = Application', .8]].forEach(([t, f]) => ctx.fillText(t, W * f, ly + lh / 2)); });
+      const legendArea = [0, ly + lh * .2, W, lh * .6], legendInk = panel ? panelInk(s, panel.hex) : textOnArea(ctx, s, p.title, p.stone, ...legendArea);
+      ctx.fillStyle = legendInk; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+      withRole(ctx, s, 'legendText', () => {
+        ctx.font = font(H * .015, { italic: true });
+        const labels = () => [['Status', .1], ['N = Not Interpreted', .3], ['I = Interpreted', .6], ['A = Application', .8]].forEach(([t, f]) => ctx.fillText(t, W * f, ly + lh / 2));
+        if (panel) labels(); else withHalo(ctx, s, legendInk, legendArea, labels);
+      });
       ctx.fillRect(W * .175, ly + lh * .2, Math.max(1, W * .002), lh * .6);
       ctx.fillStyle = ink; withRole(ctx, s, 'pageTitle', () => { ctx.font = font(H * .045); fillFit(ctx, s, 'contentsTitle', T(s, 'contentsTitle'), W / 2, H * .135, W * .88); });
       headerRule(ctx, 0, H * .17, W, H * .011, s);
