@@ -756,7 +756,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     'bg-img-marble-blue-gold': { type: 'background', renderer: 'image', textureKey: 'img:marble-blue-gold', image: 'canva:marble-blue-gold', colorRoles: ['paper'], label: 'Blue watercolor marble', hint: 'Navy ink + gold' },
     'bg-img-marble-pink-gold': { type: 'background', renderer: 'image', textureKey: 'img:marble-pink-gold', image: 'canva:marble-pink-gold', colorRoles: ['paper'], label: 'Pink watercolor marble', hint: 'Blush ink + gold' },
     // Sydni's violet + peach watercolor cloud (Sept 25 export). It keeps its transparent edges, so the paper color shows through.
-    'bg-img-cloud-violet-peach': { type: 'background', renderer: 'image', textureKey: 'img:cloud-violet-peach', image: 'canva:cloud-violet-peach', colorRoles: ['paper'], label: 'Violet + peach cloud', hint: 'Watercolor cloud on your paper color' },
+    'bg-img-cloud-violet-peach': { type: 'background', renderer: 'image', textureKey: 'img:cloud-violet-peach', image: 'canva:cloud-violet-peach', colorRoles: ['paper', 'stone', 'accent'], recommendedPalette: 'Violet + Peach Cloud', label: 'Violet + peach cloud', hint: 'Recolorable watercolor cloud' },
     'bg-img-stripes-blue-cream': { type: 'background', renderer: 'image', textureKey: 'img:stripes-blue-cream', image: 'canva:stripes-blue-cream', colorRoles: ['paper'], label: 'Blue stripes', hint: 'Wide cabana stripe' },
     'bg-img-stripes-navy-thin': { type: 'background', renderer: 'image', textureKey: 'img:stripes-navy-thin', image: 'canva:stripes-navy-thin', colorRoles: ['paper'], label: 'Navy pinstripe', hint: 'Thin stripes' },
     'bg-img-stripes-diagonal': { type: 'background', renderer: 'image', textureKey: 'img:stripes-diagonal', image: 'canva:stripes-diagonal', colorRoles: ['paper'], label: 'Diagonal stripes', hint: 'Black + white' },
@@ -872,6 +872,8 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     { name: 'Gold Leaf', stone: '#FBF8F3', vein: '#C9A55E', highlight: '#FFFFFF', plate: '#FFFFFF', frame: '#1E1B18', trim: '#C9A55E', title: '#1E1B18', paper: '#FFFFFF', line: '#D8CBB4' },
     { name: 'White Marble', stone: '#F8F8F7', vein: '#8C8C90', highlight: '#FFFFFF', plate: '#FFFFFF', frame: '#222222', trim: '#BFA06A', title: '#222222', paper: '#FFFFFF', line: '#CFCFCF' },
     { name: 'Floral Garden', stone: '#718365', vein: '#CBA15F', highlight: '#E3A69D', plate: '#860B03', frame: '#63202E', trim: '#A87C2D', title: '#FFFFFF', paper: '#FFFFFF', line: '#EBE3E2' },
+    // The cloud's own colors (Jesus Girl cover): violet + peach wash, lavender lettering, soft gold frame on white.
+    { name: 'Violet + Peach Cloud', stone: '#8466C2', vein: '#B79A6A', highlight: '#F1E8F7', plate: '#FFFFFF', frame: '#B79A6A', trim: '#B79A6A', title: '#9A7CCB', paper: '#FFFFFF', line: '#D8CBE6', accent: '#E3A085' },
     { name: 'Abstract Watercolor', stone: '#63101A', vein: '#D7A04D', highlight: '#E89F97', plate: '#F4EDE6', frame: '#63101A', trim: '#D7A04D', title: '#63101A', paper: '#F4EDE6', line: '#E3CBC3', accent: '#B8471C' },
     { name: 'Original Black + Gold', stone: '#141212', vein: '#C9A05A', highlight: '#F1E6CC', plate: '#2A070E', frame: '#151313', trim: '#CBA15F', title: '#FFFFFF', paper: '#FFFFFF', line: '#B8948C' },
     { name: 'Dove Signature', stone: '#1A0B0B', vein: '#E6A742', highlight: '#F2DFD8', plate: '#630000', frame: '#1A0B0B', trim: '#E6A742', title: '#FFFDFC', paper: '#FFFDFC', line: '#C9A49B' },
@@ -1358,6 +1360,12 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       const col = ramp01(C, 6, 16), gold = col * hueBand(H, 50, 105, 12), light = (1 - col) * ramp01(L, 55, 75);
       return [gold, light, Math.max(0, 1 - gold - light)];
     } },
+    // Violet + peach watercolor cloud: the cool (violet / lilac) paint and the warm (peach / coral) paint each follow their
+    // own color, as pigment on paper (pale stays pale, dense paint takes the full color); near-whites stay as painted.
+    cloud: { pigment: ['violet', 'peach'], comps: ['keep', 'violet', 'peach'], weights: (L, a, b, C, H) => {
+      const col = ramp01(C, 2, 6), warm = ramp01(Math.cos((H - 50) * Math.PI / 180), -.15, .35);
+      return [1 - col, col * (1 - warm), col * warm];
+    } },
     // Colored ink on paper (e.g. a flattened page): only the ink changes.
     ink: { comps: ['keep', 'main'], weights: (L, a, b, C) => { const c = ramp01(C, 8, 20); return [1 - c, c]; } },
     // Floral artwork: deep blooms, soft blooms, leaves, gold; page white and greys stay put.
@@ -1541,6 +1549,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     return out;
   }
 
+  const CLOUD = 'img:cloud-violet-peach';
   // The vertical centre (fraction of the page) of an artwork's fullest horizontal band, or null when the art already
   // fills its page edges (then a bar keeps the slice at its own spot). Measured once per image on a small copy.
   const bandCache = new Map();
@@ -1579,7 +1588,11 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
       if (s.marble === 'abstract') paintAbstract(ctx, ax, ay, PW, PH, s);
       else {
-        const key = `canva:${s.marble.slice(4)}`, img = ASSETS[key];
+        const key = `canva:${s.marble.slice(4)}`, raw = ASSETS[key];
+        // The cloud recolors like the abstract watercolor: violet paint → stone, peach paint → accent (unless its original colors are chosen).
+        const img = raw && s.marble === CLOUD && s.bgArt === 'palette'
+          ? toneTransfer(raw, Math.min(1200, raw.naturalWidth), Math.round(Math.min(1200, raw.naturalWidth) * raw.naturalHeight / raw.naturalWidth), 'cloud', { violet: s.palette.stone, peach: s.palette.accent || s.palette.vein })
+          : raw;
         ctx.fillStyle = s.palette.paper; ctx.fillRect(x, y, w, h);
         // A thin bar on a page shows the fullest band of an airy artwork (a cloud that leaves the page edges blank),
         // centred on the bar, instead of the near-empty slice at the page edge.
@@ -2550,10 +2563,10 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   // ---------- Decorative slots (top / bottom / divider) ----------
   // The zones are fixed by the layout (above and below the title plate, never over it); the CONTENT of each
   // zone is whatever approved or uploaded asset the user picks, recolored and sized within the zone's bounds.
-  function drawCover(ctx, img, x, y, w, h) {          // object-fit: cover, centred
-    const ir = img.naturalWidth / img.naturalHeight, r = w / h;
-    let sw = img.naturalWidth, sh = img.naturalHeight, sx = 0, sy = 0;
-    if (ir > r) { sw = sh * r; sx = (img.naturalWidth - sw) / 2; } else { sh = sw / r; sy = (img.naturalHeight - sh) / 2; }
+  function drawCover(ctx, img, x, y, w, h) {          // object-fit: cover, centred (an image or a canvas)
+    const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height, ir = iw / ih, r = w / h;
+    let sw = iw, sh = ih, sx = 0, sy = 0;
+    if (ir > r) { sw = sh * r; sx = (iw - sw) / 2; } else { sh = sw / r; sy = (ih - sh) / 2; }
     ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
   }
   // Which color treatments an asset supports: line art tints; full-color art keeps or remaps its colors.
@@ -4605,11 +4618,11 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
 
   // Artwork with its own colors (Canva watercolors, floral) switches to "recolor" as soon as a color it uses is edited,
   // so a color change always shows. Picking the background's own recommended palette returns it to original colors.
-  const ART_ROLES = { abstract: ['stone', 'highlight', 'accent', 'vein', 'paper'], floral: ['plate', 'highlight', 'stone', 'trim'] };
+  const ART_ROLES = { abstract: ['stone', 'highlight', 'accent', 'vein', 'paper'], floral: ['plate', 'highlight', 'stone', 'trim'], [CLOUD]: ['stone', 'accent'] };
   function artFollowsColor(key) {
     if (state.journal !== 'dream') { if (PR_ART_ROLES[state.journal].includes(key)) state.prayerArt = 'palette'; return; }
     if (!ART_ROLES[state.marble]?.includes(key)) return;
-    if (state.marble === 'abstract') state.bgArt = 'palette';
+    if (state.marble === 'abstract' || state.marble === CLOUD) state.bgArt = 'palette';
     if (state.marble === 'floral') {
       for (const k of ['top', 'bottom']) if (state.decor[k].asset === 'decor-floral') state.decor[k].colorMode = 'palette';
       if (state.floralArt === 'original') state.floralArt = 'cover';
@@ -4618,7 +4631,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   function artFollowsPalette() {
     if (state.journal !== 'dream') { state.prayerArt = state.palette.name === JOURNALS[state.journal].palette && !state.palette.v ? 'original' : 'palette'; return; }
     const rec = bgAssetFor(state.marble)?.recommendedPalette, original = rec && state.palette.name === rec && !state.palette.v;
-    if (state.marble === 'abstract') state.bgArt = original ? 'original' : 'palette';
+    if (state.marble === 'abstract' || state.marble === CLOUD) state.bgArt = original ? 'original' : 'palette';
     if (state.marble === 'floral') for (const k of ['top', 'bottom']) if (state.decor[k].asset === 'decor-floral') state.decor[k].colorMode = original ? 'original' : 'palette';
   }
   // Only the colors the current design actually uses, named for what they color.
@@ -4667,6 +4680,10 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       add('accent', 'Watercolor', 'Orange + peach shapes', 'Warm middle layers', null);
       add('vein', 'Watercolor', 'Gold lines + splatter', 'Fine gold details', 'showVeins');
       add('paper', 'Watercolor', 'Paper', 'Cream base', null);
+    } else if (m === CLOUD) {
+      add('stone', 'Cloud', 'Violet paint', 'The cool side of the wash', null);
+      add('accent', 'Cloud', 'Peach paint', 'The warm side of the wash', null);
+      add('paper', 'Cloud', 'Paper', 'Shows through the soft edges', null);
     } else if (m === 'floral') {
       add('plate', 'Flowers', 'Deep roses', 'Burgundy blooms, boxes + page titles', null);
       add('highlight', 'Flowers', 'Soft pink blooms', 'Blush flowers + Belongs To box', null);
@@ -4762,7 +4779,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     const recBtn = $('recommendColors');
     recBtn.classList.toggle('hidden', !rec || paletteMatch()?.name === rec.name);
     if (rec) recBtn.textContent = `Use recommended colors (${rec.name})`;
-    $('bgArtRow').classList.toggle('hidden', state.marble !== 'abstract'); $('bgArt').value = state.bgArt;
+    $('bgArtRow').classList.toggle('hidden', state.marble !== 'abstract' && state.marble !== CLOUD); $('bgArt').value = state.bgArt;
     const floralNote = $('floralNote');
     floralNote.classList.toggle('hidden', !bg?.bakedTitle);
     floralNote.textContent = state.plateStyle === 'none'
