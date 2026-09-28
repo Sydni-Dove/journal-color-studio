@@ -524,7 +524,8 @@ function placeObjects(c: Ctx, asset: Exclude<DesignAsset, { type: "marble" | "pa
 
 export function planDecoration(g: PageGeometry, input: DecorativeTheme, colors: ColorTokens, comp: Composition): DecorPlan | null {
   const theme = normalizeDecoration(input);
-  if (theme.style === "none") return null;
+  // A designed cover or divider is its own artwork: a band or frame from the project would cut across it.
+  if (theme.style === "none" || comp.ownArtwork) return null;
   const W = g.mediaWidthIn, H = g.mediaHeightIn;
   const ox = g.trimOffset.x, oy = g.trimOffset.y;
   const toMedia = (r: Rect): Rect => ({ x: r.x + ox, y: r.y + oy, w: r.w, h: r.h });

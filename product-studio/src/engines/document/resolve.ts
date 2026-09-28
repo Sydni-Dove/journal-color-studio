@@ -19,6 +19,7 @@ import { PRODUCT_RECOMMENDED_MARGINS, PRODUCT_TYPES } from "../../presets/produc
 import { resolveSpacing } from "../../presets/spacing/spacingPresets";
 import { resolveColors } from "../../presets/themes/palettes";
 import { resolveTypography } from "../../presets/typography/typography";
+import { withLuxeCoverType } from "../../presets/coverLuxe";
 import { resolveWording } from "../../presets/wording";
 import type { BindingProfile } from "../../types/binding";
 import type { CalendarData, WeekStart } from "../../types/calendar";
@@ -117,6 +118,20 @@ function isPaged(binding: BindingProfile, duplex: boolean): boolean {
   return binding.boundEdgeMode === "book-spine" || (binding.boundEdgeMode === "punched-leaf" && duplex);
 }
 
+/** Cover and divider pages drawn in a designed style (not "plain"): they carry that design's title type. */
+export const designedCoverPage = (p: PageInstance) => (p.layoutId === "cover-page" || p.layoutId === "divider-page") && p.module?.cover?.preset !== "plain";
+
+/**
+ * The document's typography: the project's, plus — when the book has Neutral
+ * Cheetah Luxe covers or dividers — that design's script title and spaced
+ * subtitle, so choosing the design gives its type without changing the
+ * project's other fonts or colors.
+ */
+function bookTypography(project: ProductProject, recipe: ExpandedRecipe): TypographySettings {
+  const t = resolveTypography(project.typography.fonts, project.typography.roleOverrides);
+  return recipe.pages.some(designedCoverPage) ? withLuxeCoverType(t, project.typography.roleOverrides) : t;
+}
+
 export function resolveDocument(input: ProductProject): ResolvedDocument {
   const project = applyVariant(input);
   const productType = PRODUCT_TYPES[project.productType];
@@ -172,7 +187,7 @@ export function resolveDocument(input: ProductProject): ResolvedDocument {
     weekStart: project.calendar?.weekStart ?? 1,
     recipe,
     spacing: resolveSpacing(project.spacing.density, project.spacing.overrides),
-    typography: resolveTypography(project.typography.fonts, project.typography.roleOverrides),
+    typography: bookTypography(project, recipe),
     colors: resolveColors(project.colors.paletteId, project.colors.overrides),
     wording: resolveWording(project.wording),
     // Projects saved before the design-library snapshot may carry retired

@@ -175,4 +175,9 @@ export type SolvedPage = {
   regions?: LayoutRegions;
   /** Node id of the page's title (composition anchor "title"); defaults to the first page-title semantic. */
   titleId?: string;
+  /**
+   * The page is its own artwork (a designed cover or divider): the project's
+   * background and decorative elements are not drawn on it.
+   */
+  ownArtwork?: boolean;
 };

@@ -10,8 +10,9 @@ const WEIGHTS = [400, 500, 600, 700];
  * Loads the selected font families and reports when they are ready, so text
  * measurement (validation) runs against the real glyph metrics.
  */
-export function useFontLoader(fonts: FontSelection): boolean {
-  const families = [...new Set(Object.values(fonts))].sort();
+export function useFontLoader(fonts: FontSelection, extra: string[] = []): boolean {
+  // `extra`: families a role may use on its own (a designed cover's script title).
+  const families = [...new Set([...Object.values(fonts), ...extra])].sort();
   const key = families.join("|");
   const [ready, setReady] = useState(false);
 

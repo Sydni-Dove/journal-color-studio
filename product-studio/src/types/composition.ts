@@ -103,6 +103,8 @@ export type Composition = {
   /** Trim size and bleed (media extends `bleedIn` past each trim edge). */
   trim: { w: number; h: number };
   bleedIn: { x: number; y: number };
+  /** The page draws its own artwork (SolvedPage.ownArtwork): no project decoration on it. */
+  ownArtwork?: boolean;
 };
 
 export type AlignX = "start" | "center" | "end";

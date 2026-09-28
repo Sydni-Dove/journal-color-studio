@@ -168,6 +168,7 @@ export function resolveComposition(
     clearanceIn: clearance,
     trim: { w: W, h: H },
     bleedIn: { x: g.trimOffset.x, y: g.trimOffset.y },
+    ownArtwork: solved.ownArtwork,
   };
 }
 

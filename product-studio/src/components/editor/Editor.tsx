@@ -1,3 +1,4 @@
+import { LUXE_TITLE_FONT } from "../../presets/coverLuxe";
 import { useCallback, useMemo, useState, type CSSProperties } from "react";
 import { PanelResizer, usePanelWidth } from "./PanelResizer";
 import { compositionFor, geometryFor, resolveDocument, solvePage, type ResolvedDocument } from "../../engines/document/resolve";
@@ -45,7 +46,8 @@ export function Editor({ project, onChange, onBack, saveStatus }: Props) {
   const [debug, setDebug] = useState<DebugFlags>(DEBUG_OFF);
   const [exporting, setExporting] = useState(false);
   const panel = usePanelWidth();
-  const fontsReady = useFontLoader(project.typography.fonts);
+  // The Neutral Cheetah Luxe script is always loaded: covers and dividers in that design use it for their title.
+  const fontsReady = useFontLoader(project.typography.fonts, [LUXE_TITLE_FONT]);
   const facesLoaded = useFontFacesLoaded();
 
   const update = useCallback(

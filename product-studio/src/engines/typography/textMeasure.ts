@@ -17,7 +17,7 @@ export type TextMeasurer = (text: string, style: TextStyle) => number;
 
 export function styleForRole(typography: TypographySettings, role: keyof TypographySettings["roles"]): TextStyle {
   const r = typography.roles[role];
-  return { family: typography.fonts[r.group], sizePt: r.sizePt, weight: r.weight, style: r.style, trackingEm: r.trackingEm, transform: r.transform };
+  return { family: r.family ?? typography.fonts[r.group], sizePt: r.sizePt, weight: r.weight, style: r.style, trackingEm: r.trackingEm, transform: r.transform };
 }
 
 /** A text node's measuring style: its role, at the fitted size when the layout fitted it. */

@@ -50,10 +50,31 @@ export const LUXE_RINGS: LuxeCircle[] = [
   { id: "luxe-ring-right", x: 1.13, y: 0.942, r: 0.35 },
   { id: "luxe-ring-low", x: 0.779, y: 1.057, r: 0.236 },
 ];
-/** Title, subtitle and gold rule anchors (fractions of the trim). */
-// titleBase: where the title's box ends — its baseline with the design's tight leading (the lettering's
-// loops and descenders draw past the box, as the reference's P does beside the subtitle).
-const LUXE_TEXT = { titleX: 0.52, titleBase: 0.68, titleW: 0.9, subX: 0.593, subY: 0.706, subW: 0.26, subLineGap: 0.043, ruleGap: 0.036, ruleW: 0.173 };
+/**
+ * Title, subtitle and gold rule anchors (fractions of the trim). Cover and
+ * divider have their own zones:
+ *   COVER    the title is the page's focal point — as wide as the design
+ *            allows, its lettering between the burgundy circle and the lower
+ *            shapes, the subtitle stacked under its last letters (reference:
+ *            "Plan / WITH PURPOSE")
+ *   DIVIDER  a section label — a smaller, centred title a little above the
+ *            middle, the subtitle on one centred line, a short centred rule
+ * titleBase: where the title's box ends — its baseline with the design's tight
+ * leading (the lettering's loops and descenders draw past the box, as the
+ * reference's P does beside the subtitle). titleH caps the title's height.
+ */
+type TextZone = { titleX: number; titleBase: number; titleW: number; titleH: number; subX: number; subY: number; subW: number; subLineGap: number; stack: boolean; ruleGap: number; ruleW: number; ruleX: number };
+export const COVER_TEXT: TextZone = { titleX: 0.52, titleBase: 0.68, titleW: 0.9, titleH: 0.45, subX: 0.593, subY: 0.706, subW: 0.26, subLineGap: 0.043, stack: true, ruleGap: 0.036, ruleW: 0.173, ruleX: 0.593 };
+/**
+ * The cover title hangs from the burgundy circle, not from a fixed share of the
+ * page height: its box starts this far below the circle, and the subtitle sits
+ * this far below the title's baseline — both in the design's scale (R), so a
+ * taller trim keeps the title with its anchor shape instead of drifting down
+ * (measured from the Letter reference: the box top 1.24" under the circle, the
+ * subtitle's first line centred 0.29" under the baseline).
+ */
+export const COVER_TITLE_GAP_R = 0.146, COVER_SUB_BELOW_R = 0.0336;
+export const DIVIDER_TEXT: TextZone = { titleX: 0.5, titleBase: 0.56, titleW: 0.74, titleH: 0.24, subX: 0.5, subY: 0.6, subW: 0.6, subLineGap: 0.04, stack: false, ruleGap: 0.036, ruleW: 0.12, ruleX: 0.5 };
 const RING_PT = 1.9, RULE_PT = 1.8;
 
 /** One line of the title, as large as the width allows (the role's size is the ceiling). */
@@ -66,12 +87,12 @@ function fillTitle(value: string, rect: Rect, ctx: LayoutContext): TextFit & { o
 }
 
 /** The subtitle stacked on two lines, as in the reference ("WITH / PURPOSE"); one line for a single word. */
-function stackSubtitle(value: string, w: number, lineGapIn: number, ctx: LayoutContext): TextFit & { ok: boolean } {
+function stackSubtitle(value: string, w: number, lineGapIn: number, ctx: LayoutContext, stack = true): TextFit & { ok: boolean } {
   const r = ctx.typography.roles.coverSubtitle, base = styleForRole(ctx.typography, "coverSubtitle");
   const words = value.trim().split(/\s+/).filter(Boolean);
   const measure = (t: string, pt: number) => getLayoutMeasurer().measure(t, { ...base, sizePt: pt });
   let lines = [value];
-  if (words.length > 1) {
+  if (stack && words.length > 1) {
     let best = Infinity;
     for (let k = 1; k < words.length; k++) {
       const pair = [words.slice(0, k).join(" "), words.slice(k).join(" ")];
@@ -130,34 +151,39 @@ function solve(ctx: LayoutContext, divider: boolean): SolvedPage[] {
     if (!fitted.ok) diagnostics.push({ severity: "error", rule: "heading-fit", componentId: id, message: "This wording is too long. Shorten it or choose a larger page." });
     nodes.push(node);
   };
-  // Title: one line of script, as wide as the reference's.
-  const tx = clampX(LUXE_TEXT.titleX * W, LUXE_TEXT.titleW * W);
-  const titleFit = fillTitle(title, { ...tx, y: 0, h: content.h * 0.45 }, ctx);
+  const Z = divider ? DIVIDER_TEXT : COVER_TEXT;
+  // Title: one line of script, as wide as the zone allows (the cover's the widest, a divider's smaller).
+  const tx = clampX(Z.titleX * W, Z.titleW * W);
+  const titleFit = fillTitle(title, { ...tx, y: 0, h: Math.min(content.h, H * Z.titleH) }, ctx);
   const titleH = (titleFit.sizePt * titleFit.lineHeight) / 72;
-  const titleRect = { ...tx, y: clampY((LUXE_TEXT.titleBase + shift) * H - titleH, titleH), h: titleH };
+  const burgundy = LUXE_CIRCLES[0];
+  const titleTop = divider ? (Z.titleBase + shift) * H - titleH : burgundy.y * H + burgundy.r * R + COVER_TITLE_GAP_R * R + shift * H;
+  const titleRect = { ...tx, y: clampY(titleTop, titleH), h: titleH };
   push("cover-title", title, titleRect, "coverTitle", titleFit);
   // Subtitle: stacked, widely spaced, right of centre under the title.
   const subtitle = opt.subtitle ?? (divider ? "" : "WITH PURPOSE");
   let below = titleRect.y + titleRect.h;
   if (subtitle.trim()) {
-    const sx = clampX(LUXE_TEXT.subX * W, LUXE_TEXT.subW * W);
-    const subFit = stackSubtitle(subtitle, sx.w, LUXE_TEXT.subLineGap * H, ctx);
+    const sx = clampX(Z.subX * W, Z.subW * W);
+    const subFit = stackSubtitle(subtitle, sx.w, Z.subLineGap * H, ctx, Z.stack);
     const subH = (subFit.sizePt * subFit.lineHeight * subFit.lines.length) / 72;
     // The subtitle tucks under the title's last letters ("an" in the reference). A letter with a tail
     // (g j p q y) above it would run into it, so the subtitle drops below the tail instead.
     const tail = descenderOver(title, titleRect, titleFit.sizePt, left, sx, ctx) ? DESCENDER_EM * (titleFit.sizePt / 72) : 0;
-    const top = (LUXE_TEXT.subY + shift) * H - (subFit.sizePt * subFit.lineHeight) / 72 / 2 + tail;
+    const firstLine = divider ? (Z.subY + shift) * H : titleRect.y + titleRect.h + COVER_SUB_BELOW_R * R;
+    // Never above the title's box: on a small trim the design-scale gap is less than half a subtitle line.
+    const top = Math.max(firstLine - (subFit.sizePt * subFit.lineHeight) / 72 / 2, titleRect.y + titleRect.h) + tail;
     const subRect = { ...sx, y: clampY(top, subH), h: subH };
     push("cover-subtitle", subtitle, subRect, "coverSubtitle", subFit);
     below = subRect.y + subRect.h;
   }
   if (opt.smallLine !== false) {
-    const rx = clampX(LUXE_TEXT.subX * W, LUXE_TEXT.ruleW * W), ry = Math.min(below + LUXE_TEXT.ruleGap * H * 0.5, content.y + content.h);
+    const rx = clampX(Z.ruleX * W, Z.ruleW * W), ry = Math.min(below + Z.ruleGap * H * 0.5, content.y + content.h);
     nodes.push(rule("cover-line", rx.x, ry, rx.x + rx.w, ry, { color: "lineArt", strokePt: RULE_PT }));
     below = ry;
   }
   if (opt.quote) {
-    const qx = clampX(LUXE_TEXT.subX * W, 0.6 * W), qy = below + 0.2;
+    const qx = clampX(Z.subX * W, 0.6 * W), qy = below + 0.2;
     const qRect = { ...qx, y: qy, h: Math.max(0.2, content.y + content.h - qy) };
     push("cover-quote", opt.quote, qRect, "body", { ...fitHeading(opt.quote, "body", qRect, ctx) });
   }
@@ -171,7 +197,8 @@ function solve(ctx: LayoutContext, divider: boolean): SolvedPage[] {
     label.fit = { ...fitted, failed: !fitted.ok }; nodes.push(label);
     if (!fitted.ok) diagnostics.push({ severity: "error", rule: "tab-label-fit", componentId: label.id, message: "This tab label is too long. Use a short label or fewer tabs." });
   }
-  return [{ nodes, diagnostics, metrics: [], regions: { mainContent: content } }];
+  // A designed page is its own artwork: the project's background band or frame would cut across it.
+  return [{ nodes, diagnostics, metrics: [], regions: { mainContent: content }, ownArtwork: opt.preset !== "plain" }];
 }
 const capability = { ...guidedPage.capability, supportsPatterns: [], supportsLineStyle: false, supportsPageNumbers: false, supportsFooter: false, wordingKeys: [] };
 export const coverPage: LayoutDefinition = { id: "cover-page", label: "Cover page", description: "Reusable front cover, section cover or title page.", family: "shared", pages: 1, period: "none", capability, fit: minimumAreaFit(1.5, 2.5), solve: (ctx) => solve(ctx, false) };

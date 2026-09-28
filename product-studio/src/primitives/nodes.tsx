@@ -3,6 +3,7 @@
  * They never compute geometry — positions come from the layout solvers —
  * so the editor preview and the print output are the same drawing.
  */
+import { fontStack } from "../presets/typography/typography";
 import { useId, memo, type CSSProperties } from "react";
 import type { BoxNode, CheckboxNode, DotsNode, LayoutNode, LinesNode, RuleNode, TextNode } from "../types/layout";
 import type { ColorToken, TypographySettings } from "../types/tokens";
@@ -83,7 +84,7 @@ export function TextBlock({ node, typography }: { node: TextNode; typography: Ty
     flexDirection: "column",
     justifyContent: node.vAlign === "top" ? "flex-start" : node.vAlign === "bottom" ? "flex-end" : "center",
     textAlign: align,
-    fontFamily: `var(--f-${role.group})`,
+    fontFamily: role.family ? fontStack(role.family) : `var(--f-${role.group})`,
     fontSize: `${node.fit?.sizePt ?? role.sizePt}pt`,
     fontWeight: role.weight,
     fontStyle: role.style,

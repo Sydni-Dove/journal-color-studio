@@ -85,6 +85,8 @@ export type TextTransform = "none" | "uppercase" | "lowercase" | "capitalize" | 
 
 export type TypographyRoleStyle = {
   group: FontGroup;
+  /** A family for this role alone, in place of its group's font (a designed cover's script title). */
+  family?: string;
   sizePt: number;
   weight: number;
   style: "normal" | "italic";
