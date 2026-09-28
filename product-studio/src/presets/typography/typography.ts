@@ -42,6 +42,7 @@ export const FONT_CATALOG: FontDefinition[] = [
   { family: "Josefin Sans", category: "sans-serif", googleSpec: "ital,wght@0,400;0,600;0,700;1,400", fallback: "Helvetica, Arial, sans-serif", avgCharEm: 0.5 },
   { family: "Inter", category: "sans-serif", googleSpec: "wght@400;600;700", fallback: "Helvetica, Arial, sans-serif", avgCharEm: 0.54 },
   // Script
+  { family: "Birthstone Bounce", category: "script", googleSpec: "wght@400;500", fallback: "cursive", avgCharEm: 0.4 },
   { family: "The Nautigal", category: "script", googleSpec: "wght@400;700", fallback: "cursive", avgCharEm: 0.4 },
   { family: "Dancing Script", category: "script", googleSpec: "wght@400;700", fallback: "cursive", avgCharEm: 0.5 },
   { family: "Great Vibes", category: "script", googleSpec: "wght@400", fallback: "cursive", avgCharEm: 0.42 },

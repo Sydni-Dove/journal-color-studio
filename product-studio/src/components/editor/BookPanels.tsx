@@ -1,4 +1,5 @@
 import { neutralLuxeDividers } from "../../presets/bookRecipes";
+import { LUXE_SUBTITLE_STYLE, LUXE_TITLE_FONT, luxeTitleStyle, NEUTRAL_LUXE_ID } from "../../presets/coverLuxe";
 import { CoverDividerControls } from "./CoverDividerControls";
 /**
  * BOOK STRUCTURE — the composite recipe as the book reads: sections (Front
@@ -140,7 +141,7 @@ function StepCard({ s, siblings, scope, props, first, last }: { s: BookStep; sib
           <input type="text" value={s.title ?? ""} placeholder={moduleTitle(s.module, scope === "none" ? "none" : scope)} onChange={(e) => set({ title: e.target.value || undefined })} />
         </Field>
       )}
-      {(s.module === "cover-page" || s.module === "divider-page") && <CoverDividerControls step={s} set={set} titleFont={doc.typography.fonts.cover} onTitleFont={(cover) => update((p) => ({ ...p, typography: { ...p.typography, fonts: { ...p.typography.fonts, cover }, roleOverrides: { ...p.typography.roleOverrides, coverTitle: { ...p.typography.roleOverrides.coverTitle, sizePt: 150, weight: cover === "The Nautigal" || cover === "Dancing Script" ? 700 : 400, color: "text", transform: "none", trackingEm: 0, lineHeight: 1.2 } } } }))} applyPreset={() => update((p) => ({ ...p, colors: { paletteId: "neutral-cheetah-luxe", overrides: {} }, typography: { ...p.typography, fonts: { ...p.typography.fonts, cover: "The Nautigal" }, roleOverrides: { ...p.typography.roleOverrides, coverTitle: { ...p.typography.roleOverrides.coverTitle, sizePt: 150, color: "text", weight: 700, transform: "none", trackingEm: 0, lineHeight: 1.2 }, coverSubtitle: { ...p.typography.roleOverrides.coverSubtitle, sizePt: 10, color: "text", transform: "uppercase", trackingEm: 0.22 } } } }))}/>}
+      {(s.module === "cover-page" || s.module === "divider-page") && <CoverDividerControls step={s} set={set} titleFont={doc.typography.fonts.cover} onTitleFont={(cover) => update((p) => ({ ...p, typography: { ...p.typography, fonts: { ...p.typography.fonts, cover }, roleOverrides: { ...p.typography.roleOverrides, coverTitle: { ...p.typography.roleOverrides.coverTitle, ...luxeTitleStyle(cover) } } } }))} applyPreset={() => update((p) => ({ ...p, colors: { paletteId: NEUTRAL_LUXE_ID, overrides: {} }, typography: { ...p.typography, fonts: { ...p.typography.fonts, cover: LUXE_TITLE_FONT }, roleOverrides: { ...p.typography.roleOverrides, coverTitle: { ...p.typography.roleOverrides.coverTitle, ...luxeTitleStyle(LUXE_TITLE_FONT) }, coverSubtitle: { ...p.typography.roleOverrides.coverSubtitle, ...LUXE_SUBTITLE_STYLE } } } }))}/>}
       {guided && (
         <details className="subsection" open>
           <summary>Prompts</summary>

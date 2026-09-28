@@ -4,7 +4,9 @@ import { neutralLuxeDividers } from "../src/presets/bookRecipes";
 import { resolveDocument, solvePage, geometryFor } from "../src/engines/document/resolve";
 import { SIZE_PRESETS } from "../src/presets/sizes/sizePresets";
 import { rectContains } from "../src/engines/layout/math";
-import { tabEdge, tabGeometry } from "../src/layouts/book/coverDivider";
+import { LUXE_CHEETAH, LUXE_CIRCLES, LUXE_RINGS, tabEdge, tabGeometry } from "../src/layouts/book/coverDivider";
+import { LUXE_SUBTITLE_STYLE, LUXE_TITLE_FONT, luxeTitleStyle, NEUTRAL_LUXE_ID } from "../src/presets/coverLuxe";
+import { findPalette } from "../src/presets/themes/palettes";
 import { validateProject } from "../src/engines/validation/validate";
 import { heuristicMeasurer } from "../src/engines/typography/textMeasure";
 import { step } from "../src/presets/bookRecipes";
@@ -55,6 +57,50 @@ describe("Reusable covers and printed tabs", () => {
       expect(title.rect.x + title.rect.w <= tab.rect.x || tab.rect.x + tab.rect.w <= title.rect.x).toBe(true);
     }
     expect(validateProject(p, heuristicMeasurer).issues.filter((x) => x.severity === "error")).toEqual([]);
+  });
+  it("Neutral Cheetah Luxe: the reference cover's composition, colors and type on every size", () => {
+    const luxeType = (size: string) => {
+      const p = luxeProject(size);
+      p.typography = { ...p.typography, fonts: { ...p.typography.fonts, cover: LUXE_TITLE_FONT }, roleOverrides: { ...p.typography.roleOverrides, coverTitle: luxeTitleStyle(LUXE_TITLE_FONT), coverSubtitle: LUXE_SUBTITLE_STYLE } };
+      return p;
+    };
+    // Palette: sampled from the reference.
+    const c = findPalette(NEUTRAL_LUXE_ID).colors;
+    expect([c.primary, c.decorHighlight, c.accent, c.secondary, c.decorativeAccent, c.lineArt, c.background]).toEqual(["#5b0610", "#f2d8cd", "#c5674a", "#e9d3c0", "#718496", "#c8974d", "#ffffff"]);
+    for (const size of ["8.5x11", "6x9", "5.5x8.5", "a5"]) {
+      const doc = resolveDocument(luxeType(size)), g = geometryFor(doc, doc.recipe.pages[0]), s = solvePage(doc, 0);
+      const W = g.trimWidthIn, H = g.trimHeightIn, R = Math.min(W, (H * 8.5) / 11);
+      const circle = (id: string) => s.nodes.find((n) => n.id === id)!;
+      // Every shape at its reference position (fractions of the trim), in draw order: fills, cheetah, rings.
+      for (const ref of [...LUXE_CIRCLES, ...LUXE_CHEETAH, ...LUXE_RINGS]) {
+        const n = circle(ref.id);
+        expect(n.rect.x + n.rect.w / 2, `${size} ${ref.id}`).toBeCloseTo(ref.x * W, 6);
+        expect(n.rect.y + n.rect.h / 2).toBeCloseTo(ref.y * H, 6);
+        expect(n.rect.w / 2).toBeCloseTo(ref.r * R, 6);
+      }
+      const order = s.nodes.filter((n) => n.type === "circle").map((n) => n.id);
+      expect(order).toEqual([...LUXE_CIRCLES, ...LUXE_CHEETAH, ...LUXE_RINGS].map((r) => r.id));
+      expect(LUXE_RINGS.every((r) => { const n = circle(r.id); return n.type === "circle" && n.outline && n.stroke === "lineArt" && n.fill === null; })).toBe(true);
+      expect(LUXE_CHEETAH.every((r) => { const n = circle(r.id); return n.type === "circle" && n.leopard; })).toBe(true);
+      // Title: one line of script; subtitle stacked on two lines below the title's box; gold rule under it.
+      const title = s.nodes.find((n) => n.id === "cover-title")!, sub = s.nodes.find((n) => n.id === "cover-subtitle")!, line = s.nodes.find((n) => n.id === "cover-line")!;
+      expect(title.type === "text" && title.fit?.lines).toEqual(["Plan"]);
+      expect(sub.type === "text" && sub.fit?.lines).toEqual(["WITH", "PURPOSE"]);
+      expect(sub.rect.y).toBeGreaterThanOrEqual(title.rect.y + title.rect.h - 1e-9);
+      expect(line.type === "rule" && line.color).toBe("lineArt");
+      expect(line.rect.y).toBeGreaterThan(sub.rect.y + sub.rect.h);
+      for (const n of [title, sub, line]) expect(rectContains(g.safeRect, n.rect), `${size} ${n.id}`).toBe(true);
+      expect(validateProject(luxeType(size), heuristicMeasurer, { pageIndices: [0] }).issues.filter((x) => x.severity === "error")).toEqual([]);
+    }
+  });
+  it("a title letter with a tail (g j p q y) above the subtitle pushes the subtitle below it", () => {
+    const at = (title: string) => {
+      const p = luxeProject("8.5x11");
+      p.recipe = { items: [], ordering: "sequential", structure: [step("cover-page", { type: "once" }, { title, cover: { subtitle: "DRAW NEAR" } })] };
+      p.typography = { ...p.typography, roleOverrides: { ...p.typography.roleOverrides, coverTitle: luxeTitleStyle(LUXE_TITLE_FONT) } };
+      return solvePage(resolveDocument(p), 0).nodes.find((n) => n.id === "cover-subtitle")!.rect.y;
+    };
+    expect(at("Prayer")).toBeGreaterThan(at("Plan") + 0.1);
   });
   it("covers and dividers start on a right-hand page by default; a step can still choose its side", () => {
     const p = { ...luxeProject("8.5x11"), production: { ...luxeProject("8.5x11").production, bindingType: "coil" as const, printProfileId: "coil-generic", duplex: true } };

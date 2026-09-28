@@ -42,6 +42,7 @@ const brandBase: ColorTokens = {
  * base on the paper. (Snapshotted JCS palettes carry JCS's own values.)
  */
 type DerivedRoles = "lineArt" | "patternGround" | "patternInk";
+export const NEUTRAL_LUXE_ID = "neutral-cheetah-luxe";
 const derived = (c: Omit<ColorTokens, DerivedRoles> & Partial<Pick<ColorTokens, DerivedRoles>>): ColorTokens => ({ ...c, lineArt: c.decorativeAccent, patternGround: c.background, patternInk: c.decorBase });
 
 export const PALETTES: ColorPalette[] = [
@@ -67,7 +68,18 @@ export const PALETTES: ColorPalette[] = [
     colors: { ...brandBase, primary: DOVE_BRAND.charcoal, border: DOVE_BRAND.charcoal, decorBase: DOVE_BRAND.charcoal },
   },
   // Cover & divider design preset (after the brand palettes, so Dove Signature stays the default).
-  { id: "neutral-cheetah-luxe", label: "Neutral Cheetah Luxe", brandPalette: false, colors: { primary: "#482c20", secondary: "#d4bca2", accent: "#a7694e", background: "#f5efe5", text: "#14110f", mutedText: "#5e5148", line: "#14110f", border: "#14110f", decorativeAccent: "#84939c", decorBase: "#482c20", decorHighlight: "#e3d3bf", lineOpacity: 0.3 } },
+  // Sampled from the reference cover: burgundy, tan, terracotta, slate blue and blush
+  // circles, gold rings and rule, cheetah print, black script on white paper.
+  {
+    id: NEUTRAL_LUXE_ID,
+    label: "Neutral Cheetah Luxe",
+    brandPalette: false,
+    colors: {
+      primary: "#5b0610", secondary: "#e9d3c0", accent: "#c5674a", background: "#ffffff", text: "#121212", mutedText: "#5e5148",
+      line: "#121212", border: "#121212", decorativeAccent: "#718496", decorBase: "#5b0610", decorHighlight: "#f2d8cd", lineOpacity: 0.3,
+      lineArt: "#c8974d", patternGround: "#d39a6e", patternInk: "#22140f",
+    },
+  },
   // ── Variant palettes requested for product variants. These use colors
   //    OUTSIDE the approved brand palette and require designer approval. ──
   {
@@ -91,7 +103,8 @@ export const PALETTES: ColorPalette[] = [
     colors: { ...brandBase, primary: "#1E3A5C", border: "#1E3A5C", decorBase: "#1E3A5C", decorativeAccent: "#9FB6CE" },
     note: "Non-brand hex values — pending designer approval.",
   },
-].map((p) => ({ ...p, colors: derived(p.colors) }));
+  // Neutral Cheetah Luxe sets its own line-art (gold) and cheetah-print colors.
+].map((p) => ({ ...p, colors: p.id === NEUTRAL_LUXE_ID ? (p.colors as ColorTokens) : derived(p.colors) }));
 PALETTES.push(
   // Approved Journal Color Studio palettes and color families (one-way snapshot).
   ...JCS_PALETTES_ADAPTED,

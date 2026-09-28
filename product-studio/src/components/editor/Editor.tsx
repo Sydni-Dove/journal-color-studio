@@ -6,7 +6,7 @@ import { computeUsage } from "../../engines/document/usage";
 import { createCanvasMeasurer, heuristicMeasurer, setLayoutMeasurer } from "../../engines/typography/textMeasure";
 import { finalizeReport, validatePage, validateProductLevel } from "../../engines/validation/validate";
 import type { ProductProject } from "../../types/project";
-import { useFontLoader } from "../../utils/useFontLoader";
+import { useFontFacesLoaded, useFontLoader } from "../../utils/useFontLoader";
 import { DEBUG_ALL, DEBUG_LABELS, DEBUG_OFF, type DebugFlags } from "../debug/DebugOverlay";
 import { GeometryInfo } from "../debug/GeometryInfo";
 import { ExportDialog, IssueList } from "../export/ExportDialog";
@@ -46,19 +46,21 @@ export function Editor({ project, onChange, onBack, saveStatus }: Props) {
   const [exporting, setExporting] = useState(false);
   const panel = usePanelWidth();
   const fontsReady = useFontLoader(project.typography.fonts);
+  const facesLoaded = useFontFacesLoaded();
 
   const update = useCallback(
     (fn: (p: ProductProject) => ProductProject) => onChange({ ...fn(project), updatedAt: new Date().toISOString() }),
     [project, onChange],
   );
 
-  // Layouts fit headings with the same real glyph metrics the live check uses, once the fonts have loaded.
+  // Layouts fit headings with the same real glyph metrics the live check uses, once the fonts have loaded
+  // (and again whenever another face finishes loading, so nothing stays measured with a fallback's widths).
   const layoutMeasure = useMemo(() => {
     const canvas = fontsReady ? createCanvasMeasurer() : null;
-    const id = canvas ? `canvas:${JSON.stringify(project.typography.fonts)}` : "heuristic";
+    const id = canvas ? `canvas:${JSON.stringify(project.typography.fonts)}:${facesLoaded}` : "heuristic";
     setLayoutMeasurer(id, canvas ?? heuristicMeasurer);
     return id;
-  }, [fontsReady, project.typography.fonts]);
+  }, [fontsReady, project.typography.fonts, facesLoaded]);
   // Re-resolve when the layout measurer changes (solve keys include it).
   const { doc, error } = useMemo(() => (void layoutMeasure, tryResolve(project)), [project, layoutMeasure]);
   const usage = useMemo(() => (doc ? computeUsage(doc) : null), [doc]);
@@ -72,7 +74,7 @@ export function Editor({ project, onChange, onBack, saveStatus }: Props) {
     const group = doc.recipe.pages[i].spreadPart !== undefined ? visibleIndices(doc, i, true) : pages;
     const issues = [...validateProductLevel(doc), ...group.flatMap((k) => validatePage(doc, k, measure))];
     return finalizeReport(issues, group.length);
-  }, [doc, index, fontsReady]);
+  }, [doc, index, fontsReady, facesLoaded]);
   const issueIds = useMemo(() => new Set((check?.issues ?? []).map((i) => i.componentId ?? "").filter(Boolean)), [check]);
 
   const current = doc && doc.recipe.pages.length ? Math.min(index, doc.recipe.pages.length - 1) : 0;

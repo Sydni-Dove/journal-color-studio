@@ -1,9 +1,10 @@
-import type { LayoutNode, SolvedPage } from "../../types/layout";
+import type { CircleNode, LayoutNode, SolvedPage, TextFit } from "../../types/layout";
 import type { PageGeometry, Rect } from "../../types/geometry";
 import type { CoverDividerSettings } from "../../types/recipe";
 import type { ColorToken } from "../../types/tokens";
+import { getLayoutMeasurer, styleForRole } from "../../engines/typography/textMeasure";
 import { text, box, rule } from "../shared/nodes";
-import { fitHeading } from "../shared/components";
+import { fitHeading, HEADING_MIN_PT } from "../shared/components";
 import { guidedPage } from "./guidedPage";
 import { minimumAreaFit, type LayoutContext, type LayoutDefinition } from "../shared/types";
 
@@ -24,6 +25,78 @@ export function tabGeometry(g: PageGeometry, tab: NonNullable<CoverDividerSettin
   return { x: tabEdge(g) === "left" ? s.x : s.x + s.w - w, y: s.y + (order - 1) * slot + (slot - h) / 2, w, h };
 }
 
+/**
+ * NEUTRAL CHEETAH LUXE — measured from the reference cover (Letter, "Plan / WITH
+ * PURPOSE"). Every shape is a fraction of the trim: x of its width, y of its
+ * height, r of the page's Letter-proportioned size, so each trim gets the same
+ * composition. Circles run off the trim edge (decoration, never content).
+ * Drawn in order: color circles, cheetah circles, then the thin rings over them.
+ */
+type LuxeCircle = { id: string; x: number; y: number; r: number; fill?: ColorToken };
+export const LUXE_CIRCLES: LuxeCircle[] = [
+  { id: "luxe-burgundy", x: 0.269, y: 0.108, r: 0.248, fill: "primary" },
+  { id: "luxe-blush", x: 0.655, y: 0.37, r: 0.184, fill: "decorHighlight" },
+  { id: "luxe-terracotta", x: 1.013, y: 0.536, r: 0.17, fill: "accent" },
+  { id: "luxe-tan", x: 0.109, y: 0.722, r: 0.132, fill: "secondary" },
+  { id: "luxe-slate", x: 0.24, y: 0.989, r: 0.222, fill: "decorativeAccent" },
+];
+export const LUXE_CHEETAH: LuxeCircle[] = [
+  { id: "luxe-cheetah-top", x: 0.88, y: 0.232, r: 0.132 },
+  { id: "luxe-cheetah-bottom", x: 0.858, y: 0.895, r: 0.116 },
+];
+export const LUXE_RINGS: LuxeCircle[] = [
+  { id: "luxe-ring-top", x: 0.384, y: 0.046, r: 0.349 },
+  { id: "luxe-ring-left", x: 0.188, y: 0.942, r: 0.308 },
+  { id: "luxe-ring-right", x: 1.13, y: 0.942, r: 0.35 },
+  { id: "luxe-ring-low", x: 0.779, y: 1.057, r: 0.236 },
+];
+/** Title, subtitle and gold rule anchors (fractions of the trim). */
+// titleBase: where the title's box ends — its baseline with the design's tight leading (the lettering's
+// loops and descenders draw past the box, as the reference's P does beside the subtitle).
+const LUXE_TEXT = { titleX: 0.52, titleBase: 0.68, titleW: 0.9, subX: 0.593, subY: 0.706, subW: 0.26, subLineGap: 0.043, ruleGap: 0.036, ruleW: 0.173 };
+const RING_PT = 1.9, RULE_PT = 1.8;
+
+/** One line of the title, as large as the width allows (the role's size is the ceiling). */
+function fillTitle(value: string, rect: Rect, ctx: LayoutContext): TextFit & { ok: boolean } {
+  const r = ctx.typography.roles.coverTitle;
+  const perPt = getLayoutMeasurer().measure(value, { ...styleForRole(ctx.typography, "coverTitle"), sizePt: 100 }) / 100;
+  // 98.5 % of the width: glyph widths scale almost, not exactly, linearly with size.
+  const sizePt = Math.max(HEADING_MIN_PT, Math.min(r.sizePt, perPt > 0 ? (rect.w * 0.985) / perPt : r.sizePt, (rect.h * 72) / r.lineHeight));
+  return { sizePt, lineHeight: r.lineHeight, lines: [value], ok: perPt * sizePt <= rect.w + 1e-6 };
+}
+
+/** The subtitle stacked on two lines, as in the reference ("WITH / PURPOSE"); one line for a single word. */
+function stackSubtitle(value: string, w: number, lineGapIn: number, ctx: LayoutContext): TextFit & { ok: boolean } {
+  const r = ctx.typography.roles.coverSubtitle, base = styleForRole(ctx.typography, "coverSubtitle");
+  const words = value.trim().split(/\s+/).filter(Boolean);
+  const measure = (t: string, pt: number) => getLayoutMeasurer().measure(t, { ...base, sizePt: pt });
+  let lines = [value];
+  if (words.length > 1) {
+    let best = Infinity;
+    for (let k = 1; k < words.length; k++) {
+      const pair = [words.slice(0, k).join(" "), words.slice(k).join(" ")];
+      const widest = Math.max(...pair.map((l) => measure(l, 10)));
+      if (widest < best) (best = widest), (lines = pair);
+    }
+  }
+  const widestAt10 = Math.max(...lines.map((l) => measure(l, 10)));
+  const sizePt = Math.max(HEADING_MIN_PT, Math.min(r.sizePt, widestAt10 > 0 ? (w / widestAt10) * 10 : r.sizePt));
+  return { sizePt, lineHeight: Math.max(1.3, (lineGapIn * 72) / sizePt), lines, ok: (widestAt10 * sizePt) / 10 <= w + 1e-6 };
+}
+
+/** How far a script tail (g j p q y) reaches below the baseline, in ems. */
+const DESCENDER_EM = 0.3;
+/** Whether a lowercase letter with a tail sits above the subtitle's column. */
+function descenderOver(title: string, rect: Rect, sizePt: number, left: boolean, col: { x: number; w: number }, ctx: LayoutContext): boolean {
+  const measure = getLayoutMeasurer().measure, style = { ...styleForRole(ctx.typography, "coverTitle"), sizePt };
+  const total = measure(title, style), x0 = left ? rect.x : rect.x + (rect.w - total) / 2;
+  return [...title].some((ch, i) => {
+    if (!/[gjpqy]/.test(ch)) return false;
+    const a = x0 + measure(title.slice(0, i), style), b = x0 + measure(title.slice(0, i + 1), style);
+    return b > col.x && a < col.x + col.w;
+  });
+}
+
 function solve(ctx: LayoutContext, divider: boolean): SolvedPage[] {
   const g = ctx.pages[0], s = g.safeRect, opt = ctx.module?.cover ?? {};
   const nodes: LayoutNode[] = [], diagnostics: SolvedPage["diagnostics"] = [];
@@ -32,43 +105,68 @@ function solve(ctx: LayoutContext, divider: boolean): SolvedPage[] {
   if (opt.tab?.show && !tab) diagnostics.push({ severity: "error", rule: "tab-fit", componentId: "tab", message: "These tabs do not fit comfortably. Use fewer tabs or a larger page." });
   const tabRoom = tab ? tab.w + 0.16 : 0;
   const content = { ...s, x: tab && tabEdge(g) === "left" ? s.x + tabRoom : s.x, w: s.w - tabRoom };
-  const w = g.trimWidthIn, h = g.trimHeightIn;
-  // Wide and narrow trims recompose their corner elements; physical tab width never scales.
-  const narrow = s.w < 4;
-  const d = Math.min(w * (narrow ? 0.42 : 0.46), h * 0.32);
-  const circle = (id: string, x: number, y: number, size: number, fill: ColorToken | null, outline = false, leopard = false) => nodes.push({ id, type: "circle", component: "Section", rect: { x, y, w: size, h: size }, functional: false, fill, outline, leopard });
+  const W = g.trimWidthIn, H = g.trimHeightIn;
+  // Circles keep the reference's proportions on any trim: sized from the page's Letter-proportioned width.
+  const R = Math.min(W, (H * 8.5) / 11);
+  const circle = (c: LuxeCircle, extra: Partial<CircleNode>) =>
+    nodes.push({ id: c.id, type: "circle", component: "Section", rect: { x: c.x * W - c.r * R, y: c.y * H - c.r * R, w: 2 * c.r * R, h: 2 * c.r * R }, functional: false, fill: c.fill ?? null, ...extra });
   if (opt.preset !== "plain") {
-    if (opt.circles !== false) {
-      circle("luxe-chocolate", w * 0.12, -d * 0.2, d, "primary");
-      circle("luxe-taupe", w - d * 0.75, h * 0.12, d * 0.8, "secondary");
-      circle("luxe-blue", -d * 0.3, h - d * 0.65, d * 0.72, "decorativeAccent");
-      circle("luxe-rust", w - d * 0.6, h - d * 0.55, d * 0.6, "accent");
-    }
-    if (opt.leopard !== false) circle("luxe-leopard", w - d * 0.6, narrow ? h * 0.72 : h * 0.04, d * 0.58, "secondary", false, true);
-    if (opt.outlines !== false) {
-      circle("luxe-arc-top", -d * 0.65, -d * 0.65, d * 1.8, null, true);
-      circle("luxe-arc-bottom", w - d * 1.25, h - d * 0.75, d * 1.7, null, true);
-    }
+    if (opt.circles !== false) LUXE_CIRCLES.forEach((c) => circle(c, {}));
+    if (opt.leopard !== false) LUXE_CHEETAH.forEach((c) => circle(c, { leopard: true }));
+    if (opt.outlines !== false) LUXE_RINGS.forEach((c) => circle(c, { outline: true, stroke: "lineArt", strokePt: RING_PT }));
   }
-  const desiredY = content.y + content.h * (opt.position === "upper" ? 0.26 : opt.position === "lower" ? 0.58 : 0.4);
-  const addText = (id: string, value: string, rect: Rect, role: "coverTitle" | "coverSubtitle" | "body") => {
-    const node = text(id, rect, value, role, { align: opt.alignment ?? "center", wrap: true });
-    const fitted = fitHeading(value, role, rect, ctx);
+  // Text anchors: the reference's, kept inside the live area (and clear of a tab).
+  const shift = opt.position === "upper" ? -0.09 : opt.position === "lower" ? 0.07 : 0;
+  const left = opt.alignment === "left";
+  const clampX = (cx: number, w: number) => {
+    const ww = Math.min(w, content.w);
+    const x = left ? content.x : Math.max(content.x, Math.min(cx - ww / 2, content.x + content.w - ww));
+    return { x, w: ww };
+  };
+  const clampY = (y: number, h: number) => Math.max(content.y, Math.min(y, content.y + content.h - h));
+  const push = (id: string, value: string, rect: Rect, role: "coverTitle" | "coverSubtitle" | "body", fitted: TextFit & { ok: boolean }) => {
+    const node = text(id, rect, value, role, { align: left ? "left" : "center", wrap: true });
     node.fit = { ...fitted, failed: !fitted.ok };
     if (!fitted.ok) diagnostics.push({ severity: "error", rule: "heading-fit", componentId: id, message: "This wording is too long. Shorten it or choose a larger page." });
     nodes.push(node);
   };
-  const titleH = Math.min(2.2, content.h * 0.27);
-  const y = Math.max(content.y, Math.min(desiredY, content.y + content.h - titleH - 0.88 - (opt.quote ? 0.7 : 0)));
-  addText("cover-title", title, { x: content.x, y, w: content.w, h: titleH }, "coverTitle");
-  const subY = y + titleH + 0.08;
-  addText("cover-subtitle", opt.subtitle ?? (divider ? "" : "WITH PURPOSE"), { x: content.x, y: subY, w: content.w, h: 0.35 }, "coverSubtitle");
-  if (opt.smallLine !== false) nodes.push(rule("cover-line", content.x + content.w * 0.4, subY + 0.44, content.x + content.w * 0.6, subY + 0.44, { color: "text", strokePt: 0.5 }));
-  if (opt.quote) addText("cover-quote", opt.quote, { x: content.x, y: subY + 0.62, w: content.w, h: Math.max(0.2, s.y + s.h - subY - 0.72) }, "body");
+  // Title: one line of script, as wide as the reference's.
+  const tx = clampX(LUXE_TEXT.titleX * W, LUXE_TEXT.titleW * W);
+  const titleFit = fillTitle(title, { ...tx, y: 0, h: content.h * 0.45 }, ctx);
+  const titleH = (titleFit.sizePt * titleFit.lineHeight) / 72;
+  const titleRect = { ...tx, y: clampY((LUXE_TEXT.titleBase + shift) * H - titleH, titleH), h: titleH };
+  push("cover-title", title, titleRect, "coverTitle", titleFit);
+  // Subtitle: stacked, widely spaced, right of centre under the title.
+  const subtitle = opt.subtitle ?? (divider ? "" : "WITH PURPOSE");
+  let below = titleRect.y + titleRect.h;
+  if (subtitle.trim()) {
+    const sx = clampX(LUXE_TEXT.subX * W, LUXE_TEXT.subW * W);
+    const subFit = stackSubtitle(subtitle, sx.w, LUXE_TEXT.subLineGap * H, ctx);
+    const subH = (subFit.sizePt * subFit.lineHeight * subFit.lines.length) / 72;
+    // The subtitle tucks under the title's last letters ("an" in the reference). A letter with a tail
+    // (g j p q y) above it would run into it, so the subtitle drops below the tail instead.
+    const tail = descenderOver(title, titleRect, titleFit.sizePt, left, sx, ctx) ? DESCENDER_EM * (titleFit.sizePt / 72) : 0;
+    const top = (LUXE_TEXT.subY + shift) * H - (subFit.sizePt * subFit.lineHeight) / 72 / 2 + tail;
+    const subRect = { ...sx, y: clampY(top, subH), h: subH };
+    push("cover-subtitle", subtitle, subRect, "coverSubtitle", subFit);
+    below = subRect.y + subRect.h;
+  }
+  if (opt.smallLine !== false) {
+    const rx = clampX(LUXE_TEXT.subX * W, LUXE_TEXT.ruleW * W), ry = Math.min(below + LUXE_TEXT.ruleGap * H * 0.5, content.y + content.h);
+    nodes.push(rule("cover-line", rx.x, ry, rx.x + rx.w, ry, { color: "lineArt", strokePt: RULE_PT }));
+    below = ry;
+  }
+  if (opt.quote) {
+    const qx = clampX(LUXE_TEXT.subX * W, 0.6 * W), qy = below + 0.2;
+    const qRect = { ...qx, y: qy, h: Math.max(0.2, content.y + content.h - qy) };
+    push("cover-quote", opt.quote, qRect, "body", { ...fitHeading(opt.quote, "body", qRect, ctx) });
+  }
   if (tab && opt.tab) {
-    nodes.push(box("tab", tab, { stroke: null, fill: opt.tab.color ?? "secondary", radiusIn: opt.tab.style === "rounded" ? 0.12 : 0 }));
+    // A thin paper-colored edge keeps the tab distinct where it crosses the artwork.
+    nodes.push(box("tab", tab, { stroke: "background", strokePt: 1.5, fill: opt.tab.color ?? "secondary", radiusIn: opt.tab.style === "rounded" ? 0.12 : 0 }));
     if (opt.tab.leopard) nodes.push({ id: "tab-leopard", type: "circle", component: "Section", rect: tab, functional: false, fill: "secondary", leopard: true });
-    const label = text("tab-label", { x: tab.x + 0.04, y: tab.y + 0.03, w: tab.w - 0.08, h: tab.h - 0.06 }, opt.tab.label ?? title, "label", { wrap: true, align: "center", color: opt.tab.color === "primary" || opt.tab.color === "text" || opt.tab.leopard ? "background" : "text" });
+    const dark = opt.tab.leopard || (["primary", "text", "accent", "decorativeAccent"] as (ColorToken | undefined)[]).includes(opt.tab.color);
+    const label = text("tab-label", { x: tab.x + 0.04, y: tab.y + 0.03, w: tab.w - 0.08, h: tab.h - 0.06 }, opt.tab.label ?? title, "label", { wrap: true, align: "center", color: dark ? "background" : "text" });
     const fitted = fitHeading(label.text, "label", label.rect, ctx);
     label.fit = { ...fitted, failed: !fitted.ok }; nodes.push(label);
     if (!fitted.ok) diagnostics.push({ severity: "error", rule: "tab-label-fit", componentId: label.id, message: "This tab label is too long. Use a short label or fewer tabs." });

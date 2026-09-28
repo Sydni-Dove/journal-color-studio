@@ -4,6 +4,7 @@ import type { FontSelection } from "../types/tokens";
 
 const LINK_ID = "ps-google-fonts";
 const LOCAL_ID = "ps-local-fonts";
+const WEIGHTS = [400, 500, 600, 700];
 
 /**
  * Loads the selected font families and reports when they are ready, so text
@@ -38,7 +39,9 @@ export function useFontLoader(fonts: FontSelection): boolean {
     }
     let cancelled = false;
     const done = () => !cancelled && setReady(true);
-    const loads = families.map((f) => document.fonts.load(`16px "${f}"`).catch(() => undefined));
+    // Every weight a role may use: a bold or medium face measured before it loads would be measured with
+    // the regular face's (different) widths, and layouts would fit headings the live check then rejects.
+    const loads = families.flatMap((f) => WEIGHTS.map((w) => document.fonts.load(`${w} 16px "${f}"`).catch(() => undefined)));
     Promise.all(loads).then(() => document.fonts.ready).then(done, done);
     return () => {
       cancelled = true;
@@ -46,4 +49,20 @@ export function useFontLoader(fonts: FontSelection): boolean {
   }, [key]);
 
   return ready;
+}
+
+/**
+ * Counts completed font-face loads. A face can finish after the fonts were
+ * reported ready (a weight first drawn later); measurements made before it
+ * arrived used a fallback's widths, so text must be measured again.
+ */
+export function useFontFacesLoaded(): number {
+  const [loaded, setLoaded] = useState(0);
+  useEffect(() => {
+    if (typeof document === "undefined" || !document.fonts?.addEventListener) return;
+    const bump = () => setLoaded((n) => n + 1);
+    document.fonts.addEventListener("loadingdone", bump);
+    return () => document.fonts.removeEventListener("loadingdone", bump);
+  }, []);
+  return loaded;
 }
