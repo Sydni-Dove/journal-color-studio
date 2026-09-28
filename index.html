@@ -177,6 +177,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
           <button data-preset="canva"><strong>Black + gold</strong><small>Original Canva cover</small></button>
           <button data-preset="floral"><strong>Floral</strong><small>Original floral cover</small></button>
           <button data-preset="abstract"><strong>Abstract watercolor</strong><small>Your Canva page 64 art</small></button>
+          <button data-preset="circles"><strong>Plan with purpose</strong><small>Circles + leopard planner art</small></button>
         </div>
         <span class="hint">Fills every slot with that design's original pieces. Everything stays editable after.</span>
       </div>
@@ -294,6 +295,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
           <option value="Radley">Radley (floral journal)</option>
           <option value="Cardo">Cardo (floral journal)</option>
           <option value="Against">Against (Dove Expressions brand)</option>
+          <option value="Allura">Allura (script, Plan with purpose)</option>
         </select>
       </div>
       <label class="slider"><span>Cover title size <b id="coverFontScaleVal"></b></span><input type="range" id="coverFontScale" min="60" max="120"></label>
@@ -522,6 +524,8 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     { group: 'Abstract shapes', key: 'shapeStripes', label: 'Striped circle', hint: 'Banded center circle', pattern: 'arches', variant: true },
     { group: 'Abstract shapes', key: 'shapeSun', label: 'Sun', hint: 'Circle (its overlap with the leaf deepens it)', pattern: 'arches', variant: true },
     { group: 'Abstract shapes', key: 'shapeLoop', label: 'Loop', hint: 'Soft outline loop', pattern: 'arches', variant: true },
+    // Plan With Purpose circles: its slate-blue circle has no other role to follow (shown only for that background).
+    { group: 'Circles', key: 'shapeBlue', label: 'Blue circle', hint: 'Lower-left slate circle', pattern: 'circles' },
   ];
   ROLES.find((r) => r.key === 'accent').variant = true;
 
@@ -548,6 +552,8 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     // Prayer journals only: the journal's own Canva watercolor (listed first in their Background picker).
     'bg-journal':           { type: 'background', renderer: 'journal', textureKey: 'journal', colorRoles: [], label: 'This journal’s watercolor', hint: 'Your original Canva art' },
     'bg-abstract':          { type: 'background', renderer: 'abstract', textureKey: 'abstract', colorRoles: ['paper', 'stone', 'highlight', 'accent', 'vein'], recommendedPalette: 'Abstract Watercolor', label: 'Abstract watercolor', hint: 'Burgundy, blush + gold' },
+    // "Plan With Purpose" planner cover (Design Elements.svg), rebuilt from its Canva layers like the abstract watercolor.
+    'bg-circles':           { type: 'background', renderer: 'abstract', textureKey: 'circles', colorRoles: ['paper', 'stone', 'highlight', 'accent', 'shapeBlue', 'vein'], recommendedPalette: 'Plan With Purpose', label: 'Circles + leopard', hint: 'Burgundy, blush, gold rings' },
     // Full-bleed backgrounds from the Canva library (photos/patterns keep their own colors).
     'bg-img-marble-white': { type: 'background', renderer: 'image', textureKey: 'img:marble-white', image: 'canva:marble-white', colorRoles: ['paper'], label: 'Carrara photo', hint: 'White marble' },
     'bg-img-gold-leaf-veins': { type: 'background', renderer: 'image', textureKey: 'img:gold-leaf-veins', image: 'canva:gold-leaf-veins', colorRoles: ['paper'], label: 'Gold leaf on paper', hint: 'Gold veins, your paper color' },
@@ -622,7 +628,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     dream: {
       cover: {
         // 'bg-watercolor' (procedural blobs) is retired from the picker: it was never Sydni's artwork.
-        backgroundSlot: ['bg-solid', 'bg-marble-veined', 'bg-marble-boldgold', 'bg-abstract', 'bg-marble-goldleaf', 'bg-marble-white', 'bg-marble-rose', 'bg-marble-burgundy', 'bg-marble-ember', 'bg-marble-peach', 'bg-floral', 'bg-cabana', 'bg-pinstripe', 'bg-bias', 'bg-candy', 'bg-scribble', 'bg-arches', 'bg-img-marble-white', 'bg-img-gold-leaf-veins', 'bg-img-marble-black-gold', 'bg-img-marble-blue-gold', 'bg-img-marble-pink-gold', 'bg-img-stripes-blue-cream', 'bg-img-stripes-navy-thin', 'bg-img-stripes-diagonal', 'bg-img-notebook-paper', 'bg-img-leather-tan', 'bg-img-leather-black', 'bg-img-leather-brown', 'bg-img-leather-croc-brown', 'bg-img-leather-orange', 'bg-img-leather-croc-white', 'bg-img-leather-suede-beige', 'bg-img-abstract-white-ribbons', 'bg-img-abstract-white-chevron'],
+        backgroundSlot: ['bg-solid', 'bg-marble-veined', 'bg-marble-boldgold', 'bg-abstract', 'bg-circles', 'bg-marble-goldleaf', 'bg-marble-white', 'bg-marble-rose', 'bg-marble-burgundy', 'bg-marble-ember', 'bg-marble-peach', 'bg-floral', 'bg-cabana', 'bg-pinstripe', 'bg-bias', 'bg-candy', 'bg-scribble', 'bg-arches', 'bg-img-marble-white', 'bg-img-gold-leaf-veins', 'bg-img-marble-black-gold', 'bg-img-marble-blue-gold', 'bg-img-marble-pink-gold', 'bg-img-stripes-blue-cream', 'bg-img-stripes-navy-thin', 'bg-img-stripes-diagonal', 'bg-img-notebook-paper', 'bg-img-leather-tan', 'bg-img-leather-black', 'bg-img-leather-brown', 'bg-img-leather-croc-brown', 'bg-img-leather-orange', 'bg-img-leather-croc-white', 'bg-img-leather-suede-beige', 'bg-img-abstract-white-ribbons', 'bg-img-abstract-white-chevron'],
         titlePlateSlot: ['plate-rectangle', 'plate-rounded', 'plate-oval', 'plate-circle', 'plate-bevel', 'plate-ring', 'plate-none'],
         // Uploaded elements are appended to every decor slot (and the background slot) at runtime.
         decorTopSlot: ['decor-none', 'decor-floral', 'decor-wash-pink', 'decor-wash-beige', 'decor-wash-orange', 'decor-wash-cream', 'decor-blob-purple', 'decor-scribble', 'decor-stripes-yellow', 'decor-boho', 'decor-bouquet', 'decor-corner', 'decor-topo', 'decor-waves', 'decor-arcs', 'decor-ribbon', 'decor-dots', 'decor-stripes'],
@@ -669,6 +675,8 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     { name: 'White Marble', stone: '#F8F8F7', vein: '#8C8C90', highlight: '#FFFFFF', plate: '#FFFFFF', frame: '#222222', trim: '#BFA06A', title: '#222222', paper: '#FFFFFF', line: '#CFCFCF' },
     { name: 'Floral Garden', stone: '#718365', vein: '#CBA15F', highlight: '#E3A69D', plate: '#860B03', frame: '#63202E', trim: '#A87C2D', title: '#FFFFFF', paper: '#FFFFFF', line: '#EBE3E2' },
     { name: 'Abstract Watercolor', stone: '#63101A', vein: '#D7A04D', highlight: '#E89F97', plate: '#F4EDE6', frame: '#63101A', trim: '#D7A04D', title: '#63101A', paper: '#F4EDE6', line: '#E3CBC3', accent: '#B8471C' },
+    // Plan With Purpose: medians of each layer in the Canva artwork; black lettering as designed.
+    { name: 'Plan With Purpose', stone: '#5C0711', vein: '#CB9B4A', highlight: '#F2DCD2', plate: '#FFFFFF', frame: '#5C0711', trim: '#CB9B4A', title: '#111111', paper: '#FFFFFF', line: '#E6D3CB', accent: '#C5674A', shapeBlue: '#73869A' },
     { name: 'Original Black + Gold', stone: '#141212', vein: '#C9A05A', highlight: '#F1E6CC', plate: '#2A070E', frame: '#151313', trim: '#CBA15F', title: '#FFFFFF', paper: '#FFFFFF', line: '#B8948C' },
     { name: 'Dove Signature', stone: '#1A0B0B', vein: '#E6A742', highlight: '#F2DFD8', plate: '#630000', frame: '#1A0B0B', trim: '#E6A742', title: '#FFFDFC', paper: '#FFFDFC', line: '#C9A49B' },
     { name: 'White Carrara', stone: '#EDEAE4', vein: '#8F8B86', highlight: '#CFCAC3', plate: '#FFFFFF', frame: '#2B2B2B', trim: '#B8955A', title: '#630000', paper: '#FFFFFF', line: '#C9C1B6' },
@@ -975,6 +983,29 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   ];
   // Which palette role each abstract layer follows when recolored (and which toggle hides it).
   const ABSTRACT_ROLE = ['paper', 'stone', 'vein', 'highlight', 'vein', 'highlight', 'accent', 'highlight', 'vein', 'vein', 'accent', 'stone', 'vein', 'vein'];
+  // "Plan With Purpose" circles, same format. Pixels come from Sydni's 295 DPI transparent PNG export (Design Elements (4));
+  // the upscaled SVG export's layers only say which piece each pixel belongs to (and fill the parts other pieces cover).
+  // Pieces cut by the page edge are mirrored out past it (~0.13 in) so they run off the edge with bleed.
+  // No paper layer: the palette's paper color fills behind the circles.
+  const CIRCLE_LAYERS = [
+    { file: 'layer-00.png', w: 1254, h: 1027, m: [0.243728, 0, 0, 0.243692, 12.9176, -9.7477] },
+    { file: 'layer-01.png', w: 1889, h: 1080, m: [0.243728, 0, 0, 0.243692, -9.7491, -9.7477] },
+    { file: 'layer-02.png', w: 986, h: 1033, m: [0.243728, 0, 0, 0.243692, 273.219, 158.887] },
+    { file: 'layer-03.png', w: 692, h: 948, m: [0.243728, 0, 0, 0.243692, 453.09, 64.0911] },
+    { file: 'layer-04.png', w: 447, h: 893, m: [0.243728, 0, 0, 0.243692, 512.803, 315.094] },
+    { file: 'layer-05.png', w: 657, h: 1024, m: [0.243728, 0, 0, 0.243692, -9.7491, 488.847] },
+    { file: 'layer-06.png', w: 1147, h: 655, m: [0.243728, 0, 0, 0.243692, 12.4301, 642.129] },
+    { file: 'layer-07.png', w: 1300, h: 1026, m: [0.243728, 0, 0, 0.243692, -9.7491, 551.719] },
+    { file: 'layer-08.png', w: 442, h: 21, m: [0.243728, 0, 0, 0.243692, 310.753, 615.811] },
+    { file: 'layer-09.png', w: 1194, h: 1068, m: [0.243728, 0, 0, 0.243692, 330.738, 541.484] },
+    { file: 'layer-10.png', w: 791, h: 751, m: [0.243728, 0, 0, 0.243692, 428.961, 618.735] }
+  ];
+  const CIRCLE_ROLE = ['stone', 'vein', 'highlight', 'keep', 'accent', 'highlight', 'shapeBlue', 'vein', 'vein', 'vein', 'keep'];
+  // Backgrounds rebuilt from their Canva layers (state.marble key -> layers, roles, asset key prefix, folder).
+  const LAYER_ART = {
+    abstract: { layers: ABSTRACT_LAYERS, roles: ABSTRACT_ROLE, prefix: 'abs', dir: 'canva/abstract64' },
+    circles: { layers: CIRCLE_LAYERS, roles: CIRCLE_ROLE, prefix: 'circ', dir: 'canva/circles' },
+  };
   // Floral + prayer elements exported one by one from Sydni's Canva file at full resolution (transparent PNGs).
   const ELEMENT_FILES = ['peony', 'bouquet', 'ring', 'bar', 'line', 'checkbox', 'summary-header', 'legend-brainstorm-band', 'legend-card', 'legend-frame',
     'legend-pen', 'legend-highlighter-a', 'legend-highlighter-b', 'legend-paper', 'prayer-wash-a', 'prayer-wash-b', 'prayer-cover-wash', 'prayer-spiral',
@@ -983,7 +1014,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     'pw-date', 'ww-title', 'ww-sub', 'ww-tagline'];
   const CANVA_SRC = {
     ...Object.fromEntries(ELEMENT_FILES.map((f) => [`el:${f}`, `canva/elements/${f}.png`])), ...Object.fromEntries(CANVA_FILES.map((f) => [`canva:${f.replace(/\.\w+$/, '')}`, `canva/${f}`])),
-    ...Object.fromEntries(ABSTRACT_LAYERS.map((l, i) => [`abs:${i}`, `canva/abstract64/${l.file}`])),
+    ...Object.fromEntries(Object.values(LAYER_ART).flatMap((a) => a.layers.map((l, i) => [`${a.prefix}:${i}`, `${a.dir}/${l.file}`]))),
     ...Object.fromEntries(LETTERING_FILES.map((f) => [`lt:${f}`, `canva/lettering/${f}.png`])) };
   const ASSET_SRC = { ...Object.fromEntries(Object.entries(TEXTURES).map(([k, t]) => [`marble:${k}`, t.src])),
     ...Object.fromEntries(Object.entries(TEXTURES).filter(([, t]) => t.veins).map(([k, t]) => [`marbleVeins:${k}`, t.veins])), ...IMAGES, ...CANVA_SRC };
@@ -1269,19 +1300,20 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     return c;
   }
 
+  const ROLE_FALLBACK = { shapeBlue: '#73869A' };   // palettes saved before a role existed
   // Page 64 abstract watercolor, drawn layer by layer at its Canva positions (uniform scale, like the floral cover).
   function paintAbstract(ctx, x, y, w, h, s) {
-    const { k, ox, oy } = canvaToPage(w, h), p = s.palette;
+    const { k, ox, oy } = canvaToPage(w, h), p = s.palette, art = LAYER_ART[s.marble] || LAYER_ART.abstract;
     ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
     ctx.fillStyle = p.paper; ctx.fillRect(x, y, w, h);
-    ABSTRACT_LAYERS.forEach((l, i) => {
-      const role = ABSTRACT_ROLE[i];
+    art.layers.forEach((l, i) => {
+      const role = art.roles[i];
       if (role === 'vein' && !s.showVeins) return;
       if (role === 'highlight' && !s.showHighlights) return;
-      const img = ASSETS[`abs:${i}`];
-      if (!img) { ensureAsset(`abs:${i}`).catch(() => {}); return; }
+      const img = ASSETS[`${art.prefix}:${i}`];
+      if (!img) { ensureAsset(`${art.prefix}:${i}`).catch(() => {}); return; }
       const [a, b, c, d, e, f] = l.m, pw = l.w * a * k, ph = l.h * d * k;
-      const src = s.bgArt === 'palette' ? toneTransfer(img, Math.min(pw, img.naturalWidth), Math.min(ph, img.naturalHeight), 'all', { main: p[role] || p.trim }) : img;
+      const src = s.bgArt === 'palette' && role !== 'keep' ? toneTransfer(img, Math.min(pw, img.naturalWidth), Math.min(ph, img.naturalHeight), 'all', { main: p[role] || ROLE_FALLBACK[role] || p.trim }) : img;
       ctx.drawImage(src, x + ox + e * k, y + oy + f * k, pw, ph);
     });
     ctx.restore();
@@ -1337,14 +1369,14 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     if (s.marble === 'solid') { ctx.fillStyle = s.palette.stone; ctx.fillRect(x, y, w, h); return; }        // only prayer journals use their own art; never reaches here in practice
     if (s.marble in PATTERNS) { paintPattern(ctx, x, y, w, h, s, soft); return; }
     if (s.marble === 'blush') { paintWatercolor(ctx, x, y, w, h, s, soft); return; }
-    if (s.marble === 'abstract' || s.marble.startsWith('img:')) {
+    if (s.marble in LAYER_ART || s.marble.startsWith('img:')) {
       // Full-bleed areas (covers) show the artwork; thin header/footer bars use the stone color.
       if (h <= w * .9 && !s._thumb) { ctx.fillStyle = s.palette.stone; ctx.fillRect(x, y, w, h); return; }
       // A partial tall area (e.g. the sidebar) shows ITS slice of the full-page artwork — never a squashed miniature.
       const PW = s._W && !s._thumb ? s._W : w, PH = s._W && !s._thumb ? Math.round(s._W * PAGE_H / PAGE_W) : h, part = PW !== w || PH !== h;
       const [ax, ay] = part ? [0, 0] : [x, y];
       ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
-      if (s.marble === 'abstract') paintAbstract(ctx, ax, ay, PW, PH, s);
+      if (s.marble in LAYER_ART) paintAbstract(ctx, ax, ay, PW, PH, s);
       else {
         const key = `canva:${s.marble.slice(4)}`, img = ASSETS[key];
         ctx.fillStyle = s.palette.paper; ctx.fillRect(x, y, w, h);
@@ -2164,6 +2196,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     for (const ch of text) { ctx.fillText(ch, x, y); x += ctx.measureText(ch).width + track; }
   }
 
+  const SCRIPT_SUB_FONT = { Allura: 'Montserrat' };
   // Real type for the cover title: a large first word over a small letter-spaced second line, both
   // measured with the font's actual glyph bounds and scaled down (never squashed) to fit the safe area.
   // Longer wording: the whole title shrinks proportionally; below the cover title's minimum size, the title (and then
@@ -2171,7 +2204,11 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   // with "…" at the minimum size and flagged. The original wording always takes the one-line layout, as before.
   function drawCustomTitle(ctx, W, box, s) {
     const fam = `"${s.coverFont}", Georgia, serif`;
-    const TOP_W = 600, SUB_W = 500, SUB = .4, TRACK = .24, GAP = .17;   // sub-line size, tracking (em) and gap, as fractions of the top size
+    // A script top word gets a clean sans sub-line (spaced script capitals don't read), like the Plan With Purpose art.
+    const subFont = SCRIPT_SUB_FONT[s.coverFont];
+    if (subFont) ensureFont(subFont);
+    const subFam = subFont ? `"${subFont}", Arial, sans-serif` : fam;
+    const TOP_W = subFont ? 400 : 600, SUB_W = subFont ? 400 : 500, SUB = .4, TRACK = .24, GAP = .17;   // sub-line size, tracking (em) and gap, as fractions of the top size
     // The subtitle line is set in capitals by design (display only: the stored wording keeps its own case).
     const top = T(s, 'coverTitle'), sub = T(s, 'coverSubtitle').toUpperCase();
     ctx.textBaseline = 'alphabetic';                                    // glyph bounds are baseline-relative
@@ -2180,7 +2217,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       const rows = [];
       ctx.font = `${TOP_W} ${px}px ${fam}`;
       tops.forEach((t) => { const m = ctx.measureText(t); rows.push({ t, sub: false, w: m.width, a: m.actualBoundingBoxAscent, d: m.actualBoundingBoxDescent }); });
-      ctx.font = `${SUB_W} ${px * SUB}px ${fam}`;
+      ctx.font = `${SUB_W} ${px * SUB}px ${subFam}`;
       subs.forEach((t) => { const m = ctx.measureText(t); rows.push({ t, sub: true, w: trackedWidth(ctx, t, px * SUB * TRACK), a: m.actualBoundingBoxAscent, d: m.actualBoundingBoxDescent }); });
       let h = 0;
       rows.forEach((r, i) => { if (i) h += r.sub && !rows[i - 1].sub ? px * GAP : r.sub ? px * SUB * .5 : px * .1; r.y = h + r.a; h += r.a + r.d; });
@@ -2223,7 +2260,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
         };
         const cut = (a, b) => {
           ctx.font = `${TOP_W} ${fit}px ${fam}`; const ta = fill(top, a.length, (u) => ctx.measureText(u).width);
-          ctx.font = `${SUB_W} ${fit * SUB}px ${fam}`; const tb = fill(sub, b.length, (u) => trackedWidth(ctx, u, fit * SUB * TRACK));
+          ctx.font = `${SUB_W} ${fit * SUB}px ${subFam}`; const tb = fill(sub, b.length, (u) => trackedWidth(ctx, u, fit * SUB * TRACK));
           const L = layout(fit, ta, tb);
           return { a: ta, b: tb, fits: L.h <= box.h && L.w <= box.w + .5, kept: [...ta, ...tb].join('').replace(/…/g, '').length };
         };
@@ -2239,7 +2276,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     ctx.fillStyle = coverTitleColor(s); ctx.textBaseline = 'alphabetic';
     if (s.titleShadow > 0) { ctx.shadowColor = `rgba(0,0,0,${s.titleShadow / 100 * .45})`; ctx.shadowBlur = W * .008; ctx.shadowOffsetX = W * .002; ctx.shadowOffsetY = W * .003; }
     m.rows.forEach((r) => {
-      if (r.sub) { ctx.font = `${SUB_W} ${px * SUB}px ${fam}`; fillTracked(ctx, r.t, cx, y0 + r.y, px * SUB * TRACK); }
+      if (r.sub) { ctx.font = `${SUB_W} ${px * SUB}px ${subFam}`; fillTracked(ctx, r.t, cx, y0 + r.y, px * SUB * TRACK); }
       else { ctx.font = `${TOP_W} ${px}px ${fam}`; ctx.textAlign = 'center'; ctx.fillText(r.t, cx, y0 + r.y); }
     });
     ctx.restore();
@@ -2779,7 +2816,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     if (floralDesign(s)) { const [r, g, b] = hexRgb(s.palette.paper); ctx.fillStyle = `rgb(${r * .945},${g * .945},${b * .945})`; ctx.fillRect(sx, 0, W - sx, H); }
     else stoneBar(ctx, sx, 0, W - sx, H, s);
     // Art backgrounds (Canva watercolor/photos) are busy: sidebar content sits on a soft paper card.
-    if (!floralDesign(s) && s.headerFill !== 'solid' && (s.marble === 'abstract' || s.marble.startsWith('img:'))) {
+    if (!floralDesign(s) && s.headerFill !== 'solid' && (s.marble in LAYER_ART || s.marble.startsWith('img:'))) {
       ctx.fillStyle = rgba(s.palette.paper, .9); roundRect(ctx, sx + W * .018, H * .018, W - sx - W * .036, cardH, W * .02); ctx.fill();
       s._card = true;
     }
@@ -3724,7 +3761,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     if (m in PATTERNS) return 'pattern';
     if (s.journal && s.journal !== 'dream') return 'wash';
     if (m === 'floral') return 'floral';
-    if (m === 'abstract' || m === 'blush') return 'watercolor';
+    if (m in LAYER_ART || m === 'blush') return 'watercolor';
     if (m === 'solid' || /stripe/.test(m)) return 'geometric';
     if (m.startsWith('img:') || m.startsWith('upload:')) return 'decor';
     return 'marble';
@@ -4024,11 +4061,11 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
 
   // Artwork with its own colors (Canva watercolors, floral) switches to "recolor" as soon as a color it uses is edited,
   // so a color change always shows. Picking the background's own recommended palette returns it to original colors.
-  const ART_ROLES = { abstract: ['stone', 'highlight', 'accent', 'vein', 'paper'], floral: ['plate', 'highlight', 'stone', 'trim'] };
+  const ART_ROLES = { abstract: ['stone', 'highlight', 'accent', 'vein', 'paper'], circles: ['stone', 'highlight', 'accent', 'shapeBlue', 'vein', 'paper'], floral: ['plate', 'highlight', 'stone', 'trim'] };
   function artFollowsColor(key) {
     if (state.journal !== 'dream') { if (PR_ART_ROLES[state.journal].includes(key)) state.prayerArt = 'palette'; return; }
     if (!ART_ROLES[state.marble]?.includes(key)) return;
-    if (state.marble === 'abstract') state.bgArt = 'palette';
+    if (state.marble in LAYER_ART) state.bgArt = 'palette';
     if (state.marble === 'floral') {
       for (const k of ['top', 'bottom']) if (state.decor[k].asset === 'decor-floral') state.decor[k].colorMode = 'palette';
       if (state.floralArt === 'original') state.floralArt = 'cover';
@@ -4037,7 +4074,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   function artFollowsPalette() {
     if (state.journal !== 'dream') { state.prayerArt = state.palette.name === JOURNALS[state.journal].palette && !state.palette.v ? 'original' : 'palette'; return; }
     const rec = bgAssetFor(state.marble)?.recommendedPalette, original = rec && state.palette.name === rec && !state.palette.v;
-    if (state.marble === 'abstract') state.bgArt = original ? 'original' : 'palette';
+    if (state.marble in LAYER_ART) state.bgArt = original ? 'original' : 'palette';
     if (state.marble === 'floral') for (const k of ['top', 'bottom']) if (state.decor[k].asset === 'decor-floral') state.decor[k].colorMode = original ? 'original' : 'palette';
   }
   // Only the colors the current design actually uses, named for what they color.
@@ -4055,6 +4092,10 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   };
   const PR_ART_ROLES = { prayer: ['stone', 'vein', 'plate', 'highlight', 'title'], warrior: ['stone', 'plate', 'title'], warring: ['stone', 'vein', 'plate', 'trim', 'frame', 'title'] };
   const PR_PLATE_ROLES = [['plate', 'Title plate', 'Plate fill'], ['frame', 'Title plate', 'Outer frame'], ['trim', 'Title plate', 'Inner trim'], ['title', 'Title plate', 'Lettering on the plate']];
+  // Plan With Purpose circles: [role, label, hint, show/hide toggle]. The leopard prints keep their own colors.
+  const CIRCLE_LABELS = [['stone', 'Burgundy circle', 'Large top-left circle', null], ['highlight', 'Blush + beige circles', 'Soft washes', 'showHighlights'],
+    ['accent', 'Terracotta circle', 'Right-edge circle', null], ['shapeBlue', 'Blue circle', 'Lower-left slate circle', null],
+    ['vein', 'Gold rings', 'Thin gold circles + rule', 'showVeins'], ['paper', 'Paper', 'White base', null]];
   const patternRoles = (m) => ROLES.filter((r) => r.pattern === true || r.pattern === m);
   function rolesFor() {
     if (state.journal !== 'dream') {
@@ -4066,6 +4107,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       if (swapped) {
         if (m in PATTERNS) patternRoles(m).forEach((r) => out.push({ ...r }));
         else if (m === 'solid') out.push({ ...byKey.stone, group: 'Background', label: 'Background color', hint: 'Solid background', toggle: null });
+        else if (m === 'circles') CIRCLE_LABELS.forEach(([key, label]) => out.push({ ...byKey[key], group: 'Background', label, hint: 'Circles + leopard', toggle: null }));
         else if (m === 'abstract') [['stone', 'Burgundy shapes'], ['highlight', 'Pink washes'], ['accent', 'Orange + peach shapes'], ['vein', 'Gold lines + splatter']].forEach(([key, label]) => out.push({ ...byKey[key], group: 'Background', label, hint: 'Abstract watercolor', toggle: null }));
         else if (!(m in PATTERNS) && !m.startsWith('img:') && !m.startsWith('upload:') && m !== 'floral' && m !== 'solid') ['stone', 'vein', 'highlight'].forEach((key) => { const [label, hint] = TEXTURES[m]?.roles?.[key] || []; out.push({ ...byKey[key], group: 'Background', ...(label ? { label, hint } : {}) }); });
       }
@@ -4086,6 +4128,8 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       add('accent', 'Watercolor', 'Orange + peach shapes', 'Warm middle layers', null);
       add('vein', 'Watercolor', 'Gold lines + splatter', 'Fine gold details', 'showVeins');
       add('paper', 'Watercolor', 'Paper', 'Cream base', null);
+    } else if (m === 'circles') {
+      CIRCLE_LABELS.forEach(([key, label, hint, toggle]) => add(key, 'Circles', label, hint, toggle));
     } else if (m === 'floral') {
       add('plate', 'Flowers', 'Deep roses', 'Burgundy blooms, boxes + page titles', null);
       add('highlight', 'Flowers', 'Soft pink blooms', 'Blush flowers + Belongs To box', null);
@@ -4112,6 +4156,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   function buildRoles() {
     const box = $('roles'); box.innerHTML = '';
     if (state.marble in PATTERNS) Object.assign(state.palette, withPatternRoles(state.palette));
+    for (const [k, v] of Object.entries(ROLE_FALLBACK)) state.palette[k] ??= v;
     let group = '';
     if (state.marble.startsWith('img:')) {
       const n = document.createElement('p'); n.className = 'hint'; n.style.margin = '0 0 6px';
@@ -4181,7 +4226,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     const recBtn = $('recommendColors');
     recBtn.classList.toggle('hidden', !rec || paletteMatch()?.name === rec.name);
     if (rec) recBtn.textContent = `Use recommended colors (${rec.name})`;
-    $('bgArtRow').classList.toggle('hidden', state.marble !== 'abstract'); $('bgArt').value = state.bgArt;
+    $('bgArtRow').classList.toggle('hidden', !(state.marble in LAYER_ART)); $('bgArt').value = state.bgArt;
     const floralNote = $('floralNote');
     floralNote.classList.toggle('hidden', !bg?.bakedTitle);
     floralNote.textContent = state.plateStyle === 'none'
@@ -4220,7 +4265,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     $('accentTile').value = state.accentTile ?? 100; $('accentSpacing').value = state.accentSpacing ?? 0;
     $('accentXIn').value = Math.round(state.accentX * 100); $('accentYIn').value = Math.round(state.accentY * 100); $('accentRot').value = state.accentRot || 0;
     for (const id of ['texture', 'veinStrength', 'plateOpacity', 'titleShadow', 'accentOpacity']) $(id).value = state[id];
-    const marbleBg = !['abstract', 'floral', 'blush', 'journal', 'solid'].includes(state.marble) && !state.marble.startsWith('img:');
+    const marbleBg = !['abstract', 'circles', 'floral', 'blush', 'journal', 'solid'].includes(state.marble) && !state.marble.startsWith('img:');
     for (const id of ['texture', 'veinStrength']) $(id).closest('.slider').classList.toggle('hidden', !marbleBg);
     $('plateOpacity').closest('.slider').classList.toggle('hidden', ['none', 'ring'].includes(state.plateStyle));
     $('textureVal').textContent = state.texture + '%';
@@ -4561,6 +4606,9 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   };
   DESIGN_PRESETS.abstract = { palette: 'Abstract Watercolor', marble: 'abstract', plateStyle: 'none', titleStyle: 'custom', coverFont: 'Playfair Display', coverFontColor: '#63101A',
     decor: { top: 'decor-none', bottom: 'decor-none', divider: 'divider-canva-gold' } };
+  // Its gold rule under the title is part of the artwork, so no divider is added.
+  DESIGN_PRESETS.circles = { palette: 'Plan With Purpose', marble: 'circles', plateStyle: 'none', titleStyle: 'custom', coverFont: 'Allura', coverFontColor: '#111111',
+    decor: { top: 'decor-none', bottom: 'decor-none', divider: 'divider-none' } };
   document.querySelectorAll('#presetSeg button').forEach((b) => b.onclick = () => {
     const pr = DESIGN_PRESETS[b.dataset.preset];
     if (pr.coverFont) { state.coverFont = pr.coverFont; ensureFont(pr.coverFont).then(() => commit(false)); }
