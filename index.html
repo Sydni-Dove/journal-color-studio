@@ -1925,7 +1925,17 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     }
     const tmp = scratch('patternOut', w, h);
     tmp.getContext('2d').putImageData(out, 0, 0);
-    ctx.drawImage(tmp, x, y, w, h);
+    // A stripe panel beside the writing (a sidebar that starts inside the page) ends on a dark stripe next to the text:
+    // if its text-facing (left) edge would be the light ground, the stripes are mirrored so the dark one sits there.
+    const P0 = hexRgb(p.stripePrimary || p.stone), B0 = hexRgb(p.stripeBackground || p.paper);
+    let flip = false;
+    if (x > 0 && !pat.layers) {
+      let edge = 0; for (let yy = 0; yy < h; yy += Math.max(1, h >> 6)) { const j = yy * w * 4; edge += Math.abs(d[j] - B0[0]) + Math.abs(d[j + 1] - B0[1]) + Math.abs(d[j + 2] - B0[2]) < Math.abs(d[j] - P0[0]) + Math.abs(d[j + 1] - P0[1]) + Math.abs(d[j + 2] - P0[2]) ? 1 : -1; }
+      const lum = ([r, g, b]) => .2126 * r + .7152 * g + .0722 * b, lightGround = lum(B0) > lum(P0);
+      flip = lightGround ? edge > 0 : edge < 0;          // left edge is on the lighter tone
+    }
+    if (flip) { ctx.save(); ctx.translate(x + w, y); ctx.scale(-1, 1); ctx.drawImage(tmp, 0, 0, w, h); ctx.restore(); }
+    else ctx.drawImage(tmp, x, y, w, h);
     if (s.showStripeBorder && !soft) {
       const o = Math.round(w * .035);
       ctx.strokeStyle = p.stripeAccent; ctx.lineWidth = Math.max(1, w * .006);
