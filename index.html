@@ -3009,7 +3009,30 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   // The header style a page uses. "As designed" gives each page its Canva style, except that on photo / image
   // backgrounds the heavy title blocks become a strip of the art with the title on the page underneath (like Dream,
   // Brainstorm and Keys): lettering set on a busy photo texture doesn't read.
-  const headerStyleFor = (s, pref) => (s.headerStyle !== 'mixed' ? s.headerStyle : pref === 'block' && photoBg(s) && s.headerFill !== 'solid' ? 'rule' : pref);
+  const headerStyleFor = (s, pref) => (s.headerStyle !== 'mixed' ? s.headerStyle : pref === 'block' && wordsOffArt(s) ? 'rule' : pref);
+  // Whether lettering should move off the header art onto the page. Light lettering reads on a dark strip (black + gold,
+  // the dark marbles, black leather), so those keep their words on the art; on any lighter or blotchy strip (pink
+  // kintsugi, watercolor, photos, patterns) the words sit on the page instead. Measured on a small render of the strip
+  // (mean luminance and its spread), cached per look. Flat fills never move.
+  const busyCache = new Map();
+  function wordsOffArt(s) {
+    if (s.headerFill === 'solid' || floralDesign(s) || s.marble === 'solid') return false;
+    const key = JSON.stringify([s.marble, s.palette, s.bgArt, s.texture, s.veinStrength, s.showVeins, s.showHighlights]);
+    if (busyCache.has(key)) return busyCache.get(key);
+    const w = 160, h = Math.round(w * TRIM_H / TRIM_W * .1), c = document.createElement('canvas'); c.width = w; c.height = h;
+    const ctx = c.getContext('2d');
+    paintMarble(ctx, 0, 0, w, h, { ...s, _W: w, _thumb: false });
+    let busy = false;
+    try {
+      const d = ctx.getImageData(0, 0, w, h).data, lin = (v) => { v /= 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; };
+      let n = 0, s1 = 0, s2 = 0;
+      for (let i = 0; i < d.length; i += 4) { const L = .2126 * lin(d[i]) + .7152 * lin(d[i + 1]) + .0722 * lin(d[i + 2]); n++; s1 += L; s2 += L * L; }
+      const mean = s1 / n; busy = mean > .15 || Math.sqrt(Math.max(0, s2 / n - mean * mean)) > .2;
+    } catch { busy = false; }
+    if (busyCache.size > 60) busyCache.clear();
+    busyCache.set(key, busy);
+    return busy;
+  }
   function drawHeader(ctx, W, H, s, title, opts = {}) { return withRole(ctx, s, 'pageTitle', () => drawHeaderTitle(ctx, W, H, s, title, opts)); }
   function drawHeaderTitle(ctx, W, H, s, title, { sub = '', pref = 'rule', x0 = 0, x1 = W, id = null, subId = null } = {}) {
     const p = s.palette, w = x1 - x0, cx = x0 + w / 2, maxW = w * .9;
@@ -3452,12 +3475,12 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
         return;
       }
       const ly = H * .055, lh = H * .04;
-      // Photo / image backgrounds (unless a reading panel is chosen): the legend line sits on the page and the art is a
-      // strip right under it, like the bar under the Dream title — small lettering on a busy photo texture doesn't read.
+      // Lighter or blotchy strips (see wordsOffArt), unless a reading panel is chosen: the legend line sits on the page
+      // between two strips of the art, one above and one below — small lettering on that texture doesn't read.
       const LEGEND = [['Status', .1], ['N = Not Interpreted', .3], ['I = Interpreted', .6], ['A = Application', .8]];
-      const panel = pagePanel(s, 'contents'), onPage = !panel && photoBg(s) && s.headerFill !== 'solid';
+      const panel = pagePanel(s, 'contents'), onPage = !panel && wordsOffArt(s);
       const legendY = onPage ? H * .05 : ly + lh / 2;                           // the legend line's centre
-      if (onPage) stoneBar(ctx, 0, H * .072, W, H * .022, s); else stoneBar(ctx, 0, ly, W, lh, s);
+      if (onPage) { stoneBar(ctx, 0, 0, W, H * .028, s); stoneBar(ctx, 0, H * .072, W, H * .022, s); } else stoneBar(ctx, 0, ly, W, lh, s);
       if (panel) {
         // Edge to edge (bleeds off both sides like the strip); padding sets how much of the strip's height it covers.
         const iy = [lh * .16, lh * .08, 0][panel.lvl + 1];
@@ -5543,7 +5566,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   $('showGuides').onchange = (e) => { state.showGuides = e.target.checked; commit(false, false); };
 
   // ?debug exposes the renderers for visual QA (preview vs. export comparisons); off in normal use.
-  if (new URLSearchParams(location.search).has('debug')) window.__studio = { sectionStyle, TYPO_PAGES, palettesFor, paletteVariations, designType, paletteFit, recommendedPalettes, PALETTE_HOME, renderCover, renderPage, renderDesign, pageList, insideNumber, bindingSide, titleContrast, get state() { return state; }, commit, TITLE_PLATE_STYLES };
+  if (new URLSearchParams(location.search).has('debug')) window.__studio = { sectionStyle, TYPO_PAGES, palettesFor, paletteVariations, designType, paletteFit, recommendedPalettes, PALETTE_HOME, renderCover, renderPage, renderDesign, pageList, insideNumber, bindingSide, titleContrast, wordsOffArt, get state() { return state; }, commit, TITLE_PLATE_STYLES };
   if (location.protocol === 'file:') { showBlocked(); return; }
   // Controls that only apply to the Dream Journal's modular cover/interior are hidden for the prayer journals.
   // Title plate, lettering, accents and decorations work on every journal; the Dream-only pieces (its preset designs,
