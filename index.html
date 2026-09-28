@@ -194,7 +194,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   .text-pop { left: 8px !important; right: 8px; top: auto !important; bottom: calc(var(--rail) + 8px); width: auto; max-width: none; }
   body.focus .text-pop { bottom: calc(76px + env(safe-area-inset-bottom)); }
   :root { --hdr: 56px; --rail: calc(62px + env(safe-area-inset-bottom)); --sheet: 0px; }
-  body.sheet-open { --sheet: 43dvh; }             /* half detent: page ≈ 57%, controls ≈ 43% */
+  body.sheet-open { --sheet: 36dvh; }             /* half detent: the page keeps most of the screen, controls ≈ a third */
   body.sheet-open.sheet-full { --sheet: calc(100dvh - var(--hdr) - var(--rail) - 150px); }
   html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
   header { position: fixed; top: 0; left: 0; right: 0; height: var(--hdr); padding: 6px 12px; gap: 8px; z-index: 30; }
@@ -205,11 +205,11 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   .layout { display: block; padding: 0; }
   /* The page: everything between the header and the rail (and the sheet, when one is open). */
   .workspace { position: fixed; top: var(--hdr); left: 0; right: 0; bottom: calc(var(--rail) + var(--sheet)); max-height: none; min-height: 0; border: 0; border-radius: 0; box-shadow: none; z-index: 1; transition: bottom .22s ease; }
-  .preview { order: 1; padding: 10px 12px; }
+  .preview { order: 1; padding: 6px 8px; }
   .preview { min-height: 0; overflow: hidden; }
   /* Sized from the space left between the header, the page bar, the rail and any open sheet. */
-  .preview canvas { max-width: 100%; max-height: calc(100dvh - var(--hdr) - var(--rail) - var(--sheet) - 84px); transition: max-height .22s ease; }
-  .workbar { order: 2; padding: 6px 10px; border-top: 1px solid var(--line); border-bottom: 0; flex-wrap: nowrap; gap: 6px; }
+  .preview canvas { max-width: 100%; max-height: calc(100dvh - var(--hdr) - var(--rail) - var(--sheet) - 68px); transition: max-height .22s ease; }
+  .workbar { order: 2; padding: 3px 8px; border-top: 1px solid var(--line); border-bottom: 0; flex-wrap: nowrap; gap: 6px; }
   .workbar > div:first-child { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .m-pager { display: flex; gap: 6px; }
   .m-pager .btn { min-width: 44px; min-height: 44px; font-size: 20px; text-align: center; padding: 0; }
