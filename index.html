@@ -264,16 +264,126 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   .pal-detail canvas { width: 72px; }
   .toast { bottom: calc(var(--rail) + var(--sheet) + 12px); }
 }
+
+/* ================= Studio shell (UI only: the preview, its page bar and thumbnails keep their own styles) =================
+   Light, calm design-tool look: warm white + soft cream surfaces, pale neutral lines, charcoal text, Dove burgundy for
+   selection and the primary action, gold only as a small accent. Desktop settings are six workflow stages (accordion);
+   on phones the stages flatten away and the existing rail + bottom sheet keep grouping the same cards. */
+:root {
+  --text: #262220; --text-soft: #6f6763; --surface: #ffffff; --cream: #f6f1ea; --field: #fcfaf7; --line-soft: #ece6df; --line-strong: #d8cfc7;
+  --tint: #faf1ef; --focus: rgba(99, 0, 0, .22);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --text: var(--ink); --text-soft: var(--muted); --surface: var(--panel); --cream: #2a2120; --field: #2a2120; --line-soft: #342a28; --line-strong: #4a3d3a; --tint: #3a2626; --focus: rgba(230,163,163,.3); }
+}
+header { height: 64px; padding: 0 20px; gap: 10px; background: var(--surface); border-bottom: 1px solid var(--line-soft); }
+.back-btn { width: 40px; height: 40px; flex: 0 0 40px; display: grid; place-items: center; border: 0; border-radius: 10px; background: transparent; color: var(--text); cursor: pointer; padding: 0; }
+.back-btn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.back-btn:hover:not(:disabled) { background: var(--cream); }
+.back-btn:disabled { opacity: .32; cursor: default; }
+.hdr-title { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 21px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+#startOver { border-radius: 999px; padding: 9px 16px; border-color: var(--line-strong); background: transparent; color: var(--text); font-weight: 600; font-size: 13px; }
+#startOver:hover { background: var(--cream); border-color: var(--text-soft); }
+:where(aside, header) :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+/* Cards and groups */
+aside { color: var(--text); }
+aside .card h2 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 18px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--text); align-items: baseline; gap: 10px; margin: 0 0 8px; }
+aside .card h2 span { font-family: Lato, system-ui, sans-serif; font-size: 12px; color: var(--text-soft); text-align: right; }
+.intro h1 { font-size: 24px; margin: 0 0 4px; color: var(--text); }
+.intro .lead { font-size: 12.5px; color: var(--text-soft); }
+aside .hint { color: var(--text-soft); }
+aside .field { color: var(--text); }
+aside .field > span:first-child, aside .slider span, .group-label { color: var(--text); font-weight: 600; }
+.group-label { font-size: 11px; color: var(--text-soft); letter-spacing: .1em; }
+aside .field input, aside .field select, aside .text-slot input, aside .text-slot textarea { background: var(--field); border-color: var(--line-strong); border-radius: 9px; color: var(--text); }
+@media (min-width: 701px) { aside .field select, aside .field input:not([type=color]):not([type=checkbox]) { min-height: 40px; } }
+aside .role { border-bottom-color: var(--line-soft); }
+aside .btn { border-color: var(--line-strong); background: var(--surface); color: var(--text); border-radius: 10px; }
+aside .btn:hover:not(:disabled) { background: var(--cream); }
+aside .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+aside .btn.primary:hover:not(:disabled) { background: #4f0000; }
+
+/* Option cards (backgrounds, plates, lettering, presets…): clear selection with a check badge */
+aside .seg { gap: 8px; }
+aside .seg button { position: relative; background: var(--field); border-color: var(--line-soft); border-radius: 11px; padding: 10px 11px; transition: border-color .15s, background .15s; }
+aside .seg button:hover { border-color: var(--line-strong); }
+aside .seg button strong { font-size: 13px; color: var(--text); padding-right: 16px; }
+aside .seg button small { color: var(--text-soft); }
+aside .seg button.active { border-color: var(--brand); background: var(--tint); box-shadow: inset 0 0 0 1px var(--brand); }
+aside .seg button.active::after { content: '✓'; position: absolute; top: 7px; right: 7px; width: 17px; height: 17px; border-radius: 50%; background: var(--brand); color: #fff; font-size: 10px; font-weight: 800; line-height: 17px; text-align: center; }
+aside .accent-tiles button { background: var(--field); border-color: var(--line-soft); border-radius: 10px; color: var(--text); }
+aside .accent-tiles button.active { border-color: var(--brand); background: var(--tint); box-shadow: inset 0 0 0 1px var(--brand); }
+
+/* Palette: name + a crisp swatch strip; the selected one is tinted and checked. (The small cover thumbnail is not shown.) */
+#paletteCover { display: none; }
+.pal-detail { background: var(--cream); border: 1px solid var(--line-soft); border-radius: 12px; padding: 12px 14px; }
+.pal-detail strong { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 18px; font-weight: 600; color: var(--text); }
+.pal-detail small { color: var(--text-soft); }
+.pal-detail .swatch-row { height: 18px; border-radius: 5px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }
+.pal-group { color: var(--text-soft); margin: 16px 0 8px; }
+.pal-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.palettes button { display: flex; flex-direction: column; gap: 7px; padding: 9px 10px 10px; background: var(--field); border-color: var(--line-soft); border-radius: 10px; color: var(--text); transition: border-color .15s, background .15s; }
+.palettes button:hover { border-color: var(--line-strong); }
+.palettes button > span { order: -1; font-size: 12.5px; font-weight: 600; padding-right: 20px; min-height: 16px; }
+.palettes .swatch-row { height: 14px; border-radius: 4px; margin: 0; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }
+.palettes button.selected { border-color: var(--brand); background: var(--tint); box-shadow: inset 0 0 0 1px var(--brand); }
+.palettes button.selected::after { top: 8px; left: auto; right: 8px; width: 17px; height: 17px; font-size: 10px; line-height: 17px; font-weight: 800; }
+.palettes button.selected:has(.del)::after { right: 30px; }
+.palettes .del { top: 5px; right: 5px; }
+#savePalette { border-style: dashed; border-color: var(--brand); color: var(--brand); background: transparent; font-weight: 700; }
+
+/* Page settings sections: lighter dividers */
+.typo-sec, .decor-slot { border-top-color: var(--line-soft); }
+.text-slot { border-bottom-color: var(--line-soft); }
+
+/* ---------- Desktop / tablet: six workflow stages ---------- */
+@media (min-width: 701px) {
+  aside { gap: 10px; }
+  aside .intro { background: transparent; border: 0; box-shadow: none; padding: 2px 4px 6px; }
+  .stage { background: var(--surface); border: 1px solid var(--line-soft); border-radius: 14px; box-shadow: 0 1px 2px rgba(40,25,20,.04), 0 6px 18px rgba(40,25,20,.05); overflow: hidden; position: relative; }
+  .stage.open::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--brand); z-index: 1; }
+  .stage-toggle { width: 100%; min-height: 60px; display: grid; grid-template-columns: 28px minmax(0, 1fr) 16px; align-items: center; gap: 12px; padding: 12px 16px; border: 0; background: transparent; color: var(--text); text-align: left; cursor: pointer; font: inherit; }
+  .stage-toggle:hover { background: color-mix(in srgb, var(--surface) 70%, var(--cream)); }
+  .stage-num { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--line-strong); display: grid; place-items: center; font-size: 11px; font-weight: 700; color: var(--text-soft); font-variant-numeric: tabular-nums; transition: background .15s, color .15s, border-color .15s; }
+  .stage.open .stage-num { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .stage-title { display: grid; gap: 2px; min-width: 0; }
+  .stage-name { font-size: 12px; font-weight: 700; letter-spacing: .13em; text-transform: uppercase; }
+  .stage-sub { font-size: 12px; color: var(--text-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .stage-chev { width: 9px; height: 9px; border-right: 2px solid var(--text-soft); border-bottom: 2px solid var(--text-soft); transform: rotate(45deg) translate(-2px, -2px); transition: transform .18s; justify-self: center; }
+  .stage.open .stage-chev { transform: rotate(-135deg) translate(-2px, -2px); }
+  .stage-body { display: none; border-top: 1px solid var(--line-soft); padding: 0 18px 6px; }
+  .stage.open > .stage-body { display: block; }
+  .stage .card { background: transparent; border: 0; border-radius: 0; box-shadow: none; padding: 16px 0; }
+  .stage .card + .card { border-top: 1px solid var(--line-soft); }
+  .stage[data-stage=export] { border-color: color-mix(in srgb, var(--brand) 22%, var(--line-soft)); }
+  #exportCard .actions .btn { min-height: 42px; text-align: center; font-weight: 600; }
+  #exportCard .actions .btn.primary { font-weight: 700; }
+}
+@media (prefers-reduced-motion: reduce) { .stage-chev, .stage-num, aside .seg button, .palettes button { transition: none; } }
+
+/* ---------- Phones: stages flatten; the rail + bottom sheet keep grouping the same cards as before ---------- */
+@media (max-width: 700px) {
+  .stage, .stage-body { display: contents; }
+  .stage-toggle { display: none; }
+  header { height: var(--hdr); padding: 6px 8px; gap: 6px; }
+  .back-btn { width: 44px; height: 44px; flex-basis: 44px; }
+  .hdr-title { font-size: 18px; }
+  #startOver { min-height: 44px; padding: 0 14px; }
+  /* Edit sheet keeps its order: journal + page, this page's text style, reading panel, wording. */
+  #journalCard { order: 1; } #pageTypoCard { order: 2; } #readingPanelCard { order: 3; } #textCard { order: 4; }
+  #textCard, #exportCard, #readingPanelCard, #pageTypoCard { border-top: 1px solid var(--line-soft); }
+  aside .card + .card { border-top-color: var(--line-soft); }
+  .sheet-head { border-bottom-color: var(--line-soft); }
+}
 </style>
 </head>
 <body>
 <header>
-  <div class="brand-mark">DE</div>
-  <div><strong>Journal Color Studio</strong><small>DOVE EXPRESSIONS</small></div>
+  <button class="back-btn" id="undoBtn" type="button" title="Go back: undo the last change (⌘Z)" aria-label="Go back (undo the last change)" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+  <strong class="hdr-title">Journal Color Studio</strong>
   <div class="spacer"></div>
-  <button class="btn head-btn" id="undoBtn" type="button" title="Undo the last change (⌘Z)" disabled>↶ Go back</button>
   <button class="btn head-btn" id="startOver" type="button" title="Reset this journal to its original design">Start over</button>
-  <span class="saved">Changes save automatically</span>
 </header>
 
 <div class="layout">
@@ -282,312 +392,345 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     <div data-tab="pages" class="card pages-card"><div id="pagesSlot"></div></div>
     <div class="card intro">
       <h1>Your journal, your colors.</h1>
-      <p class="lead">Choose a journal, then swap the marble, colors and elements. Every page of the book changes together, so you never rebuild a layout.</p>
+      <p class="lead">Work top to bottom: pick a journal, design it, color it, then export. Changes save automatically.</p>
     </div>
-
-    <div data-tab="page" class="card">
-      <h2>Journal <span>layout</span></h2>
-      <div class="field"><span>Which journal</span>
-        <select id="journal">
-          <option value="dream">Dream Journal</option>
-          <option value="prayer">Prayer Journal (Pink)</option>
-          <option value="warrior">Prayer Warrior Journal (Orange)</option>
-          <option value="warring">Warring Woman Journal</option>
-        </select>
-      </div>
-      <div class="pager">
-        <button class="btn" id="prevPage" aria-label="Previous page">‹</button>
-        <div><strong id="pageName"></strong><span id="pageNum"></span></div>
-        <button class="btn" id="nextPage" aria-label="Next page">›</button>
-      </div>
-    </div>
-
-    <div data-tab="page" class="card hidden" id="pageTypoCard">
-      <h2>Page settings <span id="pageTypoName"></span></h2>
-      <p class="hint" style="margin:0" id="pageTypoNote">Fonts, colors and sizes for the text on this page only. Anything on “Journal default” follows Typography.</p>
-      <div id="pageTypoFields"></div>
-      <button class="btn" id="pageTypoReset" type="button" style="width:100%;text-align:center;margin-top:10px">Reset page typography</button>
-    </div>
-
-    <div data-tab="page" class="card hidden" id="readingPanelCard">
-      <h2>Reading panel <span id="readingPanelWhere"></span></h2>
-      <label class="field"><span>Show panel</span>
-        <select id="readingPanelShow">
-          <option value="auto">Automatic</option>
-          <option value="on">Always show on this page</option>
-          <option value="off">Hide on this page</option>
-        </select></label>
-      <p class="hint" style="margin:6px 0 0" id="readingPanelMode"></p>
-      <div class="row2" id="readingPanelColorRow">
-        <div class="field"><span>Panel color</span>
-          <select id="readingPanelColor">
-            <option value="paper">Paper (palette)</option>
-            <option value="white">White</option>
-            <option value="cream">Cream</option>
-            <option value="neutral">Palette neutral</option>
-            <option value="custom">Custom color</option>
-          </select>
-        </div>
-        <div class="field"><span>Custom</span><input type="color" id="readingPanelCustom" aria-label="Custom reading panel color" style="height:36px;width:100%"></div>
-      </div>
-      <label class="slider" id="readingPanelOpacityRow"><span>Panel opacity <b id="readingPanelOpacityVal"></b></span><input type="range" id="readingPanelOpacity" min="0" max="100"></label>
-      <div class="seg" id="readingPanelPad" style="margin-top:8px">
-        <button data-pad="tight"><strong>Tight</strong><small>Close to the text</small></button>
-        <button data-pad="normal"><strong>Normal</strong></button>
-        <button data-pad="generous"><strong>Generous</strong><small>Covers more</small></button>
-      </div>
-      <span class="hint">Sits on top of the background, behind the text. The text and page layout don’t move.</span>
-    </div>
-
-
-    <div data-tab="page" class="card" id="textCard">
-      <h2>Text content <span>the wording on this page</span></h2>
-      <p class="hint" style="margin:0">Change the words themselves. Fonts, sizes and colors stay under Typography.</p>
-      <div id="textFields"></div>
-    </div>
-
-    <div data-tab="design" class="card">
-      <h2>Design pieces <span>from your Canva elements</span></h2>
-      <div class="field"><span>Start from a design</span>
-        <div class="seg" id="presetSeg">
-          <button data-preset="canva"><strong>Black + gold</strong><small>Original Canva cover</small></button>
-          <button data-preset="floral"><strong>Floral</strong><small>Original floral cover</small></button>
-          <button data-preset="abstract"><strong>Abstract watercolor</strong><small>Your Canva page 64 art</small></button>
-        </div>
-        <span class="hint">Fills every slot with that design's original pieces. Everything stays editable after.</span>
-      </div>
-      <div class="field"><span>Background</span>
-        <div class="seg" id="marbleSeg"></div>
-        <button class="btn hidden" id="recommendColors" type="button">Use recommended colors</button>
-        <label class="field hidden" id="bgArtRow"><span>Background artwork colors</span>
-          <select id="bgArt"><option value="original">Original watercolor colors</option><option value="palette">Recolor to palette (keeps texture)</option></select></label>
-        <span class="hint hidden" id="floralNote"></span>
-      </div>
-      <div class="field"><span>Title plate</span>
-        <div class="seg" id="plateSeg"></div>
-      </div>
-      <div class="field" id="titleFillField"><span>Title box fill</span>
-        <div class="role"><label><input type="checkbox" id="titleFillOn"> Fill behind title</label></div>
-        <div class="row2" id="titleFillColorRow">
-          <div class="field"><span>Fill color</span>
-            <select id="titleFillColor">
-              <option value="paper">Paper (palette)</option>
-              <option value="neutral">Neutral cream</option>
-              <option value="plate">Plate color (palette)</option>
-              <option value="highlight">Highlight (palette)</option>
-              <option value="stone">Stone (palette)</option>
-              <option value="trim">Gold trim (palette)</option>
-              <option value="white">White</option>
-              <option value="black">Black</option>
-              <option value="custom">Custom color</option>
+    <section class="stage" data-stage="journal">
+      <button class="stage-toggle" type="button" aria-expanded="false" aria-controls="stage-journal"><span class="stage-num">01</span><span class="stage-title"><span class="stage-name">Journal</span><span class="stage-sub">Which journal, which page</span></span><span class="stage-chev" aria-hidden="true"></span></button>
+      <div class="stage-body" id="stage-journal">
+        <div data-tab="page" class="card" id="journalCard">
+          <h2>Journal <span>and page</span></h2>
+          <div class="field"><span>Which journal</span>
+            <select id="journal">
+              <option value="dream">Dream Journal</option>
+              <option value="prayer">Prayer Journal (Pink)</option>
+              <option value="warrior">Prayer Warrior Journal (Orange)</option>
+              <option value="warring">Warring Woman Journal</option>
             </select>
           </div>
-          <div class="field"><span>Custom</span><input type="color" id="titleFillCustom" aria-label="Custom title fill color" style="height:36px;width:100%"></div>
-        </div>
-        <label class="slider" id="titleFillOpacityRow"><span>Fill opacity <b id="titleFillOpacityVal"></b></span><input type="range" id="titleFillOpacity" min="0" max="100"></label>
-        <div class="seg" id="titleFillPad" style="margin-top:8px">
-          <button data-pad="tight"><strong>Tight</strong><small>Close to the title</small></button>
-          <button data-pad="normal"><strong>Normal</strong></button>
-          <button data-pad="generous"><strong>Generous</strong><small>To the frame</small></button>
-        </div>
-        <span class="hint" id="titleFillNote">Sits behind the title and inside its frame. The title, frame and artwork don’t move.</span>
-      </div>
-      <div class="field"><span>Cover lettering</span>
-        <div class="seg" id="titleSeg">
-          <button data-title="custom"><strong>Custom font</strong><small>Real type, your font</small></button>
-          <button data-title="script"><strong>Script</strong><small>Original brush artwork</small></button>
-          <button data-title="serif"><strong>Serif</strong><small>Original Canva artwork</small></button>
-        </div>
-        <span class="hint prayer-only">Script or Serif keeps your original Canva lettering. Custom font types the cover title in your cover font.</span>
-        <span class="hint warn hidden" id="contrastWarn"></span>
-      </div>
-      <div class="field"><span>Accent art</span><div class="accent-tiles" id="accentTiles"></div></div>
-      <div class="row2">
-        <div class="field hidden"><span>Accent art</span>
-          <select id="accent">
-            <option value="none">None</option>
-            <option value="topo">Topographic lines</option>
-            <option value="waves">Flowing lines</option>
-            <option value="arcs">Nested arcs</option>
-            <option value="ribbon">Line ribbon</option>
-            <option value="dots">Halftone dots</option>
-            <option value="stripes">Bold stripes</option>
-          </select>
-        </div>
-        <div class="field"><span>Accent layout</span>
-          <select id="accentPlace"></select>
+          <div class="pager">
+            <button class="btn" id="prevPage" aria-label="Previous page">‹</button>
+            <div><strong id="pageName"></strong><span id="pageNum"></span></div>
+            <button class="btn" id="nextPage" aria-label="Next page">›</button>
+          </div>
         </div>
       </div>
-      <label class="slider" id="accentOpacityRow"><span>Accent opacity <b id="accentVal"></b></span><input type="range" id="accentOpacity" min="5" max="100"></label>
-      <label class="slider" id="accentScaleRow"><span>Accent size <b id="accentScaleVal"></b></span><input type="range" id="accentScale" min="30" max="200"></label>
-      <label class="slider hidden" id="accentTileRow"><span>Pattern size <b id="accentTileVal"></b></span><input type="range" id="accentTile" min="40" max="200"></label>
-      <label class="slider hidden" id="accentSpacingRow"><span>Repeat spacing <b id="accentSpacingVal"></b></span><input type="range" id="accentSpacing" min="0" max="100"></label>
-      <label class="slider hidden" id="accentXRow"><span>X position <b id="accentXVal"></b></span><input type="range" id="accentXIn" min="0" max="100"></label>
-      <label class="slider hidden" id="accentYRow"><span>Y position <b id="accentYVal"></b></span><input type="range" id="accentYIn" min="0" max="100"></label>
-      <label class="slider hidden" id="accentRotRow"><span>Rotation <b id="accentRotVal"></b></span><input type="range" id="accentRot" min="-180" max="180"></label>
-      <div class="role hidden" id="accentDragRow"><span class="hint">Drag the element on the cover preview to reposition it.</span></div>
-      <div class="role" id="accentLinedRow"><label><input type="checkbox" id="accentLined"> Also show accent faintly on lined pages</label></div>
-      <label class="slider" id="shadowRow"><span>Lettering shadow <b id="shadowVal"></b></span><input type="range" id="titleShadow" min="0" max="100"></label>
-    </div>
-
-    <div data-tab="design" class="card" id="decorCard">
-      <h2>Decorative elements <span>swap, recolor, hide</span></h2>
-      <p class="hint" style="margin:0">Each element lives in a fixed zone of the cover, so swapping it never moves the title.</p>
-      <div class="prayer-only" id="prElements"></div>
-      <div id="decorSlots"></div>
-      <div class="group-label">Your elements</div>
-      <p class="hint" style="margin:0 0 6px">Upload a PNG/JPG/SVG (transparent PNGs work best). It becomes available in every slot above and as a background.</p>
-      <label class="btn" style="display:block;text-align:center;cursor:pointer">Upload an element<input type="file" id="uploadInput" accept="image/png,image/jpeg,image/webp,image/svg+xml" multiple hidden></label>
-      <div id="uploadList"></div>
-    </div>
-
-    <div data-tab="colors" class="card">
-      <h2>Palette <span id="paletteName"></span></h2>
-      <div class="pal-detail hidden" id="paletteDetail"><canvas id="paletteCover" aria-hidden="true"></canvas>
-        <div style="min-width:0;flex:1"><strong id="paletteDetailName"></strong><small id="paletteDetailVar"></small><div class="swatch-row" id="paletteRoles"></div></div></div>
-      <div class="palettes" id="palettes"></div>
-      <button class="btn" id="savePalette" type="button" style="margin-top:10px;width:100%;text-align:center">+ Save current colors as my palette</button>
-      <p class="hint" style="margin:6px 0 0">Change any color under Layers, then save it here. Your palettes appear in this list and are kept on this computer.</p>
-    </div>
-
-    <div data-tab="type" class="card">
-      <h2>Typography <span>cover, headings, body</span></h2>
-      <div class="group-label">Cover title <span class="hint" id="coverFontNote"></span></div>
-      <div class="field"><span>Cover font</span>
-        <select id="coverFont">
-          <option value="Cormorant Garamond">Cormorant Garamond</option>
-          <option value="Playfair Display">Playfair Display</option>
-          <option value="Lora">Lora</option>
-          <option value="Libre Baskerville">Libre Baskerville</option>
-          <option value="Cinzel">Cinzel</option>
-          <option value="Montserrat">Montserrat</option>
-          <option value="Raleway">Raleway</option>
-          <option value="Lato">Lato</option>
-          <option value="Radley">Radley (floral journal)</option>
-          <option value="Cardo">Cardo (floral journal)</option>
-          <option value="Against">Against (Dove Expressions brand)</option>
-        </select>
-      </div>
-      <label class="slider"><span>Cover title size <b id="coverFontScaleVal"></b></span><input type="range" id="coverFontScale" min="60" max="120"></label>
-      <div class="role"><label><input type="checkbox" id="coverFontColorAuto"> Cover title color follows palette</label>
-        <input type="color" id="coverFontColor" aria-label="Cover title color"></div>
-      <div class="group-label">Section headings</div>
-      <div class="field"><span>Heading font</span>
-        <select id="headingFont">
-          <option value="Cormorant Garamond">Cormorant Garamond</option>
-          <option value="Playfair Display">Playfair Display</option>
-          <option value="Lora">Lora</option>
-          <option value="Libre Baskerville">Libre Baskerville</option>
-          <option value="Cinzel">Cinzel</option>
-          <option value="Montserrat">Montserrat</option>
-          <option value="Raleway">Raleway</option>
-          <option value="Lato">Lato</option>
-          <option value="Radley">Radley (floral journal)</option>
-          <option value="Cardo">Cardo (floral journal)</option>
-          <option value="Against">Against (Dove Expressions brand)</option>
-        </select>
-      </div>
-      <label class="slider"><span>Heading size <b id="headingFontScaleVal"></b></span><input type="range" id="headingFontScale" min="70" max="140"></label>
-      <div class="group-label">Body text</div>
-      <div class="field"><span>Body font</span>
-        <select id="bodyFont">
-          <option value="Cormorant Garamond">Cormorant Garamond</option>
-          <option value="Playfair Display">Playfair Display</option>
-          <option value="Lora">Lora</option>
-          <option value="Libre Baskerville">Libre Baskerville</option>
-          <option value="Cinzel">Cinzel</option>
-          <option value="Montserrat">Montserrat</option>
-          <option value="Raleway">Raleway</option>
-          <option value="Lato">Lato</option>
-          <option value="Radley">Radley (floral journal)</option>
-          <option value="Cardo">Cardo (floral journal)</option>
-          <option value="Against">Against (Dove Expressions brand)</option>
-        </select>
-      </div>
-      <label class="slider"><span>Body size <b id="bodyFontScaleVal"></b></span><input type="range" id="bodyFontScale" min="70" max="140"></label>
-      <div class="role"><label><input type="checkbox" id="textColorAuto"> Text color follows palette</label>
-        <input type="color" id="textColor" aria-label="Text color"></div>
-    </div>
-
-    <div data-tab="colors" class="card">
-      <h2>Layers <span>toggle + recolor</span></h2>
-      <div id="roles"></div>
-      <label class="slider"><span>Stone texture <b id="textureVal"></b></span><input type="range" id="texture" min="0" max="100"></label>
-      <label class="slider"><span>Vein strength <b id="veinVal"></b></span><input type="range" id="veinStrength" min="0" max="100"></label>
-      <label class="slider"><span>Title plate opacity <b id="plateVal"></b></span><input type="range" id="plateOpacity" min="0" max="100"></label>
-    </div>
-
-    <div data-tab="book" class="card" id="linedCard">
-      <h2>Interior pages</h2>
-      <div class="field"><span>Header style</span>
-        <select id="headerStyle">
-          <option value="mixed">As designed (your Canva layout)</option>
-          <option value="block">Dark block + gold rule</option>
-          <option value="rule">Classic title + gold rule</option>
-          <option value="bar">Title + dark bar</option>
-          <option value="band">Marble band + title plate</option>
-          <option value="soft">Soft marble wash</option>
-          <option value="plain">Title only</option>
-        </select>
-      </div>
-      <div class="field"><span>Header spacing</span>
-        <select id="headerSpacing">
-          <option value="snug">Snug (title close to its border and the lines)</option>
-          <option value="designed">As designed (original Canva spacing)</option>
-        </select>
-      </div>
-      <div class="row2">
-        <div class="field"><span>Dark bars + blocks</span>
-          <select id="headerFill"><option value="marble">Marble</option><option value="solid">Solid stone color</option></select>
+    </section>
+    <section class="stage" data-stage="design">
+      <button class="stage-toggle" type="button" aria-expanded="false" aria-controls="stage-design"><span class="stage-num">02</span><span class="stage-title"><span class="stage-name">Design</span><span class="stage-sub">Background, plate, lettering, accents</span></span><span class="stage-chev" aria-hidden="true"></span></button>
+      <div class="stage-body" id="stage-design">
+        <div data-tab="design" class="card dream-only" id="presetCard">
+          <h2>Start from a design</h2>
+          <div class="field">
+            <div class="seg" id="presetSeg">
+              <button data-preset="canva"><strong>Black + gold</strong><small>Original Canva cover</small></button>
+              <button data-preset="floral"><strong>Floral</strong><small>Original floral cover</small></button>
+              <button data-preset="abstract"><strong>Abstract watercolor</strong><small>Your Canva page 64 art</small></button>
+            </div>
+            <span class="hint">Fills every slot with that design's original pieces. Everything stays editable after.</span>
+          </div>
         </div>
-        <div class="field"><span>Page footer</span>
-          <select id="footer"><option value="on">Gold rule + bar</option><option value="off">None</option></select>
+        <div data-tab="design" class="card" id="backgroundCard">
+          <h2>Background</h2>
+          <div class="field">
+            <div class="seg" id="marbleSeg"></div>
+            <button class="btn hidden" id="recommendColors" type="button">Use recommended colors</button>
+            <label class="field hidden" id="bgArtRow"><span>Background artwork colors</span>
+              <select id="bgArt"><option value="original">Original watercolor colors</option><option value="palette">Recolor to palette (keeps texture)</option></select></label>
+            <span class="hint hidden" id="floralNote"></span>
+          </div>
+        </div>
+        <div data-tab="design" class="card" id="plateCard">
+          <h2>Title plate</h2>
+          <div class="field">
+            <div class="seg" id="plateSeg"></div>
+          </div>
+        </div>
+        <div data-tab="design" class="card" id="titleFillField">
+          <h2>Title box fill</h2>
+          <div class="field">
+            <div class="role"><label><input type="checkbox" id="titleFillOn"> Fill behind title</label></div>
+            <div class="row2" id="titleFillColorRow">
+              <div class="field"><span>Fill color</span>
+                <select id="titleFillColor">
+                  <option value="paper">Paper (palette)</option>
+                  <option value="neutral">Neutral cream</option>
+                  <option value="plate">Plate color (palette)</option>
+                  <option value="highlight">Highlight (palette)</option>
+                  <option value="stone">Stone (palette)</option>
+                  <option value="trim">Gold trim (palette)</option>
+                  <option value="white">White</option>
+                  <option value="black">Black</option>
+                  <option value="custom">Custom color</option>
+                </select>
+              </div>
+              <div class="field"><span>Custom</span><input type="color" id="titleFillCustom" aria-label="Custom title fill color" style="height:36px;width:100%"></div>
+            </div>
+            <label class="slider" id="titleFillOpacityRow"><span>Fill opacity <b id="titleFillOpacityVal"></b></span><input type="range" id="titleFillOpacity" min="0" max="100"></label>
+            <div class="seg" id="titleFillPad" style="margin-top:8px">
+              <button data-pad="tight"><strong>Tight</strong><small>Close to the title</small></button>
+              <button data-pad="normal"><strong>Normal</strong></button>
+              <button data-pad="generous"><strong>Generous</strong><small>To the frame</small></button>
+            </div>
+            <span class="hint" id="titleFillNote">Sits behind the title and inside its frame. The title, frame and artwork don’t move.</span>
+          </div>
+        </div>
+        <div data-tab="design" class="card" id="letteringCard">
+          <h2>Cover lettering</h2>
+          <div class="field">
+            <div class="seg" id="titleSeg">
+              <button data-title="custom"><strong>Custom font</strong><small>Real type, your font</small></button>
+              <button data-title="script"><strong>Script</strong><small>Original brush artwork</small></button>
+              <button data-title="serif"><strong>Serif</strong><small>Original Canva artwork</small></button>
+            </div>
+            <span class="hint prayer-only">Script or Serif keeps your original Canva lettering. Custom font types the cover title in your cover font.</span>
+            <span class="hint warn hidden" id="contrastWarn"></span>
+          </div>
+          <label class="slider" id="shadowRow"><span>Lettering shadow <b id="shadowVal"></b></span><input type="range" id="titleShadow" min="0" max="100"></label>
+        </div>
+        <div data-tab="design" class="card" id="accentCard">
+          <h2>Accent art</h2>
+          <div class="field"><div class="accent-tiles" id="accentTiles"></div></div>
+          <div class="row2">
+            <div class="field hidden"><span>Accent art</span>
+              <select id="accent">
+                <option value="none">None</option>
+                <option value="topo">Topographic lines</option>
+                <option value="waves">Flowing lines</option>
+                <option value="arcs">Nested arcs</option>
+                <option value="ribbon">Line ribbon</option>
+                <option value="dots">Halftone dots</option>
+                <option value="stripes">Bold stripes</option>
+              </select>
+            </div>
+            <div class="field"><span>Accent layout</span>
+              <select id="accentPlace"></select>
+            </div>
+          </div>
+          <label class="slider" id="accentOpacityRow"><span>Accent opacity <b id="accentVal"></b></span><input type="range" id="accentOpacity" min="5" max="100"></label>
+          <label class="slider" id="accentScaleRow"><span>Accent size <b id="accentScaleVal"></b></span><input type="range" id="accentScale" min="30" max="200"></label>
+          <label class="slider hidden" id="accentTileRow"><span>Pattern size <b id="accentTileVal"></b></span><input type="range" id="accentTile" min="40" max="200"></label>
+          <label class="slider hidden" id="accentSpacingRow"><span>Repeat spacing <b id="accentSpacingVal"></b></span><input type="range" id="accentSpacing" min="0" max="100"></label>
+          <label class="slider hidden" id="accentXRow"><span>X position <b id="accentXVal"></b></span><input type="range" id="accentXIn" min="0" max="100"></label>
+          <label class="slider hidden" id="accentYRow"><span>Y position <b id="accentYVal"></b></span><input type="range" id="accentYIn" min="0" max="100"></label>
+          <label class="slider hidden" id="accentRotRow"><span>Rotation <b id="accentRotVal"></b></span><input type="range" id="accentRot" min="-180" max="180"></label>
+          <div class="role hidden" id="accentDragRow"><span class="hint">Drag the element on the cover preview to reposition it.</span></div>
+          <div class="role" id="accentLinedRow"><label><input type="checkbox" id="accentLined"> Also show accent faintly on lined pages</label></div>
+        </div>
+        <div data-tab="design" class="card" id="decorCard">
+          <h2>Decorations <span>swap, recolor, hide</span></h2>
+          <p class="hint" style="margin:0">Each element lives in a fixed zone of the cover, so swapping it never moves the title.</p>
+          <div class="prayer-only" id="prElements"></div>
+          <div id="decorSlots"></div>
+          <div class="group-label">Your elements</div>
+          <p class="hint" style="margin:0 0 6px">Upload a PNG/JPG/SVG (transparent PNGs work best). It becomes available in every slot above and as a background.</p>
+          <label class="btn" style="display:block;text-align:center;cursor:pointer">Upload an element<input type="file" id="uploadInput" accept="image/png,image/jpeg,image/webp,image/svg+xml" multiple hidden></label>
+          <div id="uploadList"></div>
         </div>
       </div>
-      <div class="row2">
-        <div class="field"><span>Header rule</span>
-          <select id="headerRule"><option value="line">Gold line</option><option value="ornament">Gold ornament divider</option></select>
+    </section>
+    <section class="stage" data-stage="color">
+      <button class="stage-toggle" type="button" aria-expanded="false" aria-controls="stage-color"><span class="stage-num">03</span><span class="stage-title"><span class="stage-name">Color</span><span class="stage-sub">Palette and layers</span></span><span class="stage-chev" aria-hidden="true"></span></button>
+      <div class="stage-body" id="stage-color">
+        <div data-tab="colors" class="card" id="paletteCard">
+          <h2>Palette <span id="paletteName"></span></h2>
+          <div class="pal-detail hidden" id="paletteDetail"><canvas id="paletteCover" aria-hidden="true"></canvas>
+            <div style="min-width:0;flex:1"><strong id="paletteDetailName"></strong><small id="paletteDetailVar"></small><div class="swatch-row" id="paletteRoles"></div></div></div>
+          <div class="palettes" id="palettes"></div>
+          <button class="btn" id="savePalette" type="button" style="margin-top:10px;width:100%;text-align:center">+ Save current colors as my palette</button>
+          <p class="hint" style="margin:6px 0 0">Change any color under Layers, then save it here. Your palettes appear in this list and are kept on this computer.</p>
         </div>
-        <div class="field"><span>Writing lines</span>
-          <select id="lineStyle"><option value="printed">Printed</option><option value="hand">Hand-drawn</option></select>
+        <div data-tab="colors" class="card" id="layersCard">
+          <h2>Fine-tune <span>layers: toggle + recolor</span></h2>
+          <div id="roles"></div>
+          <label class="slider"><span>Stone texture <b id="textureVal"></b></span><input type="range" id="texture" min="0" max="100"></label>
+          <label class="slider"><span>Vein strength <b id="veinVal"></b></span><input type="range" id="veinStrength" min="0" max="100"></label>
+          <label class="slider"><span>Title plate opacity <b id="plateVal"></b></span><input type="range" id="plateOpacity" min="0" max="100"></label>
         </div>
       </div>
-      <div class="field"><span>Floral artwork colors</span>
-        <select id="floralArt"><option value="cover">Match the cover</option><option value="original">Original watercolor colors</option><option value="palette">Recolor to palette</option></select>
-      </div>
-      <div class="field"><span>Line spacing</span>
-        <select id="lineSpacing">
-          <option value="25">Master (25 pt)</option>
-          <option value="20.25">College (20.25 pt · 9/32 in)</option>
-          <option value="30">Wide (30 pt)</option>
-        </select>
-      </div>
-      <div class="role" style="margin-top:10px"><label><input type="checkbox" id="marginLine"> Left margin rule</label></div>
-    </div>
-
-    <div data-tab="book" class="card">
-      <h2>Export <span>8.5 × 11 in + 1/8 in bleed</span></h2>
-      <div class="seg" id="qualitySeg">
-        <button data-q="proof" class="active"><strong>Quick proof</strong><small>150 DPI</small></button>
-        <button data-q="print"><strong>Print quality</strong><small>300 DPI</small></button>
-      </div>
-      <div class="row2">
-        <div class="field"><span>Interior pages</span><input type="number" id="pageCount" min="10" max="300" value="102"></div>
-        <div class="field"><span>Front cover</span><select id="includeCover"><option value="yes">Include</option><option value="no">Leave out</option></select></div>
-      </div>
-      <div class="field"><span>Back cover</span><select id="includeBack"><option value="yes">Include</option><option value="no">Leave out</option></select></div>
-      <div class="role" style="margin-top:8px"><label><input type="checkbox" id="showGuides"> Show trim and safe area</label></div>
-      <span class="hint">Inside pages export as their own PDF: page 1 is the first inside page (odd pages bind on the left, even on the right). The covers are a separate file. "Whole journal PDF" puts the included covers and the inside pages in one file.</span>
-      <div class="actions" style="margin-top:12px">
-        <button class="btn primary" id="exportPdf">Export interior PDF</button>
-        <div class="row2">
-          <button class="btn" id="exportCoverPdf">Cover PDF</button>
-          <button class="btn" id="exportCover">Cover PNG</button>
+    </section>
+    <section class="stage" data-stage="text">
+      <button class="stage-toggle" type="button" aria-expanded="false" aria-controls="stage-text"><span class="stage-num">04</span><span class="stage-title"><span class="stage-name">Text</span><span class="stage-sub">Wording and typography</span></span><span class="stage-chev" aria-hidden="true"></span></button>
+      <div class="stage-body" id="stage-text">
+        <div data-tab="page" class="card" id="textCard">
+          <h2>Wording <span>on this page</span></h2>
+          <p class="hint" style="margin:0">Change the words themselves. Fonts, sizes and colors stay under Typography.</p>
+          <div id="textFields"></div>
         </div>
-        <button class="btn" id="exportBookPdf">Whole journal PDF</button>
-        <button class="btn" id="exportLined">This page PNG</button>
+        <div data-tab="page" class="card hidden" id="pageTypoCard">
+          <h2>This page’s text style <span id="pageTypoName"></span></h2>
+          <p class="hint" style="margin:0" id="pageTypoNote">Fonts, colors and sizes for the text on this page only. Anything on “Journal default” follows Typography.</p>
+          <div id="pageTypoFields"></div>
+          <button class="btn" id="pageTypoReset" type="button" style="width:100%;text-align:center;margin-top:10px">Reset page typography</button>
+        </div>
+        <div data-tab="type" class="card" id="typographyCard">
+          <h2>Typography <span>journal defaults</span></h2>
+          <div class="group-label">Cover title <span class="hint" id="coverFontNote"></span></div>
+          <div class="field"><span>Cover font</span>
+            <select id="coverFont">
+              <option value="Cormorant Garamond">Cormorant Garamond</option>
+              <option value="Playfair Display">Playfair Display</option>
+              <option value="Lora">Lora</option>
+              <option value="Libre Baskerville">Libre Baskerville</option>
+              <option value="Cinzel">Cinzel</option>
+              <option value="Montserrat">Montserrat</option>
+              <option value="Raleway">Raleway</option>
+              <option value="Lato">Lato</option>
+              <option value="Radley">Radley (floral journal)</option>
+              <option value="Cardo">Cardo (floral journal)</option>
+              <option value="Against">Against (Dove Expressions brand)</option>
+            </select>
+          </div>
+          <label class="slider"><span>Cover title size <b id="coverFontScaleVal"></b></span><input type="range" id="coverFontScale" min="60" max="120"></label>
+          <div class="role"><label><input type="checkbox" id="coverFontColorAuto"> Cover title color follows palette</label>
+            <input type="color" id="coverFontColor" aria-label="Cover title color"></div>
+          <div class="group-label">Section headings</div>
+          <div class="field"><span>Heading font</span>
+            <select id="headingFont">
+              <option value="Cormorant Garamond">Cormorant Garamond</option>
+              <option value="Playfair Display">Playfair Display</option>
+              <option value="Lora">Lora</option>
+              <option value="Libre Baskerville">Libre Baskerville</option>
+              <option value="Cinzel">Cinzel</option>
+              <option value="Montserrat">Montserrat</option>
+              <option value="Raleway">Raleway</option>
+              <option value="Lato">Lato</option>
+              <option value="Radley">Radley (floral journal)</option>
+              <option value="Cardo">Cardo (floral journal)</option>
+              <option value="Against">Against (Dove Expressions brand)</option>
+            </select>
+          </div>
+          <label class="slider"><span>Heading size <b id="headingFontScaleVal"></b></span><input type="range" id="headingFontScale" min="70" max="140"></label>
+          <div class="group-label">Body text</div>
+          <div class="field"><span>Body font</span>
+            <select id="bodyFont">
+              <option value="Cormorant Garamond">Cormorant Garamond</option>
+              <option value="Playfair Display">Playfair Display</option>
+              <option value="Lora">Lora</option>
+              <option value="Libre Baskerville">Libre Baskerville</option>
+              <option value="Cinzel">Cinzel</option>
+              <option value="Montserrat">Montserrat</option>
+              <option value="Raleway">Raleway</option>
+              <option value="Lato">Lato</option>
+              <option value="Radley">Radley (floral journal)</option>
+              <option value="Cardo">Cardo (floral journal)</option>
+              <option value="Against">Against (Dove Expressions brand)</option>
+            </select>
+          </div>
+          <label class="slider"><span>Body size <b id="bodyFontScaleVal"></b></span><input type="range" id="bodyFontScale" min="70" max="140"></label>
+          <div class="role"><label><input type="checkbox" id="textColorAuto"> Text color follows palette</label>
+            <input type="color" id="textColor" aria-label="Text color"></div>
+        </div>
       </div>
-    </div>
+    </section>
+    <section class="stage" data-stage="interior">
+      <button class="stage-toggle" type="button" aria-expanded="false" aria-controls="stage-interior"><span class="stage-num">05</span><span class="stage-title"><span class="stage-name">Interior</span><span class="stage-sub">Headers, lines, reading panel</span></span><span class="stage-chev" aria-hidden="true"></span></button>
+      <div class="stage-body" id="stage-interior">
+        <div data-tab="book" class="card" id="linedCard">
+          <h2>Interior pages <span>headers, footer, lines</span></h2>
+          <div class="field"><span>Header style</span>
+            <select id="headerStyle">
+              <option value="mixed">As designed (your Canva layout)</option>
+              <option value="block">Dark block + gold rule</option>
+              <option value="rule">Classic title + gold rule</option>
+              <option value="bar">Title + dark bar</option>
+              <option value="band">Marble band + title plate</option>
+              <option value="soft">Soft marble wash</option>
+              <option value="plain">Title only</option>
+            </select>
+          </div>
+          <div class="field"><span>Header spacing</span>
+            <select id="headerSpacing">
+              <option value="snug">Snug (title close to its border and the lines)</option>
+              <option value="designed">As designed (original Canva spacing)</option>
+            </select>
+          </div>
+          <div class="row2">
+            <div class="field"><span>Dark bars + blocks</span>
+              <select id="headerFill"><option value="marble">Marble</option><option value="solid">Solid stone color</option></select>
+            </div>
+            <div class="field"><span>Page footer</span>
+              <select id="footer"><option value="on">Gold rule + bar</option><option value="off">None</option></select>
+            </div>
+          </div>
+          <div class="row2">
+            <div class="field"><span>Header rule</span>
+              <select id="headerRule"><option value="line">Gold line</option><option value="ornament">Gold ornament divider</option></select>
+            </div>
+            <div class="field"><span>Writing lines</span>
+              <select id="lineStyle"><option value="printed">Printed</option><option value="hand">Hand-drawn</option></select>
+            </div>
+          </div>
+          <div class="field"><span>Floral artwork colors</span>
+            <select id="floralArt"><option value="cover">Match the cover</option><option value="original">Original watercolor colors</option><option value="palette">Recolor to palette</option></select>
+          </div>
+          <div class="field"><span>Line spacing</span>
+            <select id="lineSpacing">
+              <option value="25">Master (25 pt)</option>
+              <option value="20.25">College (20.25 pt · 9/32 in)</option>
+              <option value="30">Wide (30 pt)</option>
+            </select>
+          </div>
+          <div class="role" style="margin-top:10px"><label><input type="checkbox" id="marginLine"> Left margin rule</label></div>
+        </div>
+        <div data-tab="page" class="card hidden" id="readingPanelCard">
+          <h2>Reading panel <span id="readingPanelWhere"></span></h2>
+          <label class="field"><span>Show panel</span>
+            <select id="readingPanelShow">
+              <option value="auto">Automatic</option>
+              <option value="on">Always show on this page</option>
+              <option value="off">Hide on this page</option>
+            </select></label>
+          <p class="hint" style="margin:6px 0 0" id="readingPanelMode"></p>
+          <div class="row2" id="readingPanelColorRow">
+            <div class="field"><span>Panel color</span>
+              <select id="readingPanelColor">
+                <option value="paper">Paper (palette)</option>
+                <option value="white">White</option>
+                <option value="cream">Cream</option>
+                <option value="neutral">Palette neutral</option>
+                <option value="custom">Custom color</option>
+              </select>
+            </div>
+            <div class="field"><span>Custom</span><input type="color" id="readingPanelCustom" aria-label="Custom reading panel color" style="height:36px;width:100%"></div>
+          </div>
+          <label class="slider" id="readingPanelOpacityRow"><span>Panel opacity <b id="readingPanelOpacityVal"></b></span><input type="range" id="readingPanelOpacity" min="0" max="100"></label>
+          <div class="seg" id="readingPanelPad" style="margin-top:8px">
+            <button data-pad="tight"><strong>Tight</strong><small>Close to the text</small></button>
+            <button data-pad="normal"><strong>Normal</strong></button>
+            <button data-pad="generous"><strong>Generous</strong><small>Covers more</small></button>
+          </div>
+          <span class="hint">Sits on top of the background, behind the text. The text and page layout don’t move.</span>
+        </div>
+      </div>
+    </section>
+    <section class="stage" data-stage="export">
+      <button class="stage-toggle" type="button" aria-expanded="false" aria-controls="stage-export"><span class="stage-num">06</span><span class="stage-title"><span class="stage-name">Export</span><span class="stage-sub">PDF and PNG files</span></span><span class="stage-chev" aria-hidden="true"></span></button>
+      <div class="stage-body" id="stage-export">
+        <div data-tab="book" class="card" id="exportCard">
+          <h2>Export <span>8.5 × 11 in + 1/8 in bleed</span></h2>
+          <div class="seg" id="qualitySeg">
+            <button data-q="proof" class="active"><strong>Quick proof</strong><small>150 DPI</small></button>
+            <button data-q="print"><strong>Print quality</strong><small>300 DPI</small></button>
+          </div>
+          <div class="row2">
+            <div class="field"><span>Interior pages</span><input type="number" id="pageCount" min="10" max="300" value="102"></div>
+            <div class="field"><span>Front cover</span><select id="includeCover"><option value="yes">Include</option><option value="no">Leave out</option></select></div>
+          </div>
+          <div class="field"><span>Back cover</span><select id="includeBack"><option value="yes">Include</option><option value="no">Leave out</option></select></div>
+          <div class="role" style="margin-top:8px"><label><input type="checkbox" id="showGuides"> Show trim and safe area</label></div>
+          <span class="hint">Inside pages export as their own PDF: page 1 is the first inside page (odd pages bind on the left, even on the right). The covers are a separate file. "Whole journal PDF" puts the included covers and the inside pages in one file.</span>
+          <div class="actions" style="margin-top:12px">
+            <button class="btn primary" id="exportPdf">Export interior PDF</button>
+            <div class="row2">
+              <button class="btn" id="exportCoverPdf">Cover PDF</button>
+              <button class="btn" id="exportCover">Cover PNG</button>
+            </div>
+            <button class="btn" id="exportBookPdf">Whole journal PDF</button>
+            <button class="btn" id="exportLined">This page PNG</button>
+          </div>
+        </div>
+      </div>
+    </section>
   </aside>
 
   <article class="workspace">
@@ -5067,7 +5210,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
         <button type="button" class="tp-b${o.bold ? ' on' : ''}" data-k="bold" aria-pressed="${!!o.bold}" title="Bold">B</button></div>
       <div class="tp-row"><button type="button" data-k="minus" aria-label="Smaller">A−</button><input type="range" min="60" max="160" step="5" value="${sz}" data-k="size" aria-label="Size"><button type="button" data-k="plus" aria-label="Larger">A+</button><b>${sz}%</b></div>
       <div class="tp-warn hidden"></div>
-      <div class="tp-foot"><small class="hint">More in Edit → Page settings</small><button class="btn" type="button" data-k="reset"${Object.keys(o).length ? '' : ' disabled'}>Reset</button></div>`;
+      <div class="tp-foot"><small class="hint">More in ${wideScreen() ? 'Text' : 'Edit'} → this page’s text style</small><button class="btn" type="button" data-k="reset"${Object.keys(o).length ? '' : ' disabled'}>Reset</button></div>`;
     const set = (patch, rerender = true) => { setTypo(role, patch); if (rerender) renderPop(); };
     pop.querySelector('.tp-x').onclick = closePop;
     pop.querySelectorAll('.tp-sw button').forEach((b) => b.onclick = () => set({ color: b.dataset.c ? { mode: 'palette', role: b.dataset.c } : null }));
@@ -5534,6 +5677,24 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   Promise.all([...core.map((k) => ensureAsset(k).then((img) => { loaded++; status.querySelector('small').textContent = `${loaded} of ${core.length} pieces`; return img; })), fontsReady, ensureFont(state.coverFont), ensureFont(state.headingFont), ensureFont(state.bodyFont), loadUploads()])
     .then(() => { buildCoverSlots(); buildUploadList(); syncControls(); ready = true; status.classList.add('hidden'); draw(); refreshThumbs(); })
     .catch((e) => { status.querySelector('strong').textContent = 'A design file could not be loaded'; status.querySelector('small').textContent = `${e.message} — check your connection and refresh.`; });
+})();
+</script>
+<script>
+// Settings stages (desktop / tablet): one open at a time, remembered on this device. UI only — no app state involved.
+(() => {
+  const stages = [...document.querySelectorAll('aside .stage')], KEY = 'jcs.openStage';
+  let saved = null; try { saved = localStorage.getItem(KEY); } catch {}
+  const open = (key, remember = true) => {
+    stages.forEach((st) => { const on = st.dataset.stage === key; st.classList.toggle('open', on); st.querySelector('.stage-toggle').setAttribute('aria-expanded', String(on)); });
+    if (remember) try { localStorage.setItem(KEY, key || ''); } catch {}
+  };
+  stages.forEach((st) => st.querySelector('.stage-toggle').addEventListener('click', () => {
+    open(st.classList.contains('open') ? '' : st.dataset.stage);
+    // Closing the stage above can pull this one up out of view: bring its header back under the top bar.
+    const top = st.getBoundingClientRect().top, bar = document.querySelector('header').getBoundingClientRect().bottom;
+    if (top < bar + 8) window.scrollBy({ top: top - bar - 16 });
+  }));
+  open(saved === null ? 'journal' : saved, false);
 })();
 </script>
 </body>
