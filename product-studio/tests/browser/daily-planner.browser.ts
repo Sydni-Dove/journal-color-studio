@@ -63,18 +63,23 @@ async function shot(page: Page, name: string) {
 }
 
 describe("Daily planner browser QA", () => {
-  it("Letter: at least three writing lines per day, connected week and adjoining Meeting With God", async () => {
+  it("Letter: the week across a spread with at least three writing lines per day, then the Meeting With God spread", async () => {
     const p = project(), doc = resolveDocument(p), page = await open(p);
-    const i = doc.recipe.pages.findIndex((p) => p.layoutId === "weekly-plan-mwg-spread");
+    const i = doc.recipe.pages.findIndex((p) => p.layoutId === "weekly-plan-spread");
     await go(page, i + 1);
-    await expect.poll(() => page.locator('.ps-page--editor path[data-node^="mw0-days-d"]').count()).toBe(7);
-    const paths = await page.locator('.ps-page--editor path[data-node^="mw0-days-d"]').evaluateAll((els) => els.map((e) => e.getAttribute("d")!.match(/M/g)!.length));
-    expect(paths).toHaveLength(7);
-    for (const n of paths) expect(n).toBeGreaterThanOrEqual(3);
+    const lines = (side: string) => page.locator(`.ps-page--editor path[data-node^="${side}-days-d"][data-node$="-surface"]`);
+    await expect.poll(() => lines("wp0").count()).toBeGreaterThanOrEqual(3);
+    const left = await lines("wp0").evaluateAll((els) => els.map((e) => e.getAttribute("d")!.match(/M/g)!.length));
     await expect.poll(() => page.locator(".badge").first().textContent()).toMatch(/Page OK/);
     await shot(page, "weekly-letter");
     await page.getByRole("button", { name: "Next page" }).click();
-    await expect.poll(() => page.locator('.ps-page--editor [data-node="mw1-header-title"]').textContent()).toBe("Meeting With God");
+    await expect.poll(() => lines("wp1").count()).toBeGreaterThanOrEqual(3);
+    const right = await lines("wp1").evaluateAll((els) => els.map((e) => e.getAttribute("d")!.match(/M/g)!.length));
+    expect(left.length + right.length).toBe(7);
+    for (const n of [...left, ...right]) expect(n).toBeGreaterThanOrEqual(3);
+    await expect.poll(() => page.locator(".badge").first().textContent()).toMatch(/Page OK/);
+    await page.getByRole("button", { name: "Next page" }).click();
+    await expect.poll(() => page.locator('.ps-page--editor [data-node="mg0-header-title"]').textContent()).toBe("Meeting With God");
     await shot(page, "meeting-with-god");
     await page.context().close();
   });

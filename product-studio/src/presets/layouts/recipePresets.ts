@@ -117,6 +117,14 @@ export const RECIPE_PRESETS: RecipePreset[] = [
     layoutOptions: { showPageNumbers: true, dailySections: ["schedule", "topPriorities", "toDo"] },
   },
   {
+    id: "planner-weekly-plan-spread",
+    label: "Weekly Plan Spread",
+    productTypes: ["planner", "insert"],
+    needsCalendar: true,
+    build: () => ({ items: [{ id: "week", layoutId: "weekly-plan-spread", repeat: { kind: "every-week" } }], ordering: "chronological" }),
+    layoutOptions: { showPageNumbers: true },
+  },
+  {
     id: "planner-weekly-mwg",
     label: "Weekly Plan + Meeting With God",
     productTypes: ["planner", "insert"],
@@ -146,7 +154,7 @@ export const RECIPE_PRESETS: RecipePreset[] = [
     needsCalendar: true,
     build: () => ({ items: [], ordering: "chronological", structure: dailyPlannerBook() }),
     layoutOptions: { showPageNumbers: true, dailySections: ["schedule", "topPriorities", "toDo"] },
-    template: { summary: "Includes monthly, weekly, daily and Meetings With God pages.", preview: ["weekly-plan-mwg-spread", "weekly-plan-mwg-spread#1", "planner-daily", "planner-monthly"], card: ["weekly-plan-mwg-spread", "planner-daily"] },
+    template: { summary: "Includes monthly, weekly, daily and Meetings With God pages.", preview: ["weekly-plan-spread", "weekly-plan-spread#1", "meeting-with-god-spread", "meeting-with-god-spread#1", "planner-daily", "planner-monthly"], card: ["weekly-plan-spread", "planner-daily"] },
   },
   {
     id: "book-meetings-with-god",
@@ -155,7 +163,7 @@ export const RECIPE_PRESETS: RecipePreset[] = [
     needsCalendar: true,
     build: () => ({ items: [], ordering: "chronological", structure: meetingsWithGodBook() }),
     layoutOptions: { showPageNumbers: true },
-    template: { summary: "Monthly and weekly planning with Meetings With God journal pages.", preview: ["weekly-plan-mwg-spread", "weekly-plan-mwg-spread#1", "planner-monthly", "journal-lined"] },
+    template: { summary: "Monthly and weekly planning with Meetings With God journal pages.", preview: ["weekly-plan-spread", "weekly-plan-spread#1", "meeting-with-god-spread", "meeting-with-god-spread#1", "planner-monthly", "journal-lined"] },
   },
   {
     id: "book-meetings-with-god-daily",
@@ -164,7 +172,7 @@ export const RECIPE_PRESETS: RecipePreset[] = [
     needsCalendar: true,
     build: () => ({ items: [], ordering: "chronological", structure: BOOK_PRESETS.find((b) => b.id === "meetings-with-god-daily")!.build() }),
     layoutOptions: { showPageNumbers: true, dailySections: ["schedule", "topPriorities", "toDo"] },
-    template: { summary: "Monthly, weekly, Meetings With God and journal pages, plus a page for every day.", preview: ["weekly-plan-mwg-spread", "weekly-plan-mwg-spread#1", "planner-daily", "journal-lined"], card: ["weekly-plan-mwg-spread#1", "planner-daily"] },
+    template: { summary: "Monthly, weekly, Meetings With God and journal pages, plus a page for every day.", preview: ["weekly-plan-spread", "weekly-plan-spread#1", "meeting-with-god-spread", "meeting-with-god-spread#1", "planner-daily", "journal-lined"], card: ["meeting-with-god-spread", "planner-daily"] },
   },
   {
     id: "book-planner-journal",

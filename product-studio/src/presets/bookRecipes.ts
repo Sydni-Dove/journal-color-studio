@@ -20,14 +20,15 @@ export function section(label: string, children: BookNode[], period?: BookGroup[
 
 /** Meetings With God planner — the motivating structure (not its old design). */
 export function meetingsWithGodBook(includeDaily = false): BookNode[] {
-  const spread = step("weekly-planner", { type: "once" }, { layoutId: "weekly-plan-mwg-spread" });
+  const plan = step("weekly-planner", { type: "once" }, { layoutId: "weekly-plan-spread" });
+  const spread = step("meeting-with-god", { type: "once" }, { layoutId: "meeting-with-god-spread" });
   return [
     section("Front Matter", [step("mission"), step("vision"), step("goals")]),
     section(
       "Every Month",
       [
         step("monthly-calendar", { type: "once" }),
-        section("Every Week", [spread, step("lined-journal", { type: "after-module", moduleId: spread.id }, { copies: 2 }), ...(includeDaily ? [step("daily-planner")] : [])], "week"),
+        section("Every Week", [plan, spread, step("lined-journal", { type: "after-module", moduleId: spread.id }, { copies: 2 }), ...(includeDaily ? [step("daily-planner")] : [])], "week"),
         step("review", { type: "end-of-period", period: "month" }),
       ],
       "month",
@@ -38,16 +39,17 @@ export function meetingsWithGodBook(includeDaily = false): BookNode[] {
 
 /**
  * Daily planner book: front matter, then each month — its calendar, each week's
- * plan + Meeting With God spread followed by that week's daily pages — and a
- * monthly review.
+ * plan spread and Meeting With God spread followed by that week's daily pages —
+ * and a monthly review.
  */
 export function dailyPlannerBook(): BookNode[] {
-  const spread = step("weekly-planner", { type: "once" }, { layoutId: "weekly-plan-mwg-spread" });
+  const plan = step("weekly-planner", { type: "once" }, { layoutId: "weekly-plan-spread" });
+  const spread = step("meeting-with-god", { type: "once" }, { layoutId: "meeting-with-god-spread" });
   return [
     section("Front Matter", [step("mission"), step("vision"), step("goals")]),
     section(
       "Every Month",
-      [step("monthly-calendar", { type: "once" }), section("Every Week", [spread, step("daily-planner", { type: "daily" })], "week"), step("review", { type: "end-of-period", period: "month" })],
+      [step("monthly-calendar", { type: "once" }), section("Every Week", [plan, spread, step("daily-planner", { type: "daily" })], "week"), step("review", { type: "end-of-period", period: "month" })],
       "month",
     ),
   ];

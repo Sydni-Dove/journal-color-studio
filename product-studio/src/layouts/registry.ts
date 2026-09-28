@@ -1,6 +1,7 @@
 import { coverPage, dividerPage } from "./book/coverDivider";
 import { guidedPage } from "./book/guidedPage";
 import { weeklyPlanMwgSpread } from "./book/weeklyPlanMwgSpread";
+import { meetingWithGodSpread, weeklyPlanSpread } from "./book/weeklyPlanSpread";
 import { weeklyDeskPad } from "./deskpad/weeklyDeskPad";
 import { linedJournal, notesPage } from "./journal/linedJournal";
 import { groceryNotepad } from "./notepad/groceryNotepad";
@@ -17,7 +18,7 @@ import { STATIONERY_LAYOUTS } from "./stationery/stationeryLayout";
  * the shared notes page (used as spread filler). The full template library
  * is Phase 6 — added only after these validate.
  */
-export const LAYOUTS: LayoutDefinition[] = [coverPage, dividerPage, todoNotepad, groceryNotepad, linedJournal, notesPage, monthlyCalendar, weeklySpread, weeklyDeskPad, guidedPage, weeklyPlanMwgSpread, dailyPlanner, luxuryDailyExecution, dailyPlannerSheet, ...STATIONERY_LAYOUTS];
+export const LAYOUTS: LayoutDefinition[] = [coverPage, dividerPage, todoNotepad, groceryNotepad, linedJournal, notesPage, monthlyCalendar, weeklySpread, weeklyDeskPad, guidedPage, weeklyPlanMwgSpread, dailyPlanner, luxuryDailyExecution, dailyPlannerSheet, weeklyPlanSpread, meetingWithGodSpread, ...STATIONERY_LAYOUTS];
 
 export const FILLER_LAYOUT_ID = notesPage.id;
 

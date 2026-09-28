@@ -53,13 +53,16 @@ async function open(viewport: { width: number; height: number }): Promise<Page> 
 const section = (page: Page, re: RegExp) => page.locator("details.section", { has: page.locator(":scope > summary", { hasText: re }) });
 
 describe("Book Structure editor", () => {
-  it("outline jumps to the hybrid spread; the spread and its Meeting With God page render with no errors", async () => {
+  it("outline jumps to the week's plan spread; the plan and the Meeting With God spread after it render with no errors", async () => {
     const page = await open({ width: 1400, height: 1000 });
     const outline = section(page, /^Book outline/);
     await outline.locator(":scope > summary").click();
     await outline.locator("button", { hasText: /Week of Jan 4/ }).click();
     await expect.poll(() => page.locator(".ps-page--editor .ps-text", { hasText: /^Week of Jan 4/ }).count()).toBeGreaterThan(0);
     await expect.poll(async () => (await page.locator(".badge").first().textContent()) ?? "").toMatch(/Page OK|warning/);
+    // Right-hand page of the plan, then the Meeting With God spread.
+    await page.getByRole("button", { name: "Next page" }).click();
+    await expect.poll(() => page.locator(".ps-page--editor .ps-text", { hasText: /^Priorities$/i }).count()).toBeGreaterThan(0);
     await page.getByRole("button", { name: "Next page" }).click();
     await expect.poll(() => page.locator(".ps-page--editor .ps-text", { hasText: /^Meeting With God$/ }).count()).toBeGreaterThan(0);
     await page.context().close();

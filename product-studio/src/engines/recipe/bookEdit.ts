@@ -83,6 +83,8 @@ const MODULE_FOR_LAYOUT: Record<string, BookStep["module"]> = {
   "planner-daily": "daily-planner",
   "planner-weekly-spread": "weekly-planner",
   "weekly-plan-mwg-spread": "weekly-planner",
+  "weekly-plan-spread": "weekly-planner",
+  "meeting-with-god-spread": "meeting-with-god",
   "journal-lined": "lined-journal",
   "notes-page": "notes",
   "guided-page": "custom",

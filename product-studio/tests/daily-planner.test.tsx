@@ -37,7 +37,7 @@ describe("Daily planner and composite recipes", () => {
     const daily = doc.recipe.pages.filter((p) => p.layoutId === "planner-daily");
     expect(daily.map((p) => p.period.kind === "day" && p.period.iso)).toEqual(getCalendar(CAL).days.filter((d) => d.inRange).map((d) => d.iso));
     expect(new Set(doc.recipe.pages.map((p) => p.key)).size).toBe(doc.recipe.pageCount);
-    for (const id of ["planner-monthly", "weekly-plan-mwg-spread", "journal-lined", "guided-page"]) expect(doc.recipe.pages.some((p) => p.layoutId === id)).toBe(true);
+    for (const id of ["planner-monthly", "weekly-plan-spread", "meeting-with-god-spread", "journal-lined", "guided-page"]) expect(doc.recipe.pages.some((p) => p.layoutId === id)).toBe(true);
     for (const [i, p] of doc.recipe.pages.entries()) {
       expect(p.pageNumber).toBe(i + 1);
       if (p.spreadPart === 0) {

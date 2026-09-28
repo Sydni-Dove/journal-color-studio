@@ -22,9 +22,10 @@ const everyPageType = (): BookNode[] => [
   step("lined-journal", { type: "once" }),
   step("notes", { type: "once" }),
   step("worksheet", { type: "once" }, { layoutId: "stationery:worksheet-prompt.prompt-response" }),
-  ...dailyPlannerBook(), // monthly, weekly spread, daily, guided pages
+  ...dailyPlannerBook(), // monthly, weekly plan spread, Meeting With God spread, daily, guided pages
+  step("weekly-planner", { type: "weekly" }, { layoutId: "weekly-plan-mwg-spread" }),
 ];
-const LAYOUTS = ["cover-page", "divider-page", "journal-lined", "notes-page", "stationery:worksheet-prompt.prompt-response", "planner-monthly", "weekly-plan-mwg-spread", "planner-daily", "guided-page"];
+const LAYOUTS = ["cover-page", "divider-page", "journal-lined", "notes-page", "stationery:worksheet-prompt.prompt-response", "planner-monthly", "weekly-plan-spread", "meeting-with-god-spread", "weekly-plan-mwg-spread", "planner-daily", "guided-page"];
 
 function project(dimensions: DimensionSettings): ProductProject {
   return createProject("planner", { name: "Orientation", dimensions, calendar: CAL, recipe: { items: [], ordering: "chronological", structure: everyPageType() } });

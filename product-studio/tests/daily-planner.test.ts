@@ -246,3 +246,67 @@ describe("Weekly Plan + Meeting With God: open days with more writing room", () 
     }
   }
 });
+
+describe("Weekly Plan Spread: the week across two facing pages", () => {
+  const SIZES: [string, string, string][] = [LETTER, ["8x10", "coil", "coil-generic"], ["7x9", "coil", "coil-generic"], ["7x9.25", "coil", "coil-generic"], ["6x9", "coil", "coil-generic"], ["5.5x8.5", "discbound", "disc-generic"], ["a5", "ring-6", "ring-insert"]];
+  const dayOf = (id: string) => +id.match(/-d(\d)(-|$)/)![1];
+  const weekdayLines = (s: ReturnType<typeof solvePage>, prefix: string) =>
+    s.nodes.filter((n): n is Lines => n.type === "lines" && new RegExp(`^${prefix}-d\\d-surface$`).test(n.id));
+  for (const size of SIZES) {
+    for (const weekStart of [0, 1] as const) {
+      it(`${size[0]}, ${weekStart ? "Monday" : "Sunday"}-start: three weekdays left, two + weekend + Priorities right; weekdays equal across the spread and roomier than one page`, () => {
+        const plan = step("weekly-planner", { type: "once" }, { layoutId: "weekly-plan-spread" });
+        const onePage = step("weekly-planner", { type: "once" }, { layoutId: "weekly-plan-mwg-spread" });
+        const p = book([section("Every Week", [plan, onePage], "week")], { size, end: "2027-01-16" });
+        p.calendar = { ...p.calendar!, weekStart };
+        const doc = resolveDocument(p);
+        const i = doc.recipe.pages.findIndex((x) => x.layoutId === "weekly-plan-spread" && x.spreadPart === 0);
+        expect(doc.recipe.pages[i].side).toBe("verso");
+        const [left, right] = [solvePage(doc, i), solvePage(doc, i + 1)];
+        const period = doc.recipe.pages[i].period;
+        const week = doc.calendar!.weeks.find((w) => period.kind === "week" && w.key === period.key)!;
+        const isWeekend = (d: number) => week.days[d].weekday === 0 || week.days[d].weekday === 6;
+        const daysOn = (s: ReturnType<typeof solvePage>, prefix: string) => [...new Set(s.nodes.filter((n) => new RegExp(`^${prefix}-d\\d$`).test(n.id)).map((n) => +n.id.slice(-1)))].sort();
+        const L = daysOn(left, "wp0-days"), R = daysOn(right, "wp1-days");
+        expect([...L, ...R].sort()).toEqual([0, 1, 2, 3, 4, 5, 6]);
+        expect(L.filter((d) => !isWeekend(d))).toHaveLength(3);
+        expect(R.filter((d) => !isWeekend(d))).toHaveLength(2);
+        // No rectangles on either page; Notes closes the left page, Priorities (a checklist) the right.
+        for (const s of [left, right]) expect(s.nodes.filter((n) => n.type === "box" && n.stroke)).toEqual([]);
+        expect(left.nodes.some((n) => n.id === "wp0-days-notes-title")).toBe(true);
+        expect(right.nodes.filter((n) => n.type === "checkbox" && n.id.startsWith("wp1-days-priorities")).length).toBeGreaterThanOrEqual(3);
+        // Every weekday has the same number of lines on both pages, and more than on the one-page plan.
+        const counts = [...weekdayLines(left, "wp0-days"), ...weekdayLines(right, "wp1-days")].filter((n) => !isWeekend(dayOf(n.id))).map((n) => n.positions.length);
+        expect(new Set(counts).size).toBe(1);
+        const j = doc.recipe.pages.findIndex((x) => x.layoutId === "weekly-plan-mwg-spread" && x.spreadPart === 0);
+        const one = weekdayLines(solvePage(doc, j), "mw0-days").filter((n) => !isWeekend(dayOf(n.id)))[0].positions.length;
+        expect(counts[0]).toBeGreaterThan(one);
+        expect(validateProject(p, heuristicMeasurer, { pageIndices: [i, i + 1] }).issues.filter((x) => x.severity !== "info")).toEqual([]);
+      });
+    }
+  }
+
+  it("Meeting With God spread: open writing left; What did God say? and Response / action steps right — no boxes, no issues", () => {
+    for (const size of SIZES) {
+      const p = book([section("Every Week", [step("meeting-with-god", { type: "once" }, { layoutId: "meeting-with-god-spread" })], "week")], { size, end: "2027-01-16" });
+      const doc = resolveDocument(p);
+      const i = doc.recipe.pages.findIndex((x) => x.layoutId === "meeting-with-god-spread" && x.spreadPart === 0);
+      const [left, right] = [solvePage(doc, i), solvePage(doc, i + 1)];
+      expect(left.nodes.some((n) => n.id === "mg0-open" && n.type === "lines"), size[0]).toBe(true);
+      expect(right.nodes.some((n) => n.id.startsWith("mg1-said")), size[0]).toBe(true);
+      expect(right.nodes.some((n) => n.type === "checkbox" && n.id.startsWith("mg1-response")), size[0]).toBe(true);
+      expect(validateProject(p, heuristicMeasurer, { pageIndices: [i, i + 1] }).issues.filter((x) => x.severity !== "info"), size[0]).toEqual([]);
+    }
+  });
+
+  it("the daily planner and Meetings With God books: each week is a plan spread, then a Meeting With God spread", () => {
+    for (const structure of [dailyPlannerBook(), meetingsWithGodBook(), meetingsWithGodBook(true)]) {
+      const doc = resolveDocument(book(structure, { end: "2027-01-31" }));
+      const ids = doc.recipe.pages.filter((x) => !x.filler).map((x) => x.layoutId);
+      const w = ids.indexOf("weekly-plan-spread");
+      expect(ids.slice(w, w + 4)).toEqual(["weekly-plan-spread", "weekly-plan-spread", "meeting-with-god-spread", "meeting-with-god-spread"]);
+      expect(ids.filter((x) => x === "weekly-plan-spread").length).toBe(ids.filter((x) => x === "meeting-with-god-spread").length);
+      expect(ids).not.toContain("weekly-plan-mwg-spread");
+    }
+  });
+});

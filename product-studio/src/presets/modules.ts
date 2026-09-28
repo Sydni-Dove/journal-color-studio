@@ -82,7 +82,7 @@ export const PAGE_MODULES: PageModuleDefinition[] = [
   {
     type: "weekly-planner",
     label: "Weekly planner",
-    layouts: ["planner-weekly-spread", "weekly-plan-mwg-spread"],
+    layouts: ["planner-weekly-spread", "weekly-plan-spread", "weekly-plan-mwg-spread"],
     defaultCadence: { type: "weekly" }, cadences: MODULE_CADENCES["weekly-planner"],
     titles: { none: "Week" },
     prompts: { none: [] },
@@ -91,7 +91,7 @@ export const PAGE_MODULES: PageModuleDefinition[] = [
   {
     type: "meeting-with-god",
     label: "Meeting With God",
-    layouts: GUIDED,
+    layouts: [...GUIDED, "meeting-with-god-spread"],
     defaultCadence: { type: "weekly" }, cadences: MODULE_CADENCES["meeting-with-god"],
     titles: { none: "Meeting With God" },
     prompts: { none: ["Time with God", "What did God say?", "Response / action steps"] },

@@ -21,7 +21,7 @@ import { minimumAreaFit, type LayoutContext, type LayoutDefinition } from "../sh
 import { weightedStack } from "./guidedPage";
 
 /** Recto writing blocks: open journal, What did God say?, Response / action steps. */
-const RECTO_WEIGHTS = [2, 1.2, 1];
+export const RECTO_WEIGHTS = [2, 1.2, 1];
 /** Priorities: a checklist closing the plan page — at least this many rows (it also takes lines the days cannot use). */
 const PRIORITY_ROWS = 3;
 /** A weekend day that runs full width (Sunday-start weeks) gets this share of a weekday's height. */
@@ -65,45 +65,61 @@ export function allotLines(total: number, rows: { weight: number; weekend: boole
 
 const isWeekend = (d: CalendarDay) => d.weekday === 0 || d.weekday === 6;
 
-/**
- * The week's plan as open rows — no boxes, no heading rows. Each day's short
- * name and date sit in a narrow label column at the left of its row; the
- * writing lines fill the rest of the row, and the day's last line is a
- * full-width hairline rule that separates it from the next. Monday–Friday get
- * full-width rows (always the same number of lines); Saturday and Sunday share
- * the last row (half width each) when they sit together (a Monday-start week),
- * or take shorter full-width rows otherwise. Priorities close the page as a
- * checklist on the same line pitch.
- */
-function planOpen(id: string, rect: Rect, ctx: LayoutContext, week: CalendarWeek) {
-  const s = ctx.spacing;
-  const short = ctx.calendar!.weekdayShortNames;
-  const days = week.days;
-  const nodes: LayoutNode[] = [];
-  const diagnostics: LayoutDiagnostic[] = [];
-  const rows: { days: number[]; weight: number; weekend: boolean }[] = isWeekend(days[5]) && isWeekend(days[6])
+type PlanRow = { days: number[]; weight: number; weekend: boolean };
+type Foot = "priorities" | "notes";
+
+/** The week as rows: Mon–Fri full width; Sat | Sun share a row when they sit together, else shorter full-width rows. */
+function weekRows(days: CalendarDay[]): PlanRow[] {
+  return isWeekend(days[5]) && isWeekend(days[6])
     ? [...[0, 1, 2, 3, 4].map((i) => ({ days: [i], weight: 1, weekend: false })), { days: [5, 6], weight: 1, weekend: true }]
     : days.map((d, i) => ({ days: [i], weight: isWeekend(d) ? WEEKEND_ROW_SHARE : 1, weekend: isWeekend(d) }));
-  // Rows are measured in whole writing lines. A row n lines tall draws n − 1 writing lines, and its n-th line
-  // is the day's divider rule — a full-width hairline you can still write on. Nothing is left over under a
-  // day, and the next day's label starts the label clearance below that rule.
+}
+
+/** Measurements every plan page shares (the writing pitch, the label and the foot section). */
+function planMetrics(ctx: LayoutContext) {
+  const s = ctx.spacing;
   const pitch = pitchOf(ctx);
   const inset = s.labelToBorderInset;
-  // Priorities keep the page's rhythm: checkbox rows on the writing pitch (never tighter than a checkbox needs).
-  const priRow = Math.max(pitch, s.checkbox + 2 * CHECK_CLEAR_IN);
-  const priHeadH = lineBoxIn(ctx.typography, "subheading");
-  const priFixed = priHeadH + s.headingToContentGap + inset;
-  const daysH = rect.h - priFixed - PRIORITY_ROWS * priRow;
+  // The foot keeps the page's rhythm: rows on the writing pitch (never tighter than a checkbox needs).
+  const footRow = Math.max(pitch, s.checkbox + 2 * CHECK_CLEAR_IN);
+  const footHeadH = lineBoxIn(ctx.typography, "subheading");
+  const footFixed = footHeadH + s.headingToContentGap + inset;
   // A row is at least as tall as its label, inset from the rules on both sides. Rows tall enough stack the
   // short name over the date; a shorter row (a weekend day on a small page) sets them on one line instead.
   const nameH = lineBoxIn(ctx.typography, "subheading"), dateH = lineBoxIn(ctx.typography, "pageTitle");
   const stackedH = 2 * inset + nameH + dateH, inlineH = 2 * inset + Math.max(nameH, dateH);
   const minLines = Math.max(1, Math.ceil((inlineH - 1e-9) / pitch));
-  const lines = allotLines(Math.floor((daysH + 1e-9) / pitch), rows, minLines);
-  // Lines too few for a whole round of weekdays become extra Priorities rows, so the page is used to the bottom.
+  return { pitch, inset, footRow, footHeadH, footFixed, nameH, dateH, stackedH, inlineH, minLines };
+}
+
+/** Whole lines per row on one page, leaving room for the foot section's minimum rows. */
+function allotPage(rect: Rect, ctx: LayoutContext, rows: PlanRow[]): number[] {
+  const m = planMetrics(ctx);
+  const daysH = rect.h - m.footFixed - PRIORITY_ROWS * m.footRow;
+  return allotLines(Math.floor((daysH + 1e-9) / m.pitch), rows, m.minLines);
+}
+
+/**
+ * Open plan rows — no boxes, no heading rows. Each day's short name and date
+ * sit in a narrow label column at the left of its row; the writing lines fill
+ * the rest of the row, and the day's last line is a full-width hairline rule
+ * that separates it from the next. A foot section closes the page on the same
+ * pitch: Priorities (a checklist) or Notes (lines), taking every line the rows
+ * leave.
+ */
+function drawPlan(id: string, rect: Rect, ctx: LayoutContext, week: CalendarWeek, rows: PlanRow[], lines: number[], foot: Foot) {
+  const s = ctx.spacing;
+  const m = planMetrics(ctx);
+  const { pitch, inset } = m;
+  const short = ctx.calendar!.weekdayShortNames;
+  const days = week.days;
+  const nodes: LayoutNode[] = [];
+  const diagnostics: LayoutDiagnostic[] = [];
+  // Rows are measured in whole writing lines. A row n lines tall draws n − 1 writing lines, and its n-th line
+  // is the day's divider rule — a full-width hairline you can still write on.
   const used = lines.reduce((a, b) => a + b, 0) * pitch;
-  const priRows = Math.floor((rect.h - used - priFixed + 1e-9) / priRow);
-  const priH = priHeadH + s.headingToContentGap + priRows * priRow;
+  const footRows = Math.floor((rect.h - used - m.footFixed + 1e-9) / m.footRow);
+  const footH = m.footHeadH + s.headingToContentGap + footRows * m.footRow;
   const bands: { y: number; h: number }[] = [];
   let y = rect.y;
   for (const n of lines) bands.push({ y, h: n * pitch }), (y += n * pitch);
@@ -124,26 +140,52 @@ function planOpen(id: string, rect: Rect, ctx: LayoutContext, week: CalendarWeek
       const cell: Rect = { x: rect.x + k * (colW + gutter), y: band.y, w: colW, h: band.h };
       const did = `${id}-d${i}`;
       nodes.push(group(did, "Section", cell));
-      const stacked = stackedH <= cell.h + 1e-6;
+      const stacked = m.stackedH <= cell.h + 1e-6;
       const lw = stacked ? labelW : inlineW;
       if (stacked) {
-        nodes.push(text(`${did}-title`, { x: cell.x, y: cell.y + inset, w: labelW, h: nameH }, short[i], "subheading", { component: "SectionHeader" }));
-        nodes.push(text(`${did}-date`, { x: cell.x, y: cell.y + inset + nameH, w: labelW, h: dateH }, String(days[i].day), "pageTitle", { component: "SectionHeader" }));
+        nodes.push(text(`${did}-title`, { x: cell.x, y: cell.y + inset, w: labelW, h: m.nameH }, short[i], "subheading", { component: "SectionHeader" }));
+        nodes.push(text(`${did}-date`, { x: cell.x, y: cell.y + inset + m.nameH, w: labelW, h: m.dateH }, String(days[i].day), "pageTitle", { component: "SectionHeader" }));
       } else {
-        const lineH = Math.max(nameH, dateH);
-        nodes.push(text(`${did}-title`, { x: cell.x, y: cell.y + inset + (lineH - nameH) / 2, w: nameW, h: nameH }, short[i], "subheading", { component: "SectionHeader" }));
-        nodes.push(text(`${did}-date`, { x: cell.x + nameW + s.column, y: cell.y + inset + (lineH - dateH) / 2, w: dateW, h: dateH }, String(days[i].day), "pageTitle", { component: "SectionHeader" }));
+        const lineH = Math.max(m.nameH, m.dateH);
+        nodes.push(text(`${did}-title`, { x: cell.x, y: cell.y + inset + (lineH - m.nameH) / 2, w: nameW, h: m.nameH }, short[i], "subheading", { component: "SectionHeader" }));
+        nodes.push(text(`${did}-date`, { x: cell.x + nameW + s.column, y: cell.y + inset + (lineH - m.dateH) / 2, w: dateW, h: m.dateH }, String(days[i].day), "pageTitle", { component: "SectionHeader" }));
       }
       nodes.push(...writingSurface(`${did}-surface`, { x: cell.x + lw, y: cell.y, w: cell.w - lw, h: cell.h - pitch }, ctx));
-      if (inlineH > cell.h + 1e-6) diagnostics.push({ severity: "error", rule: "layout-incompatible", componentId: did, message: `The ${short[i]} row is shorter than its day label at this size.` });
+      if (m.inlineH > cell.h + 1e-6) diagnostics.push({ severity: "error", rule: "layout-incompatible", componentId: did, message: `The ${short[i]} row is shorter than its day label at this size.` });
     });
   });
-  const priorities: Rect = { x: rect.x, y: rect.y + rect.h - priH, w: rect.w, h: priH };
-  nodes.push(group(`${id}-priorities`, "Section", priorities));
-  nodes.push(text(`${id}-priorities-title`, { x: priorities.x, y: priorities.y, w: priorities.w, h: priHeadH }, ctx.wording.priorities, "subheading", { component: "SectionHeader" }));
-  const list = checklistRows(`${id}-priorities-list`, { x: priorities.x, y: priorities.y + priHeadH + s.headingToContentGap, w: priorities.w, h: priRows * priRow }, ctx, priRow);
-  nodes.push(...list.nodes);
-  return { nodes, diagnostics, weekdayH: bands[0].h, priorities };
+  const footRect: Rect = { x: rect.x, y: rect.y + rect.h - footH, w: rect.w, h: footH };
+  const fid = `${id}-${foot}`;
+  nodes.push(group(fid, "Section", footRect));
+  nodes.push(text(`${fid}-title`, { x: footRect.x, y: footRect.y, w: footRect.w, h: m.footHeadH }, foot === "priorities" ? ctx.wording.priorities : ctx.wording.notes, "subheading", { component: "SectionHeader" }));
+  const body: Rect = { x: footRect.x, y: footRect.y + m.footHeadH + s.headingToContentGap, w: footRect.w, h: footRows * m.footRow };
+  nodes.push(...(foot === "priorities" ? checklistRows(`${fid}-list`, body, ctx, m.footRow).nodes : writingSurface(`${fid}-list`, body, ctx)));
+  return { nodes, diagnostics, weekdayH: bands[rows.findIndex((r) => !r.weekend)]?.h ?? 0, foot: footRect };
+}
+
+/** The whole week on one page, closed by Priorities. */
+function planOpen(id: string, rect: Rect, ctx: LayoutContext, week: CalendarWeek) {
+  const rows = weekRows(week.days);
+  const plan = drawPlan(id, rect, ctx, week, rows, allotPage(rect, ctx, rows), "priorities");
+  return { ...plan, priorities: plan.foot };
+}
+
+/**
+ * The week across a spread: the first three weekdays (and a weekend day that
+ * starts the week) on the left page, closed by Notes; the last two weekdays
+ * and the weekend on the right, closed by Priorities. Weekdays get the same
+ * number of lines on both pages.
+ */
+export function planAcross(ids: [string, string], rects: [Rect, Rect], ctx: LayoutContext, week: CalendarWeek) {
+  const rows = weekRows(week.days);
+  let seen = 0;
+  const cut = rows.findIndex((r) => !r.weekend && ++seen === 4);
+  const halves: [PlanRow[], PlanRow[]] = [rows.slice(0, cut), rows.slice(cut)];
+  const alloc = halves.map((h, k) => allotPage(rects[k], ctx, h));
+  const pick = (weekend: boolean) => Math.min(...halves.flatMap((h, k) => h.map((r, j) => (r.weekend === weekend ? alloc[k][j] : Infinity))));
+  const wd = pick(false), we = Math.min(pick(true), wd);
+  const lines = halves.map((h) => h.map((r) => (r.weekend ? we : wd)));
+  return halves.map((h, k) => drawPlan(ids[k], rects[k], ctx, week, h, lines[k], k === 0 ? "notes" : "priorities")) as [ReturnType<typeof drawPlan>, ReturnType<typeof drawPlan>];
 }
 
 function solveSpread(ctx: LayoutContext): SolvedPage[] {

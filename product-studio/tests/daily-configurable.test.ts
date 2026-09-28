@@ -120,7 +120,7 @@ describe("Daily Planner product", () => {
     expect(f.start).toMatchObject({ type: "planner", template: "book-daily-planner", section: "books" });
     expect(RECIPE_PRESETS.find((r) => r.id === "book-daily-planner")!.layoutOptions?.dailySections).toEqual(["schedule", "topPriorities", "toDo"]);
   });
-  it("book: front matter → each month: calendar → each week: plan + Meeting With God, then that week's days → monthly review", () => {
+  it("book: front matter → each month: calendar → each week: plan spread + Meeting With God spread, then that week's days → monthly review", () => {
     const preset = RECIPE_PRESETS.find((r) => r.id === "book-daily-planner")!;
     const p = createProject("planner", {
       dimensions: { sizePresetId: "7x9", orientation: "portrait" },
@@ -132,8 +132,8 @@ describe("Daily Planner product", () => {
     const doc = resolveDocument(p);
     const seq = doc.recipe.pages
       .filter((x) => !x.filler && x.spreadPart !== 1)
-      .map((x) => (x.layoutId === "planner-daily" ? "D" : x.layoutId === "planner-monthly" ? "M" : x.layoutId === "weekly-plan-mwg-spread" ? "W" : x.module?.type === "review" ? "R" : "F"));
-    expect(seq.join("")).toMatch(/^FFFM(WD{1,7})+RM(WD{1,7})+R$/);
+      .map((x) => (x.layoutId === "planner-daily" ? "D" : x.layoutId === "planner-monthly" ? "M" : x.layoutId === "weekly-plan-spread" ? "W" : x.layoutId === "meeting-with-god-spread" ? "G" : x.module?.type === "review" ? "R" : "F"));
+    expect(seq.join("")).toMatch(/^FFFM(WGD{1,7})+RM(WGD{1,7})+R$/);
     expect(doc.recipe.pages.filter((x) => x.layoutId === "planner-daily")).toHaveLength(59);
     expect(dailyPlannerBook()).toHaveLength(2);
     const errors = validateProject(p, heuristicMeasurer).issues.filter((x) => x.severity === "error");
