@@ -19,11 +19,11 @@ import { STUDIO_PLANNER } from "../../presets/studioDefaults";
 import { DEFAULT_WORDING } from "../../presets/wording";
 import type { Rect } from "../../types/geometry";
 import type { LayoutDiagnostic, LayoutMetric, LayoutNode, SolvedPage, TextNode } from "../../types/layout";
-import { requestedLines, SPACING_FACTOR, type PromptBlock, type PromptSet, type ResponseStyle } from "../../types/prompts";
+import { requestedLines, spaceOf, SPACING_FACTOR, type GuidedHeader, type PromptBlock, type PromptSet, type ResponseStyle } from "../../types/prompts";
 import type { StationeryZone, SurfaceKind } from "../../types/stationery";
 import { fillInIn, SURFACES } from "../stationery/surfaces";
 import { fitHeading, headerTitle, pageFrame } from "./components";
-import { group, lineBoxIn, text } from "./nodes";
+import { group, lineBoxIn, rule, text } from "./nodes";
 import type { FitContext, LayoutContext } from "./types";
 
 export type ZonePageSpec = {
@@ -35,6 +35,10 @@ export type ZonePageSpec = {
   headerRight?: string;
   /** Instructions under the header (first page only). */
   instructions?: string;
+  /** A designed header above the sections (first page only): step label and number, subtitle, reference, rule. */
+  intro?: GuidedHeader;
+  /** What the sections are called in messages ("prompt" — default — or "section"). */
+  noun?: "prompt" | "section";
   /** Every zone of this page instance, in order (split across pages when they don't fit). */
   zones: StationeryZone[];
   /** Gap between sections (inches). */
@@ -69,6 +73,8 @@ export function blocksToZones(set: PromptSet, surfaceOf: (b: PromptBlock) => { s
     return {
       key: b.id,
       label: b.label,
+      ...(b.prompt?.trim() ? { prompt: b.prompt.trim() } : {}),
+      ...(lines === undefined && spaceOf(b) === "equal" ? { equal: true } : {}),
       surface: b.responseStyle ? RESPONSE_SURFACE[b.responseStyle] : own.surface,
       ...(b.responseStyle ? {} : own.treatment ? { treatment: own.treatment } : {}),
       weight: b.weight ?? 1,
@@ -137,6 +143,32 @@ function frameOf(spec: ZonePageSpec, ctx: LayoutContext, pageIndex: number, firs
     nodes.push(text(`${id}-period`, { x: z.x, y: z.y, w: z.w, h: z.h - ctx.spacing.titleToRuleGap }, right, "label", { component: "PageHeader", align: "right", vAlign: "bottom" }));
   }
   let body: Rect = frame.body;
+  if (first && spec.intro) {
+    // The designed header: each line measured in its role, stacked; the sections get what is left below it.
+    const h = spec.intro;
+    const items: { key: string; value: string; role: "label" | "weekTitle" | "subheading" | "prompt" }[] = [];
+    if (h.eyebrow?.trim()) items.push({ key: "eyebrow", value: h.eyebrow.trim(), role: "label" });
+    if (h.number?.trim()) items.push({ key: "number", value: h.number.trim(), role: "weekTitle" });
+    if (h.subtitle?.trim()) items.push({ key: "subtitle", value: h.subtitle.trim(), role: "subheading" });
+    if (h.reference?.trim()) items.push({ key: "reference", value: h.reference.trim(), role: "prompt" });
+    let y = body.y;
+    items.forEach((it, k) => {
+      const lines = it.role === "subheading" || it.role === "prompt" ? wrapText(it.value, body.w, ctx, it.role === "prompt" ? "prompt" : "body") : [it.value];
+      const role = it.role;
+      const lh = lineBoxIn(ctx.typography, role);
+      const t: TextNode = text(`${id}-intro-${it.key}`, { x: body.x, y, w: body.w, h: lh * lines.length }, lines.join(" "), role, { component: "PageHeader", vAlign: "top", wrap: lines.length > 1 });
+      if (lines.length > 1) t.fit = { sizePt: ctx.typography.roles[role].sizePt, lineHeight: ctx.typography.roles[role].lineHeight, lines };
+      nodes.push(t);
+      y += lh * lines.length + (k < items.length - 1 ? ctx.spacing.block : 0);
+    });
+    if (h.rule) {
+      if (items.length) y += ctx.spacing.block;
+      const w = Math.min(body.w, 0.9);
+      nodes.push(rule(`${id}-intro-rule`, body.x, y, body.x + w, y, { component: "PageHeader", color: "lineArt" }));
+    }
+    const used = y - body.y + (items.length || h.rule ? ctx.spacing.section : 0);
+    body = { ...body, y: body.y + used, h: Math.max(0, body.h - used) };
+  }
   if (first && spec.instructions?.trim()) {
     const lines = wrapText(spec.instructions, body.w, ctx, "body");
     const h = lines.length * lineBoxIn(ctx.typography, "body");
@@ -223,7 +255,7 @@ export function solveZonePages(spec: ZonePageSpec, ctx: LayoutContext, pageIndex
     });
     diagnostics.push(...res.problems.map((message): LayoutDiagnostic => ({ severity: "error", rule: "stationery-fit", componentId: `${spec.idPrefix}${pi}`, message })));
     if (k === frames.length - 1 && p.overflow) {
-      diagnostics.push({ severity: "error", rule: "prompt-fit", componentId: `${spec.idPrefix}${pi}`, message: promptFitMessage(spec.zones) });
+      diagnostics.push({ severity: "error", rule: "prompt-fit", componentId: `${spec.idPrefix}${pi}`, message: promptFitMessage(spec.zones, spec.noun) });
     }
     res.zones.forEach((z) => {
       const m = p.byZone.get(z.zone)!;
@@ -252,11 +284,45 @@ export function solveZonePages(spec: ZonePageSpec, ctx: LayoutContext, pageIndex
   });
 }
 
-/** "This page does not have enough room for 6 prompts with 5 writing lines each." */
-export function promptFitMessage(zones: StationeryZone[]): string {
+/**
+ * "This page does not have enough room for 6 prompts with 5 writing lines each."
+ * "This page does not have enough room for 4 sections with the selected writing lines."
+ */
+export function promptFitMessage(zones: StationeryZone[], noun: "prompt" | "section" = "prompt"): string {
   const prompts = zones.filter((z) => z.surface !== "fill-in" && z.surface !== "table");
   const counts = [...new Set(prompts.map((z) => z.lines))];
   const n = prompts.length;
-  const each = counts.length === 1 && counts[0] !== undefined ? ` with ${counts[0]} writing line${counts[0] === 1 ? "" : "s"} each` : "";
-  return `This page does not have enough room for ${n} prompt${n === 1 ? "" : "s"}${each}.`;
+  const each =
+    counts.length === 1 && counts[0] !== undefined ? ` with ${counts[0]} writing line${counts[0] === 1 ? "" : "s"} each` : prompts.some((z) => z.lines !== undefined) ? " with the selected writing lines" : "";
+  return `This page does not have enough room for ${n} ${noun}${n === 1 ? "" : "s"}${each}.`;
+}
+
+/** The (0-based) page of an instance each section starts on, read from the solved pages. */
+export function sectionPages(pages: SolvedPage[], idPrefix: string): Record<string, number> {
+  const out: Record<string, number> = {};
+  const re = new RegExp(`^${idPrefix}\\d+-(.+?)-surface`);
+  pages.forEach((page, k) => {
+    for (const n of page.nodes) {
+      const m = re.exec(n.id);
+      if (m && out[m[1]] === undefined) out[m[1]] = k;
+    }
+  });
+  return out;
+}
+
+/**
+ * The writing lines (or checklist items) each section actually got, read from
+ * the solved pages: `{ [section key]: count }`, summed over continuation pages.
+ */
+export function sectionLineCounts(pages: SolvedPage[], idPrefix: string): Record<string, number> {
+  const out: Record<string, number> = {};
+  const re = new RegExp(`^${idPrefix}\\d+-(.+?)-surface`);
+  for (const page of pages)
+    for (const n of page.nodes) {
+      const m = re.exec(n.id);
+      if (!m) continue;
+      if (n.type === "lines") out[m[1]] = (out[m[1]] ?? 0) + n.positions.length;
+      else if (n.type === "checkbox") out[m[1]] = (out[m[1]] ?? 0) + 1;
+    }
+  return out;
 }

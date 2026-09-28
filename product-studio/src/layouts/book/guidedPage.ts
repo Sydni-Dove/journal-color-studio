@@ -39,11 +39,18 @@ export function guidedSpec(module: PageModuleContent | undefined, fallbackTitle:
     title: module?.title ?? fallbackTitle,
     headerRight: module?.subtitle,
     instructions: set.instructions,
+    intro: set.header,
+    noun: set.header || set.blocks.some((b) => b.prompt || b.space) ? "section" : "prompt",
     // "The page's own style" for a guided page is the project's writing lines (ruled, dot grid, graph, blank).
-    zones: blocksToZones(set, () => ({ surface: "pattern" })),
+    // Small fill-in fields from the header ("Date", "Source") sit on one row before the first section.
+    zones: [
+      ...(set.header?.fields?.some((f) => f.trim()) ? [{ key: "fields", label: "", surface: "fill-in" as const, weight: 0, fields: set.header.fields.filter((f) => f.trim()) }] : []),
+      ...blocksToZones(set, () => ({ surface: "pattern" })),
+    ],
     gapIn: promptGap(spacing.section, set),
     legacyWeights: set.legacyWeights,
-    flow: true,
+    // "Tell me instead": keep one page and report that it does not fit.
+    flow: set.whenFull !== "stop",
     fewerLines: set.whenFull === "fewer-lines",
     emptySurface: "pattern",
     basis: "guided page",
@@ -52,7 +59,7 @@ export function guidedSpec(module: PageModuleContent | undefined, fallbackTitle:
 
 export const guidedPage: LayoutDefinition = {
   id: "guided-page",
-  label: "Guided page (title + prompts)",
+  label: "Guided Lined Page (title + prompt sections)",
   family: "journal",
   description: "Module title and period, then one writing section per prompt. Serves Meeting With God, Vision, Goals, Reviews and other purposes.",
   pages: 1,

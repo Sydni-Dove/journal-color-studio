@@ -1,7 +1,8 @@
 import type { ProductType } from "../../types/product";
 import type { ProductRecipe } from "../../types/recipe";
 import type { LayoutOptions } from "../../types/project";
-import { BOOK_PRESETS, dailyPlannerBook, meetingsWithGodBook } from "../bookRecipes";
+import { BOOK_PRESETS, dailyPlannerBook, meetingsWithGodBook, step } from "../bookRecipes";
+import { PROMPT_STARTERS } from "../../types/prompts";
 import { STATIONERY_RECIPES, stationeryLayoutId } from "../stationery/catalog";
 import type { StationeryRecipe } from "../../types/stationery";
 
@@ -193,7 +194,27 @@ export const RECIPE_PRESETS: RecipePreset[] = [
   },
 ];
 
+/**
+ * Guided Lined Page: a page of prompt sections with writing lines — how many
+ * sections, their headings and prompts, and each one's writing space are the
+ * creator's (Book structure → the page → Sections). Starts as a Full Page
+ * Prompt; the other starter structures are one choice away.
+ */
+export const GUIDED_LINED_PRESET: RecipePreset = {
+  id: "guided-lined",
+  label: "Guided Lined Page",
+  productTypes: ["journal", "notebook", "devotional", "worksheet", "planner", "insert"],
+  needsCalendar: false,
+  build: ({ count }) => ({
+    items: [],
+    ordering: "sequential",
+    structure: [step("guided", { type: "copies", count: Math.max(1, Math.round(count)) }, { title: "The Word", promptSet: PROMPT_STARTERS[0].set() })],
+  }),
+  layoutOptions: { showPageNumbers: true },
+};
+// After the stationery recipes: a devotional or worksheet still starts on its own designs.
 RECIPE_PRESETS.push(...STATIONERY_PRESETS);
+RECIPE_PRESETS.push(GUIDED_LINED_PRESET);
 
 /** Page types for a product: single page layouts only — complete books are templates (below). */
 export function recipePresetsFor(t: ProductType): RecipePreset[] {

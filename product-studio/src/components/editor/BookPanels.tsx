@@ -9,6 +9,7 @@ import { CoverDividerControls } from "./CoverDividerControls";
  */
 import { Visual } from "../help/visuals";
 import { PromptEditor, type PromptFit } from "./PromptEditor";
+import { sectionLineCounts, sectionPages } from "../../layouts/shared/promptPages";
 import { promptSetFromList } from "../../types/prompts";
 import { layoutAvailability, solvePage, type ResolvedDocument } from "../../engines/document/resolve";
 import { addNode, bookOutline, duplicateNode, moveNode, newSection, newStep, removeNode, structureFromItems, updateNode } from "../../engines/recipe/bookEdit";
@@ -58,8 +59,9 @@ function stepFit(doc: ResolvedDocument, stepId: string): PromptFit | undefined {
   if (i < 0) return undefined;
   const page = doc.recipe.pages[i];
   const pages = page.flowCount ?? 1;
-  const problem = [...Array(pages).keys()].flatMap((k) => solvePage(doc, i + k).diagnostics).find((d) => d.rule === "prompt-fit")?.message;
-  return { pages, problem };
+  const solved = [...Array(pages).keys()].map((k) => solvePage(doc, i + k));
+  const problem = solved.flatMap((s) => s.diagnostics).find((d) => d.rule === "prompt-fit")?.message;
+  return { pages, problem, lines: sectionLineCounts(solved, "gp"), pageOf: sectionPages(solved, "gp") };
 }
 
 const stepName = (s: BookStep, scope: Scope) =>
@@ -144,12 +146,14 @@ function StepCard({ s, siblings, scope, props, first, last }: { s: BookStep; sib
       {(s.module === "cover-page" || s.module === "divider-page") && <CoverDividerControls step={s} set={set} titleFont={doc.typography.fonts.cover} onTitleFont={(cover) => update((p) => ({ ...p, typography: { ...p.typography, fonts: { ...p.typography.fonts, cover }, roleOverrides: { ...p.typography.roleOverrides, coverTitle: { ...p.typography.roleOverrides.coverTitle, ...luxeTitleStyle(cover) } } } }))} applyPreset={() => update((p) => ({ ...p, colors: { paletteId: NEUTRAL_LUXE_ID, overrides: {} }, typography: { ...p.typography, fonts: { ...p.typography.fonts, cover: LUXE_TITLE_FONT }, roleOverrides: { ...p.typography.roleOverrides, coverTitle: { ...p.typography.roleOverrides.coverTitle, ...luxeTitleStyle(LUXE_TITLE_FONT) }, coverSubtitle: { ...p.typography.roleOverrides.coverSubtitle, ...LUXE_SUBTITLE_STYLE } } } }))}/>}
       {guided && (
         <details className="subsection" open>
-          <summary>Prompts</summary>
+          <summary>Sections</summary>
           <PromptEditor
             set={s.promptSet ?? promptSetFromList(s.prompts ?? mod.prompts[scope === "none" ? "none" : scope] ?? mod.prompts.none)}
             onChange={(promptSet) => set({ promptSet, prompts: undefined })}
             ownStyleLabel="Your writing lines style"
             allowInstructions
+            allowHeader
+            allowStarters
             fit={stepFit(doc, s.id)}
           />
         </details>

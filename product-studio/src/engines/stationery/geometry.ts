@@ -223,6 +223,23 @@ export function resolveZones(reqs: ZoneRequest[], body: Rect, gapIn: number, rat
       if (reqs.length > 1) gap = gapIn + residual / (reqs.length - 1);
     }
   }
+  // Equal share: every "equal" section gets the same whole number of lines — from the whole free space, or
+  // (when some sections fill) from the equal sections' own share; the "fill" sections take the rest.
+  const eq = flexIdx.filter((i) => reqs[i].zone.equal);
+  if (eq.length && !opts.legacyWeights && pitch > 0 && writing >= 0) {
+    const fill = flexIdx.filter((i) => !reqs[i].zone.equal);
+    const pool = fill.length ? eq.reduce((a, i) => a + (shareOf.get(i) ?? 0), 0) : Math.max(0, writing);
+    const perRound = eq.reduce((a, i) => a + rowOf(reqs[i]), 0);
+    const n = Math.max(0, Math.floor(pool / perRound + 1e-6));
+    eq.forEach((i) => shareOf.set(i, n * rowOf(reqs[i])));
+    // Only equal sections: the part-line left over is spread between the sections, not pooled at the bottom.
+    if (!fill.length && reqs.length > 1) gap += (Math.max(0, writing) - n * perRound) / (reqs.length - 1);
+    if (fill.length) {
+      const rest = Math.max(0, writing - n * perRound);
+      const totalW = fill.reduce((a, i) => a + reqs[i].zone.weight, 0) || 1;
+      fill.forEach((i) => shareOf.set(i, (rest * reqs[i].zone.weight) / totalW));
+    }
+  }
   let y = body.y;
   const zones = reqs.map((r, idx): ResolvedZone => {
     if (r.fixedIn !== undefined) {

@@ -132,14 +132,19 @@ describe("Studio home", () => {
     const prayer = sections.locator('[data-prompt="prayer"]');
     await expect(prayer.count()).resolves.toBe(1);
     await expect(sections.locator('input[type="number"]').count()).resolves.toBe(0);
-    // Choosing writing lines updates the page immediately.
+    // Each section is a compact row showing its real writing space; open it to edit.
+    await expect(prayer.getByTestId("section-space").textContent()).resolves.toMatch(/\d+ lines?/);
+    await prayer.locator(":scope > summary").click();
+    // Choosing a fixed number of writing lines updates the page immediately.
+    await prayer.getByRole("button", { name: "Fixed lines" }).click();
     const field = prayer.getByRole("spinbutton", { name: "Writing lines" });
     await field.click();
     await field.fill("4");
     await field.press("Enter");
     await expect.poll(() => page.locator(".badge").first().textContent()).toBe("Page OK");
     // Rename a prompt: the page shows the new wording.
-    await prayer.getByRole("textbox", { name: "Prompt 4" }).fill("What should I pray about?");
+    await expect.poll(() => prayer.getByTestId("section-space").textContent()).toBe("4 lines");
+    await prayer.getByRole("textbox", { name: "Heading" }).fill("What should I pray about?");
     await expect.poll(() => page.locator(".ps-page--editor").first().textContent()).toMatch(/What should I pray about\?/i);
 
     await page.context().close();
@@ -238,17 +243,67 @@ describe("Prompt editor in a book", () => {
     await page.locator('details.book-step[data-step="mwg"] > summary').click();
     const editor = page.getByTestId("prompt-editor").first();
     await editor.scrollIntoViewIfNeeded();
-    await editor.getByLabel("Use the same number of lines for every prompt").check();
-    const per = editor.getByRole("spinbutton", { name: "Lines per prompt" });
+    await editor.locator("details.subsection > summary", { hasText: "More section options" }).click();
+    await editor.getByLabel("Use the same number of lines for every section").check();
+    const per = editor.getByRole("spinbutton", { name: "Lines per section" });
     await per.fill("5");
     await per.press("Enter");
-    const count = editor.getByRole("spinbutton", { name: "Number of prompts" });
-    await count.fill("9");
-    await count.press("Enter");
+    const before = await editor.locator(".prompt-block").count();
+    for (let k = before; k < 9; k++) await editor.getByRole("button", { name: "+ Add section" }).click();
     await expect(editor.locator(".prompt-block").count()).resolves.toBe(9);
     await expect.poll(() => page.getByTestId("prompt-continues").count(), { timeout: 10_000 }).toBe(1);
     // Continuing is not a problem: nothing about the prompts needs fixing.
     await expect(page.getByTestId("prompt-fit").count()).resolves.toBe(0);
     await page.context().close();
   });
+});
+
+describe("Guided Lined Page", () => {
+  const rows = (editor: import("playwright-core").Locator) => editor.locator(".prompt-block > summary").allInnerTexts();
+  const openRow = (editor: import("playwright-core").Locator, i: number) => editor.locator(".prompt-block").nth(i).evaluate((d) => ((d as HTMLDetailsElement).open = true));
+  for (const [vp, label] of [[DESKTOP, "desktop"], [PHONE, "phone"]] as const) {
+    it(`${label}: New product → Journal → Guided Lined Page; starters, add, duplicate, move, remove, lines ± — real line counts, saved and reloaded`, async () => {
+      const page = await home([], vp);
+      await page.locator("button.family-card", { hasText: /^Journal/ }).first().click();
+      await page.waitForSelector("#wizard-build");
+      await page.locator("button.choice", { hasText: /^Guided Lined Page$/ }).click();
+      await page.getByRole("button", { name: "Generate" }).click();
+      await page.waitForSelector(".ps-page--editor");
+      await expect.poll(() => page.locator(".badge").first().textContent()).toBe("Page OK");
+      // The page's step: one section that fills the page, shown with its real line count.
+      await page.locator("details.book-step > summary").first().click();
+      const editor = page.getByTestId("prompt-editor").first();
+      await expect.poll(() => rows(editor)).toEqual([expect.stringMatching(/^The Word\s*Fills space · \d{2} lines/)]);
+      // Three Prompt Response: 8 + 8 lines, Prayer fills what is left.
+      await editor.getByLabel("Start from a structure (replaces the sections)").selectOption({ label: "Three Prompt Response" });
+      await expect.poll(() => rows(editor)).toEqual([expect.stringMatching(/My Response\s*8 lines/), expect.stringMatching(/What I Will Do\s*8 lines/), expect.stringMatching(/Prayer\s*Fills space · \d+ lines?( · page 2)?/)]);
+      // Duplicate the first, move the copy down, remove it again; add a section.
+      const first = editor.locator(".prompt-block").first();
+      await openRow(editor, 0);
+      await first.getByRole("button", { name: "Duplicate" }).click();
+      await expect.poll(() => editor.locator(".prompt-block").count()).toBe(4);
+      await openRow(editor, 1);
+      await editor.locator(".prompt-block").nth(1).getByRole("button", { name: "Move section 2 down" }).click();
+      await expect.poll(async () => (await rows(editor))[2]).toMatch(/^My Response/);
+      await openRow(editor, 2);
+      await editor.locator(".prompt-block").nth(2).getByRole("button", { name: "Remove" }).click();
+      await expect.poll(() => editor.locator(".prompt-block").count()).toBe(3);
+      // Lines ±: one line more on My Response.
+      await openRow(editor, 0);
+      await editor.locator(".prompt-block").first().getByRole("button", { name: "One line more" }).click();
+      await openRow(editor, 0);
+      await expect.poll(async () => (await rows(editor))[0]).toMatch(/9 lines/);
+      await editor.getByRole("button", { name: "+ Add section" }).click();
+      await expect.poll(() => editor.locator(".prompt-block").count()).toBe(4);
+      if (label === "phone") expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+      // Saved: reload and the sections are the same.
+      const saved = await rows(editor);
+      await page.reload();
+      await page.locator(".card").first().getByRole("button", { name: "Open" }).click();
+      await page.waitForSelector(".ps-page--editor");
+      await page.locator("details.book-step > summary").first().click();
+      await expect.poll(() => rows(page.getByTestId("prompt-editor").first())).toEqual(saved);
+      await page.context().close();
+    });
+  }
 });

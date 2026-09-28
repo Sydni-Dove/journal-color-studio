@@ -1096,3 +1096,70 @@ button.family-card:focus-visible {
   .preview-toolbar > .check,
   .preview-toolbar > .btn--icon[aria-label^="Zoom"] { order: 2; }
 }
+
+/* Sections editor: compact rows that open to edit */
+.prompt-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.prompt-block {
+  border: 1px solid var(--ui-line);
+  border-radius: var(--ui-radius);
+  background: var(--ui-panel);
+}
+.prompt-block > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: var(--ui-touch);
+  padding: 8px 12px;
+  cursor: pointer;
+  list-style: none;
+}
+.prompt-block > summary::-webkit-details-marker { display: none; }
+.prompt-block > summary::after {
+  content: "⋮";
+  color: var(--ui-muted);
+  font-weight: 700;
+  margin-left: 4px;
+}
+.prompt-block[open] > summary { border-bottom: 1px solid var(--ui-line); }
+.prompt-block__name {
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+.prompt-block__space {
+  color: var(--ui-muted);
+  font-size: 13px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.prompt-block__body {
+  display: grid;
+  gap: 10px;
+  padding: 10px 12px 12px;
+}
+.stepper {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+.stepper .field { flex: 0 1 140px; }
+.stepper input { text-align: center; }
+.prompt-count { margin: 4px 0 0; }
+/* The sections editor never widens its panel: controls take the panel's width, not their content's. */
+.prompt-editor { display: grid; gap: 10px; min-width: 0; max-width: 100%; }
+.prompt-editor > *, .prompt-block__body > * { min-width: 0; }
+.prompt-editor select, .prompt-editor input, .prompt-editor textarea { max-width: 100%; min-width: 0; }
+.prompt-editor .field, .prompt-editor .row { min-width: 0; }
+.prompt-editor .row { flex-wrap: wrap; }
+.prompt-list > li, .prompt-block, .prompt-block > summary { min-width: 0; }
+.prompt-list { grid-template-columns: minmax(0, 1fr); }

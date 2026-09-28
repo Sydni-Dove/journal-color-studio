@@ -14,6 +14,7 @@ import type { StationeryCustomization, StationeryRecipe } from "../../types/stat
 import { Field, Section } from "./ui";
 import { TechnicalDetails } from "../help/visuals";
 import { PromptEditor, type PromptFit } from "./PromptEditor";
+import { sectionLineCounts, sectionPages } from "../../layouts/shared/promptPages";
 
 type Update = (fn: (p: ProductProject) => ProductProject) => void;
 
@@ -23,8 +24,9 @@ function recipeFit(doc: ResolvedDocument | null, comboId: string): PromptFit | u
   const i = doc.recipe.pages.findIndex((p) => p.layoutId === stationeryLayoutId(comboId));
   if (i < 0) return undefined;
   const pages = doc.recipe.pages[i].flowCount ?? 1;
-  const problem = [...Array(pages).keys()].flatMap((k) => solvePage(doc, i + k).diagnostics).find((d) => d.rule === "prompt-fit")?.message;
-  return { pages, problem };
+  const solved = [...Array(pages).keys()].map((k) => solvePage(doc, i + k));
+  const problem = solved.flatMap((s) => s.diagnostics).find((d) => d.rule === "prompt-fit")?.message;
+  return { pages, problem, lines: sectionLineCounts(solved, "st"), pageOf: sectionPages(solved, "st") };
 }
 
 function RecipeSections({ recipe, custom, set, fit }: { recipe: StationeryRecipe; custom: StationeryCustomization; set: (c: StationeryCustomization) => void; fit?: PromptFit }) {

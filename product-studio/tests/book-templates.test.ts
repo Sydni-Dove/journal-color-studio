@@ -27,7 +27,9 @@ describe("Page type lists page layouts only", () => {
     it(`${t}: no complete book among its page types`, () => {
       for (const r of recipePresetsFor(t)) {
         expect(r.template, r.id).toBeUndefined();
-        expect(r.build({ count: 1, sheets: 1 }).structure, r.id).toBeUndefined();
+        // A page type is one kind of page: a flat page list, or a single book step (no sections) — never a whole book.
+        const st = r.build({ count: 1, sheets: 1 }).structure;
+        expect(!st || (st.length === 1 && st[0].kind === "step"), r.id).toBe(true);
         expect(r.label, r.id).not.toMatch(/^Book:/);
       }
     });

@@ -129,7 +129,7 @@ export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: 
   };
   const recipeProblem = recipeFit(recipe);
   const stationery = recipe.id.startsWith("stationery:");
-  const needsCount = recipe.id === "journal-lined" || recipe.id === "planner-monthly-weekly" || stationery;
+  const needsCount = recipe.id === "journal-lined" || recipe.id === "guided-lined" || recipe.id === "planner-monthly-weekly" || stationery;
 
   const generate = () => {
     const sizeLabel = sizeId === CUSTOM_SIZE_ID ? `${custom.width}×${custom.height}${custom.unit}` : sizes.find((s) => s.id === sizeId)?.label ?? sizeId;
@@ -255,7 +255,8 @@ export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: 
               </Field>
             </div>
           )}
-          {(recipe.id === "journal-lined" || stationery) && <NumberField label="Pages" step={1} min={1} value={count} onChange={(c) => setCount(Math.max(1, Math.round(c)))} />}
+          {recipe.id === "guided-lined" && <p className="hint">Choose how many prompt sections each page has and how many writing lines each gets after you create it (Book structure → the page → Sections).</p>}
+          {(recipe.id === "journal-lined" || recipe.id === "guided-lined" || stationery) && <NumberField label="Pages" step={1} min={1} value={count} onChange={(c) => setCount(Math.max(1, Math.round(c)))} />}
           {stationery && <p className="hint">Margins, section sizes, writing lines and table columns are worked out for this page size — nothing to measure.</p>}
           {isPad && (
             <Field label="Sheets per pad">

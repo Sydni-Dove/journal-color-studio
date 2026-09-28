@@ -56,8 +56,9 @@ describe("catalog", () => {
   it("filters by family: the MVP devotional and worksheet recipes", () => {
     expect(stationeryRecipesFor("devotional").map((r) => r.comboId)).toEqual(["devotional-daily-reflection.stacked", "devotional-soap.four-band", "devotional-verse-mapping.spread"]);
     expect(stationeryRecipesFor("worksheet").map((r) => r.comboId)).toEqual(["worksheet-prompt.prompt-response", "worksheet-reading-tracker.table", "worksheet-prayer-log.table"]);
-    expect(recipePresetsFor("devotional").map((r) => r.id)).toEqual(stationeryRecipesFor("devotional").map((r) => stationeryLayoutId(r.comboId)));
-    expect(recipePresetsFor("worksheet").map((r) => r.id)).toEqual(stationeryRecipesFor("worksheet").map((r) => stationeryLayoutId(r.comboId)));
+    // Their own designs first (the default), then the Guided Lined Page.
+    expect(recipePresetsFor("devotional").map((r) => r.id)).toEqual([...stationeryRecipesFor("devotional").map((r) => stationeryLayoutId(r.comboId)), "guided-lined"]);
+    expect(recipePresetsFor("worksheet").map((r) => r.id)).toEqual([...stationeryRecipesFor("worksheet").map((r) => stationeryLayoutId(r.comboId)), "guided-lined"]);
   });
   it("recipes carry structure only: no colors, fonts or physical page measurements", () => {
     const json = JSON.stringify(STATIONERY_RECIPES);

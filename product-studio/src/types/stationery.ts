@@ -73,6 +73,8 @@ export type StationeryZone = {
   lines?: number;
   /** Prompt blocks: the fewest lines the section may get. */
   minLines?: number;
+  /** Prompt blocks: an equal share — every "equal" section on the page gets the same number of whole lines. */
+  equal?: boolean;
 };
 
 export type StationeryPageSpec = {
