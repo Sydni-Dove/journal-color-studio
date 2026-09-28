@@ -20,6 +20,9 @@ export type RecipeItem = {
   repeat: RepeatRule;
   /** Optional title override for this recipe step (wording key or literal). */
   label?: string;
+  /** Guided Lined Pages in the simple page list: the page title and its prompt sections (as a book step has). */
+  title?: string;
+  promptSet?: import("./prompts").PromptSet;
 };
 
 export type RecipeOrdering =

@@ -307,3 +307,38 @@ describe("Guided Lined Page", () => {
     });
   }
 });
+
+describe("Guided Lined Page in the simple page list", () => {
+  for (const [vp, label] of [[DESKTOP, "desktop"], [PHONE, "phone"]] as const) {
+    it(`${label}: Monthly + Weekly + Notes planner → add a Guided Lined Page type → its Sections editor, real line counts, labelled in Pages`, async () => {
+      const page = await home([], vp);
+      await page.locator("button.family-card", { hasText: /^Planner/ }).first().click();
+      await page.waitForSelector("#wizard-build");
+      await page.locator("button.choice", { hasText: /^Monthly \+ Weekly \+ Notes$/ }).click();
+      await page.getByRole("button", { name: "Generate" }).click();
+      await page.waitForSelector(".ps-page--editor");
+      // Page label and Pages control beside the page number.
+      await expect.poll(() => page.getByTestId("page-label").innerText()).toMatch(/MONTHLY PLANNER/);
+      await expect(page.getByRole("button", { name: "Pages", exact: true }).isVisible()).resolves.toBe(true);
+      // Add a page type and make it a Guided Lined Page.
+      await page.getByRole("button", { name: "Add another page type" }).click();
+      const last = page.locator("label.field", { hasText: /^Page type \d/ }).last().locator("select");
+      await last.selectOption({ label: "Guided Lined Page (title + prompt sections)" });
+      const sections = page.getByTestId("item-sections");
+      await expect.poll(() => sections.locator(".prompt-block > summary").allInnerTexts()).toEqual([expect.stringMatching(/^The Word\s*Fills space · \d+ lines/)]);
+      await sections.getByLabel("Start from a structure (replaces the sections)").selectOption({ label: "Four Prompt Review" });
+      await expect.poll(() => sections.locator(".prompt-block > summary").allInnerTexts()).toEqual([
+        expect.stringMatching(/What God Did\s*8 lines/), expect.stringMatching(/Timeline\s*6 lines/), expect.stringMatching(/Fruit & Impact\s*6 lines/), expect.stringMatching(/Praise & Gratitude\s*Fills space/),
+      ]);
+      await expect.poll(() => page.locator(".badge").first().textContent()).toMatch(/Page OK|warning/);
+      // Pages: filter Journal → the guided page, labelled with its title.
+      await page.getByRole("button", { name: "Pages", exact: true }).click();
+      const sheet = page.getByRole("dialog", { name: "Pages" });
+      await sheet.getByLabel("Show pages").selectOption("journal");
+      await sheet.locator(".page-row").first().click();
+      await expect.poll(() => page.getByTestId("page-label").innerText()).toMatch(/JOURNAL PAGE\s*The Word/);
+      if (label === "phone") expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+      await page.context().close();
+    });
+  }
+});

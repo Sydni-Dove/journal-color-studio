@@ -76,6 +76,7 @@ const LAYOUT_CATEGORY: Record<string, PageCategory> = {
   "notepad-daily": "daily",
   "journal-lined": "journal",
   "notes-page": "notes",
+  "guided-page": "journal",
 };
 
 /** Book purposes (modules) whose page is identified by what it is for, not by its layout. */
@@ -89,6 +90,8 @@ const MODULE_CATEGORY: Partial<Record<string, PageCategory>> = {
   notes: "notes",
   "daily-planner": "daily",
   "monthly-calendar": "monthly",
+  guided: "journal",
+  custom: "journal",
 };
 
 const STATIONERY_CATEGORY: Record<string, PageCategory> = { devotional: "devotional", worksheet: "worksheet", journal: "journal", planner: "other" };

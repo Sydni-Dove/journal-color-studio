@@ -111,3 +111,19 @@ describe("page navigation", () => {
     await page.context().close();
   });
 });
+
+describe("stale tab", () => {
+  it("shows the build on the home page, and offers a reload when a newer build is deployed", async () => {
+    const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 } });
+    const page = await ctx.newPage();
+    await page.goto(base);
+    await expect(page.getByTestId("build").innerText()).resolves.toMatch(/^Version \S+/);
+    expect(await page.locator(".update-banner").count()).toBe(0);
+    // The server now serves another build.
+    await page.route(/\/\?v=\d+/, (r) => r.fulfill({ status: 200, contentType: "text/html", body: '<script type="module" src="./assets/index-NEWBUILD1.js"></script>' }));
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await expect.poll(() => page.locator(".update-banner").count()).toBe(1);
+    await expect(page.locator(".update-banner").innerText()).resolves.toMatch(/Reload/);
+    await ctx.close();
+  });
+});

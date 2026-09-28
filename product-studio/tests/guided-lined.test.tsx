@@ -190,3 +190,35 @@ describe("Guided Lined Page", () => {
     expect(again.pages.map((x) => x.nodes)).toEqual(solved(p).pages.map((x) => x.nodes));
   });
 });
+
+describe("Guided Lined Page in the simple page list (no book structure)", () => {
+  const flat = (set: PromptSet, size = "7x9") =>
+    createProject("planner", {
+      name: "Flat", dimensions: { sizePresetId: size, orientation: "portrait" }, production: { bindingType: "coil", printProfileId: "coil-generic", duplex: false },
+      calendar: { startDate: "2027-01-01", endDate: "2027-01-31", weekStart: 1, sixRowMonths: true },
+      recipe: { items: [{ id: "m", layoutId: "planner-monthly", repeat: { kind: "every-month" } }, { id: "g", layoutId: "guided-page", repeat: { kind: "count", count: 2 }, title: "Respond", promptSet: set }], ordering: "sequential" },
+    });
+  it("its sections and title reach its pages; lines as set; continuation measured on the page", () => {
+    const set = PROMPT_STARTERS[2].set();
+    const doc = resolveDocument(flat(set));
+    const pages = doc.recipe.pages.map((p, i) => ({ p, i })).filter(({ p }) => p.recipeItemId === "g");
+    expect(pages.length).toBeGreaterThanOrEqual(2);
+    expect(pages[0].p.module).toMatchObject({ type: "guided", title: "Respond" });
+    const s = solvePage(doc, pages[0].i);
+    expect(s.nodes.some((n) => n.type === "text" && n.text === "Respond")).toBe(true);
+    const c = sectionLineCounts([s], "gp");
+    expect([c[set.blocks[0].id], c[set.blocks[1].id]]).toEqual([8, 8]);
+    // Too many lines: each copy continues on another page, measured on this size.
+    const big = { blocks: set.blocks.map((b) => ({ ...b, space: "fixed" as const, lineCount: 14 })) };
+    const d2 = resolveDocument(flat(big, "a5"));
+    const g2 = d2.recipe.pages.filter((p) => p.recipeItemId === "g");
+    expect(g2[0].flowCount).toBeGreaterThan(1);
+    expect(g2.length).toBe(2 * g2[0].flowCount!);
+    expect(issues(flat(set) as never)).toEqual([]);
+  });
+  it("a simple list without sections is unchanged (no module on its pages)", () => {
+    const p = flat(PROMPT_STARTERS[0].set());
+    p.recipe.items = p.recipe.items.map((x) => ({ ...x, promptSet: undefined, title: undefined }));
+    expect(resolveDocument(p).recipe.pages.every((x) => !x.module)).toBe(true);
+  });
+});

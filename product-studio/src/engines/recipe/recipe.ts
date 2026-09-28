@@ -7,6 +7,7 @@
  * - Two-page spread layouts are kept on a verso/recto pair; in paged
  *   products a filler page is inserted when a spread would start on a recto.
  */
+import type { PageModuleContent } from "../../types/recipe";
 import type { CalendarData } from "../../types/calendar";
 import type { PageSide } from "../../types/geometry";
 import type { PageInstance, PeriodRef, ProductRecipe, RecipeItem } from "../../types/recipe";
@@ -181,8 +182,11 @@ export function expandRecipe(recipe: ProductRecipe, ctx: RecipeContext): Expande
       });
       pageNumber++;
     }
+    // A page type with its own prompt sections (Guided Lined Page in the simple page list) carries them as
+    // its module, exactly as a book step does.
+    const module: PageModuleContent | undefined = u.item.promptSet ? { type: "guided", title: u.item.title ?? "Guided Page", prompts: [], promptSet: u.item.promptSet } : undefined;
     // Content that doesn't fit one page continues on more pages (single-page layouts only).
-    const flow = u.pages === 1 && !u.physicalSheets ? Math.max(1, ctx.flowPages?.(u.item.layoutId) ?? 1) : 1;
+    const flow = u.pages === 1 && !u.physicalSheets ? Math.max(1, ctx.flowPages?.(u.item.layoutId, module) ?? 1) : 1;
     for (let part = 0; part < u.pages * flow; part++) {
       pages.push({
         key: `${u.item.id}:${pk}${u.pages === 2 ? `:${part}` : part > 0 ? `~${part}` : ""}`,
@@ -193,6 +197,7 @@ export function expandRecipe(recipe: ProductRecipe, ctx: RecipeContext): Expande
         pageNumber,
         side: sideOf(pageNumber),
         physicalSheets: u.physicalSheets,
+        ...(module ? { module } : {}),
         ...(flow > 1 ? { flowPart: part, flowCount: flow } : {}),
       });
       pageNumber++;

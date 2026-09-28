@@ -1,4 +1,7 @@
-import { layoutAvailability, type ResolvedDocument } from "../../engines/document/resolve";
+import { layoutAvailability, solvePage, type ResolvedDocument } from "../../engines/document/resolve";
+import { sectionLineCounts, sectionPages } from "../../layouts/shared/promptPages";
+import { PROMPT_STARTERS } from "../../types/prompts";
+import { PromptEditor, type PromptFit } from "./PromptEditor";
 import type { ProjectUsage } from "../../engines/document/usage";
 import { getLayout } from "../../layouts/registry";
 import { BINDING_CHOICES, getBindingProfile } from "../../presets/bindingProfiles/bindingProfiles";
@@ -177,6 +180,7 @@ export function repeatsFor(layoutId: string, isPad: boolean): RepeatRule["kind"]
   return isPad ? r.filter((k) => k === "repeated-sheet") : r.filter((k) => k !== "repeated-sheet");
 }
 
+const GUIDED = "guided-page";
 const nextYear = new Date().getFullYear() + 1;
 
 export function PagesPanel({ project, update, doc, usage, nav }: PanelProps & { doc: ResolvedDocument; usage: ProjectUsage; nav: EditorNav }) {
@@ -186,6 +190,15 @@ export function PagesPanel({ project, update, doc, usage, nav }: PanelProps & { 
   const avail = layoutAvailability(doc).filter((a) => a.supportedType);
   const setItems = (next: RecipeItem[]) => update((p) => ({ ...p, recipe: { ...p.recipe, items: next } }));
 
+  const putItem = (id: string, patch: Partial<RecipeItem>) => setItems(items.map((x) => (x.id === id ? { ...x, ...patch } : x)));
+  /** How a page type's sections fit: pages each time, a plain problem, and the lines each section gets. */
+  const itemFit = (id: string): PromptFit | undefined => {
+    const i = doc.recipe.pages.findIndex((p) => p.recipeItemId === id && !p.filler);
+    if (i < 0) return undefined;
+    const n = doc.recipe.pages[i].flowCount ?? 1;
+    const solved = [...Array(n).keys()].map((k) => solvePage(doc, i + k));
+    return { pages: n, problem: solved.flatMap((s) => s.diagnostics).find((d) => d.rule === "prompt-fit")?.message, lines: sectionLineCounts(solved, "gp"), pageOf: sectionPages(solved, "gp") };
+  };
   const changeLayout = (item: RecipeItem, layoutId: string) =>
     update((p) => {
       const layout = getLayout(layoutId);
@@ -195,7 +208,20 @@ export function PagesPanel({ project, update, doc, usage, nav }: PanelProps & { 
       return {
         ...p,
         calendar,
-        recipe: { ...p.recipe, items: p.recipe.items.map((x) => (x.id === item.id ? { ...x, layoutId, repeat: repeatFor(kind, x.repeat, sheets) } : x)) },
+        recipe: {
+          ...p.recipe,
+          items: p.recipe.items.map((x) =>
+            x.id !== item.id
+              ? x
+              : {
+                  ...x,
+                  layoutId,
+                  repeat: repeatFor(kind, x.repeat, sheets),
+                  // A Guided Lined Page starts as a Full Page Prompt; its sections are then the creator's.
+                  ...(layoutId === GUIDED && !x.promptSet ? { title: x.title ?? "The Word", promptSet: PROMPT_STARTERS[0].set() } : {}),
+                },
+          ),
+        },
       };
     });
 
@@ -230,6 +256,25 @@ export function PagesPanel({ project, update, doc, usage, nav }: PanelProps & { 
             )}
             {items.length > 1 && nav.currentLayoutId !== it.layoutId && (
               <button type="button" className="btn btn--ghost" style={{ justifySelf: "start" }} onClick={() => nav.goToItem(it.id)}>Show its first page</button>
+            )}
+            {it.layoutId === GUIDED && (
+              <>
+                <Field label="Page title">
+                  <input type="text" value={it.title ?? ""} placeholder="e.g. The Word" onChange={(e) => putItem(it.id, { title: e.target.value || undefined })} />
+                </Field>
+                <details className="subsection" open data-testid="item-sections">
+                  <summary>Sections</summary>
+                  <PromptEditor
+                    set={it.promptSet ?? { blocks: [] }}
+                    onChange={(promptSet) => putItem(it.id, { promptSet })}
+                    ownStyleLabel="Your writing lines style"
+                    allowInstructions
+                    allowHeader
+                    allowStarters
+                    fit={itemFit(it.id)}
+                  />
+                </details>
+              </>
             )}
             {kinds.length > 1 ? (
               <div className="row">

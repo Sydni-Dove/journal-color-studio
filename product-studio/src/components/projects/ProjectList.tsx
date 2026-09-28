@@ -135,6 +135,7 @@ export function ProjectList({ projects, meta, onStart, onOpen, onDuplicate, onDu
           <p className="home-eyebrow">Internal creative workspace</p>
           <h1>Dove Expressions Product Studio</h1>
           <p className="lede">Create print-ready journals, planners, devotionals, worksheets, workbooks and stationery from reusable layouts, content structures and design systems.</p>
+          <p className="hint build-stamp" data-testid="build">Version {__BUILD__}</p>
         </section>
 
         {hasProjects ? (

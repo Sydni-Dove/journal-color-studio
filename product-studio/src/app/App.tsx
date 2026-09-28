@@ -1,3 +1,4 @@
+import { useUpdateCheck } from "../utils/useUpdateCheck";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Editor } from "../components/editor/Editor";
 import { ProjectList, type ProjectMeta } from "../components/projects/ProjectList";
@@ -25,7 +26,18 @@ function projectMeta(id: string): ProjectMeta {
 /** Autosave debounce — long enough to batch typing, short enough to feel instant. */
 const AUTOSAVE_MS = 600;
 
+/** A newer build is deployed than this tab is running: offer a reload (saving first). */
+function UpdateBanner({ onReload }: { onReload: () => void }) {
+  return (
+    <div className="update-banner" role="status">
+      <span>Product Studio was updated. Reload to get the latest version — your work is saved first.</span>
+      <button type="button" className="btn btn--primary" onClick={onReload}>Reload</button>
+    </div>
+  );
+}
+
 export function App() {
+  const stale = useUpdateCheck();
   const store = localProjectStore;
   const [projects, setProjects] = useState<ProjectSummary[]>(() => store.list());
   const [view, setView] = useState<View>({ kind: "list" });
@@ -65,9 +77,19 @@ export function App() {
     return () => window.removeEventListener("beforeunload", flush);
   }, [view, saveStatus, persist]);
 
-  if (view.kind === "new") return <NewProductWizard start={view.start} onCreate={open} onCancel={() => setView({ kind: "list" })} />;
+  const reload = () => {
+    if (view.kind === "edit") {
+      window.clearTimeout(timer.current);
+      persist(view.project);
+    }
+    window.location.reload();
+  };
+  const banner = stale ? <UpdateBanner onReload={reload} /> : null;
+  if (view.kind === "new") return <>{banner}<NewProductWizard start={view.start} onCreate={open} onCancel={() => setView({ kind: "list" })} /></>;
   if (view.kind === "edit") {
     return (
+      <>
+      {banner}
       <Editor
         project={view.project}
         onChange={onChange}
@@ -78,9 +100,12 @@ export function App() {
           setView({ kind: "list" });
         }}
       />
+      </>
     );
   }
   return (
+    <>
+    {banner}
     <ProjectList
       projects={projects}
       meta={projectMeta}
@@ -104,5 +129,6 @@ export function App() {
         refresh();
       }}
     />
+    </>
   );
 }
