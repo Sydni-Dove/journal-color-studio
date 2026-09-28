@@ -1547,9 +1547,10 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     if (s.marble in PATTERNS) { paintPattern(ctx, x, y, w, h, s, soft); return; }
     if (s.marble === 'blush') { paintWatercolor(ctx, x, y, w, h, s, soft); return; }
     if (s.marble === 'abstract' || s.marble.startsWith('img:')) {
-      // Full-bleed areas (covers) show the artwork; thin header/footer bars use the stone color.
-      if (h <= w * .9 && !s._thumb) { ctx.fillStyle = s.palette.stone; ctx.fillRect(x, y, w, h); return; }
-      // A partial tall area (e.g. the sidebar) shows ITS slice of the full-page artwork — never a squashed miniature.
+      // Every area on a page shows ITS slice of the full-page artwork: the cover the whole piece, header / footer bars
+      // and the sidebar the strip of the artwork at that spot — so the background carries through the whole book, never
+      // as a squashed miniature. (Dark bars + blocks: "Solid stone color" still gives flat bars; see stoneBar.)
+      // The option tiles (_thumb) show the whole artwork in their small box.
       const PW = s._W && !s._thumb ? s._W : w, PH = s._W && !s._thumb ? Math.round(s._W * TRIM_H / TRIM_W) : h, part = PW !== w || PH !== h;
       const [ax, ay] = part ? [0, 0] : [x, y];
       ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
@@ -1559,15 +1560,22 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
         ctx.fillStyle = s.palette.paper; ctx.fillRect(x, y, w, h);
         if (!img) ensureAsset(key).catch(() => {}); else drawCover(ctx, img, ax, ay, PW, PH);
       }
+      if (soft) { ctx.fillStyle = rgba(s.palette.paper, .55); ctx.fillRect(x, y, w, h); }     // "Soft marble wash" header
       ctx.restore();
       return;
     }
     if (s.marble.startsWith('upload:')) {
       // An uploaded background fills full-bleed areas (covers) in its own colors; thin bars use the stone color.
       const img = ASSETS[s.marble];
+      if (!img) { ctx.fillStyle = s.palette.stone; ctx.fillRect(x, y, w, h); return; }
+      // Like the artwork backgrounds: each area shows its slice of the full-page image (covers: all of it).
+      const PW = s._W && !s._thumb ? s._W : w, PH = s._W && !s._thumb ? Math.round(s._W * TRIM_H / TRIM_W) : h, part = PW !== w || PH !== h;
+      ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
       // Paper first: transparent PNGs would otherwise export black in the JPEG pages of the PDF.
-      if (img && h > w * .9) { ctx.fillStyle = s.palette.paper; ctx.fillRect(x, y, w, h); drawCover(ctx, img, x, y, w, h); }
-      else { ctx.fillStyle = s.palette.stone; ctx.fillRect(x, y, w, h); }
+      ctx.fillStyle = s.palette.paper; ctx.fillRect(x, y, w, h);
+      drawCover(ctx, img, part ? 0 : x, part ? 0 : y, PW, PH);
+      if (soft) { ctx.fillStyle = rgba(s.palette.paper, .55); ctx.fillRect(x, y, w, h); }
+      ctx.restore();
       return;
     }
     if (s.marble === 'floral') {
@@ -3447,8 +3455,13 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
       ctx.fillStyle = legendInk; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
       withRole(ctx, s, 'legendText', () => {
         ctx.font = font(H * .015, { italic: true });
-        const labels = () => [['Status', .1], ['N = Not Interpreted', .3], ['I = Interpreted', .6], ['A = Application', .8]].forEach(([t, f]) => ctx.fillText(t, W * f, ly + lh / 2));
-        if (panel) labels(); else withHalo(ctx, s, legendInk, legendArea, labels);
+        // Each label reads on the artwork right behind it (a strip can run from deep to pale across the page).
+        [['Status', .1], ['N = Not Interpreted', .3], ['I = Interpreted', .6], ['A = Application', .8]].forEach(([t, f]) => {
+          const tw = ctx.measureText(t).width, area = [W * f - tw / 2, ly + lh * .2, tw, lh * .6];
+          const ink = panel ? legendInk : textOnArea(ctx, s, p.title, p.stone, ...area), draw = () => ctx.fillText(t, W * f, ly + lh / 2);
+          ctx.fillStyle = ink;
+          if (panel) draw(); else withHalo(ctx, s, ink, area, draw);
+        });
       });
       ctx.fillRect(W * .175, ly + lh * .2, Math.max(1, W * .002), lh * .6);
       ctx.fillStyle = ink; withRole(ctx, s, 'pageTitle', () => { ctx.font = font(H * .045); fillFit(ctx, s, 'contentsTitle', T(s, 'contentsTitle'), W / 2, H * .135, W * .88); });
