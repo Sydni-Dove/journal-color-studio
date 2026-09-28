@@ -3053,9 +3053,12 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     ctx.drawImage(rec, cx + halfGap, y, w, h);
   }
 
-  function writingLines(ctx, W, H, s, x0, x1, top, bottom) {
+  // lead: where the first line sits below the header, in line spacings (0.9 = the Canva master). Snug spacing starts it
+  // sooner under thin-border headers (0.6) and a little later under the heavy block / band headers (1.25), so the
+  // lines don't crowd a big marble block.
+  function writingLines(ctx, W, H, s, x0, x1, top, bottom, lead = .9) {
     const p = s.palette, pt = H / TRIM_H, spacing = Number(s.lineSpacing) * pt;
-    const first = top + spacing * (snugHeader(s) ? .6 : .9);
+    const first = top + spacing * lead;
     if (s.lineStyle === 'hand' && ASSETS.handLines) {
       // Cycle through the 11 hand-drawn strokes so neighbouring lines never repeat.
       const img = ASSETS.handLines, sh = img.naturalHeight / HAND_LINE_COUNT, lw = x1 - x0, dh = sh * lw / img.naturalWidth;
@@ -3078,7 +3081,8 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   const linedPage = (id, pref, subId = null) => (ctx, W, H, s) => {
     const bottom = pageBase(ctx, W, H, s);
     const top = drawHeader(ctx, W, H, s, T(s, id), { pref, sub: subId ? T(s, subId) : '', id, subId });
-    writingLines(ctx, W, H, s, W * .045, W * .955, top, bottom);
+    const style = s.headerStyle === 'mixed' ? pref : s.headerStyle;
+    writingLines(ctx, W, H, s, W * .045, W * .955, top, bottom, !snugHeader(s) ? .9 : (style === 'rule' || style === 'bar') && !subId ? .6 : 1.25);
   };
 
   // Dark sidebar used on the first Dream and first Brainstorm page of each cycle.
@@ -3120,7 +3124,7 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
     if (s.accent !== 'none' && s.accentLined) drawAccent(ctx, W, H, s, true);
     const sx = W * .6;
     const top = drawHeader(ctx, W, H, s, T(s, id), { pref: 'bar', x1: sx, id });
-    writingLines(ctx, W, H, s, W * .045, sx - W * .03, top, H * .965);
+    writingLines(ctx, W, H, s, W * .045, sx - W * .03, top, H * .965, snugHeader(s) && ['mixed', 'rule', 'bar'].includes(s.headerStyle) ? .6 : .9);
     if (floralDesign(s)) { const [r, g, b] = hexRgb(s.palette.paper); ctx.fillStyle = `rgb(${r * .945},${g * .945},${b * .945})`; ctx.fillRect(sx, 0, W - sx, H); }
     else stoneBar(ctx, sx, 0, W - sx, H, s);
     // Busy backgrounds: sidebar content sits on a soft reading panel (automatic on art backgrounds; see sidebarPanel).
