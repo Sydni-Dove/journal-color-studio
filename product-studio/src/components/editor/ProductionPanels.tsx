@@ -6,6 +6,7 @@ import { PRINT_PROFILES } from "../../presets/printProfiles/printProfiles";
 import { newId } from "../../presets/products/projectFactory";
 import { PRODUCT_TYPES } from "../../presets/products/productTypes";
 import { CUSTOM_SIZE_ID, sizePresetsFor } from "../../presets/sizes/sizePresets";
+import { withSizePreset } from "../../engines/geometry/dimensions";
 import { STUDIO_PAD } from "../../presets/studioDefaults";
 import type { Edge, LogicalEdge } from "../../types/geometry";
 import type { ProductProject } from "../../types/project";
@@ -30,7 +31,7 @@ export function ProductPanel({ project, update }: PanelProps) {
         label="Page size (after trimming)"
         value={d.sizePresetId}
         options={[...sizePresetsFor(project.productType).map((s) => ({ value: s.id, label: s.label })), { value: CUSTOM_SIZE_ID, label: "Custom…" }]}
-        onChange={(sizePresetId) => set({ sizePresetId, custom: sizePresetId === CUSTOM_SIZE_ID ? d.custom ?? { width: 6, height: 9, unit: "in" } : d.custom })}
+        onChange={(sizePresetId) => update((p) => ({ ...p, dimensions: withSizePreset(p.dimensions, sizePresetId) }))}
       />
       {d.sizePresetId === CUSTOM_SIZE_ID && d.custom && (
         <div className="row">

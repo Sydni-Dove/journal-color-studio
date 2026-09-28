@@ -29,6 +29,20 @@ export function orient(short: number, long: number, orientation: Orientation): P
   return orientation === "portrait" ? { widthIn: a, heightIn: b } : { widthIn: b, heightIn: a };
 }
 
+/**
+ * Choosing a size: a preset brings its own orientation (7 × 9 is portrait; the
+ * desk pads and 11 × 17 are landscape), exactly as in the New Product wizard.
+ * The previous size's orientation is never carried over: an 11 × 17 landscape
+ * project switched to 7 × 9 would otherwise become a 9 × 7 landscape page
+ * nobody chose. A custom size keeps the current orientation (the person sets
+ * it with its width and height). Landscape after this only when chosen.
+ */
+export function withSizePreset(d: DimensionSettings, sizePresetId: string): DimensionSettings {
+  if (sizePresetId === CUSTOM_SIZE_ID) return { ...d, sizePresetId, custom: d.custom ?? { width: 6, height: 9, unit: "in" } };
+  const preset = findSizePreset(sizePresetId);
+  return { ...d, sizePresetId, orientation: preset?.defaultOrientation ?? d.orientation };
+}
+
 export function validateDimensions(d: DimensionSettings): DimensionError[] {
   const errors: DimensionError[] = [];
   if (d.sizePresetId === CUSTOM_SIZE_ID) {
