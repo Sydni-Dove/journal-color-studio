@@ -42,6 +42,8 @@ export type ProductRecipe = {
 // ─── Composite book recipe ─────────────────────────────────────────────────
 /** A page's PURPOSE. Its design is the step's layout (one purpose, many possible layouts). */
 export type PageModuleType =
+  | "cover-page"
+  | "divider-page"
   | "monthly-calendar"
   | "weekly-planner"
   | "daily-planner"
@@ -101,6 +103,8 @@ export type BookStep = {
   start?: PageStartRule;
   /** Title override (otherwise the module's title for the period). */
   title?: string;
+  /** Cover / divider page settings (absent on other pages and legacy projects). */
+  cover?: CoverDividerSettings;
   /** Prompt overrides for guided pages (saved before prompt blocks; still read). */
   prompts?: string[];
   /** Prompt + response blocks for guided pages (wins over `prompts`). */
@@ -127,6 +131,8 @@ export type PageModuleContent = {
   prompts: string[];
   /** Prompt + response blocks chosen by the creator (types/prompts.ts); wins over `prompts`. */
   promptSet?: import("./prompts").PromptSet;
+  /** Cover / divider page settings (absent on other pages). */
+  cover?: CoverDividerSettings;
 };
 
 export type PeriodRef =
@@ -160,4 +166,18 @@ export type PageInstance = {
   /** Content that continues on more pages (prompts that don't fit one page): this page's part and the total. */
   flowPart?: number;
   flowCount?: number;
+};
+
+/** Additive, per-step settings; absent on legacy projects. Tabs are interior printed markers. */
+export type CoverDividerSettings = {
+  preset?: "neutral-cheetah-luxe" | "plain";
+  subtitle?: string;
+  quote?: string;
+  smallLine?: boolean;
+  alignment?: "left" | "center";
+  position?: "upper" | "middle" | "lower";
+  circles?: boolean;
+  outlines?: boolean;
+  leopard?: boolean;
+  tab?: { show: boolean; label?: string; style?: "staggered" | "rounded"; order?: number; count?: number; color?: import("./tokens").ColorToken; leopard?: boolean };
 };

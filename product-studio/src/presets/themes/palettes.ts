@@ -41,7 +41,8 @@ const brandBase: ColorTokens = {
  * ones: line art takes the decoration accent, patterns print the decoration
  * base on the paper. (Snapshotted JCS palettes carry JCS's own values.)
  */
-const derived = (c: ColorTokens): ColorTokens => ({ ...c, lineArt: c.decorativeAccent, patternGround: c.background, patternInk: c.decorBase });
+type DerivedRoles = "lineArt" | "patternGround" | "patternInk";
+const derived = (c: Omit<ColorTokens, DerivedRoles> & Partial<Pick<ColorTokens, DerivedRoles>>): ColorTokens => ({ ...c, lineArt: c.decorativeAccent, patternGround: c.background, patternInk: c.decorBase });
 
 export const PALETTES: ColorPalette[] = [
   { id: "dove-signature", label: "Dove Signature — Burgundy / Soft White / Gold", brandPalette: true, colors: brandBase },
@@ -65,6 +66,8 @@ export const PALETTES: ColorPalette[] = [
     brandPalette: true,
     colors: { ...brandBase, primary: DOVE_BRAND.charcoal, border: DOVE_BRAND.charcoal, decorBase: DOVE_BRAND.charcoal },
   },
+  // Cover & divider design preset (after the brand palettes, so Dove Signature stays the default).
+  { id: "neutral-cheetah-luxe", label: "Neutral Cheetah Luxe", brandPalette: false, colors: { primary: "#482c20", secondary: "#d4bca2", accent: "#a7694e", background: "#f5efe5", text: "#14110f", mutedText: "#5e5148", line: "#14110f", border: "#14110f", decorativeAccent: "#84939c", decorBase: "#482c20", decorHighlight: "#e3d3bf", lineOpacity: 0.3 } },
   // ── Variant palettes requested for product variants. These use colors
   //    OUTSIDE the approved brand palette and require designer approval. ──
   {

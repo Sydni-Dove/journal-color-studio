@@ -41,6 +41,9 @@ const GUIDED = ["guided-page", "journal-lined"];
  */
 const EVERY_CADENCE: CadenceKind[] = ["once", "copies", "daily", "weekly", "monthly", "quarterly", "yearly", "after-module", "end-of-period"];
 export const MODULE_CADENCES: Record<PageModuleType, CadenceKind[]> = {
+  // A cover or a divider opens the book or a section: placed once where it sits.
+  "cover-page": ["once"],
+  "divider-page": ["once"],
   "monthly-calendar": ["once", "monthly"],
   "weekly-planner": ["once", "weekly"],
   "daily-planner": ["daily"],
@@ -69,6 +72,8 @@ export const MODULE_CADENCES: Record<PageModuleType, CadenceKind[]> = {
 export const supportsCadence = (type: PageModuleType, kind: CadenceKind) => MODULE_CADENCES[type].includes(kind);
 
 export const PAGE_MODULES: PageModuleDefinition[] = [
+  { type: "cover-page", label: "Cover & Divider Pages · Cover / title page", layouts: ["cover-page"], defaultCadence: { type: "once" }, cadences: MODULE_CADENCES["cover-page"], titles: { none: "Plan" }, prompts: { none: [] } },
+  { type: "divider-page", label: "Cover & Divider Pages · Section divider / tab page", layouts: ["divider-page"], defaultCadence: { type: "once" }, cadences: MODULE_CADENCES["divider-page"], titles: { none: "Prayer" }, prompts: { none: [] } },
   { type: "monthly-calendar", label: "Monthly calendar", layouts: ["planner-monthly"], defaultCadence: { type: "monthly" }, cadences: MODULE_CADENCES["monthly-calendar"], titles: { none: "Month" }, prompts: { none: [] } },
   {
     type: "weekly-planner",

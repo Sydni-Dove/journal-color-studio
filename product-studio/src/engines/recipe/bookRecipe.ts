@@ -347,7 +347,7 @@ export function expandBook(structure: BookNode[], ctx: BookContext): ExpandedRec
     const base = `${step.id}@${leaf.path}:${periodKey(period)}#${leaf.copy}`;
     if (seen.has(base)) diagnostics.push({ severity: "error", itemId: step.id, message: `"${title}" is generated twice for ${subtitle ?? periodKey(period)}.` });
     seen.add(base);
-    const module = { type: step.module, title, subtitle, prompts: step.prompts ?? modulePrompts(step.module, kind), ...(step.promptSet ? { promptSet: step.promptSet } : {}) };
+    const module = { type: step.module, title, subtitle, prompts: step.prompts ?? modulePrompts(step.module, kind), ...(step.promptSet ? { promptSet: step.promptSet } : {}), ...(step.cover ? { cover: step.cover } : {}) };
     // Prompts that don't fit one page continue on more pages (single-page layouts only).
     const flow = n === 1 ? Math.max(1, ctx.flowPages?.(step.layoutId, module) ?? 1) : 1;
     for (let part = 0; part < n * flow; part++) {
@@ -365,6 +365,12 @@ export function expandBook(structure: BookNode[], ctx: BookContext): ExpandedRec
       pageNumber++;
     }
   }
+  // Auto-distribute the printed divider tabs across the actual expanded book.
+  const tabPages = pages.filter((p) => p.module?.type === "divider-page" && p.module.cover?.tab?.show);
+  tabPages.forEach((p, i) => {
+    const cover = p.module!.cover!;
+    p.module = { ...p.module!, cover: { ...cover, tab: { ...cover.tab!, order: cover.tab!.order ?? i + 1, count: cover.tab!.count ?? tabPages.length } } };
+  });
   if (fillers) diagnostics.push({ severity: "info", itemId: "recipe", message: `${fillers} intentional notes page(s) inserted so modules start on their required side.` });
   if (!pages.length) diagnostics.push({ severity: "warning", itemId: "recipe", message: "This book structure produces no pages yet." });
   return { pages, diagnostics, pageCount: pages.length };

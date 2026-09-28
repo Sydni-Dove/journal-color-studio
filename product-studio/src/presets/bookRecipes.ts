@@ -19,7 +19,7 @@ export function section(label: string, children: BookNode[], period?: BookGroup[
 }
 
 /** Meetings With God planner — the motivating structure (not its old design). */
-export function meetingsWithGodBook(): BookNode[] {
+export function meetingsWithGodBook(includeDaily = false): BookNode[] {
   const spread = step("weekly-planner", { type: "once" }, { layoutId: "weekly-plan-mwg-spread" });
   return [
     section("Front Matter", [step("mission"), step("vision"), step("goals")]),
@@ -27,7 +27,7 @@ export function meetingsWithGodBook(): BookNode[] {
       "Every Month",
       [
         step("monthly-calendar", { type: "once" }),
-        section("Every Week", [spread, step("lined-journal", { type: "after-module", moduleId: spread.id }, { copies: 2 })], "week"),
+        section("Every Week", [spread, step("lined-journal", { type: "after-module", moduleId: spread.id }, { copies: 2 }), ...(includeDaily ? [step("daily-planner")] : [])], "week"),
         step("review", { type: "end-of-period", period: "month" }),
       ],
       "month",
@@ -55,6 +55,7 @@ export function dailyPlannerBook(): BookNode[] {
 
 export const BOOK_PRESETS: { id: string; label: string; build: () => BookNode[] }[] = [
   { id: "meetings-with-god", label: "Meetings With God planner (plan + journal)", build: meetingsWithGodBook },
+  { id: "meetings-with-god-daily", label: "Meetings With God planner + daily pages", build: () => meetingsWithGodBook(true) },
   { id: "daily-planner", label: "Daily planner (front matter · month · week + Meeting With God · every day · review)", build: dailyPlannerBook },
   {
     id: "planner-journal",
@@ -62,3 +63,11 @@ export const BOOK_PRESETS: { id: string; label: string; build: () => BookNode[] 
     build: () => [section("Every Month", [step("monthly-calendar", { type: "once" }), section("Every Week", [step("weekly-planner", { type: "once" }), step("lined-journal", { type: "once" })], "week")], "month")],
   },
 ];
+
+/** Optional coordinating set; never added to existing recipes automatically. */
+export function neutralLuxeDividers(): BookNode[] {
+  const names = ["Prayer", "Vision", "Plan", "Schedule", "Work", "Home", "Wellness", "Finances", "Notes"];
+  const subtitles = ["Draw near", "See clearly", "Make a way", "Be steady", "Build well", "Cultivate peace", "Care for you", "Be a good steward", "Ideas & extras"];
+  const colors = ["secondary", "primary", "decorativeAccent", "decorHighlight", "secondary", "secondary", "primary", "accent", "text"] as const;
+  return [step("cover-page", { type: "once" }, { title: "Plan", cover: { subtitle: "WITH PURPOSE" } }), ...names.map((title, i) => step("divider-page", { type: "once" }, { title, cover: { subtitle: subtitles[i], tab: { show: true, style: "rounded", color: colors[i], leopard: i === 4 } } }))];
+}

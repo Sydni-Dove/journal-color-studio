@@ -1,3 +1,5 @@
+import { neutralLuxeDividers } from "../../presets/bookRecipes";
+import { CoverDividerControls } from "./CoverDividerControls";
 /**
  * BOOK STRUCTURE — the composite recipe as the book reads: sections (Front
  * Matter, Every Month, Every Week, End of…), and in each the pages it holds,
@@ -132,10 +134,11 @@ function StepCard({ s, siblings, scope, props, first, last }: { s: BookStep; sib
         </>
       )}
       {mod.type !== "monthly-calendar" && mod.type !== "weekly-planner" && (
-        <Field label="Page title">
+        <Field label={s.module === "divider-page" ? "Section name" : s.module === "cover-page" ? "Title" : "Page title"}>
           <input type="text" value={s.title ?? ""} placeholder={moduleTitle(s.module, scope === "none" ? "none" : scope)} onChange={(e) => set({ title: e.target.value || undefined })} />
         </Field>
       )}
+      {(s.module === "cover-page" || s.module === "divider-page") && <CoverDividerControls step={s} set={set} titleFont={doc.typography.fonts.cover} onTitleFont={(cover) => update((p) => ({ ...p, typography: { ...p.typography, fonts: { ...p.typography.fonts, cover }, roleOverrides: { ...p.typography.roleOverrides, coverTitle: { ...p.typography.roleOverrides.coverTitle, sizePt: 150, weight: cover === "The Nautigal" || cover === "Dancing Script" ? 700 : 400, color: "text", transform: "none", trackingEm: 0, lineHeight: 1.2 } } } }))} applyPreset={() => update((p) => ({ ...p, colors: { paletteId: "neutral-cheetah-luxe", overrides: {} }, typography: { ...p.typography, fonts: { ...p.typography.fonts, cover: "The Nautigal" }, roleOverrides: { ...p.typography.roleOverrides, coverTitle: { ...p.typography.roleOverrides.coverTitle, sizePt: 150, color: "text", weight: 700, transform: "none", trackingEm: 0, lineHeight: 1.2 }, coverSubtitle: { ...p.typography.roleOverrides.coverSubtitle, sizePt: 10, color: "text", transform: "uppercase", trackingEm: 0.22 } } } }))}/>}
       {guided && (
         <details className="subsection" open>
           <summary>Prompts</summary>
@@ -172,6 +175,9 @@ function NodeList({ nodes, scope, parentId, props }: { nodes: BookNode[]; scope:
       )}
       <div className="card-actions">
         <button className="btn" onClick={() => edit((x) => addNode(x, parentId, newStep("lined-journal", { type: "once" })))}>+ Add page</button>
+        <button className="btn" onClick={() => edit((x) => addNode(x, parentId, newStep("cover-page")))}>+ Cover</button>
+        <button className="btn" onClick={() => edit((x) => addNode(x, parentId, newStep("divider-page")))}>+ Divider / tab page</button>
+        <button className="btn" onClick={() => edit((x) => neutralLuxeDividers().reduce((n, page) => addNode(n, parentId, page), x))}>+ Coordinating cover & 9 dividers</button>
         {scope !== "week" && (
           <button className="btn" onClick={() => edit((x) => addNode(x, parentId, newSection(scope === "none" ? "Front Matter" : "Every Week", scope === "none" ? undefined : "week")))}>+ Add section</button>
         )}

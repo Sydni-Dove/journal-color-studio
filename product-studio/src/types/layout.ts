@@ -144,7 +144,8 @@ export type GroupNode = NodeBase & {
   rowEdges?: number[];
 };
 
-export type LayoutNode = BoxNode | TextNode | LinesNode | DotsNode | CheckboxNode | RuleNode | GroupNode;
+export type CircleNode = NodeBase & { type: "circle"; fill: ColorToken | null; outline?: boolean; leopard?: boolean };
+export type LayoutNode = CircleNode | BoxNode | TextNode | LinesNode | DotsNode | CheckboxNode | RuleNode | GroupNode;
 
 export type LayoutDiagnosticSeverity = "error" | "warning" | "info";
 
