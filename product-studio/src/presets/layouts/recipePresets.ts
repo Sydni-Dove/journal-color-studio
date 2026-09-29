@@ -212,8 +212,22 @@ export const GUIDED_LINED_PRESET: RecipePreset = {
   }),
   layoutOptions: { showPageNumbers: true },
 };
+export const CUSTOM_PAGE_PRESET: RecipePreset = {
+  id: "custom-page",
+  label: "Blank Custom Page",
+  productTypes: ["custom"],
+  needsCalendar: false,
+  build: ({ count }) => ({
+    items: [],
+    ordering: "sequential",
+    structure: [step("custom", { type: "copies", count: Math.max(1, Math.round(count)) }, { title: "Custom Page", promptSet: { blocks: [] } })],
+  }),
+  layoutOptions: { showPageNumbers: false },
+};
+
 // After the stationery recipes: a devotional or worksheet still starts on its own designs.
 RECIPE_PRESETS.push(...STATIONERY_PRESETS);
+RECIPE_PRESETS.push(CUSTOM_PAGE_PRESET);
 RECIPE_PRESETS.push(GUIDED_LINED_PRESET);
 
 /** Page types for a product: single page layouts only — complete books are templates (below). */
