@@ -42,7 +42,7 @@ function Choices<T extends string>({ value, options, onChange }: { value: T; opt
   );
 }
 
-const PRODUCT_ORDER: ProductType[] = ["notepad", "journal", "planner", "devotional", "worksheet", "deskpad", "notebook", "insert", "tracker"];
+const PRODUCT_ORDER: ProductType[] = ["notepad", "journal", "planner", "devotional", "worksheet", "deskpad", "notebook", "insert", "tracker", "custom"];
 const nextYear = new Date().getFullYear() + 1;
 
 export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: ProductProject) => void; onCancel: () => void; start?: WizardStart }) {
