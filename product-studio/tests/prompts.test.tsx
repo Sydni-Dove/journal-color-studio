@@ -107,6 +107,36 @@ describe("answer styles", () => {
     expect(nodes.filter((n) => n.id.startsWith("gp0-d-surface") && n.type === "checkbox").length).toBe(3);
     expect(errors(pages)).toEqual([]);
   });
+  it("checklists support square, circle, and no task marker", () => {
+    const pages = solved(guided({ blocks: [
+      { id: "sq", label: "Square", responseStyle: "checkboxes", lineCount: 2, taskMarker: "square" },
+      { id: "ci", label: "Circle", responseStyle: "checkboxes", lineCount: 2, taskMarker: "circle" },
+      { id: "no", label: "None", responseStyle: "checkboxes", lineCount: 2, taskMarker: "none" },
+    ] }));
+    const nodes = pages[0].nodes;
+    const square = nodes.find((n) => n.id === "gp0-sq-surface-cb0");
+    const circle = nodes.find((n) => n.id === "gp0-ci-surface-cb0");
+    expect(square?.type === "checkbox" && square.radiusIn).toBe(0);
+    expect(circle?.type === "checkbox" && circle.radiusIn).toBeGreaterThan(0);
+    expect(nodes.some((n) => n.id.startsWith("gp0-no-surface-cb"))).toBe(false);
+  });
+  it("a custom table keeps its requested rows and editable headings", () => {
+    const pages = solved(guided({ blocks: [{
+      id: "t",
+      label: "Schedule",
+      responseStyle: "table",
+      space: "fixed",
+      lineCount: 4,
+      table: { columns: ["Time", "Plan", "Notes"], rows: 4, showHeader: true, borders: "horizontal" },
+    }] }));
+    const nodes = pages[0].nodes;
+    expect(nodes.some((n) => n.type === "text" && n.text === "Time")).toBe(true);
+    expect(nodes.some((n) => n.type === "text" && n.text === "Plan")).toBe(true);
+    expect(nodes.some((n) => n.type === "text" && n.text === "Notes")).toBe(true);
+    const grid = nodes.find((n) => n.id === "gp0-t-surface" && n.type === "group");
+    expect(grid?.type === "group" && (grid.rowEdges?.length ?? 0)).toBe(6);
+    expect(errors(pages)).toEqual([]);
+  });
   it("long prompt wording wraps its heading instead of overflowing", () => {
     const long = "What is the one thing God has been asking me to do that I keep putting off, and what will I do about it this week?";
     const s = solved(guided({ blocks: [{ id: "a", label: long, lineCount: 4 }] }, "5.5x8.5"))[0];
