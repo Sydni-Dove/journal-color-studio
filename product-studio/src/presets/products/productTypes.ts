@@ -98,8 +98,8 @@ export const PRODUCT_TYPES: Record<ProductType, ProductTypeDefinition> = {
   },
   custom: {
     id: "custom",
-    label: "Custom",
-    description: "Anything else — start from a blank recipe.",
+    label: "Custom Page",
+    description: "Build a page from structured sections such as writing lines, blank space, checklists, tables, prompts and dot grids.",
     capabilities: { supportsCalendar: true, supportsBinding: true, supportsPageRecipes: true, supportsRepeatedSheets: true, supportsMirroredPages: true, supportsPatterns: true, supportsSpreads: true },
     defaultBinding: "none",
     allowedBindings: ["none", "digital", "perfect-bound", "case-bound", "coil", "wire-o", "discbound", "ring-6", "ring-7", "saddle-stitch", "glued-pad"],
