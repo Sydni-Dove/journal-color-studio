@@ -12,7 +12,20 @@
  */
 
 /** How a prompt's answer area is drawn. */
-export type ResponseStyle = "ruled" | "blank" | "dot-grid" | "checkboxes";
+export type ResponseStyle = "ruled" | "blank" | "dot-grid" | "checkboxes" | "table";
+export type TaskMarker = "square" | "circle" | "none";
+export type TaskMarkerPosition = "left" | "right";
+
+export type PromptTable = {
+  /** Column headings. Equal widths are used by default; the table solver keeps them printable. */
+  columns: string[];
+  /** Exact number of writing rows requested. */
+  rows: number;
+  /** Show the heading row. Default true. */
+  showHeader?: boolean;
+  /** Visual rule treatment; never changes table geometry. */
+  borders?: "grid" | "horizontal" | "minimal" | "none";
+};
 
 /**
  * How a section's writing space is set:
@@ -33,8 +46,13 @@ export type PromptBlock = {
   space?: SpaceMode;
   /** undefined = the page's own writing style (its recipe surface or the project's writing lines). */
   responseStyle?: ResponseStyle;
-  /** Writing lines requested; undefined = fill the space left on the page. */
+  /** Writing lines / checklist items requested; undefined = fill the space left on the page. */
   lineCount?: number;
+  /** Checklist/task-list marker and placement. */
+  taskMarker?: TaskMarker;
+  taskMarkerPosition?: TaskMarkerPosition;
+  /** Structured table settings when responseStyle is "table". */
+  table?: PromptTable;
   /** Never fewer lines than this when the page is short (default 2; migrated pages: 0 = as before). */
   minLines?: number;
   /** Share of the free space for "fill the space" prompts (default 1). */
