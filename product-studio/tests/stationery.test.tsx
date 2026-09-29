@@ -208,9 +208,9 @@ describe("geometry / theme separation", () => {
 });
 
 describe("families + regression", () => {
-  it("Devotional and Worksheet are ready families on the studio home; Daily Planner stays", () => {
+  it("Devotional and Worksheet are ready families on the studio home", () => {
     const ready = PRODUCT_FAMILIES.filter((f) => f.status === "ready").map((f) => f.id);
-    expect(ready).toEqual(expect.arrayContaining(["daily-planner", "devotional", "worksheet", "planner", "journal"]));
+    expect(ready).toEqual(expect.arrayContaining(["devotional", "worksheet", "planner", "journal"]));
     expect(PRODUCT_FAMILIES.find((f) => f.id === "devotional")!.start).toEqual({ type: "devotional", section: "build" });
   });
   it("planner / journal / notepad layouts and presets are unchanged", () => {

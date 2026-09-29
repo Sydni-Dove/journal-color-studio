@@ -46,14 +46,22 @@ async function home(projects: ProductProject[], viewport: { width: number; heigh
 const overflow = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 const products = (n: number) => TEST_PRODUCTS.slice(0, n).map((t, i) => ({ ...t.build(), name: `U${i} ${t.label}` }));
 
+/** "+ Add section" opens a menu of section types; add a writing-lines section. */
+async function addWritingSection(editor: import("playwright-core").Locator) {
+  const menu = editor.locator("details.add-section-menu");
+  if (!(await menu.evaluate((d) => (d as HTMLDetailsElement).open))) await menu.locator(":scope > summary").click();
+  await menu.getByRole("button", { name: "Writing lines" }).click();
+}
+
 describe("Studio home", () => {
   for (const [name, vp] of [["desktop", DESKTOP], ["phone", PHONE]] as const) {
     it(`${name}: new user — welcome, product families, quick start; no overflow`, async () => {
       const page = await home([], vp);
       await expect(page.locator("h1").textContent()).resolves.toBe("Dove Expressions Product Studio");
       await expect(page.getByText("Your studio is ready").count()).resolves.toBe(1);
-      await expect(page.locator("button.family-card").count()).resolves.toBe(9);
-      await expect(page.locator("button.family-card", { hasText: "Daily Planner" }).count()).resolves.toBe(1);
+      // The simplified home: real product categories (the daily planner is a Planner template, reached below).
+      await expect(page.locator("button.family-card").count()).resolves.toBe(8);
+      await expect(page.locator("button.family-card", { hasText: /^Planner/ }).count()).resolves.toBe(1);
       await expect(page.getByRole("button", { name: /Start a daily planner/ }).count()).resolves.toBe(1);
       // Families without a foundation are shown, never clickable.
       const next = page.locator(".family-card--next");
@@ -84,9 +92,10 @@ describe("Studio home", () => {
     await page.context().close();
   });
 
-  it("Planner + Journal opens its full book template: real page previews, then Use this template makes an editable book", async () => {
+  it("Full planners & books: the Meetings With God Planner template — real page previews, then Use this template makes an editable book", async () => {
     const page = await home([], DESKTOP);
-    await page.locator("button.family-card", { hasText: "Planner + Journal" }).click();
+    await page.getByRole("button", { name: /Start with a complete planner or book/ }).click();
+    await page.locator('.book-card[data-template="book-meetings-with-god"]').getByRole("button", { name: "View template" }).click();
     const view = page.getByRole("region", { name: "Meetings With God Planner" });
     await view.waitFor();
     // Previews are the real renderer (PrintablePage), not pictures.
@@ -97,7 +106,7 @@ describe("Studio home", () => {
     expect(pageTypes.join(" | ")).not.toMatch(/Book:|Meetings With God|Journal Planner|Daily Planner \+/);
     await view.getByRole("button", { name: "Use this template" }).click();
     await page.waitForSelector(".ps-page--editor");
-    await expect(page.locator("details.section > summary", { hasText: /^Book structure/ }).count()).resolves.toBe(1);
+    await expect(page.locator("details.section > summary", { hasText: /^Pages & layouts/ }).count()).resolves.toBe(1);
     await expect(page.locator(".badge--error").count()).resolves.toBe(0);
     await page.context().close();
   });
@@ -112,7 +121,18 @@ describe("Studio home", () => {
     await page.locator("button.choice", { hasText: /^Planner$/ }).click();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(overflow).toBeLessThanOrEqual(0);
-    const pills = await page.locator("button.choice").evaluateAll((els) => els.map((e) => ({ t: e.textContent, over: e.scrollWidth > e.clientWidth + 1, tall: e.getBoundingClientRect().height > 60 })));
+    // Choices may be large touch cards, but their text never wraps or overflows.
+    const pills = await page.locator("button.choice:visible").evaluateAll((els) =>
+      els.map((e) => {
+        // Lines of the label: its text height over its line height.
+        const label = (e.querySelector("strong") as HTMLElement | null) ?? (e as HTMLElement);
+        const lh = parseFloat(getComputedStyle(label).lineHeight) || parseFloat(getComputedStyle(label).fontSize) * 1.2;
+        const r = document.createRange();
+        r.selectNodeContents(label);
+        const lines = Math.round(r.getBoundingClientRect().height / lh);
+        return { t: e.textContent, over: e.scrollWidth > e.clientWidth + 1, tall: lines > 1 };
+      }),
+    );
     expect(pills.filter((p) => p.over || p.tall)).toEqual([]);
     await page.context().close();
   });
@@ -249,7 +269,7 @@ describe("Prompt editor in a book", () => {
     await per.fill("5");
     await per.press("Enter");
     const before = await editor.locator(".prompt-block").count();
-    for (let k = before; k < 9; k++) await editor.getByRole("button", { name: "+ Add section" }).click();
+    for (let k = before; k < 9; k++) await addWritingSection(editor);
     await expect(editor.locator(".prompt-block").count()).resolves.toBe(9);
     await expect.poll(() => page.getByTestId("prompt-continues").count(), { timeout: 10_000 }).toBe(1);
     // Continuing is not a problem: nothing about the prompts needs fixing.
@@ -293,7 +313,7 @@ describe("Guided Lined Page", () => {
       await editor.locator(".prompt-block").first().getByRole("button", { name: "One line more" }).click();
       await openRow(editor, 0);
       await expect.poll(async () => (await rows(editor))[0]).toMatch(/9 lines/);
-      await editor.getByRole("button", { name: "+ Add section" }).click();
+      await addWritingSection(editor);
       await expect.poll(() => editor.locator(".prompt-block").count()).toBe(4);
       if (label === "phone") expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
       // Saved: reload and the sections are the same.

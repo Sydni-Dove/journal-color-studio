@@ -13,7 +13,7 @@ import { validateProject } from "../src/engines/validation/validate";
 import { DAILY_SECTIONS, DEFAULT_DAILY_SECTIONS, dailySectionsOf } from "../src/layouts/planner/dailyConfigurable";
 import { dailyPlannerBook, step } from "../src/presets/bookRecipes";
 import { getModule } from "../src/presets/modules";
-import { RECIPE_PRESETS } from "../src/presets/layouts/recipePresets";
+import { BOOK_TEMPLATES, RECIPE_PRESETS } from "../src/presets/layouts/recipePresets";
 import { PRODUCT_FAMILIES } from "../src/presets/products/productFamilies";
 import { createProject } from "../src/presets/products/projectFactory";
 import type { LayoutNode } from "../src/types/layout";
@@ -114,10 +114,9 @@ describe("configurable daily page", () => {
 });
 
 describe("Daily Planner product", () => {
-  it("a Daily Planner family on the studio home opens the daily planner book template", () => {
-    const f = PRODUCT_FAMILIES.find((x) => x.id === "daily-planner")!;
-    expect(f.status).toBe("ready");
-    expect(f.start).toMatchObject({ type: "planner", template: "book-daily-planner", section: "books" });
+  it("the daily planner is a Planner template (the home lists Planner; the book is under Full planners & books)", () => {
+    expect(PRODUCT_FAMILIES.find((x) => x.id === "planner")!.status).toBe("ready");
+    expect(BOOK_TEMPLATES.some((t) => t.id === "book-daily-planner")).toBe(true);
     expect(RECIPE_PRESETS.find((r) => r.id === "book-daily-planner")!.layoutOptions?.dailySections).toEqual(["schedule", "topPriorities", "toDo"]);
   });
   it("book: front matter → each month: calendar → each week: plan spread + Meeting With God spread, then that week's days → monthly review", () => {

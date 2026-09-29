@@ -82,6 +82,8 @@ export type ZoneRequest = {
   minLines?: number;
   /** Height of one line of this zone's answer area when it differs from the page's writing lines (checklist rows). */
   rowIn?: number;
+  /** Fixed height the answer area adds above its lines (a table's header row), so N rows are really N rows. */
+  headIn?: number;
 };
 
 export type ZoneOptions = {
@@ -97,8 +99,8 @@ export type ZoneOptions = {
 export function minZoneHeight(r: ZoneRequest, linePitch: number): number {
   const row = r.rowIn ?? linePitch;
   if (r.fixedIn !== undefined) return r.fixedIn;
-  if (r.lines !== undefined) return r.overheadIn + r.lines * row;
-  return r.overheadIn + (r.minLines !== undefined ? r.minLines * row : MIN_RESPONSE_IN);
+  if (r.lines !== undefined) return r.overheadIn + (r.headIn ?? 0) + r.lines * row;
+  return r.overheadIn + (r.headIn ?? 0) + (r.minLines !== undefined ? r.minLines * row : MIN_RESPONSE_IN);
 }
 
 /**
@@ -192,7 +194,7 @@ export function resolveZones(reqs: ZoneRequest[], body: Rect, gapIn: number, rat
   // Fixed rows and fixed line counts are set; the rest of the writing is shared.
   const isShared = (r: ZoneRequest) => r.fixedIn === undefined && r.lines === undefined;
   const rowOf = (r: ZoneRequest) => r.rowIn ?? pitch;
-  const fixedH = (r: ZoneRequest) => (r.fixedIn !== undefined ? r.fixedIn : r.lines !== undefined ? r.overheadIn + r.lines * rowOf(r) : 0);
+  const fixedH = (r: ZoneRequest) => (r.fixedIn !== undefined ? r.fixedIn : r.lines !== undefined ? r.overheadIn + (r.headIn ?? 0) + r.lines * rowOf(r) : 0);
   const fixed = reqs.reduce((a, r) => a + fixedH(r), 0);
   const overhead = reqs.reduce((a, r) => a + (isShared(r) ? r.overheadIn : 0), 0);
   const promptText = reqs.reduce((a, r) => a + (r.fixedIn === undefined ? (r.promptTextIn ?? r.overheadIn) : 0), 0);
@@ -247,7 +249,7 @@ export function resolveZones(reqs: ZoneRequest[], body: Rect, gapIn: number, rat
       y += r.fixedIn + gap;
       return { zone: r.zone, rect, head: null, response: rect };
     }
-    const responseH = r.lines !== undefined ? r.lines * rowOf(r) : shareOf.get(idx) ?? 0;
+    const responseH = r.lines !== undefined ? (r.headIn ?? 0) + r.lines * rowOf(r) : shareOf.get(idx) ?? 0;
     const rect = { x: body.x, y, w: body.w, h: r.overheadIn + responseH };
     y += rect.h + gap;
     const head = r.overheadIn > 0 ? { x: rect.x, y: rect.y, w: rect.w, h: r.overheadIn } : null;

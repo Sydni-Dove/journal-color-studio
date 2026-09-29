@@ -21,7 +21,7 @@ import type { Rect } from "../../types/geometry";
 import type { LayoutDiagnostic, LayoutMetric, LayoutNode, SolvedPage, TextNode } from "../../types/layout";
 import { requestedLines, spaceOf, SPACING_FACTOR, type GuidedHeader, type PromptBlock, type PromptSet, type ResponseStyle } from "../../types/prompts";
 import type { StationeryZone, SurfaceKind } from "../../types/stationery";
-import { fillInIn, SURFACES } from "../stationery/surfaces";
+import { fillInIn, SURFACES, tableHeaderIn } from "../stationery/surfaces";
 import { fitHeading, headerTitle, pageFrame } from "./components";
 import { group, lineBoxIn, rule, text } from "./nodes";
 import type { FitContext, LayoutContext } from "./types";
@@ -132,7 +132,7 @@ function measure(zones: StationeryZone[], width: number, ctx: LayoutContext): Me
   });
 }
 
-const requestOf = (m: Measured, ctx: LayoutContext): ZoneRequest =>
+const requestOf = (m: Measured, ctx: LayoutContext, width = 0): ZoneRequest =>
   m.zone.surface === "fill-in"
     ? { zone: m.zone, overheadIn: 0, fixedIn: fillInIn(ctx) }
     : {
@@ -142,6 +142,8 @@ const requestOf = (m: Measured, ctx: LayoutContext): ZoneRequest =>
         lines: m.zone.lines,
         minLines: m.zone.minLines,
         ...(m.zone.surface === "checkbox" || m.zone.surface === "table" ? { rowIn: ctx.spacing.listRow } : {}),
+        // A table draws its header row above the requested rows.
+        ...(m.zone.surface === "table" ? { headIn: tableHeaderIn(m.zone, width, ctx) } : {}),
       };
 
 /** The page frame, header and (first page) instructions; returns the body left for the zones. */
@@ -205,7 +207,7 @@ const pitchOf = (ctx: LayoutContext) => lineSpacingIn(ctx.pattern.kind === "blan
 function plan(spec: ZonePageSpec, ctx: LayoutContext, bodies: Rect[], maxPages: number) {
   const measured = measure(spec.zones, bodies[0]?.w ?? 0, ctx);
   const byZone = new Map(measured.map((m) => [m.zone, m]));
-  const reqs = measured.map((m) => requestOf(m, ctx));
+  const reqs = measured.map((m) => requestOf(m, ctx, bodies[0]?.w ?? 0));
   const heightOf = (i: number) => (bodies[Math.min(i, bodies.length - 1)] ?? { h: 0 }).h;
   const paged = paginateZones(reqs, heightOf, spec.gapIn, pitchOf(ctx), { flow: spec.flow, fewerLines: spec.fewerLines, maxPages });
   return { byZone, ...paged };

@@ -45,15 +45,25 @@ export const columnMinIn = (ctx: LayoutContext, label: string) => {
   return widest + 2 * ctx.spacing.labelToBorderInset;
 };
 
-function table(id: string, rect: Rect, zone: StationeryZone, ctx: LayoutContext): SurfaceResult {
-  const spec = zone.table!;
+/** A table's column headings at this width, and the header row's height (0 when the header is hidden). */
+function tableHead(spec: NonNullable<StationeryZone["table"]>, rect: Pick<Rect, "x" | "w">, ctx: LayoutContext) {
   const inset = ctx.spacing.labelToBorderInset;
   // Geometry first (column widths from the research proportions), then the headings fitted to those widths.
   const cols = resolveColumns(spec.columns, rect.x, rect.w, (c) => columnMinIn(ctx, c.label));
   const labelLine = lineBoxIn(ctx.typography, "label");
   const heads = cols.columns.map((c) => fitHeading(c.column.label, "label", { w: Math.max(0, c.w - 2 * inset), h: 2 * labelLine }, ctx));
+  const headerH = spec.showHeader !== false ? Math.max(labelLine, ...heads.map((f) => f.heightIn)) + 2 * inset : 0;
+  return { cols, heads, headerH };
+}
+
+/** The header row a table surface draws above its rows (so a requested number of rows can be reserved exactly). */
+export const tableHeaderIn = (zone: StationeryZone, width: number, ctx: LayoutContext) => (zone.table ? tableHead(zone.table, { x: 0, w: width }, ctx).headerH : 0);
+
+function table(id: string, rect: Rect, zone: StationeryZone, ctx: LayoutContext): SurfaceResult {
+  const spec = zone.table!;
+  const inset = ctx.spacing.labelToBorderInset;
+  const { cols, heads, headerH } = tableHead(spec, rect, ctx);
   const showHeader = spec.showHeader !== false;
-  const headerH = showHeader ? Math.max(labelLine, ...heads.map((f) => f.heightIn)) + 2 * inset : 0;
   const rowH = tableRowIn(ctx);
   const rows = zone.lines !== undefined ? Math.max(1, Math.min(Math.round(zone.lines), tableRows(rect.h, headerH, rowH))) : tableRows(rect.h, headerH, rowH);
   const h = headerH + rows * rowH;

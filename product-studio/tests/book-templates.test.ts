@@ -80,9 +80,12 @@ describe("Full planners & books", () => {
     });
   }
 
-  it("home entry points open templates, not a page type", () => {
-    expect(PRODUCT_FAMILIES.find((f) => f.id === "daily-planner")!.start).toMatchObject({ template: "book-daily-planner", section: "books" });
-    expect(PRODUCT_FAMILIES.find((f) => f.id === "planner-journal")!.start).toMatchObject({ template: "book-meetings-with-god", section: "books" });
+  it("the simplified home lists product categories; complete books stay available as templates", () => {
+    // Daily Planner and Planner + Journal are no longer separate home cards: they are Planner, with the complete
+    // books (Daily Planner + Meetings With God, Meetings With God Planner, …) offered under Full planners & books.
+    expect(PRODUCT_FAMILIES.map((f) => f.id)).not.toContain("daily-planner");
+    expect(PRODUCT_FAMILIES.find((f) => f.id === "planner")!.start).toMatchObject({ type: "planner" });
+    expect(BOOK_TEMPLATES.map((t) => t.id)).toEqual(expect.arrayContaining(["book-daily-planner", "book-meetings-with-god"]));
     for (const f of PRODUCT_FAMILIES) if (f.start?.template) expect(BOOK_TEMPLATES.some((t) => t.id === f.start!.template)).toBe(true);
   });
 });
