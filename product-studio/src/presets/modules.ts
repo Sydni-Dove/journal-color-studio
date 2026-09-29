@@ -127,7 +127,7 @@ export const PAGE_MODULES: PageModuleDefinition[] = [
     prompts: { none: ["Scripture", "What is God saying?", "Prayer", "Today I will"] },
   },
   { type: "guided", label: "Guided Lined Page (prompts + writing lines)", layouts: GUIDED, defaultCadence: { type: "copies", count: 1 }, cadences: MODULE_CADENCES.guided, titles: { none: "Guided Page" }, prompts: { none: ["Prompt 1", "Prompt 2", "Prompt 3"] } },
-  { type: "custom", label: "Custom page", layouts: ["guided-page", "journal-lined", "notes-page"], defaultCadence: { type: "copies", count: 1 }, cadences: MODULE_CADENCES["custom"], titles: { none: "Notes" }, prompts: { none: ["Notes"] } },
+  { type: "custom", label: "Custom page", layouts: ["guided-page", "journal-lined", "notes-page"], defaultCadence: { type: "copies", count: 1 }, cadences: MODULE_CADENCES["custom"], titles: { none: "Custom Page" }, prompts: { none: [] } },
 ];
 
 export function getModule(type: PageModuleType): PageModuleDefinition {
