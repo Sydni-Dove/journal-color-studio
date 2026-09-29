@@ -138,12 +138,12 @@ function StepCard({ s, siblings, scope, props, first, last }: { s: BookStep; sib
           {start !== "any" && <Visual kind="page-sides" side={start === "recto" ? "right" : "left"} caption={start === "recto" ? "Starts on the right-hand page of an open book." : "Starts on the left-hand page of an open book."} />}
         </>
       )}
-      {mod.type !== "monthly-calendar" && mod.type !== "weekly-planner" && (
+      {mod.type !== "monthly-calendar" && mod.type !== "weekly-planner" && mod.type !== "back-cover" && (
         <Field label={s.module === "divider-page" ? "Section name" : s.module === "cover-page" ? "Title" : "Page title"}>
           <input type="text" value={s.title ?? ""} placeholder={moduleTitle(s.module, scope === "none" ? "none" : scope)} onChange={(e) => set({ title: e.target.value || undefined })} />
         </Field>
       )}
-      {(s.module === "cover-page" || s.module === "divider-page") && <CoverDividerControls step={s} set={set} titleFont={doc.typography.fonts.cover} onTitleFont={(cover) => update((p) => ({ ...p, typography: { ...p.typography, fonts: { ...p.typography.fonts, cover }, roleOverrides: { ...p.typography.roleOverrides, coverTitle: { ...p.typography.roleOverrides.coverTitle, ...luxeTitleStyle(cover) } } } }))} applyPreset={() => update((p) => ({ ...p, colors: { paletteId: NEUTRAL_LUXE_ID, overrides: {} }, typography: { ...p.typography, fonts: { ...p.typography.fonts, cover: LUXE_TITLE_FONT }, roleOverrides: { ...p.typography.roleOverrides, coverTitle: { ...p.typography.roleOverrides.coverTitle, ...luxeTitleStyle(LUXE_TITLE_FONT) }, coverSubtitle: { ...p.typography.roleOverrides.coverSubtitle, ...LUXE_SUBTITLE_STYLE } } } }))}/>}
+      {(s.module === "cover-page" || s.module === "back-cover" || s.module === "divider-page") && <CoverDividerControls step={s} set={set} titleFont={doc.typography.fonts.cover} onTitleFont={(cover) => update((p) => ({ ...p, typography: { ...p.typography, fonts: { ...p.typography.fonts, cover }, roleOverrides: { ...p.typography.roleOverrides, coverTitle: { ...p.typography.roleOverrides.coverTitle, ...luxeTitleStyle(cover) } } } }))} applyPreset={() => update((p) => ({ ...p, colors: { paletteId: NEUTRAL_LUXE_ID, overrides: {} }, typography: { ...p.typography, fonts: { ...p.typography.fonts, cover: LUXE_TITLE_FONT }, roleOverrides: { ...p.typography.roleOverrides, coverTitle: { ...p.typography.roleOverrides.coverTitle, ...luxeTitleStyle(LUXE_TITLE_FONT) }, coverSubtitle: { ...p.typography.roleOverrides.coverSubtitle, ...LUXE_SUBTITLE_STYLE } } } }))}/>}
       {guided && (
         <details className="subsection" open>
           <summary>Sections</summary>
@@ -183,6 +183,7 @@ function NodeList({ nodes, scope, parentId, props }: { nodes: BookNode[]; scope:
       <div className="card-actions">
         <button className="btn" onClick={() => edit((x) => addNode(x, parentId, newStep("lined-journal", { type: "once" })))}>+ Add page</button>
         <button className="btn" onClick={() => edit((x) => addNode(x, parentId, newStep("cover-page")))}>+ Cover</button>
+        <button className="btn" onClick={() => edit((x) => addNode(x, parentId, newStep("back-cover")))}>+ End cover</button>
         <button className="btn" onClick={() => edit((x) => addNode(x, parentId, newStep("divider-page")))}>+ Divider / tab page</button>
         <button className="btn" onClick={() => edit((x) => neutralLuxeDividers().reduce((n, page) => addNode(n, parentId, page), x))}>+ Coordinating cover & 9 dividers</button>
         {scope !== "week" && (

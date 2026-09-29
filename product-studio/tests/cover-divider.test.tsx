@@ -196,3 +196,39 @@ describe("Neutral Cheetah Luxe cover composition (the design's type and artwork,
     });
   });
 });
+
+describe("End cover (the back of the book)", () => {
+  const book = (extra: Partial<BookNode & { kind: "step" }> = {}) => {
+    const p = { ...luxeProject("7x9"), production: { ...luxeProject("7x9").production, bindingType: "coil" as const, printProfileId: "coil-generic", duplex: true } };
+    p.recipe = { items: [], ordering: "sequential", structure: [step("cover-page", { type: "once" }), step("lined-journal", { type: "once" }), step("back-cover", { type: "once" }, extra)] };
+    return resolveDocument(p);
+  };
+  it("closes the book on a left-hand page, the cover's own artwork turned half a turn", () => {
+    const doc = book(), last = doc.recipe.pages.length - 1, pg = doc.recipe.pages[last];
+    expect(pg.layoutId).toBe("back-cover-page");
+    expect(pg.side).toBe("verso");
+    const solved = solvePage(doc, last), g = geometryFor(doc, pg);
+    expect(solved.ownArtwork).toBe(true);
+    expect(planDecoration(g, doc.decorative, doc.colors, compositionFor(doc, last))).toBeNull();
+    const c = LUXE_CIRCLES[0], n = solved.nodes.find((x) => x.id === `${c.id}-back`)!;
+    expect(n.rect.x + n.rect.w / 2).toBeCloseTo((1 - c.x) * g.trimWidthIn, 6);
+    expect(n.rect.y + n.rect.h / 2).toBeCloseTo((1 - c.y) * g.trimHeightIn, 6);
+    // No text unless asked for.
+    expect(solved.nodes.some((x) => x.type === "text")).toBe(false);
+  });
+  it("an optional line of text sits centred inside the safe area", () => {
+    const doc = book({ cover: { subtitle: "DOVE EXPRESSIONS" } }), last = doc.recipe.pages.length - 1;
+    const solved = solvePage(doc, last), g = geometryFor(doc, doc.recipe.pages[last]);
+    const t = solved.nodes.find((x) => x.id === "back-line")!;
+    expect(t.type === "text" && !t.fit!.failed).toBe(true);
+    expect(rectContains(g.safeRect, t.rect)).toBe(true);
+    expect(t.rect.x + t.rect.w / 2).toBeCloseTo(g.trimWidthIn / 2, 6);
+  });
+  it("every full planner template opens with a cover and closes with an end cover", async () => {
+    const { BOOK_TEMPLATES } = await import("../src/presets/layouts/recipePresets");
+    for (const t of BOOK_TEMPLATES) {
+      const st = t.build({ count: 1, sheets: 1 }).structure!;
+      expect([st[0], st[st.length - 1]].map((n) => n.kind === "step" && n.module), t.id).toEqual(["cover-page", "back-cover"]);
+    }
+  });
+});

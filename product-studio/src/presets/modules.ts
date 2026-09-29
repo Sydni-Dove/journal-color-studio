@@ -45,6 +45,7 @@ const EVERY_CADENCE: CadenceKind[] = ["once", "copies", "daily", "weekly", "mont
 export const MODULE_CADENCES: Record<PageModuleType, CadenceKind[]> = {
   // A cover or a divider opens the book or a section: placed once where it sits.
   "cover-page": ["once"],
+  "back-cover": ["once"],
   "divider-page": ["once"],
   "monthly-calendar": ["once", "monthly"],
   "weekly-planner": ["once", "weekly"],
@@ -77,6 +78,7 @@ export const PAGE_MODULES: PageModuleDefinition[] = [
   // Covers and dividers open on a right-hand page, as in a bound book: a divider never
   // prints on the back of the previous one, and its tab sits on the outer edge.
   { type: "cover-page", label: "Cover & Divider Pages · Cover / title page", layouts: ["cover-page"], defaultCadence: { type: "once" }, cadences: MODULE_CADENCES["cover-page"], titles: { none: "Plan" }, prompts: { none: [] }, defaultStart: "recto" },
+  { type: "back-cover", label: "Cover & Divider Pages · End cover (back)", layouts: ["back-cover-page"], defaultCadence: { type: "once" }, cadences: MODULE_CADENCES["back-cover"], titles: { none: "" }, prompts: { none: [] }, defaultStart: "verso" },
   { type: "divider-page", label: "Cover & Divider Pages · Section divider / tab page", layouts: ["divider-page"], defaultCadence: { type: "once" }, cadences: MODULE_CADENCES["divider-page"], titles: { none: "Prayer" }, prompts: { none: [] }, defaultStart: "recto" },
   { type: "monthly-calendar", label: "Monthly calendar", layouts: ["planner-monthly"], defaultCadence: { type: "monthly" }, cadences: MODULE_CADENCES["monthly-calendar"], titles: { none: "Month" }, prompts: { none: [] } },
   {

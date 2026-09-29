@@ -171,9 +171,23 @@ export function ExportDialog({ doc, currentIndex, fontsReady, onClose, onGoTo, o
             onChange={(repeatSheets) => onSettings({ ...settings, repeatSheets })}
           />
         )}
-        <p className="hint">
+        <Segmented
+          label="Paper"
+          value={settings.paper ?? "page"}
+          options={[
+            { value: "page", label: "Page size (PDF, print shop)" },
+            { value: "letter", label: "Letter (home printer)" },
+            { value: "a4", label: "A4 (home printer)" },
+          ]}
+          onChange={(paper) => onSettings({ ...settings, paper: paper === "page" ? undefined : paper })}
+        />
+        <p className="hint" data-testid="export-output">
           Output: {plan.sequence.length} page(s), {plan.mediaWidthIn}" × {plan.mediaHeightIn}"
-          {doc.project.production.includeBleed ? " (page size plus the area past the cut edge)" : " (page size)"}. In the print dialog choose “Save as PDF”, margins “None”, scale 100%, and enable background graphics.
+          {doc.project.production.includeBleed ? " (page size plus the area past the cut edge)" : " (page size)"}
+          {settings.paper && settings.paper !== "page" ? `, centred on ${settings.paper === "letter" ? "Letter" : "A4"} paper with nothing else on the sheet` : ""}.{" "}
+          {settings.paper && settings.paper !== "page"
+            ? "In the print dialog keep scale at 100% (“Default” or “Actual size”) and turn on background graphics."
+            : "In the print dialog choose “Save as PDF”, margins “None”, scale 100%, and turn on background graphics. A home printer has no paper this size — choose Letter or A4 above to print at home."}
         </p>
         <div className="row">
           <span className={`badge ${report.errorCount ? "badge--error" : "badge--ok"}`}>{report.errorCount} to fix</span>

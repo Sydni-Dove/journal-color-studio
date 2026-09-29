@@ -80,6 +80,13 @@ export type ExportSettings = {
   repeatSheets: boolean;
   /** Future: separate cover/interior, printer-specific output. */
   target: "print-pdf";
+  /**
+   * The sheet the job prints on: the page's own size (Save as PDF, print
+   * shops) or a home printer's paper (Letter, A4) with the page centred on it.
+   * A home printer has no 7 × 9 paper; asked for one, the browser falls back
+   * to Letter with its own margins, header and footer around the page.
+   */
+  paper?: "page" | "letter" | "a4";
 };
 
 export type ProductVariant = {

@@ -18,11 +18,16 @@ export function section(label: string, children: BookNode[], period?: BookGroup[
   return { kind: "group", id: id ?? uid("g"), label, period, children };
 }
 
+/** A complete book opens with its front cover and closes with its end cover. */
+export function withCovers(body: BookNode[]): BookNode[] {
+  return [step("cover-page", { type: "once" }, { title: "Plan", cover: { subtitle: "WITH PURPOSE" } }), ...body, step("back-cover", { type: "once" })];
+}
+
 /** Meetings With God planner — the motivating structure (not its old design). */
 export function meetingsWithGodBook(includeDaily = false): BookNode[] {
   const plan = step("weekly-planner", { type: "once" }, { layoutId: "weekly-plan-spread" });
   const spread = step("meeting-with-god", { type: "once" }, { layoutId: "meeting-with-god-spread" });
-  return [
+  return withCovers([
     section("Front Matter", [step("mission"), step("vision"), step("goals")]),
     section(
       "Every Month",
@@ -34,7 +39,7 @@ export function meetingsWithGodBook(includeDaily = false): BookNode[] {
       "month",
     ),
     step("review", { type: "end-of-period", period: "quarter" }),
-  ];
+  ]);
 }
 
 /**
@@ -45,14 +50,14 @@ export function meetingsWithGodBook(includeDaily = false): BookNode[] {
 export function dailyPlannerBook(): BookNode[] {
   const plan = step("weekly-planner", { type: "once" }, { layoutId: "weekly-plan-spread" });
   const spread = step("meeting-with-god", { type: "once" }, { layoutId: "meeting-with-god-spread" });
-  return [
+  return withCovers([
     section("Front Matter", [step("mission"), step("vision"), step("goals")]),
     section(
       "Every Month",
       [step("monthly-calendar", { type: "once" }), section("Every Week", [plan, spread, step("daily-planner", { type: "daily" })], "week"), step("review", { type: "end-of-period", period: "month" })],
       "month",
     ),
-  ];
+  ]);
 }
 
 export const BOOK_PRESETS: { id: string; label: string; build: () => BookNode[] }[] = [
@@ -62,7 +67,7 @@ export const BOOK_PRESETS: { id: string; label: string; build: () => BookNode[] 
   {
     id: "planner-journal",
     label: "Monthly + Weekly Journal Planner",
-    build: () => [section("Every Month", [step("monthly-calendar", { type: "once" }), section("Every Week", [step("weekly-planner", { type: "once" }), step("lined-journal", { type: "once" })], "week")], "month")],
+    build: () => withCovers([section("Every Month", [step("monthly-calendar", { type: "once" }), section("Every Week", [step("weekly-planner", { type: "once" }), step("lined-journal", { type: "once" })], "week")], "month")]),
   },
 ];
 

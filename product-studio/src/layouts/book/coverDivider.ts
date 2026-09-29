@@ -201,5 +201,41 @@ function solve(ctx: LayoutContext, divider: boolean): SolvedPage[] {
   return [{ nodes, diagnostics, metrics: [], regions: { mainContent: content }, ownArtwork: opt.preset !== "plain" }];
 }
 const capability = { ...guidedPage.capability, supportsPatterns: [], supportsLineStyle: false, supportsPageNumbers: false, supportsFooter: false, wordingKeys: [] };
+/**
+ * END COVER (back of the book): the same design turned half a turn, so the
+ * back frames the book as the front does — every shape at (1 − x, 1 − y) of
+ * the trim. No title; an optional small line of text (the step's subtitle:
+ * a brand, a verse, a website) sits centred in the space the shapes leave.
+ */
+function solveBack(ctx: LayoutContext): SolvedPage[] {
+  const g = ctx.pages[0], s = g.safeRect, opt = ctx.module?.cover ?? {};
+  const nodes: LayoutNode[] = [], diagnostics: SolvedPage["diagnostics"] = [];
+  const W = g.trimWidthIn, H = g.trimHeightIn, R = Math.min(W, (H * 8.5) / 11);
+  const circle = (c: LuxeCircle, extra: Partial<CircleNode>) =>
+    nodes.push({ id: `${c.id}-back`, type: "circle", component: "Section", rect: { x: (1 - c.x) * W - c.r * R, y: (1 - c.y) * H - c.r * R, w: 2 * c.r * R, h: 2 * c.r * R }, functional: false, fill: c.fill ?? null, ...extra });
+  if (opt.preset !== "plain") {
+    if (opt.circles !== false) LUXE_CIRCLES.forEach((c) => circle(c, {}));
+    if (opt.leopard !== false) LUXE_CHEETAH.forEach((c) => circle(c, { leopard: true }));
+    if (opt.outlines !== false) LUXE_RINGS.forEach((c) => circle(c, { outline: true, stroke: "lineArt", strokePt: RING_PT }));
+  }
+  const line = (opt.subtitle ?? "").trim();
+  if (line) {
+    const w = Math.min(s.w, 0.6 * W);
+    const fit = stackSubtitle(line, w, 0.04 * H, ctx, false);
+    const h = (fit.sizePt * fit.lineHeight) / 72;
+    const rect = { x: (W - w) / 2, y: Math.max(s.y, Math.min(0.45 * H - h / 2, s.y + s.h - h)), w, h };
+    const node = text("back-line", rect, line, "coverSubtitle", { align: "center", wrap: true });
+    node.fit = { ...fit, failed: !fit.ok };
+    if (!fit.ok) diagnostics.push({ severity: "error", rule: "heading-fit", componentId: "back-line", message: "This wording is too long. Shorten it or choose a larger page." });
+    nodes.push(node);
+    if (opt.smallLine !== false) {
+      const rw = 0.12 * W, ry = Math.min(rect.y + rect.h + 0.018 * H, s.y + s.h);
+      nodes.push(rule("back-rule", (W - rw) / 2, ry, (W + rw) / 2, ry, { color: "lineArt", strokePt: RULE_PT }));
+    }
+  }
+  return [{ nodes, diagnostics, metrics: [], regions: { mainContent: s }, ownArtwork: opt.preset !== "plain" }];
+}
+
 export const coverPage: LayoutDefinition = { id: "cover-page", label: "Cover page", description: "Reusable front cover, section cover or title page.", family: "shared", pages: 1, period: "none", capability, fit: minimumAreaFit(1.5, 2.5), solve: (ctx) => solve(ctx, false) };
 export const dividerPage: LayoutDefinition = { ...coverPage, id: "divider-page", label: "Divider / tab page", description: "Section opener with optional interior printed tab.", solve: (ctx) => solve(ctx, true) };
+export const backCoverPage: LayoutDefinition = { ...coverPage, id: "back-cover-page", label: "End cover (back)", description: "The back of the book: the cover design turned half a turn, with an optional line of text.", solve: solveBack };

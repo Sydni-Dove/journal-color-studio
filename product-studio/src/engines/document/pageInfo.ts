@@ -64,6 +64,7 @@ export type PageInfo = {
 
 const LAYOUT_CATEGORY: Record<string, PageCategory> = {
   "cover-page": "cover",
+  "back-cover-page": "cover",
   "divider-page": "divider",
   "planner-monthly": "monthly",
   "planner-weekly-spread": "weekly",

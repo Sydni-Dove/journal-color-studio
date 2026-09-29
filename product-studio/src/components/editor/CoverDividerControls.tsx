@@ -21,7 +21,7 @@ export function CoverDividerControls({ step, set, applyPreset, titleFont, onTitl
     <p className="hint">Edit colors, fonts and paper in Theme, Palette and Background. Shapes below use those same colors.</p>
     <Select label="Title font" value={titleFont} options={[...TITLE_FONTS, ...(TITLE_FONTS.some((f) => f.value === titleFont) ? [] : [{ value: titleFont, label: `Current: ${titleFont}` }])]} onChange={onTitleFont}/>
     <p className="hint">Applies to cover and divider titles throughout this book.</p>
-    <Field label="Subtitle"><input value={o.subtitle ?? (step.module === "cover-page" ? "WITH PURPOSE" : "")} onChange={(e) => change({ subtitle: e.target.value })}/></Field>
+    <Field label={step.module === "back-cover" ? "Line of text (optional)" : "Subtitle"}><input value={o.subtitle ?? (step.module === "cover-page" ? "WITH PURPOSE" : "")} onChange={(e) => change({ subtitle: e.target.value })}/></Field>
     <Field label="Optional scripture or quote"><textarea value={o.quote ?? ""} onChange={(e) => change({ quote: e.target.value })}/></Field>
     <label><input type="checkbox" checked={o.smallLine !== false} onChange={(e) => change({ smallLine: e.target.checked })}/> Show small line</label>
     <Select label="Title alignment" value={o.alignment ?? "center"} options={[{ value: "center", label: "Centered" }, { value: "left", label: "Left" }]} onChange={(alignment) => change({ alignment })}/>

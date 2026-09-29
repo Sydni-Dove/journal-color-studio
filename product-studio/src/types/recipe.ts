@@ -46,6 +46,7 @@ export type ProductRecipe = {
 /** A page's PURPOSE. Its design is the step's layout (one purpose, many possible layouts). */
 export type PageModuleType =
   | "cover-page"
+  | "back-cover"
   | "divider-page"
   | "monthly-calendar"
   | "weekly-planner"
