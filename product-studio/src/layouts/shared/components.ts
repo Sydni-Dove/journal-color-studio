@@ -197,14 +197,18 @@ export function checklistRows(
   rect: Rect,
   ctx: LayoutContext,
   rowH = ctx.spacing.listRow,
+  opts: { marker?: "square" | "circle" | "none"; markerPosition?: "left" | "right" } = {},
 ): { nodes: LayoutNode[]; rows: number; metrics: LayoutMetric[] } {
   const s = ctx.spacing;
   const rows = fitCount(rect.h, rowH);
   const nodes: LayoutNode[] = [
     group(id, "Grid", rect, { rowEdges: Array.from({ length: rows + 1 }, (_, i) => rect.y + i * rowH) }),
   ];
-  const lineX0 = rect.x + s.checkbox + s.checkboxGap;
-  const lineX1 = rect.x + rect.w;
+  const marker = opts.marker ?? "square";
+  const markerPosition = opts.markerPosition ?? "left";
+  const reserve = marker === "none" ? 0 : s.checkbox + s.checkboxGap;
+  const lineX0 = markerPosition === "left" ? rect.x + reserve : rect.x;
+  const lineX1 = markerPosition === "right" ? rect.x + rect.w - reserve : rect.x + rect.w;
   const lineYs: number[] = [];
   for (let i = 0; i < rows; i++) {
     const rowTop = rect.y + i * rowH;
@@ -212,8 +216,13 @@ export function checklistRows(
     nodes.push(group(`${id}-row${i}`, "ChecklistRow", rowRect));
     // Checkbox sits on the writing line's baseline zone: bottom-aligned with a
     // clearance equal to the row's leftover split evenly.
-    const cbY = rowTop + (rowH - s.checkbox) / 2;
-    nodes.push(checkbox(`${id}-cb${i}`, { x: rect.x, y: cbY, w: s.checkbox, h: s.checkbox }));
+    if (marker !== "none") {
+      const cbY = rowTop + (rowH - s.checkbox) / 2;
+      const cbX = markerPosition === "left" ? rect.x : rect.x + rect.w - s.checkbox;
+      const node = checkbox(`${id}-cb${i}`, { x: cbX, y: cbY, w: s.checkbox, h: s.checkbox });
+      if (marker === "circle") node.radiusIn = s.checkbox / 2;
+      nodes.push(node);
+    }
     lineYs.push(rowTop + rowH);
   }
   if (rows > 0) {
@@ -238,7 +247,7 @@ export function checklistRows(
     metrics: [
       { label: "Checklist rows (floor(height ÷ row))", value: rows, unit: "count", provenance: { geometryClass: "user-design", basis: `floor(${rect.h.toFixed(3)} ÷ ${rowH})` } },
       { label: "Checklist row height", value: rowH, unit: "in", provenance: { geometryClass: "user-design", basis: "spacing token listRow (research range 0.32–0.40\")" } },
-      { label: "Checkbox size", value: s.checkbox, unit: "in", provenance: { geometryClass: "user-design", basis: "spacing token checkbox (research range 0.14–0.18\")" } },
+      { label: "Task marker size", value: marker === "none" ? 0 : s.checkbox, unit: "in", provenance: { geometryClass: "user-design", basis: marker === "none" ? "task marker hidden" : `${marker} marker; spacing token checkbox (research range 0.14–0.18")` } },
     ],
   };
 }
