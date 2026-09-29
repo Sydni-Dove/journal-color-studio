@@ -105,7 +105,8 @@ export function PromptEditor({
     const next = { blocks: blocks.map((b) => (b.id === id ? { ...b, ...patch } : b)) };
     return "space" in patch || "lineCount" in patch || "minLines" in patch ? putSpace(next) : put(next);
   };
-  const add = () => putSpace({ blocks: [...blocks, { id: newPromptId(), label: `Section ${blocks.length + 1}`, space: "fixed", lineCount: 6 }] });
+  const addBlock = (block: Omit<PromptBlock, "id">) => putSpace({ blocks: [...blocks, { id: newPromptId(), ...block }] });
+  const add = () => addBlock({ label: `Section ${blocks.length + 1}`, space: "fixed", lineCount: 6, responseStyle: "ruled" });
   const remove = (id: string) => put({ blocks: blocks.filter((b) => b.id !== id) });
   const duplicate = (i: number) => putSpace({ blocks: [...blocks.slice(0, i + 1), { ...blocks[i], id: newPromptId() }, ...blocks.slice(i + 1)] });
   const move = (i: number, d: -1 | 1) => {
@@ -284,7 +285,18 @@ export function PromptEditor({
           );
         })}
       </ol>
-      <button type="button" className="btn" onClick={add} disabled={blocks.length >= MAX_PROMPTS}>+ Add section</button>
+      <details className="subsection add-section-menu">
+        <summary>+ Add section</summary>
+        <p className="hint">Choose what you want to add. Product Studio keeps it aligned, printable, and inside the page.</p>
+        <div className="card-actions add-section-grid">
+          <button type="button" className="btn" disabled={blocks.length >= MAX_PROMPTS} onClick={() => addBlock({ label: "Writing", space: "fill", responseStyle: "ruled" })}>Writing lines</button>
+          <button type="button" className="btn" disabled={blocks.length >= MAX_PROMPTS} onClick={() => addBlock({ label: "Notes", space: "fill", responseStyle: "blank" })}>Blank writing area</button>
+          <button type="button" className="btn" disabled={blocks.length >= MAX_PROMPTS} onClick={() => addBlock({ label: "Notes", space: "fill", responseStyle: "dot-grid" })}>Dot grid</button>
+          <button type="button" className="btn" disabled={blocks.length >= MAX_PROMPTS} onClick={() => addBlock({ label: "To Do", space: "fixed", lineCount: 8, responseStyle: "checkboxes", taskMarker: "square", taskMarkerPosition: "left" })}>Checklist</button>
+          <button type="button" className="btn" disabled={blocks.length >= MAX_PROMPTS} onClick={() => addBlock({ label: "Table", space: "fixed", lineCount: 6, responseStyle: "table", table: { columns: ["Task", "Due", "Done"], rows: 6, showHeader: true, borders: "grid" } })}>Table</button>
+          <button type="button" className="btn" disabled={blocks.length >= MAX_PROMPTS} onClick={() => addBlock({ label: "Prompt", prompt: "Write your prompt here.", space: "fixed", lineCount: 6, responseStyle: "ruled" })}>Prompt + response</button>
+        </div>
+      </details>
       <details className="subsection">
         <summary>More section options</summary>
         <Check label="Use the same number of lines for every section" checked={same} onChange={(on) => put({ sameLines: on ? blocks.find((b) => b.lineCount !== undefined)?.lineCount ?? 4 : undefined })} />
