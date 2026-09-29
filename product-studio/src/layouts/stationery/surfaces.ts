@@ -52,28 +52,38 @@ function table(id: string, rect: Rect, zone: StationeryZone, ctx: LayoutContext)
   const cols = resolveColumns(spec.columns, rect.x, rect.w, (c) => columnMinIn(ctx, c.label));
   const labelLine = lineBoxIn(ctx.typography, "label");
   const heads = cols.columns.map((c) => fitHeading(c.column.label, "label", { w: Math.max(0, c.w - 2 * inset), h: 2 * labelLine }, ctx));
-  const headerH = Math.max(labelLine, ...heads.map((f) => f.heightIn)) + 2 * inset;
+  const showHeader = spec.showHeader !== false;
+  const headerH = showHeader ? Math.max(labelLine, ...heads.map((f) => f.heightIn)) + 2 * inset : 0;
   const rowH = tableRowIn(ctx);
-  const rows = tableRows(rect.h, headerH, rowH);
+  const rows = zone.lines !== undefined ? Math.max(1, Math.min(Math.round(zone.lines), tableRows(rect.h, headerH, rowH))) : tableRows(rect.h, headerH, rowH);
   const h = headerH + rows * rowH;
   const t: Rect = { x: rect.x, y: rect.y, w: rect.w, h };
   const stroke = STUDIO_STROKES.gridRulePt;
   const rowEdges = [t.y, ...Array.from({ length: rows + 1 }, (_, i) => t.y + headerH + i * rowH)];
+  const borderStyle = spec.borders ?? "grid";
   const nodes: LayoutNode[] = [
     group(id, "Grid", t, { columnEdges: [...cols.columns.map((c) => c.x), t.x + t.w], rowEdges }),
-    box(`${id}-border`, t, { component: "Grid", strokePt: stroke }),
   ];
+  if (borderStyle === "grid" || borderStyle === "minimal") nodes.push(box(`${id}-border`, t, { component: "Grid", strokePt: stroke }));
   cols.columns.forEach((c, i) => {
-    if (i > 0) nodes.push(rule(`${id}-v${i}`, c.x, t.y, c.x, t.y + h, { strokePt: stroke, component: "Grid" }));
-    const f = heads[i];
-    const head = text(`${id}-h-${c.column.key}`, { x: c.x + inset, y: t.y + inset, w: c.w - 2 * inset, h: headerH - 2 * inset }, c.column.label, "label", { component: "SectionHeader", vAlign: "middle" });
-    if (f.lines.length > 1 || f.sizePt !== ctx.typography.roles.label.sizePt) head.fit = { sizePt: f.sizePt, lineHeight: f.lineHeight, lines: f.lines, ...(f.ok ? {} : { failed: true }) };
-    nodes.push(head);
+    if (i > 0 && borderStyle === "grid") nodes.push(rule(`${id}-v${i}`, c.x, t.y, c.x, t.y + h, { strokePt: stroke, component: "Grid" }));
+    if (showHeader) {
+      const f = heads[i];
+      const head = text(`${id}-h-${c.column.key}`, { x: c.x + inset, y: t.y + inset, w: c.w - 2 * inset, h: headerH - 2 * inset }, c.column.label, "label", { component: "SectionHeader", vAlign: "middle" });
+      if (f.lines.length > 1 || f.sizePt !== ctx.typography.roles.label.sizePt) head.fit = { sizePt: f.sizePt, lineHeight: f.lineHeight, lines: f.lines, ...(f.ok ? {} : { failed: true }) };
+      nodes.push(head);
+    }
   });
   // Header rule, then one rule under every writing row.
-  for (let i = 0; i < rows; i++) {
-    const y = t.y + headerH + i * rowH;
-    nodes.push(rule(`${id}-r${i}`, t.x, y, t.x + t.w, y, { strokePt: i === 0 ? STUDIO_STROKES.headerRulePt : stroke, component: "Grid" }));
+  if (showHeader && borderStyle !== "none") {
+    const y = t.y + headerH;
+    nodes.push(rule(`${id}-header-rule`, t.x, y, t.x + t.w, y, { strokePt: STUDIO_STROKES.headerRulePt, component: "Grid" }));
+  }
+  if (borderStyle !== "none") {
+    for (let i = 1; i <= rows; i++) {
+      const y = t.y + headerH + i * rowH;
+      nodes.push(rule(`${id}-r${i}`, t.x, y, t.x + t.w, y, { strokePt: stroke, component: "Grid" }));
+    }
   }
   const diagnostics: LayoutDiagnostic[] = cols.problems.map((message) => ({ severity: "error", rule: "stationery-fit", componentId: id, message }));
   if (rows < 1) diagnostics.push({ severity: "error", rule: "stationery-fit", componentId: id, message: "No room for a single table row." });
@@ -128,7 +138,7 @@ export const SURFACES: Record<SurfaceKind, SurfaceRenderer> = {
   reflection: (id, rect, _z, ctx) => empty(lined(id, rect, ctx)),
   prayer: (id, rect, _z, ctx) => empty(lined(id, rect, ctx)),
   scripture,
-  checkbox: (id, rect, _z, ctx) => empty(checklistRows(id, rect, ctx).nodes),
+  checkbox: (id, rect, z, ctx) => empty(checklistRows(id, rect, ctx, undefined, { marker: z.taskMarker, markerPosition: z.taskMarkerPosition }).nodes),
   "fill-in": fillIn,
   table,
   "dot-grid": (id, rect, _z, ctx) => empty([group(id, "NotesArea", rect), ...fillWritingRegion(`${id}-dots`, rect, { ...ctx.pattern, kind: "dot-grid", gridPreset: ctx.pattern.kind === "dot-grid" ? ctx.pattern.gridPreset : "dot-5mm" })]),
