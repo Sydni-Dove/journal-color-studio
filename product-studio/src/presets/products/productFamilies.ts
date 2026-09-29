@@ -8,7 +8,7 @@
  */
 import type { ProductType } from "../../types/product";
 
-export type ProductFamilyId = "planner" | "daily-planner" | "journal" | "planner-journal" | "devotional" | "workbook" | "worksheet" | "notepad" | "deskpad" | "custom";
+export type ProductFamilyId = "planner" | "journal" | "devotional" | "workbook" | "worksheet" | "notepad" | "deskpad" | "tracker" | "custom";
 
 /** `template` opens that full planner / book template (Full planners & books) instead of a page type. */
 export type WizardStart = { type?: ProductType; recipeId?: string; template?: string; section?: "templates" | "books" | "build" };
@@ -25,38 +25,13 @@ export type ProductFamily = {
 };
 
 export const PRODUCT_FAMILIES: ProductFamily[] = [
-  { id: "planner", label: "Planner", blurb: "Dated monthly and weekly planners that follow your date range.", status: "ready", start: { type: "planner", section: "build" } },
-  {
-    id: "daily-planner",
-    label: "Daily Planner",
-    blurb: "A dated page for every day — with the month, the week's plan and Meeting With God around it.",
-    status: "ready",
-    start: { type: "planner", template: "book-daily-planner", section: "books" },
-  },
-  {
-    id: "devotional",
-    label: "Devotional",
-    blurb: "Daily Reflection, SOAP and Verse Mapping — Scripture with room to respond, proportioned for your trim.",
-    status: "ready",
-    start: { type: "devotional", section: "build" },
-  },
-  {
-    id: "worksheet",
-    label: "Worksheet",
-    blurb: "Prompt worksheets, Reading Tracker and Prayer Log tables.",
-    status: "ready",
-    start: { type: "worksheet", section: "build" },
-  },
-  { id: "journal", label: "Journal", blurb: "Lined, dot, graph and guided writing pages.", status: "ready", start: { type: "journal", section: "build" } },
-  {
-    id: "planner-journal",
-    label: "Planner + Journal",
-    blurb: "One book that plans the week and holds the journal — sections that repeat every month and week.",
-    status: "ready",
-    start: { type: "planner", template: "book-meetings-with-god", section: "books" },
-  },
-  { id: "notepad", label: "Notepad", blurb: "Tear-off pads: to-do, lists and notes.", status: "ready", start: { type: "notepad", section: "build" } },
-  { id: "deskpad", label: "Desk Pad", blurb: "Large-format weekly desk planners.", status: "ready", start: { type: "deskpad", section: "build" } },
-  { id: "custom", label: "Custom Product", blurb: "Any size, binding and page sequence.", status: "ready", start: { section: "build" } },
+  { id: "planner", label: "Planner", blurb: "Monthly, weekly, daily and yearly planning pages — mix the layouts you want.", status: "ready", start: { type: "planner", section: "build" } },
+  { id: "journal", label: "Journal", blurb: "Guided writing, reflection, lined, dot-grid and free-writing pages.", status: "ready", start: { type: "journal", section: "build" } },
+  { id: "devotional", label: "Devotional", blurb: "Scripture, teaching, reflection and prayer pages.", status: "ready", start: { type: "devotional", section: "build" } },
   { id: "workbook", label: "Workbook", blurb: "Lessons with guided exercises and response space.", status: "next", nextNote: "Template system next" },
+  { id: "worksheet", label: "Worksheet", blurb: "Single or multi-section worksheets with prompts, tables and response areas.", status: "ready", start: { type: "worksheet", section: "build" } },
+  { id: "tracker", label: "Tracker", blurb: "Habit, prayer, reading, progress and custom tracking pages.", status: "ready", start: { type: "tracker", section: "build" } },
+  { id: "notepad", label: "Notepad", blurb: "Tear-off to-do, list, note and custom pads.", status: "ready", start: { type: "notepad", section: "build" } },
+  { id: "deskpad", label: "Desk Pad", blurb: "Large-format planning and writing pads.", status: "ready", start: { type: "deskpad", section: "build" } },
+  { id: "custom", label: "Custom Page", blurb: "Start blank, then add writing lines, checklists, tables, prompts or dot grid.", status: "ready", start: { type: "custom", section: "build" } },
 ];
