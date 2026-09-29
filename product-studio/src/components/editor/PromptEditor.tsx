@@ -171,7 +171,7 @@ export function PromptEditor({
                   {!same && (
                     <Segmented<SpaceMode> label="Writing space" value={mode} options={(["fixed", "fill", "equal"] as const).map((v) => ({ value: v, label: SPACE_LABEL[v] }))} onChange={(v) => setSpace(b, v)} />
                   )}
-                  {!same && mode === "fixed" && (
+                  {!same && mode === "fixed" && b.responseStyle !== "table" && (
                     <div className="stepper">
                       <button type="button" className="btn btn--icon" aria-label="One line fewer" onClick={() => putBlock(b.id, { lineCount: Math.max(0, (b.lineCount ?? 0) - 1) })}>−</button>
                       <LabeledNumeric label="Writing lines" step={1} rules={{ min: 0, max: 80, integer: true }} value={b.lineCount ?? 0} onCommit={(v) => v !== null && putBlock(b.id, { lineCount: Math.round(v) })} />
