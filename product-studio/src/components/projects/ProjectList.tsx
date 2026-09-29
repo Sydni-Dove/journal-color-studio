@@ -44,22 +44,10 @@ const GLYPH: Record<ProductFamilyId, ReactNode> = {
       <path d="M5 13h22M11 4v6M21 4v6M10 18h4M18 18h4M10 22h4" />
     </>
   ),
-  "daily-planner": (
-    <>
-      <rect x="7" y="4" width="18" height="24" rx="2" />
-      <path d="M11 9h10M11 13.5h3M16 13.5h5M11 17.5h3M16 17.5h5M11 21.5h3M16 21.5h5" />
-    </>
-  ),
   journal: (
     <>
       <path d="M8 5h15a2 2 0 0 1 2 2v20H10a2 2 0 0 1-2-2z" />
       <path d="M8 25a2 2 0 0 1 2-2h15M13 10h8M13 14h8" />
-    </>
-  ),
-  "planner-journal": (
-    <>
-      <path d="M4 7h11v20H4zM17 7h11v20H17z" />
-      <path d="M4 12h11M8 16h3M8 20h3M20 12h5M20 16h5M20 20h5" />
     </>
   ),
   devotional: (
@@ -90,6 +78,12 @@ const GLYPH: Record<ProductFamilyId, ReactNode> = {
     <>
       <rect x="3" y="8" width="26" height="17" rx="1.5" />
       <path d="M3 12h26M9 12v13M15 12v13M21 12v13" />
+    </>
+  ),
+  tracker: (
+    <>
+      <rect x="5" y="5" width="22" height="22" rx="2" />
+      <path d="M10 11h12M10 16h12M10 21h12M8 11h.1M8 16h.1M8 21h.1" />
     </>
   ),
   custom: (
@@ -134,7 +128,7 @@ export function ProjectList({ projects, meta, onStart, onOpen, onDuplicate, onDu
         <section className="home-hero">
           <p className="home-eyebrow">Internal creative workspace</p>
           <h1>Dove Expressions Product Studio</h1>
-          <p className="lede">Create print-ready journals, planners, devotionals, worksheets, workbooks and stationery from reusable layouts, content structures and design systems.</p>
+          <p className="lede">Build print-ready stationery without sorting through every tool at once. Choose a product, choose its pages, then design it.</p>
           <p className="hint build-stamp" data-testid="build">Version {__BUILD__}</p>
         </section>
 
@@ -157,7 +151,7 @@ export function ProjectList({ projects, meta, onStart, onOpen, onDuplicate, onDu
         ) : (
           <section className="card home-welcome" aria-labelledby="h-welcome">
             <h2 id="h-welcome">Your studio is ready</h2>
-            <p>Nothing here yet. Choose what you are creating below, or begin from a starter template — every product can be reshaped afterwards.</p>
+            <p>Nothing here yet. Choose the kind of product first. Then add the pages and layouts you want — you can mix and match them afterwards.</p>
             <div className="card-actions">
               <button className="btn btn--primary" onClick={() => onStart({ section: "templates" })}>Browse starter templates</button>
               <button className="btn" onClick={() => onStart()}>Start a new product</button>
