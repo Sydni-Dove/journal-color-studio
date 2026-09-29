@@ -106,7 +106,6 @@ export function PromptEditor({
     return "space" in patch || "lineCount" in patch || "minLines" in patch ? putSpace(next) : put(next);
   };
   const addBlock = (block: Omit<PromptBlock, "id">) => putSpace({ blocks: [...blocks, { id: newPromptId(), ...block }] });
-  const add = () => addBlock({ label: `Section ${blocks.length + 1}`, space: "fixed", lineCount: 6, responseStyle: "ruled" });
   const remove = (id: string) => put({ blocks: blocks.filter((b) => b.id !== id) });
   const duplicate = (i: number) => putSpace({ blocks: [...blocks.slice(0, i + 1), { ...blocks[i], id: newPromptId() }, ...blocks.slice(i + 1)] });
   const move = (i: number, d: -1 | 1) => {
