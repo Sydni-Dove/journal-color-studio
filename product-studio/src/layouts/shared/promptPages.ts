@@ -59,7 +59,7 @@ export type ZonePageSpec = {
   basis: string;
 };
 
-const RESPONSE_SURFACE: Record<ResponseStyle, SurfaceKind> = { ruled: "lined", blank: "blank", "dot-grid": "dot-grid", checkboxes: "checkbox" };
+const RESPONSE_SURFACE: Record<ResponseStyle, SurfaceKind> = { ruled: "lined", blank: "blank", "dot-grid": "dot-grid", checkboxes: "checkbox", table: "table" };
 
 /**
  * Prompt blocks as page zones. `surfaceOf` gives a block's surface when the
@@ -77,6 +77,17 @@ export function blocksToZones(set: PromptSet, surfaceOf: (b: PromptBlock) => { s
       ...(lines === undefined && spaceOf(b) === "equal" ? { equal: true } : {}),
       surface: b.responseStyle ? RESPONSE_SURFACE[b.responseStyle] : own.surface,
       ...(b.responseStyle ? {} : own.treatment ? { treatment: own.treatment } : {}),
+      ...(b.responseStyle === "checkboxes" ? { taskMarker: b.taskMarker ?? "square", taskMarkerPosition: b.taskMarkerPosition ?? "left" } : {}),
+      ...(b.responseStyle === "table"
+        ? {
+            table: {
+              columns: (b.table?.columns?.length ? b.table.columns : ["Column 1", "Column 2"]).map((label, i) => ({ key: `c${i + 1}`, label, referenceWidthIn: 1 })),
+              basis: "Custom page table — equal columns",
+              showHeader: b.table?.showHeader !== false,
+              borders: b.table?.borders ?? "grid",
+            },
+          }
+        : {}),
       weight: b.weight ?? 1,
       optional: true,
       ...(lines !== undefined ? { lines: Math.max(0, Math.round(lines)) } : {}),
@@ -124,7 +135,14 @@ function measure(zones: StationeryZone[], width: number, ctx: LayoutContext): Me
 const requestOf = (m: Measured, ctx: LayoutContext): ZoneRequest =>
   m.zone.surface === "fill-in"
     ? { zone: m.zone, overheadIn: 0, fixedIn: fillInIn(ctx) }
-    : { zone: m.zone, overheadIn: m.overhead, promptTextIn: m.promptText, lines: m.zone.lines, minLines: m.zone.minLines, ...(m.zone.surface === "checkbox" ? { rowIn: ctx.spacing.listRow } : {}) };
+    : {
+        zone: m.zone,
+        overheadIn: m.overhead,
+        promptTextIn: m.promptText,
+        lines: m.zone.lines,
+        minLines: m.zone.minLines,
+        ...(m.zone.surface === "checkbox" || m.zone.surface === "table" ? { rowIn: ctx.spacing.listRow } : {}),
+      };
 
 /** The page frame, header and (first page) instructions; returns the body left for the zones. */
 function frameOf(spec: ZonePageSpec, ctx: LayoutContext, pageIndex: number, first: boolean) {
