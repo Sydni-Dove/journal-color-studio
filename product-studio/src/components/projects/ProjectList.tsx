@@ -37,7 +37,7 @@ export function relativeTime(iso: string, now = new Date()): string {
 }
 
 /** Small line glyphs per family (studio UI, not product art). */
-const GLYPH: Record<ProductFamilyId, ReactNode> = {
+const GLYPH: Partial<Record<ProductFamilyId, ReactNode>> = {
   planner: (
     <>
       <rect x="5" y="7" width="22" height="20" rx="2" />
