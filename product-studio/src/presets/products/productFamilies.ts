@@ -8,7 +8,7 @@
  */
 import type { ProductType } from "../../types/product";
 
-export type ProductFamilyId = "planner" | "journal" | "devotional" | "workbook" | "worksheet" | "notepad" | "deskpad" | "tracker" | "custom";
+export type ProductFamilyId = "planner" | "daily-planner" | "journal" | "planner-journal" | "devotional" | "workbook" | "worksheet" | "notepad" | "deskpad" | "tracker" | "custom";
 
 /** `template` opens that full planner / book template (Full planners & books) instead of a page type. */
 export type WizardStart = { type?: ProductType; recipeId?: string; template?: string; section?: "templates" | "books" | "build" };
