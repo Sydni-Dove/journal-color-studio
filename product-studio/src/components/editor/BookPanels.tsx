@@ -220,7 +220,7 @@ function GroupCard({ g, scope, props, first, last, edit }: { g: BookGroup; scope
   );
 }
 
-/** Book structure editor (composite recipe). Existing flat recipes convert on request. */
+/** Pages & layouts editor (composite recipe). Existing flat recipes convert on request. */
 export function BookStructurePanel(props: Props & { goToStep: (id: string) => void }) {
   const { project, update, doc } = props;
   const structure = project.recipe.structure;
@@ -234,14 +234,14 @@ export function BookStructurePanel(props: Props & { goToStep: (id: string) => vo
     }));
   };
   return (
-    <Section title={`Book structure${structure ? ` · ${doc.recipe.pageCount} pages` : ""}`} open={!!structure}>
+    <Section title={`Pages & layouts${structure ? ` · ${doc.recipe.pageCount} pages` : ""}`} open={!!structure}>
       {!structure ? (
         <>
           <p className="hint">Build a planner inside a journal (or a journal inside a planner): sections that repeat every month or week, with the pages each one holds.</p>
           <div className="card-actions">
-            <button className="btn" onClick={() => update((p) => ({ ...p, recipe: { ...p.recipe, structure: structureFromItems(p.recipe) } }))}>Edit as book structure</button>
+            <button className="btn" onClick={() => update((p) => ({ ...p, recipe: { ...p.recipe, structure: structureFromItems(p.recipe) } }))}>Manage pages & layouts</button>
           </div>
-          <Select label="Or start from a book structure" value="__none" options={[{ value: "__none", label: "Choose…" }, ...BOOK_PRESETS.map((b) => ({ value: b.id, label: b.label }))]} onChange={applyPreset} />
+          <Select label="Or start from a complete structure" value="__none" options={[{ value: "__none", label: "Choose…" }, ...BOOK_PRESETS.map((b) => ({ value: b.id, label: b.label }))]} onChange={applyPreset} />
         </>
       ) : (
         <>
@@ -250,8 +250,8 @@ export function BookStructurePanel(props: Props & { goToStep: (id: string) => vo
           <div className="card-actions">
             <button className="btn" onClick={() => update((p) => ({ ...p, recipe: { ...p.recipe, structure: addNode(p.recipe.structure!, null, newSection("Every Month", "month")) } }))}>+ Add repeating section</button>
           </div>
-          <Select label="Replace with a book structure" value="__none" options={[{ value: "__none", label: "Choose…" }, ...BOOK_PRESETS.map((b) => ({ value: b.id, label: b.label }))]} onChange={applyPreset} />
-          <button className="btn btn--ghost" onClick={() => update((p) => ({ ...p, recipe: { ...p.recipe, structure: undefined } }))}>Back to the simple page list</button>
+          <Select label="Replace with a complete structure" value="__none" options={[{ value: "__none", label: "Choose…" }, ...BOOK_PRESETS.map((b) => ({ value: b.id, label: b.label }))]} onChange={applyPreset} />
+          <button className="btn btn--ghost" onClick={() => update((p) => ({ ...p, recipe: { ...p.recipe, structure: undefined } }))}>Back to simple pages</button>
         </>
       )}
     </Section>
