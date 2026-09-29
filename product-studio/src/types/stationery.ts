@@ -41,6 +41,10 @@ export type TableSpec = {
   columns: TableColumn[];
   /** Where the reference widths come from (shown in metrics / docs). */
   basis: string;
+  /** Show column headings; defaults to true. */
+  showHeader?: boolean;
+  /** Visual rules only; geometry stays the same. */
+  borders?: "grid" | "horizontal" | "minimal" | "none";
 };
 
 export type StationeryZone = {
@@ -62,6 +66,9 @@ export type StationeryZone = {
   fields?: string[];
   /** Table surfaces. */
   table?: TableSpec;
+  /** Checklist/task marker options. */
+  taskMarker?: import("./prompts").TaskMarker;
+  taskMarkerPosition?: import("./prompts").TaskMarkerPosition;
   /**
    * Scripture surfaces: framed (a bordered passage area — the default),
    * open (the same open ruled lines as the other sections) or callout (open
