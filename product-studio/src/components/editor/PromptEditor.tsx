@@ -10,7 +10,7 @@
  * show what was asked for, sections that share the space show the lines they
  * get at this page size. The layout engine decides whether the page fits.
  */
-import { DEFAULT_MIN_LINES, newPromptId, PROMPT_STARTERS, spaceOf, type GuidedHeader, type PromptBlock, type PromptSet, type PromptSpacing, type ResponseStyle, type SpaceMode } from "../../types/prompts";
+import { DEFAULT_MIN_LINES, newPromptId, PROMPT_STARTERS, spaceOf, type GuidedHeader, type PromptBlock, type PromptSet, type PromptSpacing, type ResponseStyle, type SpaceMode, type TaskMarker, type TaskMarkerPosition } from "../../types/prompts";
 import { Check, Field, LabeledNumeric, NumberField, Segmented, Select } from "./ui";
 
 const MAX_PROMPTS = 20;
@@ -20,6 +20,7 @@ const STYLE_LABEL: Record<ResponseStyle | "own", string> = {
   blank: "Blank space",
   "dot-grid": "Dot grid",
   checkboxes: "Checklist",
+  table: "Table",
 };
 const SPACE_LABEL: Record<SpaceMode, string> = { fixed: "Fixed lines", fill: "Fill remaining space", equal: "Equal share" };
 
@@ -30,7 +31,7 @@ const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
 
 /** The row's one-line summary of a section's writing space. */
 function spaceSummary(set: PromptSet, b: PromptBlock, got: number | undefined): string {
-  const unit = b.responseStyle === "checkboxes" ? "item" : "line";
+  const unit = b.responseStyle === "checkboxes" ? "item" : b.responseStyle === "table" ? "row" : "line";
   if (set.sameLines !== undefined) return plural(set.sameLines, unit);
   const mode = spaceOf(b);
   if (mode === "fixed") return plural(b.lineCount ?? 0, unit);
@@ -120,7 +121,7 @@ export function PromptEditor({
     if (same) return put({ sameLines: Math.max(DEFAULT_MIN_LINES, (set.sameLines ?? DEFAULT_MIN_LINES) - 1) });
     put({ blocks: blocks.map((b) => (spaceOf(b) === "fixed" && b.lineCount !== undefined ? { ...b, lineCount: Math.max(b.minLines ?? DEFAULT_MIN_LINES, b.lineCount - 1) } : b)) });
   };
-  const styleOptions = (["own", "ruled", "blank", "dot-grid", "checkboxes"] as const).map((v) => ({ value: v, label: v === "own" ? ownStyleLabel : STYLE_LABEL[v] }));
+  const styleOptions = (["own", "ruled", "blank", "dot-grid", "checkboxes", "table"] as const).map((v) => ({ value: v, label: v === "own" ? ownStyleLabel : STYLE_LABEL[v] }));
 
   return (
     <div className="prompt-editor" data-testid="prompt-editor">
@@ -186,7 +187,91 @@ export function PromptEditor({
                       <NumberField label="Never fewer than (lines)" step={1} min={0} max={40} value={b.minLines ?? DEFAULT_MIN_LINES} onChange={(v) => putBlock(b.id, { minLines: Math.max(0, Math.round(v)) })} />
                     </>
                   )}
-                  <Select label="Writing area" value={b.responseStyle ?? "own"} options={styleOptions} onChange={(v) => putBlock(b.id, { responseStyle: v === "own" ? undefined : (v as ResponseStyle) })} />
+                  <Select
+                    label="Writing area"
+                    value={b.responseStyle ?? "own"}
+                    options={styleOptions}
+                    onChange={(v) => {
+                      const responseStyle = v === "own" ? undefined : (v as ResponseStyle);
+                      if (responseStyle === "table") {
+                        const rows = b.table?.rows ?? b.lineCount ?? 6;
+                        putBlock(b.id, {
+                          responseStyle,
+                          space: "fixed",
+                          lineCount: rows,
+                          table: b.table ?? { columns: ["Task", "Due", "Done"], rows, showHeader: true, borders: "grid" },
+                        });
+                      } else {
+                        putBlock(b.id, { responseStyle });
+                      }
+                    }}
+                  />
+                  {b.responseStyle === "checkboxes" && (
+                    <div className="row">
+                      <Select
+                        label="Task marker"
+                        value={b.taskMarker ?? "square"}
+                        options={[
+                          { value: "square", label: "Square" },
+                          { value: "circle", label: "Circle" },
+                          { value: "none", label: "None" },
+                        ]}
+                        onChange={(v) => putBlock(b.id, { taskMarker: v as TaskMarker })}
+                      />
+                      <Select
+                        label="Marker position"
+                        value={b.taskMarkerPosition ?? "left"}
+                        options={[
+                          { value: "left", label: "Left" },
+                          { value: "right", label: "Right" },
+                        ]}
+                        onChange={(v) => putBlock(b.id, { taskMarkerPosition: v as TaskMarkerPosition })}
+                      />
+                    </div>
+                  )}
+                  {b.responseStyle === "table" && (
+                    <div className="subsection custom-table-controls">
+                      <Field label="Column headings (comma separated)">
+                        <input
+                          type="text"
+                          value={(b.table?.columns ?? ["Task", "Due", "Done"]).join(", ")}
+                          onChange={(e) => {
+                            const columns = e.target.value.split(",").map((x) => x.trim()).filter(Boolean).slice(0, 8);
+                            putBlock(b.id, { table: { ...(b.table ?? { rows: b.lineCount ?? 6 }), columns: columns.length ? columns : ["Column 1", "Column 2"] } });
+                          }}
+                        />
+                      </Field>
+                      <div className="row">
+                        <NumberField
+                          label="Rows"
+                          step={1}
+                          min={1}
+                          max={30}
+                          value={b.table?.rows ?? b.lineCount ?? 6}
+                          onChange={(rows) => {
+                            const n = Math.max(1, Math.min(30, Math.round(rows)));
+                            putBlock(b.id, { space: "fixed", lineCount: n, table: { ...(b.table ?? { columns: ["Task", "Due", "Done"] }), rows: n } });
+                          }}
+                        />
+                        <Select
+                          label="Borders"
+                          value={b.table?.borders ?? "grid"}
+                          options={[
+                            { value: "grid", label: "Full grid" },
+                            { value: "horizontal", label: "Horizontal lines only" },
+                            { value: "minimal", label: "Minimal" },
+                            { value: "none", label: "None" },
+                          ]}
+                          onChange={(v) => putBlock(b.id, { table: { ...(b.table ?? { columns: ["Task", "Due", "Done"], rows: b.lineCount ?? 6 }), borders: v as "grid" | "horizontal" | "minimal" | "none" } })}
+                        />
+                      </div>
+                      <Check
+                        label="Show header row"
+                        checked={b.table?.showHeader !== false}
+                        onChange={(showHeader) => putBlock(b.id, { table: { ...(b.table ?? { columns: ["Task", "Due", "Done"], rows: b.lineCount ?? 6 }), showHeader } })}
+                      />
+                    </div>
+                  )}
                   <div className="card-actions">
                     <button type="button" className="btn" aria-label={`Move section ${i + 1} up`} disabled={i === 0} onClick={() => move(i, -1)}>Move up</button>
                     <button type="button" className="btn" aria-label={`Move section ${i + 1} down`} disabled={i === blocks.length - 1} onClick={() => move(i, 1)}>Move down</button>
