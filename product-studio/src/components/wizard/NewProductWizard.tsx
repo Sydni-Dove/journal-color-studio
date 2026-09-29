@@ -42,8 +42,19 @@ function Choices<T extends string>({ value, options, onChange }: { value: T; opt
   );
 }
 
-const PRODUCT_ORDER: ProductType[] = ["notepad", "journal", "planner", "devotional", "worksheet", "deskpad", "notebook", "insert", "tracker", "custom"];
+const PRODUCT_ORDER: ProductType[] = ["planner", "journal", "devotional", "worksheet", "tracker", "notepad", "deskpad", "notebook", "custom"];
 const nextYear = new Date().getFullYear() + 1;
+
+type PlannerPageCategory = "Monthly" | "Weekly" | "Daily" | "Notes & Lists";
+
+function plannerCategoryFor(id: string): PlannerPageCategory {
+  if (id.includes("monthly")) return "Monthly";
+  if (id.includes("weekly") || id.includes("mwg")) return "Weekly";
+  if (id.includes("daily")) return "Daily";
+  return "Notes & Lists";
+}
+
+const PLANNER_CATEGORY_ORDER: PlannerPageCategory[] = ["Monthly", "Weekly", "Daily", "Notes & Lists"];
 
 export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: ProductProject) => void; onCancel: () => void; start?: WizardStart }) {
   const [type, setType] = useState<ProductType>(start?.type ?? "notepad");
@@ -225,18 +236,44 @@ export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: 
         </section>
 
         <section className="step">
-          <h3>4 · Page type</h3>
-          <div className="choice-row" role="group">
-            {recipes.map((r) => {
-              const problem = recipeFit(r);
-              return (
-                <button key={r.id} type="button" className="choice" aria-pressed={r.id === recipeId} disabled={!!problem} title={problem ?? undefined} onClick={() => setRecipeId(r.id)}>
-                  {r.label}
-                  {problem ? " (not enough room at this size)" : ""}
-                </button>
-              );
-            })}
-          </div>
+          <h3>4 · {type === "planner" ? "Planner pages" : "Page"}</h3>
+          {type === "planner" ? (
+            <div className="planner-page-categories">
+              <p className="hint">Choose what kind of planner page you want first. Then choose the layout.</p>
+              {PLANNER_CATEGORY_ORDER.map((category) => {
+                const options = recipes.filter((r) => plannerCategoryFor(r.id) === category);
+                if (!options.length) return null;
+                return (
+                  <details className="wizard-category" key={category} open={options.some((r) => r.id === recipeId)}>
+                    <summary>{category}</summary>
+                    <div className="choice-row" role="group" aria-label={category}>
+                      {options.map((r) => {
+                        const problem = recipeFit(r);
+                        return (
+                          <button key={r.id} type="button" className="choice choice--layout" aria-pressed={r.id === recipeId} disabled={!!problem} title={problem ?? undefined} onClick={() => setRecipeId(r.id)}>
+                            <strong>{r.label}</strong>
+                            {problem && <span>Not enough room at this size</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </details>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="choice-row" role="group">
+              {recipes.map((r) => {
+                const problem = recipeFit(r);
+                return (
+                  <button key={r.id} type="button" className="choice" aria-pressed={r.id === recipeId} disabled={!!problem} title={problem ?? undefined} onClick={() => setRecipeId(r.id)}>
+                    {r.label}
+                    {problem ? " (not enough room at this size)" : ""}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           {recipeProblem && (
             <div className="issue issue--error">
               <div className="issue-title">This page type doesn't have enough room at this size.</div>
@@ -255,7 +292,7 @@ export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: 
               </Field>
             </div>
           )}
-          {recipe.id === "guided-lined" && <p className="hint">Choose how many prompt sections each page has and how many writing lines each gets after you create it (Book structure → the page → Sections).</p>}
+          {recipe.id === "guided-lined" && <p className="hint">Choose how many prompt sections each page has and how many writing lines each gets after you create it (Pages & Layouts → the page → Sections).</p>}
           {(recipe.id === "journal-lined" || recipe.id === "guided-lined" || stationery) && <NumberField label="Pages" step={1} min={1} value={count} onChange={(c) => setCount(Math.max(1, Math.round(c)))} />}
           {stationery && <p className="hint">Margins, section sizes, writing lines and table columns are worked out for this page size — nothing to measure.</p>}
           {isPad && (
