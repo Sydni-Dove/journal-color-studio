@@ -70,9 +70,25 @@ describe("composed page header: the five Prophetic Journal steps", () => {
       });
     }
 
-  it("details: one label and one line each, stacked, lines aligned (never “DATE | TIME”)", () => {
+  it("details go under the titles by default: centred across the page, below the whole header band", () => {
+    for (const size of ["6x9", "7x9", "8.5x11", "5.5x8.5"]) {
+      const { solved, g } = solve(stepPage(STEP_HEADERS[0]), size);
+      const band = solved.nodes.filter((n) => /-intro-(eyebrow|number|overline|title|subtitle|tagline)$/.test(n.id));
+      const bandBottom = Math.max(...band.map((n) => n.rect.y + n.rect.h));
+      const labels = solved.nodes.filter((n) => /-intro-meta\d-label$/.test(n.id));
+      const lines = solved.nodes.filter((n) => /-intro-meta\d-line$/.test(n.id));
+      expect(labels).toHaveLength(4);
+      for (const l of labels) expect(l.rect.y, size).toBeGreaterThanOrEqual(bandBottom - 1e-6);
+      // Centred: as far from the left edge of the text area as from the right.
+      const left = Math.min(...labels.map((n) => n.rect.x)) - g.safeRect.x;
+      const right = g.safeRect.x + g.safeRect.w - Math.max(...lines.map((n) => n.rect.x + n.rect.w));
+      expect(Math.abs(left - right), size).toBeLessThan(0.02);
+    }
+  });
+
+  it("details: one label and one line each, stacked, lines aligned (never “DATE | TIME”) when put at the right", () => {
     for (const size of ["7x9", "8.5x11"]) {
-      const { solved } = solve(stepPage(STEP_HEADERS[0]), size);
+      const { solved } = solve(stepPage({ ...STEP_HEADERS[0], metaPlace: "right" }), size);
       const labels = [0, 1, 2, 3].map((i) => byId(solved.nodes, `-intro-meta${i}-label`)!);
       expect(labels.map((l) => (l.type === "text" ? l.text : ""))).toEqual(["Date", "Time", "Received through", "Type"]);
       const lines = [0, 1, 2, 3].map((i) => byId(solved.nodes, `-intro-meta${i}-line`)!);

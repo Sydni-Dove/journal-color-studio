@@ -185,6 +185,8 @@ export type GuidedHeader = {
    * stacked at the right ("Date", "Time", "Received through", "Type").
    */
   meta?: string[];
+  /** Where the details go: under the titles, centred across the page (default), or at the right of the titles. */
+  metaPlace?: "below" | "right";
 };
 
 /** Details the page header offers as ready choices. */

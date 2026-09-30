@@ -81,7 +81,7 @@ function HeaderEditor({ header, onChange, open }: { header: GuidedHeader | undef
     <details className="subsection prompt-header-editor" data-testid="page-header" open={open}>
       <summary>Page header (optional)</summary>
       <p className="hint">
-        One compact header at the top of the page: the step at the left, the titles in the centre, details to fill in at the right. Leave everything empty for no header. The writing space starts below it.
+        One compact header at the top of the page: the step at the left, the titles in the centre, the right-side text at the right, and details to fill in under it. Leave everything empty for no header. The writing space starts below it.
       </p>
       <div className="row">
         <Field label="Step label">
@@ -109,7 +109,7 @@ function HeaderEditor({ header, onChange, open }: { header: GuidedHeader | undef
       <Field label="Right side text (between two short lines — a new line per line)">
         <textarea rows={3} value={h.mark ?? ""} placeholder={"e.g. FROM\nREVELATION TO\nEXECUTION"} onChange={(e) => put({ mark: e.target.value || undefined })} />
       </Field>
-      <div className="field-label">Details to fill in (right side of the header)</div>
+      <div className="field-label">Details to fill in (under the titles)</div>
       <div className="header-meta-choices">
         {HEADER_META_CHOICES.map((m) => (
           <Check key={m} label={m} checked={meta.includes(m)} onChange={(on) => toggle(m, on)} />
@@ -128,6 +128,7 @@ function HeaderEditor({ header, onChange, open }: { header: GuidedHeader | undef
           }}
         />
       </Field>
+      {!!meta.length && <Check label="Put the details at the right of the titles instead" checked={h.metaPlace === "right"} onChange={(on) => put({ metaPlace: on ? "right" : undefined })} />}
       <Check label="Thin lines between the step, the titles and the right side" checked={h.dividers !== false} onChange={(on) => put({ dividers: on ? undefined : false })} />
       <Check label="Short decorative rule under the header" checked={!!h.rule} onChange={(rule) => put({ rule: rule || undefined })} />
       {!!h.fields?.length && (

@@ -362,12 +362,13 @@ function composedHeader(id: string, h: GuidedHeader, body: Rect, ctx: LayoutCont
   const markW = markLines.length ? Math.max(...markLines.map((l) => widthAt(l, "label", markPt, markTrack))) : 0;
   const rowH = fillInIn(ctx);
   const labelW = meta.length ? Math.max(...meta.map((f) => widthAt(f, "label"))) : 0;
-  const metaW = meta.length ? labelW + s.checkboxGap + HEADER_META_LINE_IN : 0;
+  const metaRight = h.metaPlace === "right";
+  const metaW = meta.length && metaRight ? labelW + s.checkboxGap + HEADER_META_LINE_IN : 0;
   const centerX = body.x + leftW + (leftW ? gap : 0);
   const centerFor = (w: number) => body.x + body.w - centerX - (w ? w + gap : 0);
   // Beside the titles: the mark and the details together when both fit; else the mark alone (the details go
   // below the band); else everything below the titles.
-  let side = { mark: markLines.length > 0, meta: meta.length > 0 };
+  let side = { mark: markLines.length > 0, meta: meta.length > 0 && metaRight };
   let rightW = Math.min(body.w * 0.4, Math.max(markW, metaW));
   if (rightW && centerFor(rightW) < HEADER_CENTER_MIN_IN && side.mark && side.meta && centerFor(markW) >= HEADER_CENTER_MIN_IN) {
     side = { mark: true, meta: false };
