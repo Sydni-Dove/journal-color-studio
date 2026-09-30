@@ -35,9 +35,43 @@ export type PromptTable = {
  */
 export type SpaceMode = "fixed" | "fill" | "equal";
 
+/**
+ * PAGE COMPOSER — what a section IS. "prompt" (the default) is every section
+ * with writing space: a writing area, a prompt + writing space, a checklist /
+ * task list or a table (by its responseStyle). The others hold no writing:
+ *   heading  a heading and an optional line of text
+ *   info     one row of labelled blanks ("Date ____  Project ____")
+ *   divider  a thin rule between sections
+ *   spacer   open space of a chosen height
+ * Every kind flows top to bottom in the page's structured layout: nothing is
+ * positioned by hand, overlaps or leaves the print-safe area.
+ */
+export type PromptBlockKind = "prompt" | "heading" | "info" | "divider" | "spacer";
+
+/**
+ * How a section will be filled in (a later Fill Mode attaches real content to
+ * it without changing the page's structure):
+ *   field  one value or writing area ("Current Focus", "Prayer", "Notes")
+ *   list   a repeatable set of entries ("Projects", "Prophetic Words")
+ * `key` is the stable name the content is stored under (defaults to the block id).
+ */
+export type PromptBlockContent = { mode: "field" | "list"; key?: string };
+
+/** Open-space heights a spacer offers (inches). */
+export const SPACER_HEIGHTS = { small: 0.25, medium: 0.5, large: 1 } as const;
+export type SpacerSize = keyof typeof SPACER_HEIGHTS;
+
 export type PromptBlock = {
   /** Stable id (recipe zone key, or generated). */
   id: string;
+  /** What the section is (default "prompt": a section with writing space). */
+  kind?: PromptBlockKind;
+  /** Info row: its labelled blanks, left to right. */
+  fields?: string[];
+  /** Spacer: how much open space. */
+  spacer?: SpacerSize;
+  /** How the section is filled in later (default: list for checklists and tables, field otherwise). */
+  content?: PromptBlockContent;
   /** The section heading ("MY RESPONSE", "What did God say?"); may be empty (prompt only). */
   label: string;
   /** Optional smaller prompt / instruction under the heading ("What obedience does this word call for?"). */
@@ -107,6 +141,15 @@ export type PromptSet = {
 
 export const SPACING_FACTOR: Record<PromptSpacing, number> = { tight: 0.5, standard: 1, roomy: 1.75 };
 export const DEFAULT_MIN_LINES = 2;
+
+/** A section's kind (sections saved before the Page Composer are prompts). */
+export const kindOf = (b: PromptBlock): PromptBlockKind => b.kind ?? "prompt";
+
+/** How a section is filled in: its own choice, else a list for checklists and tables, a single field otherwise. */
+export function contentOf(b: PromptBlock): Required<PromptBlockContent> {
+  const mode = b.content?.mode ?? (b.responseStyle === "checkboxes" || b.responseStyle === "table" ? "list" : "field");
+  return { mode, key: b.content?.key ?? b.id };
+}
 
 /** A section's space mode (older blocks: fixed when they ask for lines, otherwise fill). */
 export const spaceOf = (b: PromptBlock): SpaceMode => b.space ?? (b.lineCount !== undefined ? "fixed" : "fill");

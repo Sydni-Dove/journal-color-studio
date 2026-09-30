@@ -153,4 +153,10 @@ export const SURFACES: Record<SurfaceKind, SurfaceRenderer> = {
   table,
   "dot-grid": (id, rect, _z, ctx) => empty([group(id, "NotesArea", rect), ...fillWritingRegion(`${id}-dots`, rect, { ...ctx.pattern, kind: "dot-grid", gridPreset: ctx.pattern.kind === "dot-grid" ? ctx.pattern.gridPreset : "dot-5mm" })]),
   pattern: (id, rect, _z, ctx) => empty([group(id, "NotesArea", rect), ...writingSurface(`${id}-lines`, rect, ctx)]),
+  // A thin rule across the section's width, centred in its band.
+  divider: (id, rect, _z, ctx) => empty([group(id, "Section", rect), rule(`${id}-rule`, rect.x, rect.y + rect.h / 2, rect.x + rect.w, rect.y + rect.h / 2, { strokePt: Math.max(0.5, ctx.pattern.lineWeightPt), component: "Section" })]),
+  spacer: (id, rect) => empty([group(id, "Section", rect)]),
 };
+
+/** Surfaces with a fixed height instead of writing space: fill-in rows, dividers and spacers. */
+export const isFixedSurface = (s: SurfaceKind) => s === "fill-in" || s === "divider" || s === "spacer";

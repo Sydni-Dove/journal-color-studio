@@ -32,7 +32,11 @@ export type SurfaceKind =
   | "prayer"
   | "dot-grid"
   /** The project's own writing style (ruled, dot grid, graph or blank): guided pages. */
-  | "pattern";
+  | "pattern"
+  /** Page Composer: a thin rule between sections (fixed height). */
+  | "divider"
+  /** Page Composer: open space of a fixed height. */
+  | "spacer";
 
 /** A research table column: reference width in inches, scaled by the geometry layer to the page. */
 export type TableColumn = { key: string; label: string; referenceWidthIn: number };
@@ -82,6 +86,8 @@ export type StationeryZone = {
   minLines?: number;
   /** Prompt blocks: an equal share — every "equal" section on the page gets the same number of whole lines. */
   equal?: boolean;
+  /** Fixed-height surfaces (divider, spacer): their height in inches. */
+  heightIn?: number;
 };
 
 export type StationeryPageSpec = {

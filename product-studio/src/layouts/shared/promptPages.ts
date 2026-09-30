@@ -19,9 +19,9 @@ import { STUDIO_PLANNER } from "../../presets/studioDefaults";
 import { DEFAULT_WORDING } from "../../presets/wording";
 import type { Rect } from "../../types/geometry";
 import type { LayoutDiagnostic, LayoutMetric, LayoutNode, SolvedPage, TextNode } from "../../types/layout";
-import { requestedLines, spaceOf, SPACING_FACTOR, type GuidedHeader, type PromptBlock, type PromptSet, type ResponseStyle } from "../../types/prompts";
+import { kindOf, requestedLines, spaceOf, SPACER_HEIGHTS, SPACING_FACTOR, type GuidedHeader, type PromptBlock, type PromptSet, type ResponseStyle } from "../../types/prompts";
 import type { StationeryZone, SurfaceKind } from "../../types/stationery";
-import { fillInIn, SURFACES, tableHeaderIn } from "../stationery/surfaces";
+import { fillInIn, isFixedSurface, SURFACES, tableHeaderIn } from "../stationery/surfaces";
 import { fitHeading, headerTitle, pageFrame } from "./components";
 import { group, lineBoxIn, rule, text } from "./nodes";
 import type { FitContext, LayoutContext } from "./types";
@@ -67,7 +67,19 @@ const RESPONSE_SURFACE: Record<ResponseStyle, SurfaceKind> = { ruled: "lined", b
  * project's writing lines).
  */
 export function blocksToZones(set: PromptSet, surfaceOf: (b: PromptBlock) => { surface: SurfaceKind; treatment?: StationeryZone["treatment"] }): StationeryZone[] {
-  return set.blocks.map((b) => {
+  return set.blocks.map((b): StationeryZone => {
+    // Page Composer sections without writing space.
+    switch (kindOf(b)) {
+      case "heading":
+        // A heading and its optional text line, with no writing space below.
+        return { key: b.id, label: b.label, ...(b.prompt?.trim() ? { prompt: b.prompt.trim() } : {}), surface: "blank", weight: 0, optional: true, lines: 0, minLines: 0 };
+      case "info":
+        return { key: b.id, label: "", surface: "fill-in", weight: 0, optional: true, fields: (b.fields ?? []).map((f) => f.trim()).filter(Boolean).length ? (b.fields ?? []).map((f) => f.trim()).filter(Boolean) : ["Date"] };
+      case "divider":
+        return { key: b.id, label: "", surface: "divider", weight: 0, optional: true };
+      case "spacer":
+        return { key: b.id, label: "", surface: "spacer", weight: 0, optional: true, heightIn: SPACER_HEIGHTS[b.spacer ?? "medium"] };
+    }
     const own = surfaceOf(b);
     const lines = requestedLines(set, b);
     return {
@@ -135,6 +147,8 @@ function measure(zones: StationeryZone[], width: number, ctx: LayoutContext): Me
 const requestOf = (m: Measured, ctx: LayoutContext, width = 0): ZoneRequest =>
   m.zone.surface === "fill-in"
     ? { zone: m.zone, overheadIn: 0, fixedIn: fillInIn(ctx) }
+    : m.zone.surface === "divider" || m.zone.surface === "spacer"
+    ? { zone: m.zone, overheadIn: 0, fixedIn: m.zone.heightIn ?? ctx.spacing.section }
     : {
         zone: m.zone,
         overheadIn: m.overhead,
@@ -296,7 +310,7 @@ export function solveZonePages(spec: ZonePageSpec, ctx: LayoutContext, pageIndex
       nodes.push(...out.nodes);
       diagnostics.push(...out.diagnostics);
       metrics.push(...out.metrics);
-      if (z.zone.surface !== "fill-in") {
+      if (!isFixedSurface(z.zone.surface)) {
         metrics.push({ label: `"${z.zone.label || z.zone.key}" writing height`, value: z.response.h, unit: "in", provenance: { geometryClass: "user-design", basis: `${spec.basis}: ${z.zone.lines !== undefined ? `${z.zone.lines} lines requested` : `weight ${z.zone.weight.toFixed(2)} of the page body`}` } });
       }
     });
@@ -309,7 +323,7 @@ export function solveZonePages(spec: ZonePageSpec, ctx: LayoutContext, pageIndex
  * "This page does not have enough room for 4 sections with the selected writing lines."
  */
 export function promptFitMessage(zones: StationeryZone[], noun: "prompt" | "section" = "prompt"): string {
-  const prompts = zones.filter((z) => z.surface !== "fill-in" && z.surface !== "table");
+  const prompts = zones.filter((z) => !isFixedSurface(z.surface) && z.surface !== "table");
   const counts = [...new Set(prompts.map((z) => z.lines))];
   const n = prompts.length;
   const each =
