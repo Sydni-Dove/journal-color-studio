@@ -46,10 +46,16 @@ async function open(p: ProductProject, phone: boolean): Promise<Page> {
   return page;
 }
 
+/** Tap a piece under "Build your page". */
 async function add(page: Page, label: string) {
-  const menu = page.locator("details.add-section-menu").first();
-  if (!(await menu.evaluate((d) => (d as HTMLDetailsElement).open))) await menu.locator(":scope > summary").click();
-  await menu.getByRole("button", { name: label, exact: true }).click();
+  await page.getByTestId("build-your-page").getByRole("button", { name: label, exact: true }).click();
+}
+
+/** The composer's section `i` (1-based), opened. */
+async function section(page: Page, i: number) {
+  const d = page.getByTestId("prompt-editor").first().locator(".prompt-block").nth(i - 1);
+  await d.evaluate((el) => ((el as HTMLDetailsElement).open = true));
+  return d;
 }
 
 describe("Page Composer", () => {
@@ -76,6 +82,53 @@ describe("Page Composer", () => {
       expect(await page.getByRole("button", { name: piece, exact: true }).first().isVisible(), piece).toBe(true);
     }
     expect(await page.getByTestId("save-design").isVisible()).toBe(true);
+    // "Build your page" comes first; the secondary choices sit below the pieces, under Page options.
+    const order = await page.evaluate(() => {
+      const top = (sel: string) => document.querySelector(sel)!.getBoundingClientRect().top;
+      return { build: top('[data-testid="build-your-page"]'), options: top('[data-testid="page-options"]') };
+    });
+    expect(order.build).toBeLessThan(order.options);
+    expect(await page.getByTestId("page-options").evaluate((d) => (d as HTMLDetailsElement).open)).toBe(false);
+    await page.context().close();
+  }, 60_000);
+
+  it("Revelation to Execution, built by tapping pieces and typing (no custom code for the page)", async () => {
+    const page = await open(blank(), false);
+    await openArea(page, "add");
+    for (const piece of ["Heading / text", "Writing lines", "Writing lines", "Writing lines", "Writing lines", "Info row"]) await add(page, piece);
+    const heading = await section(page, 1);
+    await heading.getByRole("textbox", { name: "Heading" }).fill("Revelation to Execution");
+    const names = ["What I received", "What I believe it concerns", "Scripture + what needs discernment", "Next act of obedience or action"];
+    for (const [k, name] of names.entries()) {
+      const s = await section(page, k + 2);
+      await s.getByRole("textbox", { name: "Heading" }).fill(name);
+      // Plain amounts, not inches: the four areas share the page.
+      await s.getByRole("group", { name: "Writing space" }).getByRole("button", { name: "Fill remaining space" }).click();
+    }
+    const info = await section(page, 6);
+    await info.getByRole("textbox", { name: "Blank 1 label" }).fill("Status");
+    await info.getByRole("textbox", { name: "Blank 2 label" }).fill("Review date");
+    await info.getByRole("group", { name: "Blank 2 is" }).getByRole("button", { name: "A box" }).click();
+    const drawn = page.locator(".ps-page--editor").first();
+    await expect.poll(() => drawn.textContent()).toMatch(/Revelation to Execution/);
+    const text = (await drawn.textContent()) ?? "";
+    for (const want of [...names, "Status", "Review date"]) expect(text, want).toContain(want);
+    expect(await page.locator('.ps-page--editor [data-node$="-surface-f1-box"]').count()).toBeGreaterThan(0);
+    await expect.poll(async () => (await page.locator(".badge").first().textContent()) ?? "").toMatch(/Page OK/);
+    // Two sections side by side, and a section style.
+    const second = await section(page, 3);
+    await second.getByRole("checkbox", { name: "Beside the section above (two columns)" }).check();
+    await second.getByLabel("Section style").selectOption("panel");
+    await expect.poll(() => page.locator('.ps-page--editor [data-node$="-frame"]').count()).toBeGreaterThan(0);
+    // The paired columns share one band: the panel's top edge is level with the first column's heading, to its right.
+    const band = await page.evaluate(() => {
+      const first = [...document.querySelectorAll('.ps-page--editor [data-node$="-title"]')].find((e) => /What I received/.test(e.textContent ?? ""))!.getBoundingClientRect();
+      const panel = document.querySelector('.ps-page--editor [data-node$="-frame"]')!.getBoundingClientRect();
+      return { firstTop: first.top, firstRight: first.left, panelTop: panel.top, panelLeft: panel.left };
+    });
+    expect(Math.abs(band.firstTop - band.panelTop)).toBeLessThanOrEqual(1.5);
+    expect(band.panelLeft).toBeGreaterThan(band.firstRight);
+    await expect.poll(async () => (await page.locator(".badge").first().textContent()) ?? "").toMatch(/Page OK/);
     await page.context().close();
   }, 60_000);
 

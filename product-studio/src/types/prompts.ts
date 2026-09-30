@@ -12,7 +12,7 @@
  */
 
 /** How a prompt's answer area is drawn. */
-export type ResponseStyle = "ruled" | "blank" | "dot-grid" | "checkboxes" | "table";
+export type ResponseStyle = "ruled" | "blank" | "dot-grid" | "graph-grid" | "checkboxes" | "table";
 export type TaskMarker = "square" | "circle" | "none";
 export type TaskMarkerPosition = "left" | "right";
 
@@ -57,6 +57,36 @@ export type PromptBlockKind = "prompt" | "heading" | "info" | "divider" | "space
  */
 export type PromptBlockContent = { mode: "field" | "list"; key?: string };
 
+/**
+ * How much room a writing section asks for, in plain words. Each is a whole
+ * number of writing lines (or list rows) at the page's own ruling; "Fill
+ * remaining space" is the `fill` space mode. Exact line counts stay available
+ * under a section's "More" options.
+ */
+export const WRITING_AMOUNTS = { compact: 3, standard: 6, spacious: 10 } as const;
+export type WritingAmount = keyof typeof WRITING_AMOUNTS;
+
+/** The plain amount a section's fixed line count matches, if any. */
+export function amountOf(lines: number | undefined): WritingAmount | undefined {
+  return (Object.keys(WRITING_AMOUNTS) as WritingAmount[]).find((k) => WRITING_AMOUNTS[k] === lines);
+}
+
+/** An info-row blank: a writing line after the label, or an open box to write in. */
+export type InfoFieldStyle = "line" | "box";
+/** Most blanks one info row offers (more are cramped on a journal page). */
+export const MAX_INFO_FIELDS = 3;
+
+/**
+ * A section's visual treatment. Colors are the palette's semantic tokens, so
+ * a section follows the product's Style:
+ *   open     no border (default)
+ *   divider  a rule under the section
+ *   outline  a soft outline
+ *   panel    a subtle filled panel
+ *   rounded  a rounded, softly filled panel
+ */
+export type SectionFrame = "open" | "divider" | "outline" | "panel" | "rounded";
+
 /** Open-space heights a spacer offers (inches). */
 export const SPACER_HEIGHTS = { small: 0.25, medium: 0.5, large: 1 } as const;
 export type SpacerSize = keyof typeof SPACER_HEIGHTS;
@@ -66,8 +96,16 @@ export type PromptBlock = {
   id: string;
   /** What the section is (default "prompt": a section with writing space). */
   kind?: PromptBlockKind;
-  /** Info row: its labelled blanks, left to right. */
+  /** Info row: its labelled blanks, left to right (up to MAX_INFO_FIELDS). */
   fields?: string[];
+  /** Info row: each blank's style, by position (default: a line). */
+  fieldStyles?: InfoFieldStyle[];
+  /** Visual treatment (default: the page's section style, else open). */
+  frame?: SectionFrame;
+  /** Sit beside the section above, as two columns (writing sections only). */
+  beside?: boolean;
+  /** Checklist / task list: a writing line on each row (default true). */
+  taskLines?: boolean;
   /** Spacer: how much open space. */
   spacer?: SpacerSize;
   /** How the section is filled in later (default: list for checklists and tables, field otherwise). */
@@ -122,6 +160,8 @@ export type PromptSet = {
   /** When set, every prompt gets this many writing lines ("Use the same number of lines for every prompt"). */
   sameLines?: number;
   spacing?: PromptSpacing;
+  /** Every section's visual treatment unless it sets its own (default open). */
+  frame?: SectionFrame;
   /** Optional instructions under the page title (worksheets). */
   instructions?: string;
   /** Optional designed header above the sections. */
@@ -141,6 +181,19 @@ export type PromptSet = {
 
 export const SPACING_FACTOR: Record<PromptSpacing, number> = { tight: 0.5, standard: 1, roomy: 1.75 };
 export const DEFAULT_MIN_LINES = 2;
+
+/** A section's visual treatment: its own, else the page's, else open. */
+export const frameOf = (set: Pick<PromptSet, "frame">, b: PromptBlock): SectionFrame => b.frame ?? set.frame ?? "open";
+
+/**
+ * Whether a section may sit beside the one above it: both are writing
+ * sections, and the one above is not itself already beside another.
+ */
+export function canSitBeside(blocks: PromptBlock[], i: number): boolean {
+  if (i < 1) return false;
+  const a = blocks[i - 1], b = blocks[i];
+  return kindOf(a) === "prompt" && kindOf(b) === "prompt" && !a.beside;
+}
 
 /** A section's kind (sections saved before the Page Composer are prompts). */
 export const kindOf = (b: PromptBlock): PromptBlockKind => b.kind ?? "prompt";

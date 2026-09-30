@@ -1753,3 +1753,50 @@ button.family-card:focus-visible {
     width: 100%;
   }
 }
+
+/* ── Page Composer: Build your page first ── */
+.composer {
+  display: grid;
+  gap: 10px;
+}
+.composer-build {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  background: #fff;
+  border: 1px solid var(--ui-line);
+  border-radius: var(--ui-radius);
+}
+.composer-build__title {
+  margin: 0;
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ui-brand);
+}
+.composer-added {
+  margin: 4px 0 0;
+  color: var(--ui-brand);
+}
+.prompt-item--beside {
+  margin-left: 16px;
+  border-left: 2px solid var(--ui-line);
+  padding-left: 8px;
+}
+.info-fields {
+  display: grid;
+  gap: 8px;
+}
+.info-field {
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  background: #fbf6f3;
+  border-radius: 8px;
+}
+.info-field .btn {
+  justify-self: start;
+}
+.page-options > summary {
+  font-weight: 600;
+}

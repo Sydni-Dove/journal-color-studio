@@ -160,8 +160,9 @@ describe("Studio home", () => {
     // Each section is a compact row showing its real writing space; open it to edit.
     await expect(prayer.getByTestId("section-space").textContent()).resolves.toMatch(/\d+ lines?/);
     await prayer.locator(":scope > summary").click();
-    // Choosing a fixed number of writing lines updates the page immediately.
-    await prayer.getByRole("button", { name: "Fixed lines" }).click();
+    // Choosing an exact number of writing lines (under More) updates the page immediately.
+    await prayer.locator("details.subsection > summary", { hasText: /^More$/ }).click();
+    await prayer.getByRole("button", { name: "Exact number of lines" }).click();
     const field = prayer.getByRole("spinbutton", { name: "Writing lines" });
     await field.click();
     await field.fill("4");
@@ -314,8 +315,9 @@ describe("Guided Lined Page", () => {
       await openRow(editor, 2);
       await editor.locator(".prompt-block").nth(2).getByRole("button", { name: "Remove" }).click();
       await expect.poll(() => editor.locator(".prompt-block").count()).toBe(3);
-      // Lines ±: one line more on My Response.
+      // Lines ±: one line more on My Response (exact lines are under More).
       await openRow(editor, 0);
+      await editor.locator(".prompt-block").first().locator("details.subsection").evaluate((d) => ((d as HTMLDetailsElement).open = true));
       await editor.locator(".prompt-block").first().getByRole("button", { name: "One line more" }).click();
       await openRow(editor, 0);
       await expect.poll(async () => (await rows(editor))[0]).toMatch(/9 lines/);
@@ -361,7 +363,7 @@ describe("Guided Lined Page in the simple page list", () => {
       await expect.poll(() => sections.locator(".prompt-block > summary").allInnerTexts()).toEqual([expect.stringMatching(/^Prompt 1/), expect.stringMatching(/^Prompt 2/), expect.stringMatching(/^Prompt 3/)]);
       await sections.getByLabel("Start from a structure (replaces the sections)").selectOption({ label: "Four Prompt Review" });
       await expect.poll(() => sections.locator(".prompt-block > summary").allInnerTexts()).toEqual([
-        expect.stringMatching(/What God Did\s*8 lines/), expect.stringMatching(/Timeline\s*6 lines/), expect.stringMatching(/Fruit & Impact\s*6 lines/), expect.stringMatching(/Praise & Gratitude\s*Fills space/),
+        expect.stringMatching(/What God Did\s*8 lines/), expect.stringMatching(/Timeline\s*(Standard · )?6 lines/), expect.stringMatching(/Fruit & Impact\s*(Standard · )?6 lines/), expect.stringMatching(/Praise & Gratitude\s*Fills space/),
       ]);
       await expect.poll(() => page.locator(".badge").first().textContent()).toMatch(/Page OK|warning/);
       // Pages: filter Journal → the guided page, labelled with its title.

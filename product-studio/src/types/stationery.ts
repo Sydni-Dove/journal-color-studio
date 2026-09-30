@@ -36,7 +36,9 @@ export type SurfaceKind =
   /** Page Composer: a thin rule between sections (fixed height). */
   | "divider"
   /** Page Composer: open space of a fixed height. */
-  | "spacer";
+  | "spacer"
+  /** Page Composer: graph grid at the product's grid size. */
+  | "graph-grid";
 
 /** A research table column: reference width in inches, scaled by the geometry layer to the page. */
 export type TableColumn = { key: string; label: string; referenceWidthIn: number };
@@ -88,6 +90,14 @@ export type StationeryZone = {
   equal?: boolean;
   /** Fixed-height surfaces (divider, spacer): their height in inches. */
   heightIn?: number;
+  /** Fill-in surfaces: each blank's style, by position (default: a line). */
+  fieldStyles?: import("./prompts").InfoFieldStyle[];
+  /** Checklist surfaces: a writing line on each row (default true). */
+  taskLines?: boolean;
+  /** Page Composer: the section's visual treatment (semantic colors only). */
+  frame?: import("./prompts").SectionFrame;
+  /** Page Composer: two writing sections side by side (this zone is the pair; the layout draws both). */
+  pair?: [StationeryZone, StationeryZone];
 };
 
 export type StationeryPageSpec = {

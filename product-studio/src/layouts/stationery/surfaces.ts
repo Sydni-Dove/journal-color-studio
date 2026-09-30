@@ -34,6 +34,27 @@ const measureW = (ctx: LayoutContext, value: string, role: "label" | "prompt" | 
 export const tableRowIn = (ctx: Pick<LayoutContext, "spacing">) => ctx.spacing.listRow;
 /** Fill-in row (Date ____ Day ____): one label line plus breathing room. */
 export const fillInIn = (ctx: Pick<LayoutContext, "typography" | "spacing">) => lineBoxIn(ctx.typography, "label") + 2 * ctx.spacing.labelToBorderInset;
+/** The shortest blank worth writing on after a label (a date, a short status). */
+export const MIN_BLANK_IN = 0.9;
+
+/**
+ * How an info row's blanks sit at this width: as many per row as keep every
+ * label whole and every blank at least MIN_BLANK_IN; the rest wrap to another
+ * row (never squeezed, never overlapping).
+ */
+export function fillInRows(fields: string[], width: number, ctx: LayoutContext): { perRow: number; rows: number; heightIn: number } {
+  const gap = ctx.spacing.column + ctx.spacing.block;
+  const need = (f: string) => measureW(ctx, f, "label") + ctx.spacing.checkboxGap + MIN_BLANK_IN;
+  const n = Math.max(1, fields.length);
+  let perRow = n;
+  while (perRow > 1) {
+    const w = (width - gap * (perRow - 1)) / perRow;
+    if (fields.every((f) => need(f) <= w + 1e-6)) break;
+    perRow--;
+  }
+  const rows = Math.ceil(n / perRow);
+  return { perRow, rows, heightIn: rows * fillInIn(ctx) + (rows - 1) * ctx.spacing.block };
+}
 /**
  * Smallest width a table column may take: its heading at the studio's minimum
  * heading size (headings shrink / wrap like every other heading), plus the
@@ -108,14 +129,23 @@ function table(id: string, rect: Rect, zone: StationeryZone, ctx: LayoutContext)
 function fillIn(id: string, rect: Rect, zone: StationeryZone, ctx: LayoutContext): SurfaceResult {
   const fields = zone.fields?.length ? zone.fields : [zone.label];
   const gap = ctx.spacing.column + ctx.spacing.block;
-  const w = (rect.w - gap * (fields.length - 1)) / fields.length;
+  const { perRow } = fillInRows(fields, rect.w, ctx);
+  const rowH = fillInIn(ctx);
+  const w = (rect.w - gap * (perRow - 1)) / perRow;
   const nodes: LayoutNode[] = [group(id, "Section", rect)];
   fields.forEach((f, i) => {
-    const x = rect.x + i * (w + gap);
+    const x = rect.x + (i % perRow) * (w + gap);
+    const y = rect.y + Math.floor(i / perRow) * (rowH + ctx.spacing.block);
     const lw = Math.min(w * 0.5, measureW(ctx, f, "label"));
-    nodes.push(text(`${id}-f${i}-label`, { x, y: rect.y, w: lw, h: rect.h }, f, "label", { component: "SectionHeader", vAlign: "bottom" }));
+    nodes.push(text(`${id}-f${i}-label`, { x, y, w: lw, h: rowH }, f, "label", { component: "SectionHeader", vAlign: "bottom" }));
     const lx = x + lw + ctx.spacing.checkboxGap;
-    nodes.push(rule(`${id}-f${i}-line`, lx, rect.y + rect.h, x + w, rect.y + rect.h, { strokePt: ctx.pattern.lineWeightPt, component: "WritingLines" }));
+    if (zone.fieldStyles?.[i] === "box") {
+      // An open box to write in, the height of the row, after the label.
+      const inset = ctx.spacing.labelToBorderInset / 2;
+      nodes.push(box(`${id}-f${i}-box`, { x: lx, y: y + inset, w: x + w - lx, h: rowH - inset }, { component: "WritingLines", stroke: ctx.pattern.color, strokePt: ctx.pattern.lineWeightPt, radiusIn: 0.04 }));
+    } else {
+      nodes.push(rule(`${id}-f${i}-line`, lx, y + rowH, x + w, y + rowH, { strokePt: ctx.pattern.lineWeightPt, component: "WritingLines" }));
+    }
   });
   return empty(nodes);
 }
@@ -148,10 +178,11 @@ export const SURFACES: Record<SurfaceKind, SurfaceRenderer> = {
   reflection: (id, rect, _z, ctx) => empty(lined(id, rect, ctx)),
   prayer: (id, rect, _z, ctx) => empty(lined(id, rect, ctx)),
   scripture,
-  checkbox: (id, rect, z, ctx) => empty(checklistRows(id, rect, ctx, undefined, { marker: z.taskMarker, markerPosition: z.taskMarkerPosition }).nodes),
+  checkbox: (id, rect, z, ctx) => empty(checklistRows(id, rect, ctx, undefined, { marker: z.taskMarker, markerPosition: z.taskMarkerPosition, lines: z.taskLines }).nodes),
   "fill-in": fillIn,
   table,
   "dot-grid": (id, rect, _z, ctx) => empty([group(id, "NotesArea", rect), ...fillWritingRegion(`${id}-dots`, rect, { ...ctx.pattern, kind: "dot-grid", gridPreset: ctx.pattern.kind === "dot-grid" ? ctx.pattern.gridPreset : "dot-5mm" })]),
+  "graph-grid": (id, rect, _z, ctx) => empty([group(id, "NotesArea", rect), ...fillWritingRegion(`${id}-grid`, rect, { ...ctx.pattern, kind: "graph-grid", gridPreset: ctx.pattern.kind === "graph-grid" ? ctx.pattern.gridPreset : "graph-5mm" })]),
   pattern: (id, rect, _z, ctx) => empty([group(id, "NotesArea", rect), ...writingSurface(`${id}-lines`, rect, ctx)]),
   // A thin rule across the section's width, centred in its band.
   divider: (id, rect, _z, ctx) => empty([group(id, "Section", rect), rule(`${id}-rule`, rect.x, rect.y + rect.h / 2, rect.x + rect.w, rect.y + rect.h / 2, { strokePt: Math.max(0.5, ctx.pattern.lineWeightPt), component: "Section" })]),

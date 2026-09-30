@@ -203,7 +203,7 @@ export function checklistRows(
   rect: Rect,
   ctx: LayoutContext,
   rowH = ctx.spacing.listRow,
-  opts: { marker?: "square" | "circle" | "none"; markerPosition?: "left" | "right" } = {},
+  opts: { marker?: "square" | "circle" | "none"; markerPosition?: "left" | "right"; lines?: boolean } = {},
 ): { nodes: LayoutNode[]; rows: number; metrics: LayoutMetric[] } {
   const s = ctx.spacing;
   const rows = fitCount(rect.h, rowH);
@@ -231,7 +231,7 @@ export function checklistRows(
     }
     lineYs.push(rowTop + rowH);
   }
-  if (rows > 0) {
+  if (rows > 0 && opts.lines !== false) {
     nodes.push({
       type: "lines",
       id: `${id}-lines`,

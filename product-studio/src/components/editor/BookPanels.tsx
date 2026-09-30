@@ -115,6 +115,8 @@ export function StepFields({ s, siblings, scope, props, parts }: { s: BookStep; 
   const start: PageStartRule = s.start ?? moduleStart(s.module);
   const cadenceOptions = howOftenOptions(s, siblings, scope);
   const guided = s.layoutId === "guided-page";
+  /** A page built from pieces (a Custom Page or one made from a saved design): the composer, first thing. */
+  const composed = guided && (s.module === "custom" || !!s.designId);
   const has = (p: StepPart) => parts.includes(p);
   return (
     <>
@@ -174,10 +176,10 @@ export function StepFields({ s, siblings, scope, props, parts }: { s: BookStep; 
         </>
       )}
       {has("cover") && (s.module === "cover-page" || s.module === "back-cover" || s.module === "divider-page") && <CoverDividerControls step={s} set={set} titleFont={doc.typography.fonts.cover} onTitleFont={(cover) => update((p) => ({ ...p, typography: { ...p.typography, fonts: { ...p.typography.fonts, cover }, roleOverrides: { ...p.typography.roleOverrides, coverTitle: { ...p.typography.roleOverrides.coverTitle, ...luxeTitleStyle(cover) } } } }))} applyPreset={() => update((p) => ({ ...p, colors: { paletteId: NEUTRAL_LUXE_ID, overrides: {} }, typography: { ...p.typography, fonts: { ...p.typography.fonts, cover: LUXE_TITLE_FONT }, roleOverrides: { ...p.typography.roleOverrides, coverTitle: { ...p.typography.roleOverrides.coverTitle, ...luxeTitleStyle(LUXE_TITLE_FONT) }, coverSubtitle: { ...p.typography.roleOverrides.coverSubtitle, ...LUXE_SUBTITLE_STYLE } } } }))}/>}
-      {has("sections") && guided && (
-        <details className="subsection" open>
-          <summary>What's on this page?</summary>
+      {has("sections") && guided && (() => {
+        const editor = (
           <PromptEditor
+            composer={composed}
             set={s.promptSet ?? promptSetFromList(s.prompts ?? mod.prompts[scope === "none" ? "none" : scope] ?? mod.prompts.none)}
             onChange={(promptSet) => set({ promptSet, prompts: undefined })}
             ownStyleLabel="Your writing lines style"
@@ -186,9 +188,20 @@ export function StepFields({ s, siblings, scope, props, parts }: { s: BookStep; 
             allowStarters
             fit={stepFit(doc, s.id)}
           />
-          <SaveDesign step={s} props={props} />
-        </details>
-      )}
+        );
+        return composed ? (
+          <div className="composer" data-testid="composer">
+            {editor}
+            <SaveDesign step={s} props={props} />
+          </div>
+        ) : (
+          <details className="subsection" open>
+            <summary>What's on this page?</summary>
+            {editor}
+            <SaveDesign step={s} props={props} />
+          </details>
+        );
+      })()}
     </>
   );
 }

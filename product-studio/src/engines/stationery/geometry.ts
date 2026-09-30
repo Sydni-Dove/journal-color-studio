@@ -84,6 +84,8 @@ export type ZoneRequest = {
   rowIn?: number;
   /** Fixed height the answer area adds above its lines (a table's header row), so N rows are really N rows. */
   headIn?: number;
+  /** Shared zones: the least writing height (overrides minLines; two sections side by side need the taller one's). */
+  minIn?: number;
 };
 
 export type ZoneOptions = {
@@ -100,6 +102,7 @@ export function minZoneHeight(r: ZoneRequest, linePitch: number): number {
   const row = r.rowIn ?? linePitch;
   if (r.fixedIn !== undefined) return r.fixedIn;
   if (r.lines !== undefined) return r.overheadIn + (r.headIn ?? 0) + r.lines * row;
+  if (r.minIn !== undefined) return r.overheadIn + r.minIn;
   return r.overheadIn + (r.headIn ?? 0) + (r.minLines !== undefined ? r.minLines * row : MIN_RESPONSE_IN);
 }
 
@@ -202,7 +205,7 @@ export function resolveZones(reqs: ZoneRequest[], body: Rect, gapIn: number, rat
   const gaps = gapIn * Math.max(0, reqs.length - 1);
   const writing = body.h - fixed - gaps - overhead;
   const flexIdx = reqs.map((r, i) => (isShared(r) ? i : -1)).filter((i) => i >= 0);
-  const minOf = (r: ZoneRequest) => (r.minLines !== undefined ? r.minLines * rowOf(r) : MIN_RESPONSE_IN);
+  const minOf = (r: ZoneRequest) => (r.minIn !== undefined ? r.minIn : r.minLines !== undefined ? r.minLines * rowOf(r) : MIN_RESPONSE_IN);
   let shareOf: Map<number, number>;
   if (opts.legacyWeights) {
     // As before prompt blocks: each whole section (heading included) gets its weighted share of the free height.
