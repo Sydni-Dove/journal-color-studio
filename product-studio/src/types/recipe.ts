@@ -182,7 +182,13 @@ export type PageInstance = {
 
 /** Additive, per-step settings; absent on legacy projects. Tabs are interior printed markers. */
 export type CoverDividerSettings = {
-  preset?: "neutral-cheetah-luxe" | "plain";
+  preset?: "neutral-cheetah-luxe" | "solid" | "plain";
+  /** Solid-cover fill from the current palette. */
+  solidColor?: import("./tokens").ColorToken;
+  /** Solid-cover wording color from the current palette. */
+  solidTextColor?: import("./tokens").ColorToken;
+  /** False = artwork/color only; no title, subtitle, quote or rule is printed. */
+  showText?: boolean;
   subtitle?: string;
   quote?: string;
   smallLine?: boolean;

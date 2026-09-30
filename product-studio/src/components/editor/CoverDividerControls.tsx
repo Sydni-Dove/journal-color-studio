@@ -1,6 +1,7 @@
 import type { BookStep, CoverDividerSettings } from "../../types/recipe";
 import { Field, NumberField, Select } from "./ui";
 import { LUXE_TITLE_FONT } from "../../presets/coverLuxe";
+import type { ColorToken } from "../../types/tokens";
 
 const TITLE_FONTS = [
   { value: LUXE_TITLE_FONT, label: "Brush calligraphy (the cover design's)" },
@@ -14,20 +15,44 @@ export function CoverDividerControls({ step, set, applyPreset, titleFont, onTitl
   const change = (p: Partial<CoverDividerSettings>) => set({ cover: { ...o, ...p } });
   const t = o.tab ?? { show: false };
   const tab = (p: Partial<typeof t>) => change({ tab: { ...t, ...p } });
+  const preset = o.preset ?? "neutral-cheetah-luxe";
+  const luxe = preset === "neutral-cheetah-luxe";
+  const solid = preset === "solid";
+  const showText = o.showText !== false;
+  const colorOptions: { value: ColorToken; label: string }[] = [
+    { value: "primary", label: "Primary" },
+    { value: "secondary", label: "Secondary" },
+    { value: "accent", label: "Accent" },
+    { value: "decorativeAccent", label: "Decorative accent" },
+    { value: "decorHighlight", label: "Highlight" },
+    { value: "background", label: "Paper / background" },
+    { value: "text", label: "Text / charcoal" },
+  ];
   return <div>
-    <Field label="Design preset"><select value={o.preset ?? "neutral-cheetah-luxe"} onChange={(e) => change({ preset: e.target.value as CoverDividerSettings["preset"] })}><option value="neutral-cheetah-luxe">Neutral Cheetah Luxe</option><option value="plain">Plain</option></select></Field>
-    <svg viewBox="0 0 180 100" width="180" height="100" aria-label="Neutral Cheetah Luxe preview"><rect width="180" height="100" fill="#ffffff" stroke="#e5e0da"/><circle cx="38" cy="12" r="34" fill="#5b0610"/><circle cx="118" cy="38" r="24" fill="#f2d8cd"/><circle cx="160" cy="24" r="17" fill="#d6a47c"/><circle cx="182" cy="56" r="21" fill="#c5674a"/><circle cx="18" cy="76" r="14" fill="#e9d3c0"/><circle cx="40" cy="100" r="26" fill="#718496"/><circle cx="60" cy="6" r="50" fill="none" stroke="#cf9e58"/><text x="90" y="64" textAnchor="middle" fontFamily="'The Nautigal', cursive" fontSize="34">Plan</text></svg>
-    <button className="btn" onClick={applyPreset}>Use matching palette & script title</button>
-    <p className="hint">Edit colors, fonts and paper in Theme, Palette and Background. Shapes below use those same colors.</p>
-    <Select label="Title font" value={titleFont} options={[...TITLE_FONTS, ...(TITLE_FONTS.some((f) => f.value === titleFont) ? [] : [{ value: titleFont, label: `Current: ${titleFont}` }])]} onChange={onTitleFont}/>
-    <p className="hint">Applies to cover and divider titles throughout this book.</p>
-    <Field label={step.module === "back-cover" ? "Line of text (optional)" : "Subtitle"}><input value={o.subtitle ?? (step.module === "cover-page" ? "WITH PURPOSE" : "")} onChange={(e) => change({ subtitle: e.target.value })}/></Field>
-    <Field label="Optional scripture or quote"><textarea value={o.quote ?? ""} onChange={(e) => change({ quote: e.target.value })}/></Field>
-    <label><input type="checkbox" checked={o.smallLine !== false} onChange={(e) => change({ smallLine: e.target.checked })}/> Show small line</label>
-    <Select label="Title alignment" value={o.alignment ?? "center"} options={[{ value: "center", label: "Centered" }, { value: "left", label: "Left" }]} onChange={(alignment) => change({ alignment })}/>
-    <Select label="Title position" value={o.position ?? "middle"} options={[{ value: "upper", label: "Higher" }, { value: "middle", label: "Middle" }, { value: "lower", label: "Lower" }]} onChange={(position) => change({ position })}/>
-    <details><summary>Decorative elements</summary>{(["circles", "outlines", "leopard"] as const).map((key) => <label key={key} style={{ display: "block", minHeight: 44 }}><input type="checkbox" checked={o[key] !== false} onChange={(e) => change({ [key]: e.target.checked })}/>{key === "circles" ? "Filled circles" : key === "outlines" ? "Thin gold rings" : "Cheetah circles"}</label>)}</details>
-    {step.module !== "back-cover" && <>
+    <Field label="Cover design"><select value={preset} onChange={(e) => change({ preset: e.target.value as CoverDividerSettings["preset"] })}><option value="neutral-cheetah-luxe">Neutral Cheetah Luxe</option><option value="solid">Solid color</option><option value="plain">Plain / use product background</option></select></Field>
+    {luxe && <svg viewBox="0 0 180 100" width="180" height="100" aria-label="Neutral Cheetah Luxe preview"><rect width="180" height="100" fill="#ffffff" stroke="#e5e0da"/><circle cx="38" cy="12" r="34" fill="#5b0610"/><circle cx="118" cy="38" r="24" fill="#f2d8cd"/><circle cx="160" cy="24" r="17" fill="#d6a47c"/><circle cx="182" cy="56" r="21" fill="#c5674a"/><circle cx="18" cy="76" r="14" fill="#e9d3c0"/><circle cx="40" cy="100" r="26" fill="#718496"/><circle cx="60" cy="6" r="50" fill="none" stroke="#cf9e58"/><text x="90" y="64" textAnchor="middle" fontFamily="'The Nautigal', cursive" fontSize="34">Plan</text></svg>}
+    {solid && <>
+      <Select label="Cover color" value={o.solidColor ?? "primary"} options={colorOptions} onChange={(solidColor) => change({ solidColor })}/>
+      <Select label="Wording color" value={o.solidTextColor ?? "background"} options={colorOptions} onChange={(solidTextColor) => change({ solidTextColor })}/>
+      <p className="hint">These colors come from the current palette, so changing the palette can recolor the cover without rebuilding it.</p>
+    </>}
+    {luxe && <>
+      <button className="btn" onClick={applyPreset}>Use matching palette & script title</button>
+      <p className="hint">Edit colors and fonts in Style. The cover shapes follow the matching palette.</p>
+    </>}
+    <label style={{ display: "block", minHeight: 44 }}><input type="checkbox" checked={showText} onChange={(e) => change({ showText: e.target.checked })}/> Show wording on this {step.module === "back-cover" ? "end cover" : step.module === "divider-page" ? "divider" : "cover"}</label>
+    {showText && <>
+      {step.module !== "back-cover" && <Field label={step.module === "cover-page" ? "Cover title" : "Divider title"}><input value={step.title ?? (step.module === "cover-page" ? "Plan" : "")} onChange={(e) => set({ title: e.target.value })}/></Field>}
+      <Select label="Title font" value={titleFont} options={[...TITLE_FONTS, ...(TITLE_FONTS.some((f) => f.value === titleFont) ? [] : [{ value: titleFont, label: `Current: ${titleFont}` }])]} onChange={onTitleFont}/>
+      <p className="hint">Applies to cover and divider titles throughout this book.</p>
+      <Field label={step.module === "back-cover" ? "Line of text (optional)" : "Subtitle"}><input value={o.subtitle ?? (step.module === "cover-page" && luxe ? "WITH PURPOSE" : "")} onChange={(e) => change({ subtitle: e.target.value })}/></Field>
+      <Field label="Optional scripture or quote"><textarea value={o.quote ?? ""} onChange={(e) => change({ quote: e.target.value })}/></Field>
+      <label><input type="checkbox" checked={o.smallLine !== false} onChange={(e) => change({ smallLine: e.target.checked })}/> Show small line</label>
+      <Select label="Title alignment" value={o.alignment ?? "center"} options={[{ value: "center", label: "Centered" }, { value: "left", label: "Left" }]} onChange={(alignment) => change({ alignment })}/>
+      <Select label="Title position" value={o.position ?? "middle"} options={[{ value: "upper", label: "Higher" }, { value: "middle", label: "Middle" }, { value: "lower", label: "Lower" }]} onChange={(position) => change({ position })}/>
+    </>}
+    {luxe && <details><summary>Decorative elements</summary>{(["circles", "outlines", "leopard"] as const).map((key) => <label key={key} style={{ display: "block", minHeight: 44 }}><input type="checkbox" checked={o[key] !== false} onChange={(e) => change({ [key]: e.target.checked })}/>{key === "circles" ? "Filled circles" : key === "outlines" ? "Thin gold rings" : "Cheetah circles"}</label>)}</details>}
+    {step.module !== "back-cover" && showText && <>
       <label style={{ display: "block", minHeight: 44 }}><input type="checkbox" checked={o.autoFit !== false} onChange={(e) => change({ autoFit: e.target.checked })}/> Fit design to page size</label>
       <p className="hint">{o.autoFit !== false ? "Title, subtitle and shapes adapt to the page size you choose; the text always wins over the shapes." : "The Letter layout scaled to this page; smaller pages may need shorter wording."}</p>
       {o.autoFit !== false && <details><summary>Fine-tune (optional)</summary>
