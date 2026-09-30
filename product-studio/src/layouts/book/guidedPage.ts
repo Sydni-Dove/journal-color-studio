@@ -35,10 +35,14 @@ export function weightedStack(y: number, h: number, weights: number[], gap: numb
  */
 export function guidedSpec(module: PageModuleContent | undefined, fallbackTitle: string, spacing: SpacingTokens): ZonePageSpec {
   const set = module?.promptSet ?? promptSetFromList(module?.prompts ?? []);
+  // A Custom Page (and every page made from a saved page design) prints only what its maker put on it:
+  // its name ("Custom Page", "Project Snapshot") names it in Pages and Browse pages but is never printed.
+  // Headings come from Heading / text pieces or the optional page header.
+  const composed = module?.type === "custom";
   return {
     idPrefix: "gp",
-    title: module?.title ?? fallbackTitle,
-    headerRight: module?.subtitle,
+    title: composed ? "" : module?.title ?? fallbackTitle,
+    headerRight: composed ? undefined : module?.subtitle,
     instructions: set.instructions,
     intro: set.header,
     noun: set.header || set.blocks.some((b) => b.prompt || b.space) ? "section" : "prompt",

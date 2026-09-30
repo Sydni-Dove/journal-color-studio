@@ -328,4 +328,39 @@ describe("Page Composer", () => {
     await expect.poll(async () => (await stored()).paper).toBe("white");
     await page.context().close();
   }, 60_000);
+
+  it("regression: a new Custom Page with an empty page header prints no “Custom Page” — the page begins with STEP ONE", async () => {
+    const page = await (await browser.newContext({ viewport: { width: 1400, height: 1000 } })).newPage();
+    await page.goto(base);
+    await page.evaluate(() => localStorage.clear());
+    await page.goto(base);
+    await page.locator("button.family-card", { hasText: /^Custom Page/ }).first().click();
+    await page.waitForSelector("#wizard-build");
+    await page.getByRole("button", { name: /^Create/ }).last().click();
+    await page.waitForSelector(".ps-page--editor");
+    await page.locator('section.area[data-area="add"]').waitFor();
+    const drawn = page.locator(".ps-page--editor").first();
+    // Before anything is added: nothing printed at the top.
+    await expect.poll(() => drawn.textContent()).not.toMatch(/Custom Page/);
+    for (const piece of ["Heading / text", "Heading / text", "Heading / text", "Heading / text", "Info row", "Writing lines"]) await add(page, piece);
+    for (const [k, words] of ["STEP ONE", "01", "RECEIVE", "THE WORD"].entries()) {
+      const s = await section(page, k + 1);
+      await s.getByRole("textbox", { name: "Heading" }).fill(words);
+    }
+    await expect.poll(() => drawn.textContent()).toMatch(/THE WORD/);
+    // The page header was never touched: every field is empty.
+    const header = page.locator("details.prompt-header-editor");
+    await header.evaluate((d) => ((d as HTMLDetailsElement).open = true));
+    for (const v of await header.locator("input").evaluateAll((els) => els.map((e) => (e as HTMLInputElement).type === "checkbox" ? String((e as HTMLInputElement).checked) : (e as HTMLInputElement).value))) expect(["", "false"]).toContain(v);
+    const topmost = await page.evaluate(() => {
+      const nodes = [...document.querySelectorAll(".ps-page--editor .ps-text")].filter((t) => (t.textContent ?? "").trim());
+      nodes.sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top);
+      return nodes.map((t) => (t.textContent ?? "").trim());
+    });
+    expect(topmost[0]).toBe("STEP ONE");
+    expect(topmost).not.toContain("Custom Page");
+    // The page is still called “Custom Page” where pages are listed.
+    await expect(page.getByTestId("page-label").innerText()).resolves.toMatch(/Custom Page/i);
+    await page.context().close();
+  }, 60_000);
 });

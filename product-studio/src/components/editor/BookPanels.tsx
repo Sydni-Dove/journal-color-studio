@@ -169,7 +169,7 @@ export function StepFields({ s, siblings, scope, props, parts }: { s: BookStep; 
             </>
           )}
           {mod.type !== "monthly-calendar" && mod.type !== "weekly-planner" && mod.type !== "back-cover" && (
-            <Field label={s.module === "divider-page" ? "Section name" : s.module === "cover-page" ? "Title" : "Page title"}>
+            <Field label={s.module === "divider-page" ? "Section name" : s.module === "cover-page" ? "Title" : s.module === "custom" ? "Page name (in Pages and Browse pages — not printed)" : "Page title"}>
               <input type="text" value={s.title ?? ""} placeholder={moduleTitle(s.module, scope === "none" ? "none" : scope)} onChange={(e) => set({ title: e.target.value || undefined })} />
             </Field>
           )}
