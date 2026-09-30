@@ -161,15 +161,14 @@ describe("Studio home", () => {
     await expect(prayer.getByTestId("section-space").textContent()).resolves.toMatch(/\d+ lines?/);
     await prayer.locator(":scope > summary").click();
     // Choosing an exact number of writing lines (under More) updates the page immediately.
-    await prayer.locator("details.subsection > summary", { hasText: /^More$/ }).click();
-    await prayer.getByRole("button", { name: "Exact number of lines" }).click();
-    const field = prayer.getByRole("spinbutton", { name: "Writing lines" });
+    await prayer.locator("details.subsection > summary", { hasText: /^More writing-space options$/ }).click();
+    const field = prayer.getByRole("spinbutton", { name: "Exact number of lines" });
     await field.click();
-    await field.fill("4");
+    await field.fill("3");
     await field.press("Enter");
     await expect.poll(() => page.locator(".badge").first().textContent()).toBe("Page OK");
     // Rename a prompt: the page shows the new wording.
-    await expect.poll(() => prayer.getByTestId("section-space").textContent()).toBe("4 lines");
+    await expect.poll(() => prayer.getByTestId("section-space").textContent()).toBe("Compact · 3 lines");
     await prayer.getByRole("textbox", { name: "Heading" }).fill("What should I pray about?");
     await expect.poll(() => page.locator(".ps-page--editor").first().textContent()).toMatch(/What should I pray about\?/i);
 

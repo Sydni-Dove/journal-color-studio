@@ -12,7 +12,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import {
-  amountOf, canSitBeside, TABLE_ROW_SCALE, contentOf, DEFAULT_MIN_LINES, kindOf, MAX_INFO_FIELDS, newPromptId, PROMPT_STARTERS, spaceOf, WRITING_AMOUNTS,
+  amountOf, canSitBeside, TABLE_ROW_SCALE, DEFAULT_MIN_LINES, kindOf, MAX_INFO_FIELDS, newPromptId, PROMPT_STARTERS, spaceOf, WRITING_AMOUNTS,
   type GuidedHeader, type HeadingTextStyle, type InfoFieldStyle, type TableRowSpace, type PromptBlockKind, type SectionFrame, type SpacerSize, type PromptBlock, type PromptSet, type PromptSpacing, type ResponseStyle, type SpaceMode, type TaskMarker, type TaskMarkerPosition, type WritingAmount,
 } from "../../types/prompts";
 import { Check, Field, LabeledNumeric, NumberField, Segmented, Select } from "./ui";
@@ -27,7 +27,6 @@ const STYLE_LABEL: Record<ResponseStyle | "own", string> = {
   checkboxes: "Checklist",
   table: "Table",
 };
-const SPACE_LABEL: Record<SpaceMode, string> = { fixed: "Exact number of lines", fill: "Fill remaining space", equal: "Equal share with the other “Equal share” sections" };
 const AMOUNT_LABEL: Record<WritingAmount, string> = { compact: "Compact", standard: "Standard", spacious: "Spacious" };
 const TEXT_STYLE_LABEL: Record<HeadingTextStyle, string> = { title: "Page title", heading: "Section heading", body: "Body text" };
 const ROW_SPACE_LABEL: Record<TableRowSpace, string> = { compact: "Compact", standard: "Standard", spacious: "Spacious" };
@@ -275,6 +274,14 @@ export function PromptEditor({
     // Moving breaks a side-by-side pair that no longer holds.
     put({ blocks: next.map((b, k) => (b.beside && !canSitBeside(next, k) ? { ...b, beside: undefined } : b)) });
   };
+  /** Close a section and bring the list of sections back into view. */
+  const closeSection = (el: HTMLElement) => {
+    const d = el.closest("details.prompt-block") as HTMLDetailsElement | null;
+    if (!d) return;
+    d.open = false;
+    d.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+  };
+  const toBuild = () => root.current?.querySelector('[data-testid="build-your-page"]')?.scrollIntoView?.({ block: "start", behavior: "smooth" });
   const setSpace = (b: PromptBlock, space: SpaceMode) => putBlock(b.id, space === "fixed" ? { space, lineCount: b.lineCount ?? fit?.lines?.[b.id] ?? 6 } : { space });
   const same = set.sameLines !== undefined;
   const fewerLines = () => {
@@ -466,7 +473,7 @@ export function PromptEditor({
                         <TableColumns b={b} putBlock={putBlock} />
                         <div className="row">
                           <NumberField
-                            label="Rows"
+                            label={mode === "fill" ? "Rows (at least)" : "Rows"}
                             step={1}
                             min={1}
                             max={30}
@@ -517,28 +524,26 @@ export function PromptEditor({
                 {k !== "divider" && k !== "spacer" && (
                   <Select<string> label="Section style" value={b.frame ?? "page"} options={frameOptions} onChange={(v) => putBlock(b.id, { frame: v === "page" ? undefined : (v as SectionFrame) })} />
                 )}
-                {k === "prompt" && (
+                {/* Only writing areas have finer settings; a table's or checklist's are all shown above. */}
+                {k === "prompt" && writing && !same && (
                   <details className="subsection">
-                    <summary>More</summary>
-                    {!same && (
-                      <Segmented<SpaceMode> label="Writing space, exactly" value={mode} options={(["fixed", "fill", "equal"] as const).map((v) => ({ value: v, label: SPACE_LABEL[v] }))} onChange={(v) => setSpace(b, v)} />
+                    <summary>More writing-space options</summary>
+                    <div className="stepper">
+                      <button type="button" className="btn btn--icon" aria-label="One line fewer" onClick={() => putBlock(b.id, { space: "fixed", lineCount: Math.max(0, (b.lineCount ?? got ?? 0) - 1) })}>−</button>
+                      <LabeledNumeric label="Exact number of lines" step={1} rules={{ min: 0, max: 80, integer: true }} value={mode === "fixed" ? b.lineCount ?? 0 : got ?? b.lineCount ?? 0} onCommit={(v) => v !== null && putBlock(b.id, { space: "fixed", lineCount: Math.round(v) })} />
+                      <button type="button" className="btn btn--icon" aria-label="One line more" onClick={() => putBlock(b.id, { space: "fixed", lineCount: Math.min(80, (b.lineCount ?? got ?? 0) + 1) })}>+</button>
+                    </div>
+                    <p className="hint">Any number of lines, not just Compact, Standard or Spacious.</p>
+                    {mode !== "fixed" && (
+                      <>
+                        <Check
+                          label="Give it the same number of lines as the other sections that fill the space"
+                          checked={mode === "equal"}
+                          onChange={(on) => setSpace(b, on ? "equal" : "fill")}
+                        />
+                        <NumberField label="When space is tight, never fewer than (lines)" step={1} min={0} max={40} value={b.minLines ?? DEFAULT_MIN_LINES} onChange={(v) => putBlock(b.id, { minLines: Math.max(0, Math.round(v)) })} />
+                      </>
                     )}
-                    {!same && mode === "fixed" && b.responseStyle !== "table" && (
-                      <div className="stepper">
-                        <button type="button" className="btn btn--icon" aria-label="One line fewer" onClick={() => putBlock(b.id, { lineCount: Math.max(0, (b.lineCount ?? 0) - 1) })}>−</button>
-                        <LabeledNumeric label="Writing lines" step={1} rules={{ min: 0, max: 80, integer: true }} value={b.lineCount ?? 0} onCommit={(v) => v !== null && putBlock(b.id, { lineCount: Math.round(v) })} />
-                        <button type="button" className="btn btn--icon" aria-label="One line more" onClick={() => putBlock(b.id, { lineCount: Math.min(80, (b.lineCount ?? 0) + 1) })}>+</button>
-                      </div>
-                    )}
-                    {!same && mode !== "fixed" && (
-                      <NumberField label="Never fewer than (lines)" step={1} min={0} max={40} value={b.minLines ?? DEFAULT_MIN_LINES} onChange={(v) => putBlock(b.id, { minLines: Math.max(0, Math.round(v)) })} />
-                    )}
-                    <Segmented<"field" | "list">
-                      label="Holds"
-                      value={contentOf(b).mode}
-                      options={[{ value: "field", label: "One answer" }, { value: "list", label: "A list of entries" }]}
-                      onChange={(m) => putBlock(b.id, { content: { ...b.content, mode: m } })}
-                    />
                   </details>
                 )}
                 <div className="card-actions">
@@ -546,6 +551,10 @@ export function PromptEditor({
                   <button type="button" className="btn" aria-label={`Move section ${i + 1} down`} disabled={i === blocks.length - 1} onClick={() => move(i, 1)}>Move down</button>
                   <button type="button" className="btn" disabled={blocks.length >= MAX_PROMPTS} onClick={() => duplicate(i)}>Duplicate</button>
                   <button type="button" className="btn btn--danger" onClick={() => remove(b.id)}>Remove</button>
+                </div>
+                <div className="card-actions section-done">
+                  <button type="button" className="btn btn--primary" onClick={(e) => closeSection(e.currentTarget)} aria-label={`Done with ${name}`}>Done</button>
+                  {composer && <button type="button" className="btn" onClick={(e) => { closeSection(e.currentTarget); toBuild(); }}>Add another piece</button>}
                 </div>
               </div>
             </details>

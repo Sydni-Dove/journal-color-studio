@@ -92,6 +92,30 @@ describe("Page Composer", () => {
     await page.context().close();
   }, 60_000);
 
+  it("after adding a piece: Done closes it and shows the list again; Add another piece goes back to Build your page; tables have no duplicate space controls", async () => {
+    const page = await open(blank(), true);
+    await openArea(page, "add");
+    for (const piece of ["Heading / text", "Writing lines", "Table"]) await add(page, piece);
+    const blocks = page.getByTestId("prompt-editor").first().locator(".prompt-block");
+    const isOpen = (i: number) => blocks.nth(i).evaluate((d) => (d as HTMLDetailsElement).open);
+    // The piece just added is open, the others closed.
+    await expect.poll(() => isOpen(2)).toBe(true);
+    expect(await isOpen(0)).toBe(false);
+    // A table shows its own Table space only: no second "writing space" control, no "More" panel.
+    await expect(blocks.nth(2).getByRole("group", { name: "Table space" }).count()).resolves.toBe(1);
+    await expect(blocks.nth(2).getByText(/writing-space options/).count()).resolves.toBe(0);
+    await blocks.nth(2).getByRole("button", { name: /^Done with / }).click();
+    await expect.poll(() => isOpen(2)).toBe(false);
+    // All three sections are visible as rows again.
+    for (let i = 0; i < 3; i++) await expect(blocks.nth(i).locator(":scope > summary").isVisible()).resolves.toBe(true);
+    // From an open section, "Add another piece" returns to the pieces.
+    await blocks.nth(1).evaluate((d) => ((d as HTMLDetailsElement).open = true));
+    await blocks.nth(1).getByRole("button", { name: "Add another piece" }).click();
+    await expect.poll(() => page.getByTestId("build-your-page").evaluate((el) => { const r = el.getBoundingClientRect(); return r.top < window.innerHeight && r.bottom > 0; })).toBe(true);
+    expect(await isOpen(1)).toBe(false);
+    await page.context().close();
+  }, 60_000);
+
   it("Master Dashboard: a page title, three column labels edited one by one, the table filling the page", async () => {
     const page = await open(blank(), false);
     await openArea(page, "add");
