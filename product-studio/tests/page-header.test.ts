@@ -14,7 +14,9 @@ import type { LayoutNode } from "../src/types/layout";
 import type { PromptSet } from "../src/types/prompts";
 import { STEP_HEADERS, stepPage } from "./fixtures/propheticSteps";
 
-const SIZES = ["6x9", "7x9", "8.5x11"];
+import { SIZE_PRESETS } from "../src/presets/sizes/sizePresets";
+/** Every page size the studio offers. */
+const SIZES = SIZE_PRESETS.map((z) => z.id);
 function solve(set: PromptSet, size: string) {
   const p = createProject("custom", { name: "h", dimensions: { sizePresetId: size, orientation: "portrait" }, recipe: { items: [], ordering: "sequential", structure: [step("custom", { type: "copies", count: 1 }, { layoutId: "guided-page", title: "Custom Page", promptSet: set })] } } as never);
   const doc = resolveDocument(p);
@@ -32,24 +34,39 @@ describe("composed page header: the five Prophetic Journal steps", () => {
         const head = solved.nodes.filter((n) => n.id.includes("-intro-") && n.type !== "group");
         const texts = head.filter((n) => n.type === "text");
         for (let a = 0; a < texts.length; a++) for (let b = a + 1; b < texts.length; b++) expect(overlaps(texts[a].rect, texts[b].rect), `${texts[a].id} × ${texts[b].id}`).toBe(false);
-        for (const n of solved.nodes.filter((n) => n.functional !== false && n.type !== "group")) expect(rectContains(g.safeRect, n.rect), n.id).toBe(true);
+        const tooSmall = ["3x5", "filofax-pocket"].includes(size) && !!header.meta && header.meta.length > 2;
+        // (Where the sections themselves don't fit — reported below — only the header is held to the safe area.)
+        for (const n of solved.nodes.filter((n) => n.functional !== false && n.type !== "group" && (!tooSmall || n.id.includes("-intro-")))) expect(rectContains(g.safeRect, n.rect), n.id).toBe(true);
         const bottom = Math.max(...head.map((n) => n.rect.y + n.rect.h));
         const firstSection = byId(solved.nodes, "-word-title")!;
         expect(firstSection.rect.y).toBeGreaterThan(bottom);
-        // Compact: the header (with its gap) takes well under a quarter of the page body.
+        const small = g.safeRect.h < 6;
+        // Compact: the header (with its gap) takes under 30% of the page body.
         const bodyTop = Math.min(...head.map((n) => n.rect.y));
-        expect(firstSection.rect.y - bodyTop, `${size} header`).toBeLessThan(0.25 * g.safeRect.h);
+        // Small cards and pocket inserts, and pages where the details drop below the titles, give the header a
+        // larger share — never most of the page.
+        const dropped = !!byId(solved.nodes, "-intro-meta0-label") && byId(solved.nodes, "-intro-meta0-label")!.rect.y > byId(solved.nodes, "-intro-title")!.rect.y + 0.1;
+        if (!tooSmall) expect(firstSection.rect.y - bodyTop, `${size} header`).toBeLessThan((small ? 0.5 : dropped ? 0.4 : 0.3) * g.safeRect.h);
         // Hierarchy: the main title is the largest text; step label and details are the smallest.
         const role = (s: string) => { const t = byId(solved.nodes, s); return t?.type === "text" ? t.role : undefined; };
         expect(role("-intro-title")).toBe("monthTitle");
         expect(role("-intro-number")).toBe("weekTitle");
         expect(role("-intro-eyebrow")).toBe("label");
-        expect(role("-intro-overline")).toBe("label");
+        if (header.overline) expect(role("-intro-overline")).toBe("label");
+        // The step number and title are display type: larger than any section text.
+        const ptOf = (s: string) => { const t = byId(solved.nodes, s); return t?.type === "text" ? t.fit?.sizePt ?? doc.typography.roles[t.role].sizePt : 0; };
+        expect(ptOf("-intro-title")).toBeGreaterThan(doc.typography.roles.sectionHeading.sizePt * 1.5);
+        expect(ptOf("-intro-number")).toBeGreaterThan(doc.typography.roles.sectionHeading.sizePt * 1.5);
+        if (header.mark) expect(solved.nodes.some((n) => /-intro-mark0$/.test(n.id))).toBe(true);
         const sz = (r: string) => doc.typography.roles[r as "label"].sizePt;
         expect(sz("monthTitle")).toBeGreaterThan(sz("weekTitle"));
         expect(sz("weekTitle")).toBeGreaterThan(sz("label"));
-        expect(solved.diagnostics.filter((d) => d.severity === "error")).toEqual([]);
-        expect(validateProject(doc.project, heuristicMeasurer).issues.filter((x) => x.severity === "error")).toEqual([]);
+        // The header itself never has a problem. On the two smallest cards, Receive's four details leave too
+        // little room for both sections: the page says so (it is never squeezed) — the only error allowed.
+        const errors = [...solved.diagnostics.filter((d) => d.severity === "error"), ...validateProject(doc.project, heuristicMeasurer).issues.filter((x) => x.severity === "error")];
+        expect(errors.filter((e) => /intro|STEP|RECEIVE|DISCERN|RESPOND|WATCH|TESTIFY/.test(`${"componentId" in e ? e.componentId : ""} ${e.message}`))).toEqual([]);
+        if (!tooSmall) expect(errors.map((e) => e.message), size).toEqual([]);
+        else expect(errors.map((e) => e.message).filter((m) => !/writing space|page body|enough room|^(Section|WritingLines|Text|SectionHeader) crosses the safe area/.test(m)), size).toEqual([]);
       });
     }
 
@@ -73,7 +90,7 @@ describe("composed page header: the five Prophetic Journal steps", () => {
   it("a narrow page moves the details below the titles as rows of blanks, inside the header region", () => {
     const { solved, g } = solve(stepPage(STEP_HEADERS[0]), "filofax-personal");
     const title = byId(solved.nodes, "-intro-title")!;
-    const firstMeta = solved.nodes.find((n) => /-intro-meta-f0-label$/.test(n.id))!;
+    const firstMeta = solved.nodes.find((n) => /-intro-meta0-label$/.test(n.id))!;
     expect(firstMeta.rect.y).toBeGreaterThan(title.rect.y + title.rect.h - 1e-6);
     expect(byId(solved.nodes, "-word-title")!.rect.y).toBeGreaterThan(firstMeta.rect.y + firstMeta.rect.h);
     for (const n of solved.nodes.filter((n) => n.functional !== false && n.type !== "group")) expect(rectContains(g.safeRect, n.rect), n.id).toBe(true);
@@ -88,5 +105,33 @@ describe("composed page header: the five Prophetic Journal steps", () => {
     expect(n.rect.y).toBeLessThan(sub.rect.y);
     expect(n.type === "text" && n.role).toBe("weekTitle");
     expect(byId(solved.nodes, "-intro-meta0-label")).toBeUndefined();
+  });
+});
+
+describe("section number circle and line at left", () => {
+  it("a number circle sits left of its heading; the heading and prompt start after it; a line at the left sets the content in", () => {
+    const { solved, g } = solve(stepPage(STEP_HEADERS[1]), "7x9");
+    const badge = byId(solved.nodes, "-word-badge")!, num = byId(solved.nodes, "-word-badge-number")!, title = byId(solved.nodes, "-word-title")!, prompt = byId(solved.nodes, "-word-prompt")!;
+    expect(badge.type).toBe("box");
+    expect(num.type === "text" && num.text).toBe("1");
+    expect(title.rect.x).toBeGreaterThan(badge.rect.x + badge.rect.w);
+    expect(prompt.rect.x).toBeCloseTo(title.rect.x, 6);
+    const line = byId(solved.nodes, "-word-frame")!;
+    expect(line.type).toBe("rule");
+    expect(line.rect.x).toBeLessThan(badge.rect.x);
+    const lines = byId(solved.nodes, "-word-surface-lines")!;
+    expect(lines.rect.x).toBeGreaterThan(line.rect.x);
+    for (const n of solved.nodes.filter((n) => n.functional !== false && n.type !== "group")) expect(rectContains(g.safeRect, n.rect), n.id).toBe(true);
+  });
+});
+
+describe("right-side mark", () => {
+  it("sits between two short rules: one above its first line, one below its last", () => {
+    const { solved } = solve(stepPage(STEP_HEADERS[1]), "8.5x11");
+    const top = byId(solved.nodes, "-intro-mark-top")!, bottom = byId(solved.nodes, "-intro-mark-bottom")!;
+    const lines = solved.nodes.filter((n) => /-intro-mark\d$/.test(n.id));
+    expect(lines.map((n) => (n.type === "text" ? n.text : ""))).toEqual(["FROM", "REVELATION", "TO", "EXECUTION"]);
+    expect(top.rect.y).toBeLessThan(lines[0].rect.y);
+    expect(bottom.rect.y).toBeGreaterThan(lines.at(-1)!.rect.y + lines.at(-1)!.rect.h - 1e-6);
   });
 });

@@ -22,6 +22,7 @@ import type { LayoutDiagnostic, LayoutMetric, LayoutNode, SolvedPage, TextNode }
 import { minZoneHeight } from "../../engines/stationery/geometry";
 import { canSitBeside, frameOf as sectionFrameOf, isComposedHeader, kindOf, requestedLines, TABLE_ROW_SCALE, spaceOf, SPACER_HEIGHTS, SPACING_FACTOR, type GuidedHeader, type PromptBlock, type PromptSet, type ResponseStyle, type SectionFrame } from "../../types/prompts";
 import type { StationeryZone, SurfaceKind } from "../../types/stationery";
+import type { ColorToken, TypographyRole } from "../../types/tokens";
 import { fillInIn, fillInRows, isFixedSurface, SURFACES, tableHeaderIn } from "../stationery/surfaces";
 import { fitHeading, headerTitle, pageFrame } from "./components";
 import { box, group, lineBoxIn, rule, text } from "./nodes";
@@ -114,6 +115,7 @@ function blockZone(set: PromptSet, b: PromptBlock, surfaceOf: (b: PromptBlock) =
     key: b.id,
     label: b.label,
     ...(b.prompt?.trim() ? { prompt: b.prompt.trim() } : {}),
+    ...(b.badge?.trim() ? { badge: b.badge.trim() } : {}),
     ...(lines === undefined && spaceOf(b) === "equal" ? { equal: true } : {}),
     surface: b.responseStyle ? RESPONSE_SURFACE[b.responseStyle] : own.surface,
     ...(b.responseStyle ? {} : own.treatment ? { treatment: own.treatment } : {}),
@@ -169,6 +171,8 @@ type Measured = {
   promptText: number;
   /** Two sections side by side: each measured at its column's width. */
   halves?: [Measured, Measured];
+  /** The number circle's diameter (0 = none). */
+  badge?: number;
 };
 
 /**
@@ -179,6 +183,19 @@ type Measured = {
 export const framePadIn = (frame: SectionFrame | undefined, ctx: Pick<LayoutContext, "spacing">) =>
   frame === "outline" || frame === "panel" || frame === "rounded" ? Math.max(ctx.spacing.boxPadding, ctx.spacing.sectionHeadingInset, ctx.spacing.labelToBorderInset) : 0;
 
+/** A section's insets on each side: the frame padding all round, or — with a line at the left — a left indent only. */
+export function frameInsets(frame: SectionFrame | undefined, ctx: Pick<LayoutContext, "spacing">): { l: number; r: number; t: number; b: number } {
+  if (frame === "rule") {
+    const l = 2 * Math.max(ctx.spacing.boxPadding, ctx.spacing.sectionHeadingInset);
+    return { l, r: 0, t: 0, b: 0 };
+  }
+  const p = framePadIn(frame, ctx);
+  return { l: p, r: p, t: p, b: p };
+}
+
+/** Diameter of a section's number circle: about two heading lines. */
+export const badgeIn = (ctx: Pick<LayoutContext, "typography">) => Math.max(0.28, 2 * lineBoxIn(ctx.typography, "sectionHeading"));
+
 /** The gap between two sections side by side. */
 const pairGapIn = (ctx: Pick<LayoutContext, "spacing">) => ctx.spacing.column + ctx.spacing.block;
 /** The width of each of two sections side by side. */
@@ -186,15 +203,19 @@ export const halfWidthIn = (width: number, ctx: Pick<LayoutContext, "spacing">) 
 
 function measureOne(zone: StationeryZone, width: number, ctx: LayoutContext): Measured {
   const s = ctx.spacing;
-  const inner = Math.max(0, width - 2 * framePadIn(zone.frame, ctx));
+  const ins = frameInsets(zone.frame, ctx);
+  // A number circle sits at the left of the heading; the heading and prompt take the width beside it.
+  const badge = zone.badge?.trim() ? badgeIn(ctx) : 0;
+  const inner = Math.max(0, width - ins.l - ins.r - (badge ? badge + s.column : 0));
   const role = zone.labelRole ?? "sectionHeading", pRole = zone.promptRole ?? "prompt";
   const headingLine = lineBoxIn(ctx.typography, role), promptLine = lineBoxIn(ctx.typography, pRole);
   const heading = zone.label ? fitHeading(zone.label, role, { w: inner, h: 2 * headingLine }, ctx) : null;
   const promptLines = zone.prompt ? wrapText(zone.prompt, inner, ctx, pRole) : [];
   const headingH = heading ? heading.heightIn : 0;
   const promptH = promptLines.length * promptLine;
-  const overhead = headingH + (promptH ? s.block + promptH : 0) + (headingH || promptH ? s.headingToContentGap : 0);
-  return { zone, heading, headingH, promptLines, promptH, overhead, promptText: headingH + promptH };
+  const textH = headingH + (promptH ? s.block + promptH : 0);
+  const overhead = Math.max(textH, badge) + (headingH || promptH || badge ? s.headingToContentGap : 0);
+  return { zone, heading, headingH, promptLines, promptH, overhead, promptText: headingH + promptH, badge };
 }
 
 function measure(zones: StationeryZone[], width: number, ctx: LayoutContext): Measured[] {
@@ -207,14 +228,14 @@ function measure(zones: StationeryZone[], width: number, ctx: LayoutContext): Me
 }
 
 function requestOne(m: Measured, ctx: LayoutContext, width: number): ZoneRequest {
-  const pad = framePadIn(m.zone.frame, ctx);
-  const inner = Math.max(0, width - 2 * pad);
-  if (m.zone.surface === "fill-in") return { zone: m.zone, overheadIn: 0, fixedIn: fillInRows(m.zone.fields?.length ? m.zone.fields : [m.zone.label], inner, ctx).heightIn + 2 * pad };
+  const ins = frameInsets(m.zone.frame, ctx);
+  const inner = Math.max(0, width - ins.l - ins.r);
+  if (m.zone.surface === "fill-in") return { zone: m.zone, overheadIn: 0, fixedIn: fillInRows(m.zone.fields?.length ? m.zone.fields : [m.zone.label], inner, ctx).heightIn + ins.t + ins.b };
   if (m.zone.surface === "divider" || m.zone.surface === "spacer") return { zone: m.zone, overheadIn: 0, fixedIn: m.zone.heightIn ?? ctx.spacing.section };
   return {
     zone: m.zone,
     // A framed section's padding sits above its heading and below its writing.
-    overheadIn: m.overhead + 2 * pad,
+    overheadIn: m.overhead + ins.t + ins.b,
     promptTextIn: m.promptText,
     lines: m.zone.lines,
     minLines: m.zone.minLines,
@@ -245,112 +266,268 @@ function requestOf(m: Measured, ctx: LayoutContext, width: number, pitch: number
 export const HEADER_CENTER_MIN_IN = 1.6;
 /** Room a header detail's writing line gets after its label. */
 export const HEADER_META_LINE_IN = 1.1;
+/** Writing room under a detail's label when the label sits above its line (small pages). */
+export const HEADER_WRITE_IN = 0.22;
+/**
+ * Display sizes of the composed header, as multiples of the Style's own roles
+ * (so a typography change follows): the main title and the step number are
+ * display type; the subtitle a spaced serif line. They shrink to fit their zone.
+ */
+export const HEADER_TITLE_SCALE = 2.6; // × monthTitle
+export const HEADER_NUMBER_SCALE = 0.92; // × the main title's size
+export const HEADER_SUBTITLE_SCALE = 0.78; // × weekTitle
 
 /**
  * A COMPOSED PAGE HEADER — one measured region, three zones:
  *
- *   [ step label ]   [   overline    ]   [ Date     ________ ]
- *   [ step number]   [  MAIN TITLE   ]   [ Time     ________ ]
- *                    [   subtitle    ]   [ Type     ________ ]
+ *   STEP TWO │        DISCERN         │      FROM
+ *   02       │      T H E  W O R D    │  REVELATION TO
+ *            │ SEEK UNDERSTANDING • … │    EXECUTION
  *
- * The step sits at the left, the titles centred, the details at the right —
- * each with its own label and writing line, lines aligned. When the page is
- * too narrow for the titles between them, the details drop below as rows of
- * blanks (wrapping, never squeezed). Everything is measured once in the
- * typography roles (label, weekTitle, monthTitle, subheading, prompt); the
- * height used — band, details and the gap after — is returned, and the page's
- * sections start below it.
+ * Left: the step label over a large step number (in the palette's line-art
+ * color). Centre: overline, the main title in display type, the subtitle as
+ * a spaced serif line, a small spaced tagline. Right: a short mark between
+ * two short rules, and/or details to fill in (each its own label and line,
+ * lines aligned). Thin rules divide the zones. Sizes derive from the Style's
+ * typography roles and shrink to fit; on a narrow page the right side drops
+ * below the titles. Measured once; the sections start below it.
  */
 function composedHeader(id: string, h: GuidedHeader, body: Rect, ctx: LayoutContext, nodes: LayoutNode[], diagnostics: LayoutDiagnostic[]): number {
   const s = ctx.spacing;
   const measure = getLayoutMeasurer().measure;
-  const widthOf = (v: string, role: "label" | "weekTitle") => measure(v, styleForRole(ctx.typography, role));
-  const gap = s.column + s.block;
+  const roles = ctx.typography.roles;
+  const ptIn = (pt: number, lh: number) => (pt * lh) / 72;
+  const widthAt = (v: string, role: TypographyRole, sizePt?: number, trackingEm?: number) =>
+    measure(v, { ...styleForRole(ctx.typography, role), ...(sizePt ? { sizePt } : {}), ...(trackingEm !== undefined ? { trackingEm } : {}) });
+  /** The largest size ≤ `max` (and ≥ `min`) at which `v` fits `w` on one line. */
+  const sizeToFit = (v: string, role: TypographyRole, w: number, max: number, min: number, trackingEm?: number) => {
+    let pt = max;
+    while (pt > min && widthAt(v, role, pt, trackingEm) > w) pt = Math.max(min, pt - 0.5);
+    return pt;
+  };
+  /** Greedy word wrap at a given size and tracking (for spaced header lines that don't fit on one line). */
+  const wrapAt = (v: string, role: TypographyRole, w: number, pt: number, trackingEm?: number) => {
+    const out: string[] = [];
+    let cur = "";
+    for (const word of v.split(/\s+/).filter(Boolean)) {
+      const next = cur ? `${cur} ${word}` : word;
+      if (cur && widthAt(next, role, pt, trackingEm) > w) {
+        out.push(cur);
+        cur = word;
+      } else cur = next;
+    }
+    if (cur) out.push(cur);
+    return out;
+  };
+  const gap = s.column + 2 * s.block;
   const tight = s.block / 2;
   const clean = (v?: string) => v?.trim() || "";
   const meta = (h.meta ?? []).map(clean).filter(Boolean);
+  const markLines = clean(h.mark) ? clean(h.mark).split(/\n+/).map((l) => l.trim().toUpperCase()).filter(Boolean) : [];
+  const dividers = h.dividers !== false;
+  const draw: (() => void)[] = [];
+  const put = (key: string, rect: Rect, value: string, role: TypographyRole, o: { sizePt?: number; trackingEm?: number; align?: "left" | "center" | "right"; color?: ColorToken; component?: "PageHeader" | "SectionHeader"; vAlign?: "top" | "bottom"; lines?: string[] } = {}) => {
+    draw.push(() => {
+      const t = text(`${id}-${key}`, rect, value, role, { component: o.component ?? "PageHeader", align: o.align ?? "left", vAlign: o.vAlign ?? "top", ...(o.color ? { color: o.color } : {}), ...(o.lines && o.lines.length > 1 ? { wrap: true } : {}) });
+      if (o.sizePt !== undefined || o.trackingEm !== undefined || (o.lines && o.lines.length > 1)) t.fit = { sizePt: o.sizePt ?? roles[role].sizePt, lineHeight: roles[role].lineHeight, lines: o.lines ?? [value], ...(o.trackingEm !== undefined ? { trackingEm: o.trackingEm } : {}) };
+      nodes.push(t);
+    });
+  };
 
-  // Left: step label over the step number.
-  const left = [
-    ...(clean(h.eyebrow) ? [{ key: "eyebrow", v: clean(h.eyebrow), role: "label" as const }] : []),
-    ...(clean(h.number) ? [{ key: "number", v: clean(h.number), role: "weekTitle" as const }] : []),
-  ];
-  const leftW = left.length ? Math.min(body.w * 0.3, Math.max(...left.map((i) => widthOf(i.v, i.role)))) : 0;
-  // Right: the details, one label + line each; labels share one width so the lines align.
+  // ── Sizes: the main title first (display type, fitted), the step number from it.
+  const titleText = clean(h.title);
+  const titleMax = roles.monthTitle.sizePt * HEADER_TITLE_SCALE * Math.min(1, body.w / 6.5);
+  // ── Left zone.
+  const eyebrow = clean(h.eyebrow), number = clean(h.number);
+  const labelTrack = Math.max(roles.label.trackingEm, 0.28);
+  let numberPt = number ? Math.max(roles.weekTitle.sizePt, titleMax * HEADER_NUMBER_SCALE) : 0;
+  const leftCap = body.w * 0.26;
+  if (number && widthAt(number, "weekTitle", numberPt) > leftCap) numberPt = sizeToFit(number, "weekTitle", leftCap, numberPt, roles.weekTitle.sizePt);
+  // The step label keeps its spacing when it fits; on a narrow column it tightens, then takes two lines ("STEP / THREE").
+  let eyebrowTrack = labelTrack;
+  let eyebrowLines = eyebrow ? [eyebrow.toUpperCase()] : [];
+  if (eyebrow && widthAt(eyebrowLines[0], "label", undefined, eyebrowTrack) > leftCap) {
+    eyebrowTrack = roles.label.trackingEm;
+    if (widthAt(eyebrowLines[0], "label", undefined, eyebrowTrack) > leftCap) eyebrowLines = wrapAt(eyebrowLines[0], "label", leftCap, roles.label.sizePt, eyebrowTrack);
+  }
+  const leftW = Math.min(leftCap, Math.max(eyebrowLines.length ? Math.max(...eyebrowLines.map((l) => widthAt(l, "label", undefined, eyebrowTrack))) : 0, number ? widthAt(number, "weekTitle", numberPt) : 0));
+  // ── Right zone: the mark and / or the details.
+  const markTrack = 0.3;
+  const markPt = roles.label.sizePt * 1.25;
+  const markW = markLines.length ? Math.max(...markLines.map((l) => widthAt(l, "label", markPt, markTrack))) : 0;
   const rowH = fillInIn(ctx);
-  const labelW = meta.length ? Math.max(...meta.map((f) => widthOf(f, "label"))) : 0;
-  let rightW = meta.length ? Math.min(body.w * 0.42, labelW + s.checkboxGap + HEADER_META_LINE_IN) : 0;
+  const labelW = meta.length ? Math.max(...meta.map((f) => widthAt(f, "label"))) : 0;
+  const metaW = meta.length ? labelW + s.checkboxGap + HEADER_META_LINE_IN : 0;
+  let rightW = Math.min(body.w * 0.4, Math.max(markW, metaW));
   const centerX = body.x + leftW + (leftW ? gap : 0);
   let centerW = body.x + body.w - centerX - (rightW ? rightW + gap : 0);
-  let metaBelow = false;
-  if (meta.length && centerW < HEADER_CENTER_MIN_IN) {
-    metaBelow = true;
+  let rightBelow = false;
+  if (rightW && centerW < HEADER_CENTER_MIN_IN) {
+    rightBelow = true;
     rightW = 0;
     centerW = body.x + body.w - centerX;
   }
 
-  // Left column.
+  // ── Left zone: step label over the large number.
   let ly = body.y;
-  left.forEach((it, k) => {
-    const lh = lineBoxIn(ctx.typography, it.role);
-    nodes.push(text(`${id}-${it.key}`, { x: body.x, y: ly, w: leftW, h: lh }, it.v, it.role, { component: "PageHeader", vAlign: "top" }));
-    ly += lh + (k < left.length - 1 ? tight : 0);
-  });
+  if (eyebrow) {
+    const lh = lineBoxIn(ctx.typography, "label") * eyebrowLines.length;
+    put("eyebrow", { x: body.x, y: ly, w: leftW, h: lh }, eyebrow.toUpperCase(), "label", { trackingEm: eyebrowTrack, align: "center", lines: eyebrowLines });
+    ly += lh + tight;
+  }
+  if (number) {
+    const lh = ptIn(numberPt, roles.weekTitle.lineHeight);
+    put("number", { x: body.x, y: ly, w: leftW, h: lh }, number, "weekTitle", { sizePt: numberPt, align: "center", color: "lineArt" });
+    ly += lh;
+  }
 
-  // Centre column: overline, main title (fitted, up to two lines), subtitle, reference.
+  // ── Centre zone: overline, display title, spaced subtitle, tagline — centred.
   let cy = body.y;
-  const center: (() => void)[] = [];
-  const push = (key: string, value: string, role: "label" | "subheading" | "prompt") => {
-    const lines = role === "label" ? [value] : wrapText(value, centerW, ctx, role === "prompt" ? "prompt" : "body");
-    const lh = lineBoxIn(ctx.typography, role);
-    const y = cy;
-    center.push(() => {
-      const t = text(`${id}-${key}`, { x: centerX, y, w: centerW, h: lh * lines.length }, lines.join(" "), role, { component: "PageHeader", align: "center", vAlign: "top", wrap: lines.length > 1 });
-      if (lines.length > 1) t.fit = { sizePt: ctx.typography.roles[role].sizePt, lineHeight: ctx.typography.roles[role].lineHeight, lines };
-      nodes.push(t);
-    });
-    cy += lh * lines.length + tight;
-  };
-  if (clean(h.overline)) push("overline", clean(h.overline), "label");
-  if (clean(h.title)) {
-    const role = "monthTitle" as const;
-    const fit = fitHeading(clean(h.title), role, { w: centerW, h: 2 * lineBoxIn(ctx.typography, role) }, ctx);
-    const y = cy;
-    center.push(() => {
-      const t = text(`${id}-title`, { x: centerX, y, w: centerW, h: fit.heightIn }, clean(h.title), role, { component: "PageHeader", align: "center", vAlign: "top" });
-      if (fit.lines.length > 1 || fit.sizePt !== ctx.typography.roles[role].sizePt || !fit.ok) t.fit = { sizePt: fit.sizePt, lineHeight: fit.lineHeight, lines: fit.lines, ...(fit.ok ? {} : { failed: true }) };
-      nodes.push(t);
-    });
-    cy += fit.heightIn + tight;
+  const overline = clean(h.overline);
+  if (overline) {
+    const lh = lineBoxIn(ctx.typography, "label");
+    put("overline", { x: centerX, y: cy, w: centerW, h: lh }, overline.toUpperCase(), "label", { trackingEm: labelTrack, align: "center" });
+    cy += lh + tight;
   }
-  if (clean(h.subtitle)) push("subtitle", clean(h.subtitle), "subheading");
-  if (clean(h.reference)) push("reference", clean(h.reference), "prompt");
+  if (titleText) {
+    const pt = sizeToFit(titleText, "monthTitle", centerW, titleMax, roles.pageTitle.sizePt);
+    const lh = ptIn(pt, roles.monthTitle.lineHeight);
+    put("title", { x: centerX, y: cy, w: centerW, h: lh }, titleText, "monthTitle", { sizePt: pt, align: "center" });
+    cy += lh + tight;
+    if (widthAt(titleText, "monthTitle", pt) > centerW + 1e-6) diagnostics.push({ severity: "error", rule: "heading-fit", componentId: `${id}-title`, message: `“${titleText}” is too long for the header at this page size. Shorten it.` });
+  }
+  const subtitle = clean(h.subtitle);
+  if (subtitle) {
+    const track = 0.42;
+    const minPt = Math.max(roles.label.sizePt, roles.sectionHeading.sizePt);
+    const pt = sizeToFit(subtitle.toUpperCase(), "weekTitle", centerW, Math.max(roles.sectionHeading.sizePt * 1.2, roles.weekTitle.sizePt * HEADER_SUBTITLE_SCALE), minPt, track);
+    const lines = wrapAt(subtitle.toUpperCase(), "weekTitle", centerW, pt, track);
+    const lh = ptIn(pt, roles.weekTitle.lineHeight) * lines.length;
+    put("subtitle", { x: centerX, y: cy, w: centerW, h: lh }, subtitle.toUpperCase(), "weekTitle", { sizePt: pt, trackingEm: track, align: "center", lines });
+    cy += lh + tight;
+  }
+  const tagline = clean(h.tagline);
+  if (tagline) {
+    const pt = sizeToFit(tagline.toUpperCase(), "label", centerW, roles.label.sizePt * 1.1, roles.label.sizePt, labelTrack);
+    const lines = wrapAt(tagline.toUpperCase(), "label", centerW, pt, labelTrack);
+    const lh = ptIn(pt, roles.label.lineHeight) * lines.length;
+    put("tagline", { x: centerX, y: cy, w: centerW, h: lh }, tagline.toUpperCase(), "label", { sizePt: pt, trackingEm: labelTrack, align: "center", lines });
+    cy += lh + tight;
+  }
+  const reference = clean(h.reference);
+  if (reference) {
+    const lines = wrapText(reference, centerW, ctx, "prompt");
+    const lh = lineBoxIn(ctx.typography, "prompt") * lines.length;
+    const y = cy;
+    draw.push(() => {
+      const t = text(`${id}-reference`, { x: centerX, y, w: centerW, h: lh }, lines.join(" "), "prompt", { component: "PageHeader", align: "center", vAlign: "top", wrap: lines.length > 1 });
+      if (lines.length > 1) t.fit = { sizePt: roles.prompt.sizePt, lineHeight: roles.prompt.lineHeight, lines };
+      nodes.push(t);
+    });
+    cy += lh + tight;
+  }
   const centerH = Math.max(0, cy - body.y - (cy > body.y ? tight : 0));
-  center.forEach((f) => f());
 
-  // Right column.
+  // ── Right zone (beside the titles, or below them on a narrow page).
+  const rightBlock = (x: number, w: number, y0: number, align: "right" | "left"): number => {
+    let y = y0;
+    if (markLines.length && align === "right") {
+      const ruleW = Math.min(w, 0.8);
+      const rx0 = x + w - ruleW;
+      const top = y;
+      draw.push(() => nodes.push(rule(`${id}-mark-top`, rx0, top, rx0 + ruleW, top, { component: "PageHeader", color: "lineArt", strokePt: 1 })));
+      y += s.block;
+      const lh = ptIn(markPt, roles.label.lineHeight);
+      markLines.forEach((l, i) => {
+        put(`mark${i}`, { x, y: y + i * lh, w, h: lh }, l, "label", { sizePt: markPt, trackingEm: markTrack, align, color: "text" });
+      });
+      y += markLines.length * lh + s.block;
+      const yy = y;
+      draw.push(() => nodes.push(rule(`${id}-mark-bottom`, rx0, yy, rx0 + ruleW, yy, { component: "PageHeader", color: "lineArt", strokePt: 1 })));
+      y += meta.length ? s.block : 0;
+    } else if (markLines.length) {
+      // Below the titles on a narrow page: the mark as one centred line between two short rules.
+      const line = markLines.join(" ");
+      const pt = sizeToFit(line, "label", Math.max(0, w - 2 * 0.5 - 2 * s.column), markPt, roles.label.sizePt * 0.8, markTrack);
+      const lh = ptIn(pt, roles.label.lineHeight);
+      const tw = Math.min(w, widthAt(line, "label", pt, markTrack));
+      const cx = x + w / 2;
+      const yy = y + lh / 2;
+      const room = (w - tw) / 2 - s.column;
+      if (room >= 0.2) {
+        const len = Math.min(0.5, room);
+        draw.push(() => {
+          nodes.push(rule(`${id}-mark-left`, cx - tw / 2 - s.column - len, yy, cx - tw / 2 - s.column, yy, { component: "PageHeader", color: "lineArt", strokePt: 1 }));
+          nodes.push(rule(`${id}-mark-right`, cx + tw / 2 + s.column, yy, cx + tw / 2 + s.column + len, yy, { component: "PageHeader", color: "lineArt", strokePt: 1 }));
+        });
+      }
+      put("mark0", { x, y, w, h: lh }, line, "label", { sizePt: pt, trackingEm: markTrack, align: "center", color: "text" });
+      y += lh + (meta.length ? s.block : 0);
+    }
+    if (meta.length) {
+      if (align === "right") {
+        // The details never reach past their zone: the writing lines take what is left after the labels.
+        const rx = x + w - Math.min(metaW, w);
+        const lx = rx + labelW + s.checkboxGap;
+        meta.forEach((f, i) => {
+          const yy = y + i * rowH;
+          put(`meta${i}-label`, { x: rx, y: yy, w: labelW, h: rowH }, f, "label", { component: "SectionHeader", vAlign: "bottom" });
+          draw.push(() => nodes.push(rule(`${id}-meta${i}-line`, lx, yy + rowH, x + w, yy + rowH, { strokePt: ctx.pattern.lineWeightPt, component: "WritingLines" })));
+        });
+        y += meta.length * rowH;
+      } else {
+        // Below the titles: two aligned columns when the labels leave room for a line, else one.
+        const colGap = s.column + s.block;
+        const cols = (w - colGap) / 2 >= labelW + s.checkboxGap + 0.6 ? 2 : 1;
+        const cellW = (w - colGap) / 2;
+        if (cols === 1 && meta.length > 1 && cellW >= Math.max(labelW, 0.9)) {
+          // Small page: a grid of two, each label above its own writing line.
+          const cellH = lineBoxIn(ctx.typography, "label") + HEADER_WRITE_IN;
+          meta.forEach((f, i) => {
+            const cx0 = x + (i % 2) * (cellW + colGap);
+            const yy = y + Math.floor(i / 2) * (cellH + s.block);
+            put(`meta${i}-label`, { x: cx0, y: yy, w: cellW, h: lineBoxIn(ctx.typography, "label") }, f, "label", { component: "SectionHeader" });
+            draw.push(() => nodes.push(rule(`${id}-meta${i}-line`, cx0, yy + cellH, cx0 + cellW, yy + cellH, { strokePt: ctx.pattern.lineWeightPt, component: "WritingLines" })));
+          });
+          const rowsN = Math.ceil(meta.length / 2);
+          return y + rowsN * cellH + (rowsN - 1) * s.block - y0;
+        }
+        const colW = (w - colGap * (cols - 1)) / cols;
+        const perCol = Math.ceil(meta.length / cols);
+        meta.forEach((f, i) => {
+          const c = Math.floor(i / perCol), r = i % perCol;
+          const cx0 = x + c * (colW + colGap);
+          const yy = y + r * rowH;
+          const lx = cx0 + labelW + s.checkboxGap;
+          put(`meta${i}-label`, { x: cx0, y: yy, w: labelW, h: rowH }, f, "label", { component: "SectionHeader", vAlign: "bottom" });
+          draw.push(() => nodes.push(rule(`${id}-meta${i}-line`, lx, yy + rowH, cx0 + colW, yy + rowH, { strokePt: ctx.pattern.lineWeightPt, component: "WritingLines" })));
+        });
+        y += perCol * rowH;
+      }
+    }
+    return y - y0;
+  };
   let rightH = 0;
-  if (meta.length && !metaBelow) {
-    const rx = body.x + body.w - rightW;
-    const lx = rx + labelW + s.checkboxGap;
-    meta.forEach((f, i) => {
-      const y = body.y + i * rowH;
-      nodes.push(text(`${id}-meta${i}-label`, { x: rx, y, w: labelW, h: rowH }, f, "label", { component: "SectionHeader", vAlign: "bottom" }));
-      nodes.push(rule(`${id}-meta${i}-line`, lx, y + rowH, body.x + body.w, y + rowH, { strokePt: ctx.pattern.lineWeightPt, component: "WritingLines" }));
-    });
-    rightH = meta.length * rowH;
-  }
+  if (rightW) rightH = rightBlock(body.x + body.w - rightW, rightW, body.y, "right");
   let used = Math.max(ly - body.y, centerH, rightH);
 
-  // Narrow page: the details as rows of blanks below the step and titles.
-  if (meta.length && metaBelow) {
-    const y = body.y + used + (used ? s.block : 0);
-    const rows = fillInRows(meta, body.w, ctx);
-    const out = SURFACES["fill-in"](`${id}-meta`, { x: body.x, y, w: body.w, h: rows.heightIn }, { key: "meta", label: "", surface: "fill-in", weight: 0, fields: meta }, ctx);
-    nodes.push(...out.nodes);
-    diagnostics.push(...out.diagnostics);
-    used = y + rows.heightIn - body.y;
+  // Thin rules between the zones, the height of the band.
+  if (dividers && used > 0) {
+    if (leftW && (titleText || subtitle || overline)) {
+      const x = body.x + leftW + gap / 2;
+      nodes.push(rule(`${id}-divider-left`, x, body.y, x, body.y + used, { component: "PageHeader", color: "lineArt", strokePt: 0.75 }));
+    }
+    if (rightW) {
+      const x = body.x + body.w - rightW - gap / 2;
+      nodes.push(rule(`${id}-divider-right`, x, body.y, x, body.y + used, { component: "PageHeader", color: "lineArt", strokePt: 1.5 }));
+    }
   }
+  // Narrow page: the right side below the titles.
+  if (rightBelow) {
+    const y = body.y + used + s.block;
+    used = y - body.y + rightBlock(body.x, body.w, y, "left");
+  }
+  draw.forEach((f) => f());
   if (h.rule) {
     const y = body.y + used + s.block;
     nodes.push(rule(`${id}-rule`, body.x, y, body.x + body.w, y, { component: "PageHeader", color: "lineArt" }));
@@ -496,22 +673,33 @@ export function solveZonePages(spec: ZonePageSpec, ctx: LayoutContext, pageIndex
     const draw = (m: Measured, rect: Rect, responseTop: number, responseH: number) => {
       const z = m.zone;
       const id = `${spec.idPrefix}${pi}-${z.key}`;
-      const pad = framePadIn(z.frame, ctx);
+      const ins = frameInsets(z.frame, ctx);
       nodes.push(group(id, "Section", rect));
       nodes.push(...frameNodes(`${id}-frame`, rect, z.frame, ctx));
-      const inner = { x: rect.x + pad, y: rect.y + pad, w: Math.max(0, rect.w - 2 * pad), h: Math.max(0, rect.h - 2 * pad) };
+      const inner = { x: rect.x + ins.l, y: rect.y + ins.t, w: Math.max(0, rect.w - ins.l - ins.r), h: Math.max(0, rect.h - ins.t - ins.b) };
       // Fixed rows (info rows, dividers, spacers) carry no heading of their own.
       const fixed = isFixedSurface(z.surface);
+      // The number circle, and the heading and prompt beside it (centred on it when shorter).
+      const d = !fixed ? m.badge ?? 0 : 0;
+      const textH = m.headingH + (m.promptLines.length ? s.block + m.promptH : 0);
+      const tx = inner.x + (d ? d + s.column : 0), tw = Math.max(0, inner.w - (d ? d + s.column : 0));
+      const ty = inner.y + (d > textH ? (d - textH) / 2 : 0);
+      if (d) {
+        nodes.push(box(`${id}-badge`, { x: inner.x, y: inner.y, w: d, h: d }, { component: "Section", stroke: null, fill: "accent", fillOpacity: 0.16, radiusIn: d / 2 }));
+        const num = text(`${id}-badge-number`, { x: inner.x, y: inner.y, w: d, h: d }, z.badge!.trim(), "weekTitle", { component: "PageHeader", align: "center", vAlign: "middle" });
+        num.fit = { sizePt: Math.min(ctx.typography.roles.weekTitle.sizePt, (d * 72) / 1.9), lineHeight: 1, lines: [z.badge!.trim()] };
+        nodes.push(num);
+      }
       if (!fixed && m.heading && m.headingH) {
         const role = z.labelRole ?? "sectionHeading";
-        const t = text(`${id}-title`, { x: inner.x, y: inner.y, w: inner.w, h: m.headingH }, z.label, role, { component: "SectionHeader" });
+        const t = text(`${id}-title`, { x: tx, y: ty, w: tw, h: m.headingH }, z.label, role, { component: "SectionHeader" });
         if (m.heading.lines.length > 1 || m.heading.sizePt !== ctx.typography.roles[role].sizePt || !m.heading.ok) t.fit = { sizePt: m.heading.sizePt, lineHeight: m.heading.lineHeight, lines: m.heading.lines, ...(m.heading.ok ? {} : { failed: true }) };
         nodes.push(t);
       }
       if (!fixed && m.promptLines.length) {
-        const y = inner.y + m.headingH + (m.headingH ? s.block : 0);
+        const y = ty + m.headingH + (m.headingH ? s.block : 0);
         const pRole = z.promptRole ?? "prompt";
-        const pt: TextNode = text(`${id}-prompt`, { x: inner.x, y, w: inner.w, h: m.promptH }, m.promptLines.join(" "), pRole, { component: "Text", vAlign: "top", wrap: true });
+        const pt: TextNode = text(`${id}-prompt`, { x: tx, y, w: tw, h: m.promptH }, m.promptLines.join(" "), pRole, { component: "Text", vAlign: "top", wrap: true });
         pt.fit = { sizePt: ctx.typography.roles[pRole].sizePt, lineHeight: ctx.typography.roles[pRole].lineHeight, lines: m.promptLines };
         nodes.push(pt);
       }
@@ -526,7 +714,7 @@ export function solveZonePages(spec: ZonePageSpec, ctx: LayoutContext, pageIndex
     };
     res.zones.forEach((z, zi) => {
       const m = p.byZone.get(z.zone)!;
-      const pad = framePadIn(z.zone.frame, ctx);
+      const pad = frameInsets(z.zone.frame, ctx).b;
       if (m.halves) {
         // Side by side: both columns share the band; their writing starts on the same line.
         const half = halfWidthIn(z.rect.w, ctx);
@@ -535,7 +723,7 @@ export function solveZonePages(spec: ZonePageSpec, ctx: LayoutContext, pageIndex
         const pitch = pitchOf(ctx);
         m.halves.forEach((h, k) => {
           const r = reqs2[k];
-          const hp = framePadIn(h.zone.frame, ctx);
+          const hp = frameInsets(h.zone.frame, ctx).b;
           const rect = { x: z.rect.x + k * (half + pairGapIn(ctx)), y: z.rect.y, w: half, h: z.rect.h };
           const responseTop = rect.y + top - hp;
           const own = r.lines !== undefined ? (r.headIn ?? 0) + r.lines * (r.rowIn ?? pitch) : rect.y + rect.h - hp - responseTop;
@@ -569,6 +757,9 @@ function frameNodes(id: string, rect: Rect, frame: SectionFrame | undefined, ctx
       return [box(id, rect, { component: "Section", stroke: null, fill: "accent", fillOpacity: 0.08 })];
     case "rounded":
       return [box(id, rect, { component: "Section", stroke: "border", strokePt: Math.max(0.5, ctx.pattern.lineWeightPt), fill: "accent", fillOpacity: 0.06, radiusIn: r })];
+    case "rule":
+      // A line down the left side, in the palette's line-art color.
+      return [rule(id, rect.x + 0.01, rect.y, rect.x + 0.01, rect.y + rect.h, { component: "Section", color: "lineArt", strokePt: 1.25 })];
     default:
       return [];
   }

@@ -30,7 +30,7 @@ const STYLE_LABEL: Record<ResponseStyle | "own", string> = {
 const AMOUNT_LABEL: Record<WritingAmount, string> = { compact: "Compact", standard: "Standard", spacious: "Spacious" };
 const TEXT_STYLE_LABEL: Record<HeadingTextStyle, string> = { title: "Page title", heading: "Section heading", body: "Body text" };
 const ROW_SPACE_LABEL: Record<TableRowSpace, string> = { compact: "Compact", standard: "Standard", spacious: "Spacious" };
-const FRAME_LABEL: Record<SectionFrame, string> = { open: "Open (no border)", divider: "Line below", outline: "Soft outline", panel: "Filled panel", rounded: "Rounded panel" };
+const FRAME_LABEL: Record<SectionFrame, string> = { open: "Open (no border)", divider: "Line below", outline: "Soft outline", panel: "Filled panel", rounded: "Rounded panel", rule: "Line at left" };
 
 /** How the current sections fit: pages each time, a plain problem when they can't, and the lines each section gets. */
 export type PromptFit = { pages: number; problem?: string; lines?: Record<string, number>; pageOf?: Record<string, number> };
@@ -62,7 +62,7 @@ function HeaderEditor({ header, onChange, open }: { header: GuidedHeader | undef
   const h = header ?? {};
   const put = (patch: Partial<GuidedHeader>) => {
     const next = { ...h, ...patch };
-    const empty = !next.eyebrow && !next.number && !next.subtitle && !next.reference && !next.rule && !next.fields?.length && !next.overline && !next.title && !next.meta?.length;
+    const empty = !next.eyebrow && !next.number && !next.subtitle && !next.reference && !next.rule && !next.fields?.length && !next.overline && !next.title && !next.meta?.length && !next.tagline && !next.mark;
     onChange(empty ? undefined : next);
   };
   const fields = (v: string) => {
@@ -100,8 +100,14 @@ function HeaderEditor({ header, onChange, open }: { header: GuidedHeader | undef
       <Field label="Subtitle">
         <input type="text" value={h.subtitle ?? ""} placeholder="e.g. THE WORD" onChange={(e) => put({ subtitle: e.target.value || undefined })} />
       </Field>
+      <Field label="Line under the subtitle (small, spaced)">
+        <input type="text" value={h.tagline ?? ""} placeholder="e.g. SEEK UNDERSTANDING • CONFIRM WITH SCRIPTURE" onChange={(e) => put({ tagline: e.target.value || undefined })} />
+      </Field>
       <Field label="Scripture or reference">
         <input type="text" value={h.reference ?? ""} placeholder="e.g. Habakkuk 2:2" onChange={(e) => put({ reference: e.target.value || undefined })} />
+      </Field>
+      <Field label="Right side text (between two short lines — a new line per line)">
+        <textarea rows={3} value={h.mark ?? ""} placeholder={"e.g. FROM\nREVELATION TO\nEXECUTION"} onChange={(e) => put({ mark: e.target.value || undefined })} />
       </Field>
       <div className="field-label">Details to fill in (right side of the header)</div>
       <div className="header-meta-choices">
@@ -122,6 +128,7 @@ function HeaderEditor({ header, onChange, open }: { header: GuidedHeader | undef
           }}
         />
       </Field>
+      <Check label="Thin lines between the step, the titles and the right side" checked={h.dividers !== false} onChange={(on) => put({ dividers: on ? undefined : false })} />
       <Check label="Short decorative rule under the header" checked={!!h.rule} onChange={(rule) => put({ rule: rule || undefined })} />
       {!!h.fields?.length && (
         <Field label="A row of blanks above the sections (comma separated)">
@@ -446,6 +453,9 @@ export function PromptEditor({
                     </Field>
                     <Field label="Prompt (optional)">
                       <textarea rows={2} value={b.prompt ?? ""} placeholder="e.g. What obedience, action, or posture does this word call for?" onChange={(e) => putBlock(b.id, { prompt: e.target.value || undefined })} />
+                    </Field>
+                    <Field label="Number in a circle (optional)">
+                      <input type="text" value={b.badge ?? ""} maxLength={3} placeholder="e.g. 1" onChange={(e) => putBlock(b.id, { badge: e.target.value || undefined })} />
                     </Field>
                     <Select
                       label="Writing area"

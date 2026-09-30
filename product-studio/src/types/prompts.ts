@@ -99,8 +99,9 @@ export const MAX_INFO_FIELDS = 3;
  *   outline  a soft outline
  *   panel    a subtle filled panel
  *   rounded  a rounded, softly filled panel
+ *   rule     a line down the left side, the content set in from it
  */
-export type SectionFrame = "open" | "divider" | "outline" | "panel" | "rounded";
+export type SectionFrame = "open" | "divider" | "outline" | "panel" | "rounded" | "rule";
 
 /** Open-space heights a spacer offers (inches). */
 export const SPACER_HEIGHTS = { small: 0.25, medium: 0.5, large: 1 } as const;
@@ -119,6 +120,8 @@ export type PromptBlock = {
   fieldStyles?: InfoFieldStyle[];
   /** Visual treatment (default: the page's section style, else open). */
   frame?: SectionFrame;
+  /** A number (or short mark) in a soft circle beside the section heading ("1", "2", …). */
+  badge?: string;
   /** Sit beside the section above, as two columns (writing sections only). */
   beside?: boolean;
   /** Checklist / task list: a writing line on each row (default true). */
@@ -171,6 +174,12 @@ export type GuidedHeader = {
   overline?: string;
   /** Composed header: the dominant title ("RECEIVE"). */
   title?: string;
+  /** Composed header: a small spaced line under the subtitle ("SEEK UNDERSTANDING • CONFIRM WITH SCRIPTURE"). */
+  tagline?: string;
+  /** Composed header: a short mark at the right, between two short rules ("FROM REVELATION TO EXECUTION"); a new line per line. */
+  mark?: string;
+  /** Composed header: thin rules between the step, the titles and the right side (default on). */
+  dividers?: boolean;
   /**
    * Composed header: details to fill in, each its own label and writing line,
    * stacked at the right ("Date", "Time", "Received through", "Type").
@@ -186,7 +195,8 @@ export const HEADER_META_CHOICES = ["Date", "Time", "Received through", "Type"] 
  * right) when it uses any of the composed parts; headers saved before keep the
  * stacked look they had.
  */
-export const isComposedHeader = (h: GuidedHeader | undefined): boolean => !!h && (!!h.title?.trim() || !!h.overline?.trim() || !!h.meta?.some((m) => m.trim()));
+export const isComposedHeader = (h: GuidedHeader | undefined): boolean =>
+  !!h && (!!h.title?.trim() || !!h.overline?.trim() || !!h.tagline?.trim() || !!h.mark?.trim() || !!h.meta?.some((m) => m.trim()));
 
 /** Space between prompt sections. */
 export type PromptSpacing = "tight" | "standard" | "roomy";

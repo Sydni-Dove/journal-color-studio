@@ -102,6 +102,8 @@ export type StationeryZone = {
   fieldStyles?: import("./prompts").InfoFieldStyle[];
   /** Checklist surfaces: a writing line on each row (default true). */
   taskLines?: boolean;
+  /** Page Composer: a number in a soft circle beside the heading. */
+  badge?: string;
   /** Page Composer: the section's visual treatment (semantic colors only). */
   frame?: import("./prompts").SectionFrame;
   /** Page Composer: two writing sections side by side (this zone is the pair; the layout draws both). */

@@ -355,7 +355,9 @@ describe("Page Composer", () => {
     // The page header was never touched: every field is empty.
     const header = page.locator("details.prompt-header-editor");
     await header.evaluate((d) => ((d as HTMLDetailsElement).open = true));
-    for (const v of await header.locator("input").evaluateAll((els) => els.map((e) => (e as HTMLInputElement).type === "checkbox" ? String((e as HTMLInputElement).checked) : (e as HTMLInputElement).value))) expect(["", "false"]).toContain(v);
+    // Every text field is empty and no detail or rule is chosen (the dividing-lines option is on by default; it draws nothing without a header).
+    for (const v of await header.locator('input[type="text"], textarea').evaluateAll((els) => els.map((e) => (e as HTMLInputElement).value))) expect(v).toBe("");
+    for (const name of ["Date", "Time", "Received through", "Type", "Short decorative rule under the header"]) expect(await header.getByRole("checkbox", { name }).isChecked(), name).toBe(false);
     const topmost = await page.evaluate(() => {
       const nodes = [...document.querySelectorAll(".ps-page--editor .ps-text")].filter((t) => (t.textContent ?? "").trim());
       nodes.sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top);
@@ -421,7 +423,7 @@ describe("Page Composer", () => {
     await header.getByRole("textbox", { name: "Step number" }).fill("01");
     await header.getByRole("textbox", { name: /^Overline/ }).fill("PROPHETIC WORD");
     await header.getByRole("textbox", { name: "Main title" }).fill("RECEIVE");
-    await header.getByRole("textbox", { name: "Subtitle" }).fill("THE WORD");
+    await header.getByRole("textbox", { name: "Subtitle", exact: true }).fill("THE WORD");
     for (const m of ["Date", "Time", "Received through", "Type"]) await header.getByRole("checkbox", { name: m }).check();
     const drawn = page.locator(".ps-page--editor").first();
     await expect.poll(() => drawn.locator('[data-node$="-intro-meta3-label"]').count()).toBe(1);
