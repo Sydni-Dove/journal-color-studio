@@ -49,6 +49,12 @@ export type LayoutOptions = {
   sidebarContent: WordingKey;
   sidebarWidthIn: number;
   sectionsPerDay: number;
+  /**
+   * Classic Weekly: days as columns ("vertical") or rows ("horizontal"). Both
+   * are two-page spreads. Absent / "auto" = columns when they fit, else rows.
+   * A choice that cannot fit at this size falls back to the one that does.
+   */
+  weeklyOrientation?: "auto" | "vertical" | "horizontal";
   hourStart: number;
   hourEnd: number;
   halfHours: boolean;

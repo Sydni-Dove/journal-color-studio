@@ -20,7 +20,7 @@
  * One solver, two layouts: the dated daily page (one per day, planners) and
  * the undated daily planner sheet (glued notepads).
  */
-import { MONTH_NAMES, WEEKDAY_NAMES } from "../../engines/calendar/calendar";
+import { FILL_IN, isUndated, MONTH_NAMES, WEEKDAY_NAMES } from "../../engines/calendar/calendar";
 import { getLayoutMeasurer, styleForRole } from "../../engines/typography/textMeasure";
 import { STUDIO_PLANNER, STUDIO_STROKES } from "../../presets/studioDefaults";
 import type { Rect } from "../../types/geometry";
@@ -271,8 +271,10 @@ function solveDaily(ctx: LayoutContext, dated: boolean): SolvedPage {
     const iso = ctx.period.iso;
     const day = ctx.calendar.days.find((d) => d.iso === iso);
     if (!day) throw new Error(`Day ${iso} not in calendar.`);
-    const t = headerTitle("dy-header", ctx, frameP.zones, "pageTitle", `${WEEKDAY_NAMES[day.weekday]}, ${MONTH_NAMES[day.month - 1]} ${day.day}`, "weekTitle", "header-left");
-    nodes.push(...t.nodes, right("dy-year", String(day.year)));
+    // An undated planner's day: fill-in lines for the date and the weekday; the rest of the page is unchanged.
+    const undated = isUndated(ctx.calendar);
+    const t = headerTitle("dy-header", ctx, frameP.zones, "pageTitle", undated ? `${ctx.wording.date} ${FILL_IN}` : `${WEEKDAY_NAMES[day.weekday]}, ${MONTH_NAMES[day.month - 1]} ${day.day}`, "weekTitle", "header-left");
+    nodes.push(...t.nodes, undated ? right("dy-day", `Day ${FILL_IN}`) : right("dy-year", String(day.year)));
     diagnostics.push(...t.diagnostics);
   } else {
     // Undated sheet: the pad's title, and a date line the writer fills in.

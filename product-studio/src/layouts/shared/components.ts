@@ -461,7 +461,8 @@ export function calendarGrid(
       const cellRect: Rect = { x: cols.starts[c], y: rows.starts[r], w: cols.size, h: rows.size };
       const cid = `${id}-r${r}c${c}`;
       nodes.push(group(cid, "CalendarCell", cellRect));
-      if (cell.inMonth) {
+      // Undated planners leave every box blank for the writer's own dates.
+      if (cell.inMonth && !ctx.calendar?.settings.undated) {
         nodes.push(
           text(
             `${cid}-date`,

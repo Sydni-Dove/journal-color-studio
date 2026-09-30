@@ -18,7 +18,7 @@
  * evening dividers once per run of neighbouring days, in the light
  * writing-line color. Days and sections never draw their own boxes.
  */
-import { formatWeekRange, formatWeekRangeShort, MONTH_NAMES, parseIso } from "../../engines/calendar/calendar";
+import { FILL_IN, formatWeekRange, formatWeekRangeShort, isUndated, MONTH_NAMES, parseIso } from "../../engines/calendar/calendar";
 import { distributeEqual } from "../../engines/layout/math";
 import { STUDIO_PLANNER, STUDIO_STROKES, STUDIO_WEEKLY_VARIANTS } from "../../presets/studioDefaults";
 import type { CalendarDay } from "../../types/calendar";
@@ -51,14 +51,16 @@ export function fitWeekly(ctx: FitContext): FitResult {
   const slotW = (b.w - (SLOTS_PER_PAGE - 1) * PLANNER_GRID_GAP_IN) / SLOTS_PER_PAGE;
   const sections = Math.max(1, ctx.options.sectionsPerDay);
   const sectionH = (b.h - STUDIO_PLANNER.dayHeader.valueIn) / sections;
-  if (slotW + 1e-6 >= V.minSlotW.valueIn && sectionH + 1e-6 >= V.minSectionH.valueIn) {
-    return { ok: true, variant: "vertical", variantLabel: "Vertical day columns", sidebarAvailable: true };
-  }
+  const vOk = slotW + 1e-6 >= V.minSlotW.valueIn && sectionH + 1e-6 >= V.minSectionH.valueIn;
   const rowH = (b.h - (SLOTS_PER_PAGE - 1) * PLANNER_GRID_GAP_IN) / SLOTS_PER_PAGE;
   const writingW = b.w - H.dayLabelW.valueIn - s.column;
-  if (rowH + 1e-6 >= H.minRowH.valueIn && writingW + 1e-6 >= H.minWritingW.valueIn) {
-    return { ok: true, variant: "horizontal", variantLabel: "Horizontal day rows (insert)", sidebarAvailable: true };
-  }
+  const hOk = rowH + 1e-6 >= H.minRowH.valueIn && writingW + 1e-6 >= H.minWritingW.valueIn;
+  const vertical: FitResult = { ok: true, variant: "vertical", variantLabel: "Vertical day columns", sidebarAvailable: true };
+  const horizontal: FitResult = { ok: true, variant: "horizontal", variantLabel: vOk ? "Horizontal day rows" : "Horizontal day rows (insert)", sidebarAvailable: true };
+  // The maker's choice when it fits; otherwise the arrangement that does (columns first).
+  if (ctx.options.weeklyOrientation === "horizontal" && hOk) return horizontal;
+  if (vOk) return vertical;
+  if (hOk) return horizontal;
   return {
     ok: false,
     reason: `Too small for a weekly spread: day columns would be ${slotW.toFixed(2)}" (min ${V.minSlotW.valueIn}") and day rows ${rowH.toFixed(2)}" (min ${H.minRowH.valueIn}").`,
@@ -99,6 +101,9 @@ function headerLabels(id: string, head: Rect, label: string, date: string | null
   ], diagnostics: [] };
 }
 
+/** The day of the month beside a weekday name; blank in an undated planner. */
+const dayNumber = (day: CalendarDay, ctx: LayoutContext) => (isUndated(ctx.calendar) ? "" : String(day.day));
+
 /**
  * Vertical day column inside the connected grid. The column draws NO border:
  * its left/right edges are the grid's shared rules, the header rule and the
@@ -107,7 +112,7 @@ function headerLabels(id: string, head: Rect, label: string, date: string | null
 function dayColumn(id: string, rect: Rect, day: CalendarDay, weekdayName: string, ctx: LayoutContext): { nodes: LayoutNode[]; diagnostics: LayoutDiagnostic[] } {
   const head = { ...rect, h: STUDIO_PLANNER.dayHeader.valueIn };
   const body = { ...rect, y: rect.y + head.h, h: rect.h - head.h };
-  const nodes: LayoutNode[] = [group(id, "Section", rect), ...headerLabels(id, head, weekdayName, String(day.day), ctx).nodes];
+  const nodes: LayoutNode[] = [group(id, "Section", rect), ...headerLabels(id, head, weekdayName, dayNumber(day, ctx), ctx).nodes];
   const n = Math.max(1, ctx.options.sectionsPerDay);
   const rows = distributeEqual(body.y, body.h, n, PLANNER_GRID_GAP_IN);
   const diagnostics: LayoutDiagnostic[] = [];
@@ -131,7 +136,7 @@ function dayRow(id: string, rect: Rect, day: CalendarDay, weekdayName: string, c
   return [
     group(id, "Section", rect),
     text(`${id}-name`, { x: labelRect.x + s.labelToBorderInset, y: labelRect.y + s.labelToBorderInset, w: labelW - 2 * s.labelToBorderInset, h: nameH }, weekdayName, "subheading", { component: "SectionHeader", vAlign: "top" }),
-    text(`${id}-date`, { x: labelRect.x + s.labelToBorderInset, y: labelRect.y + s.labelToBorderInset + nameH, w: labelW - 2 * s.labelToBorderInset, h: dateH }, String(day.day), "date", { component: "SectionHeader", vAlign: "top" }),
+    text(`${id}-date`, { x: labelRect.x + s.labelToBorderInset, y: labelRect.y + s.labelToBorderInset + nameH, w: labelW - 2 * s.labelToBorderInset, h: dateH }, dayNumber(day, ctx), "date", { component: "SectionHeader", vAlign: "top" }),
     ...writingSurface(`${id}-surface`, writing, ctx),
   ];
 }
@@ -184,8 +189,9 @@ export const weeklySpread: LayoutDefinition = {
     // The insert (horizontal) variant is designed with compact titles: short
     // range on the verso, short month(s) + year on the recto.
     const month = (m: number) => (horizontal ? MONTH_NAMES[m - 1].slice(0, 3) : MONTH_NAMES[m - 1]);
-    const monthLabel = start.month === end.month ? `${month(start.month)} ${start.year}` : `${month(start.month)} / ${month(end.month)} ${end.year}`;
-    const weekLabel = horizontal ? formatWeekRangeShort(week) : `${ctx.wording.weekOf} ${formatWeekRange(week)}`;
+    const undated = isUndated(ctx.calendar);
+    const monthLabel = undated ? `Month ${FILL_IN}` : start.month === end.month ? `${month(start.month)} ${start.year}` : `${month(start.month)} / ${month(end.month)} ${end.year}`;
+    const weekLabel = undated ? `${ctx.wording.weekOf} ${FILL_IN}` : horizontal ? formatWeekRangeShort(week) : `${ctx.wording.weekOf} ${formatWeekRange(week)}`;
 
     const sizes: number[] = [];
     const pages = [0, 1].map((p): SolvedPage => {

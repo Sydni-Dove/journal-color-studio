@@ -2,6 +2,7 @@
  * desktop/phone preview and the actual print tree. Optional QA_BASE_URL
  * repeats these checks against the deployed build in an isolated context.
  */
+import { openArea } from "./areas";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { chromium, type Browser, type Page } from "playwright-core";
 import { preview, type PreviewServer } from "vite";
@@ -78,17 +79,18 @@ describe("Cover and divider browser QA", () => {
   it("phone controls persist and do not overflow", async () => {
     const page = await open(project(), true);
     page.setDefaultTimeout(5000);
-    const card = page.locator('.book-step').first();
-    await card.locator(':scope > summary').click();
+    // Page layout edits the page being viewed: the cover.
+    await openArea(page, "layout");
+    const card = page.locator('.this-page');
     await card.getByLabel('Title font').selectOption('Dancing Script');
     await card.getByLabel('Subtitle', { exact: true }).fill('LIVE WITH PURPOSE');
     await page.waitForTimeout(900);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.reload();
     await page.locator('.card', { hasText: 'Cover QA' }).first().getByRole('button', { name: 'Open', exact: true }).click();
-    await page.locator('.book-step').first().locator(':scope > summary').click();
-    expect(await page.locator('.book-step').first().getByLabel('Subtitle', { exact: true }).inputValue()).toBe('LIVE WITH PURPOSE');
-    expect(await page.locator('.book-step').first().getByLabel('Title font').inputValue()).toBe('Dancing Script');
+    await openArea(page, "layout");
+    expect(await page.locator('.this-page').getByLabel('Subtitle', { exact: true }).inputValue()).toBe('LIVE WITH PURPOSE');
+    expect(await page.locator('.this-page').getByLabel('Title font').inputValue()).toBe('Dancing Script');
     expect(await page.locator('[data-node="cover-title"]').first().evaluate((e) => getComputedStyle(e).fontWeight)).toBe('700');
     await page.context().close();
   });

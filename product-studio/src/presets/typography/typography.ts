@@ -87,9 +87,12 @@ export function fontStack(family: string): string {
  * main ba916ad). Only the pairings — cover lettering and title-plate styles are
  * cover-specific and stay in Journal Color Studio.
  */
-export const DESIGN_TYPE_PAIRINGS: { id: string; label: string; fonts: Partial<FontSelection> }[] = [
-  { id: "jcs-floral", label: "Floral design — Cormorant Garamond headings, Radley text", fonts: { headings: "Cormorant Garamond", subheadings: "Cormorant Garamond", body: "Radley", accent: "Cormorant Garamond" } },
-  { id: "jcs-abstract", label: "Abstract watercolor — Playfair Display", fonts: { cover: "Playfair Display", headings: "Playfair Display", accent: "Playfair Display" } },
+export const DESIGN_TYPE_PAIRINGS: { id: string; label: string; short?: string; fonts: Partial<FontSelection> }[] = [
+  { id: "classic", label: "Classic — Playfair Display headings, Lato text", short: "Classic serif", fonts: { cover: "Cinzel", headings: "Playfair Display", subheadings: "Lato", body: "Lato", accent: "Playfair Display" } },
+  { id: "script-serif", label: "Script + serif — Great Vibes titles, Playfair Display headings, Lato text", short: "Script + serif", fonts: { cover: "Great Vibes", headings: "Playfair Display", subheadings: "Lato", body: "Lato", accent: "Great Vibes" } },
+  { id: "modern", label: "Modern — Josefin Sans headings, Lato text", short: "Modern sans", fonts: { cover: "Josefin Sans", headings: "Josefin Sans", subheadings: "Josefin Sans", body: "Lato", accent: "Josefin Sans" } },
+  { id: "jcs-floral", label: "Floral design — Cormorant Garamond headings, Radley text", short: "Elegant serif (Floral design)", fonts: { headings: "Cormorant Garamond", subheadings: "Cormorant Garamond", body: "Radley", accent: "Cormorant Garamond" } },
+  { id: "jcs-abstract", label: "Abstract watercolor — Playfair Display", short: "Playfair throughout (Abstract watercolor)", fonts: { cover: "Playfair Display", headings: "Playfair Display", accent: "Playfair Display" } },
 ];
 
 export const DEFAULT_FONTS: FontSelection = {

@@ -120,7 +120,7 @@ export function PagePreview({ doc, index, onIndex, debug, issueIds }: Props) {
           <span className="page-label__type"><CategoryMark category={info.category} />{info.typeLabel}</span>
           {(info.title || info.dateLabel) && <span className="page-label__detail">{[info.title, info.dateLabel].filter(Boolean).join(" · ")}</span>}
         </div>
-        <button className="btn" onClick={() => setSheet(true)} aria-haspopup="dialog">Pages</button>
+        <button className="btn" onClick={() => setSheet(true)} aria-haspopup="dialog">Browse pages</button>
         {filterLabel && (
           <div className="segmented page-filter-steps" role="group" aria-label={`${filterLabel} pages`}>
             <button onClick={() => prevOf >= 0 && onIndex(prevOf)} disabled={prevOf < 0} aria-label={`Previous ${filterLabel} page`}>‹ {filterLabel}</button>

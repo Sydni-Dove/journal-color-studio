@@ -4,6 +4,7 @@
  *   editor  default panel width, drag + keyboard resizing within limits, the
  *           preview rescales, no page-level horizontal overflow; phone keeps the stacked flow
  */
+import { openArea } from "./areas";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { chromium, type Browser, type Page } from "playwright-core";
 import { preview, type PreviewServer } from "vite";
@@ -106,7 +107,10 @@ describe("Studio home", () => {
     expect(pageTypes.join(" | ")).not.toMatch(/Book:|Meetings With God|Journal Planner|Daily Planner \+/);
     await view.getByRole("button", { name: "Use this template" }).click();
     await page.waitForSelector(".ps-page--editor");
-    await expect(page.locator("details.section > summary", { hasText: /^Pages & layouts/ }).count()).resolves.toBe(1);
+    await openArea(page, "pages");
+    // The template's pages, grouped by kind: cover, monthly, weekly, …
+    await expect(page.locator('.builder-cat[data-category="cover"] .builder-row').count()).resolves.toBe(2);
+    await expect(page.locator('.builder-cat[data-category="weekly"] .builder-row').count()).resolves.toBeGreaterThanOrEqual(2);
     await expect(page.locator(".badge--error").count()).resolves.toBe(0);
     await page.context().close();
   });
@@ -144,10 +148,11 @@ describe("Studio home", () => {
     await expect(page.locator('button.choice[aria-pressed="true"]', { hasText: /^Devotional$/ }).count()).resolves.toBe(1);
     await page.locator("label.field", { hasText: "Page size" }).locator("select").selectOption("6x9");
     await page.locator("button.choice", { hasText: /^SOAP$/ }).click();
-    await page.getByRole("button", { name: "Generate" }).click();
+    await page.getByRole("button", { name: /^(Start planner|Create )/ }).click();
     await page.waitForSelector(".ps-page--editor");
     await expect(page.locator(".badge").first().textContent()).resolves.toBe("Page OK");
-    const sections = page.locator("details.section", { has: page.locator(":scope > summary", { hasText: /^Page sections$/ }) });
+    await openArea(page, "add");
+    const sections = page.locator("details.section", { has: page.locator(":scope > summary", { hasText: /^What's on this page\?$/ }) });
     // The SOAP prompts, in the shared prompt editor; no raw measurements among the controls.
     const prayer = sections.locator('[data-prompt="prayer"]');
     await expect(prayer.count()).resolves.toBe(1);
@@ -178,8 +183,9 @@ describe("Studio home", () => {
     const choice = page.locator("button.choice", { hasText: /^Daily Reflection/ });
     await expect(choice.isDisabled()).resolves.toBe(false);
     await choice.click();
-    await page.getByRole("button", { name: "Generate" }).click();
+    await page.getByRole("button", { name: /^(Start planner|Create )/ }).click();
     await page.waitForSelector(".ps-page--editor");
+    await openArea(page, "add");
     await expect(page.getByTestId("size-variant-notice").textContent()).resolves.toMatch(/Using the Compact Daily Reflection.*not available at this size.*leaves out Stand Out Verse and Thankful For/);
     await expect(page.locator(".badge--error").count()).resolves.toBe(0);
     await page.context().close();
@@ -259,8 +265,8 @@ describe("Prompt editor in a book", () => {
     const page = await home([p], DESKTOP);
     await page.locator(".card", { hasText: "PE" }).first().getByRole("button", { name: "Open" }).click();
     await page.waitForSelector(".ps-page--editor");
-    // Open the step's card in Book structure.
-    await page.locator('details.book-step[data-step="mwg"] > summary').click();
+    // The page being viewed is the guided page: Add to page → What's on this page?
+    await openArea(page, "add");
     const editor = page.getByTestId("prompt-editor").first();
     await editor.scrollIntoViewIfNeeded();
     await editor.locator("details.subsection > summary", { hasText: "More section options" }).click();
@@ -287,11 +293,11 @@ describe("Guided Lined Page", () => {
       await page.locator("button.family-card", { hasText: /^Journal/ }).first().click();
       await page.waitForSelector("#wizard-build");
       await page.locator("button.choice", { hasText: /^Guided Lined Page$/ }).click();
-      await page.getByRole("button", { name: "Generate" }).click();
+      await page.getByRole("button", { name: /^(Start planner|Create )/ }).click();
       await page.waitForSelector(".ps-page--editor");
       await expect.poll(() => page.locator(".badge").first().textContent()).toBe("Page OK");
-      // The page's step: one section that fills the page, shown with its real line count.
-      await page.locator("details.book-step > summary").first().click();
+      // The page's sections (Add to page): one section that fills the page, shown with its real line count.
+      await openArea(page, "add");
       const editor = page.getByTestId("prompt-editor").first();
       await expect.poll(() => rows(editor)).toEqual([expect.stringMatching(/^The Word\s*Fills space · \d{2} lines/)]);
       // Three Prompt Response: 8 + 8 lines, Prayer fills what is left.
@@ -321,7 +327,7 @@ describe("Guided Lined Page", () => {
       await page.reload();
       await page.locator(".card").first().getByRole("button", { name: "Open" }).click();
       await page.waitForSelector(".ps-page--editor");
-      await page.locator("details.book-step > summary").first().click();
+      await openArea(page, "add");
       await expect.poll(() => rows(page.getByTestId("prompt-editor").first())).toEqual(saved);
       await page.context().close();
     });
@@ -330,33 +336,39 @@ describe("Guided Lined Page", () => {
 
 describe("Guided Lined Page in the simple page list", () => {
   for (const [vp, label] of [[DESKTOP, "desktop"], [PHONE, "phone"]] as const) {
-    it(`${label}: Monthly + Weekly + Notes planner → add a Guided Lined Page type → its Sections editor, real line counts, labelled in Pages`, async () => {
+    it(`${label}: planner started from Classic Monthly → add a Prompts + writing space page → its Sections editor, real line counts, labelled in Pages`, async () => {
       const page = await home([], vp);
       await page.locator("button.family-card", { hasText: /^Planner/ }).first().click();
       await page.waitForSelector("#wizard-build");
-      await page.locator("button.choice", { hasText: /^Monthly \+ Weekly \+ Notes$/ }).click();
-      await page.getByRole("button", { name: "Generate" }).click();
+      // One starting page: Classic Monthly (the planner's default start). Other pages are added under Pages.
+      await expect(page.getByTestId("planner-start").innerText()).resolves.toMatch(/Starting with: Monthly/);
+      await page.locator("button.choice", { hasText: /^Classic Monthly/ }).click();
+      await page.getByRole("button", { name: /^(Start planner|Create )/ }).click();
       await page.waitForSelector(".ps-page--editor");
       // Page label and Pages control beside the page number.
       await expect.poll(() => page.getByTestId("page-label").innerText()).toMatch(/MONTHLY PLANNER/);
-      await expect(page.getByRole("button", { name: "Pages", exact: true }).isVisible()).resolves.toBe(true);
-      // Add a page type and make it a Guided Lined Page.
-      await page.getByRole("button", { name: "Add another page type" }).click();
-      const last = page.locator("label.field", { hasText: /^Page type \d/ }).last().locator("select");
-      await last.selectOption({ label: "Guided Lined Page (title + prompt sections)" });
-      const sections = page.getByTestId("item-sections");
-      await expect.poll(() => sections.locator(".prompt-block > summary").allInnerTexts()).toEqual([expect.stringMatching(/^The Word\s*Fills space · \d+ lines/)]);
+      await expect(page.getByRole("button", { name: "Browse pages", exact: true }).isVisible()).resolves.toBe(true);
+      // Pages → a kind of page the planner doesn't list first: Prompts + writing space. Edit takes you to it.
+      await openArea(page, "pages");
+      await page.getByRole("button", { name: /^More kinds of pages/ }).click();
+      const journal = page.locator('.builder-cat[data-category="journal"]');
+      await journal.getByRole("button", { name: "+ Prompts + writing space" }).click();
+      await journal.locator(".builder-row").last().getByRole("button", { name: /^Edit / }).click();
+      await page.locator('section.area[data-area="layout"]').waitFor();
+      await openArea(page, "add");
+      const sections = page.getByTestId("prompt-editor").first();
+      await expect.poll(() => sections.locator(".prompt-block > summary").allInnerTexts()).toEqual([expect.stringMatching(/^Prompt 1/), expect.stringMatching(/^Prompt 2/), expect.stringMatching(/^Prompt 3/)]);
       await sections.getByLabel("Start from a structure (replaces the sections)").selectOption({ label: "Four Prompt Review" });
       await expect.poll(() => sections.locator(".prompt-block > summary").allInnerTexts()).toEqual([
         expect.stringMatching(/What God Did\s*8 lines/), expect.stringMatching(/Timeline\s*6 lines/), expect.stringMatching(/Fruit & Impact\s*6 lines/), expect.stringMatching(/Praise & Gratitude\s*Fills space/),
       ]);
       await expect.poll(() => page.locator(".badge").first().textContent()).toMatch(/Page OK|warning/);
       // Pages: filter Journal → the guided page, labelled with its title.
-      await page.getByRole("button", { name: "Pages", exact: true }).click();
-      const sheet = page.getByRole("dialog", { name: "Pages" });
+      await page.getByRole("button", { name: "Browse pages", exact: true }).click();
+      const sheet = page.getByRole("dialog", { name: "Browse pages" });
       await sheet.getByLabel("Show pages").selectOption("journal");
       await sheet.locator(".page-row").first().click();
-      await expect.poll(() => page.getByTestId("page-label").innerText()).toMatch(/JOURNAL PAGE\s*The Word/);
+      await expect.poll(() => page.getByTestId("page-label").innerText()).toMatch(/Guided Page/i);
       if (label === "phone") expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
       await page.context().close();
     });

@@ -5,6 +5,7 @@
  * geometry, metadata). "Bleed" appears only inside its plain explanation.
  * Technical details stay available, collapsed.
  */
+import { openArea } from "./areas";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { chromium, type Browser } from "playwright-core";
 import { preview, type PreviewServer } from "vite";
@@ -26,7 +27,7 @@ afterAll(async () => {
   await new Promise<void>((r) => server?.httpServer.close(() => r()));
 });
 
-const JARGON = /\b(gutter|cadence|recto|verso|anchor|offsets?|pitch|solver|variants?|safe area|keep-outs?|opacity|trim size|geometry|metadata|token)\b/i;
+const JARGON = /\b(gutter|cadence|recto|verso|anchor|offsets?|pitch|solver|resolver|variants?|safe area|keep-outs?|opacity|trim size|geometry|metadata|token|modules?|recipes?|capability|capabilities)\b/i;
 
 const products = (): ProductProject[] => [
   ...TEST_PRODUCTS.map((t) => t.build()),
@@ -47,15 +48,20 @@ describe("editor speaks plain language", () => {
       await page.goto(base);
       await page.locator(".card").first().getByRole("button", { name: "Open" }).click();
       await page.waitForSelector(".ps-page--editor");
-      // Open every normal section (Developer sections, Advanced and Technical details stay as they are: collapsed).
-      await page.evaluate(() =>
-        document.querySelectorAll("aside details.section").forEach((d) => {
-          if (!/^Developer/.test(d.querySelector(":scope > summary")?.textContent ?? "")) (d as HTMLDetailsElement).open = true;
-        }),
-      );
-      const visible = await page.evaluate(() =>
-        [(document.querySelector("aside") as HTMLElement).innerText, (document.querySelector(".preview-caption") as HTMLElement | null)?.innerText ?? "", ...[...document.querySelectorAll("aside select option")].map((o) => o.textContent ?? "")].join("\n"),
-      );
+      // Every normal area (Advanced holds the developer tools), each with its sections open
+      // (Developer sections and Technical details stay as they are: collapsed).
+      let visible = "";
+      for (const area of ["pages", "layout", "writing", "add", "style", "setup", "print"] as const) {
+        await openArea(page, area);
+        await page.evaluate(() =>
+          document.querySelectorAll("aside details.section").forEach((d) => {
+            if (!/^Developer/.test(d.querySelector(":scope > summary")?.textContent ?? "")) (d as HTMLDetailsElement).open = true;
+          }),
+        );
+        visible += "\n" + (await page.evaluate(() =>
+          [(document.querySelector("aside") as HTMLElement).innerText, (document.querySelector(".preview-caption") as HTMLElement | null)?.innerText ?? "", ...[...document.querySelectorAll("aside select option")].map((o) => o.textContent ?? "")].join("\n"),
+        ));
+      }
       const bad = visible.split("\n").filter((l) => JARGON.test(l));
       expect(bad, p.name).toEqual([]);
       for (const l of visible.split("\n").filter((x) => /\bbleed\b/i.test(x))) expect(l, p.name).toMatch(/Printers call this “bleed”/);

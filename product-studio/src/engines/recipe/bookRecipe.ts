@@ -64,6 +64,21 @@ const periodKind = (p: PeriodRef): PeriodKind => (p.kind === "none" || p.kind ==
 
 export function periodLabel(cal: CalendarData | null, p: PeriodRef): string | undefined {
   if (!cal) return undefined;
+  // An undated planner counts its periods and never names a date.
+  if (cal.settings.undated) {
+    switch (p.kind) {
+      case "month":
+        return `Month ${cal.months.findIndex((m) => m.key === p.key) + 1}`;
+      case "week":
+        return `Week ${cal.weeks.findIndex((w) => w.key === p.key) + 1}`;
+      case "day":
+        return `Day ${cal.days.findIndex((d) => d.iso === p.iso) + 1}`;
+      case "quarter":
+        return `Quarter ${cal.quarters.findIndex((q) => q.key === p.key) + 1}`;
+      default:
+        return undefined;
+    }
+  }
   switch (p.kind) {
     case "year":
       return String(p.year);
@@ -371,7 +386,7 @@ export function expandBook(structure: BookNode[], ctx: BookContext): ExpandedRec
     const cover = p.module!.cover!;
     p.module = { ...p.module!, cover: { ...cover, tab: { ...cover.tab!, order: cover.tab!.order ?? i + 1, count: cover.tab!.count ?? tabPages.length } } };
   });
-  if (fillers) diagnostics.push({ severity: "info", itemId: "recipe", message: `${fillers} intentional notes page(s) inserted so modules start on their required side.` });
+  if (fillers) diagnostics.push({ severity: "info", itemId: "recipe", message: `${fillers} notes page(s) added so each page starts on the side it needs.` });
   if (!pages.length) diagnostics.push({ severity: "warning", itemId: "recipe", message: "This book structure produces no pages yet." });
   return { pages, diagnostics, pageCount: pages.length };
 }

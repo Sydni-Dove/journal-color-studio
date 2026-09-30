@@ -21,7 +21,7 @@ import type { LayoutMetric, LayoutNode, SolvedPage } from "../../types/layout";
 import { CALENDAR_GRID_GAP_IN, calendarGrid, headerTitle, pageFrame, section, weekdayHeader } from "../shared/components";
 import { lineBoxIn, stackDiagnostic } from "../shared/nodes";
 import type { FitContext, FitResult, LayoutDefinition } from "../shared/types";
-import { MONTH_NAMES } from "../../engines/calendar/calendar";
+import { FILL_IN, isUndated, MONTH_NAMES } from "../../engines/calendar/calendar";
 import { heuristicMeasurer, styleForRole } from "../../engines/typography/textMeasure";
 
 /** Widest month title any month can produce ("September 2027"), measured in the title role. */
@@ -136,7 +136,7 @@ export const monthlyCalendar: LayoutDefinition = {
     const showSidebar = ctx.options.showSidebar && fit.sidebarAvailable;
 
     const frame = pageFrame(ctx, 0, { headerH: v.zones.titleH.valueIn });
-    const title = headerTitle("month-header", ctx, frame.zones, "monthYear", `${month.name} ${month.year}`, "monthTitle", "header-left");
+    const title = headerTitle("month-header", ctx, frame.zones, "monthYear", isUndated(ctx.calendar) ? `Month ${FILL_IN}` : `${month.name} ${month.year}`, "monthTitle", "header-left");
     const nodes: LayoutNode[] = [...frame.nodes, ...title.nodes];
     const diagnostics = [...frame.diagnostics, ...title.diagnostics];
     if (ctx.options.showSidebar && !showSidebar) {

@@ -55,8 +55,8 @@ describe("page navigation", () => {
     await expect.poll(() => label(page)).toMatch(/^COVER\s*Plan/i);
 
     // Pages sheet: every page listed with its type; real page thumbnails.
-    await page.getByRole("button", { name: "Pages", exact: true }).click();
-    const sheet = page.getByRole("dialog", { name: "Pages" });
+    await page.getByRole("button", { name: "Browse pages", exact: true }).click();
+    const sheet = page.getByRole("dialog", { name: "Browse pages" });
     await expect.poll(() => sheet.locator(".page-row .ps-page").count()).toBeGreaterThan(3);
     expect(await sheet.locator(".page-row").count()).toBeGreaterThan(500);
     await expect(sheet.locator('.page-row[data-page="1"]').innerText()).resolves.toMatch(/Cover — Plan/);
@@ -75,13 +75,13 @@ describe("page navigation", () => {
     expect(Number(await pageNo(page))).toBeGreaterThan(march3);
 
     // Jump to a month: its first page (the monthly calendar).
-    await page.getByRole("button", { name: "Pages", exact: true }).click();
-    await page.getByRole("dialog", { name: "Pages" }).getByLabel("Jump to").selectOption({ label: "June 2027" });
+    await page.getByRole("button", { name: "Browse pages", exact: true }).click();
+    await page.getByRole("dialog", { name: "Browse pages" }).getByLabel("Jump to").selectOption({ label: "June 2027" });
     await expect.poll(() => label(page)).toMatch(/MONTHLY PLANNER\s*June 2027/);
 
     // Jump to a section (divider).
-    await page.getByRole("button", { name: "Pages", exact: true }).click();
-    await page.getByRole("dialog", { name: "Pages" }).getByLabel("Jump to").selectOption({ label: "Wellness" });
+    await page.getByRole("button", { name: "Browse pages", exact: true }).click();
+    await page.getByRole("dialog", { name: "Browse pages" }).getByLabel("Jump to").selectOption({ label: "Wellness" });
     await expect.poll(() => label(page)).toMatch(/DIVIDER\s*Wellness/);
 
     // Navigation changed nothing: same page count, same saved book.
@@ -93,8 +93,8 @@ describe("page navigation", () => {
   it("phone: label visible, Pages opens a bottom sheet with large rows, tapping a page closes it; no horizontal overflow", async () => {
     const page = await open(book(), true);
     await expect.poll(() => label(page)).toMatch(/COVER/i);
-    await page.getByRole("button", { name: "Pages", exact: true }).click();
-    const sheet = page.getByRole("dialog", { name: "Pages" });
+    await page.getByRole("button", { name: "Browse pages", exact: true }).click();
+    const sheet = page.getByRole("dialog", { name: "Browse pages" });
     const box = (await sheet.boundingBox())!;
     expect(box.y + box.height).toBeGreaterThan(840); // anchored to the bottom of the screen
     expect(box.width).toBeLessThanOrEqual(390);

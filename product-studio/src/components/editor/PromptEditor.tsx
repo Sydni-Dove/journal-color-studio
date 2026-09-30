@@ -76,6 +76,41 @@ function HeaderEditor({ header, onChange }: { header: GuidedHeader | undefined; 
   );
 }
 
+/** "+ Add something": structured additions, grouped as a page maker thinks of them. */
+const ADD_GROUPS: { title: string; items: { label: string; block: Omit<PromptBlock, "id"> }[] }[] = [
+  {
+    title: "Writing",
+    items: [
+      { label: "Writing lines", block: { label: "Writing", space: "fill", responseStyle: "ruled" } },
+      { label: "Blank writing area", block: { label: "Notes", space: "fill", responseStyle: "blank" } },
+      { label: "Dot grid", block: { label: "Notes", space: "fill", responseStyle: "dot-grid" } },
+    ],
+  },
+  {
+    title: "Planning",
+    items: [
+      { label: "Task list", block: { label: "Tasks", space: "fixed", lineCount: 10, responseStyle: "checkboxes", taskMarker: "circle", taskMarkerPosition: "left" } },
+      { label: "Checklist", block: { label: "To Do", space: "fixed", lineCount: 8, responseStyle: "checkboxes", taskMarker: "square", taskMarkerPosition: "left" } },
+      { label: "Table", block: { label: "Table", space: "fixed", lineCount: 6, responseStyle: "table", table: { columns: ["Task", "Due", "Done"], rows: 6, showHeader: true, borders: "grid" } } },
+      { label: "Tracker", block: { label: "Tracker", space: "fixed", lineCount: 6, responseStyle: "table", table: { columns: ["Habit", "M", "T", "W", "T", "F", "S", "S"], rows: 6, showHeader: true, borders: "grid" } } },
+    ],
+  },
+  {
+    title: "Guided",
+    items: [
+      { label: "Prompt + response", block: { label: "Prompt", prompt: "Write your prompt here.", space: "fixed", lineCount: 6, responseStyle: "ruled" } },
+      { label: "Scripture", block: { label: "Scripture", space: "fixed", lineCount: 3, responseStyle: "ruled" } },
+      { label: "Reflection", block: { label: "Reflection", prompt: "What is God saying to me?", space: "fixed", lineCount: 8, responseStyle: "ruled" } },
+      { label: "Prayer", block: { label: "Prayer", space: "fixed", lineCount: 6, responseStyle: "ruled" } },
+      { label: "Journal space", block: { label: "Journal", space: "fill", responseStyle: "ruled" } },
+    ],
+  },
+  {
+    title: "Organization",
+    items: [{ label: "Notes", block: { label: "Notes", space: "fill", responseStyle: "ruled" } }],
+  },
+];
+
 export function PromptEditor({
   set,
   onChange,
@@ -285,16 +320,18 @@ export function PromptEditor({
         })}
       </ol>
       <details className="subsection add-section-menu">
-        <summary>+ Add section</summary>
+        <summary>+ Add something</summary>
         <p className="hint">Choose what you want to add. Product Studio keeps it aligned, printable, and inside the page.</p>
-        <div className="card-actions add-section-grid">
-          <button type="button" className="btn" disabled={blocks.length >= MAX_PROMPTS} onClick={() => addBlock({ label: "Writing", space: "fill", responseStyle: "ruled" })}>Writing lines</button>
-          <button type="button" className="btn" disabled={blocks.length >= MAX_PROMPTS} onClick={() => addBlock({ label: "Notes", space: "fill", responseStyle: "blank" })}>Blank writing area</button>
-          <button type="button" className="btn" disabled={blocks.length >= MAX_PROMPTS} onClick={() => addBlock({ label: "Notes", space: "fill", responseStyle: "dot-grid" })}>Dot grid</button>
-          <button type="button" className="btn" disabled={blocks.length >= MAX_PROMPTS} onClick={() => addBlock({ label: "To Do", space: "fixed", lineCount: 8, responseStyle: "checkboxes", taskMarker: "square", taskMarkerPosition: "left" })}>Checklist</button>
-          <button type="button" className="btn" disabled={blocks.length >= MAX_PROMPTS} onClick={() => addBlock({ label: "Table", space: "fixed", lineCount: 6, responseStyle: "table", table: { columns: ["Task", "Due", "Done"], rows: 6, showHeader: true, borders: "grid" } })}>Table</button>
-          <button type="button" className="btn" disabled={blocks.length >= MAX_PROMPTS} onClick={() => addBlock({ label: "Prompt", prompt: "Write your prompt here.", space: "fixed", lineCount: 6, responseStyle: "ruled" })}>Prompt + response</button>
-        </div>
+        {ADD_GROUPS.map((g) => (
+          <div key={g.title} className="add-group">
+            <div className="field-label">{g.title}</div>
+            <div className="card-actions add-section-grid">
+              {g.items.map((it) => (
+                <button key={it.label} type="button" className="btn" disabled={blocks.length >= MAX_PROMPTS} onClick={() => addBlock(it.block)}>{it.label}</button>
+              ))}
+            </div>
+          </div>
+        ))}
       </details>
       <details className="subsection">
         <summary>More section options</summary>

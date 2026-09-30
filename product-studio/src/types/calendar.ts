@@ -59,6 +59,13 @@ export type CalendarSettings = {
   weekStart: WeekStart;
   /** Force 6 rows for every month grid (universal commercial option). */
   sixRowMonths: boolean;
+  /**
+   * Undated: no real dates are printed. The planner holds `count` months,
+   * weeks or days; pages repeat as a dated planner's would, but months, weeks
+   * and days carry fill-in lines instead of dates. startDate / endDate are
+   * kept (unused) so switching back to Dated restores them.
+   */
+  undated?: { unit: "month" | "week" | "day"; count: number };
 };
 
 export type CalendarData = {

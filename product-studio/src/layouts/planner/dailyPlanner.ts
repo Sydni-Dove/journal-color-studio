@@ -24,7 +24,7 @@
  * allowed below writable minimums — a page too small for the full structure is
  * reported incompatible, never squashed.
  */
-import { MONTH_NAMES, WEEKDAY_NAMES } from "../../engines/calendar/calendar";
+import { FILL_IN, isUndated, MONTH_NAMES, WEEKDAY_NAMES } from "../../engines/calendar/calendar";
 import { getLayoutMeasurer, styleForRole } from "../../engines/typography/textMeasure";
 import { STUDIO_STROKES } from "../../presets/studioDefaults";
 import type { PageGeometry, Rect } from "../../types/geometry";
@@ -212,7 +212,7 @@ function solveDaily(ctx: LayoutContext): SolvedPage {
   const a = f.area;
   const kx = a.w / S.header.dividerW;
   nodes.push(
-    text("dl-date", { x: a.x, y: a.y, w: S.header.dateW * kx, h: S.header.dateH }, `${MONTH_NAMES[day.month - 1]} ${day.day}, ${day.year}`, "weekTitle", { component: "PageHeader", vAlign: "bottom" }),
+    text("dl-date", { x: a.x, y: a.y, w: S.header.dateW * kx, h: S.header.dateH }, isUndated(ctx.calendar) ? `Date ${FILL_IN}` : `${MONTH_NAMES[day.month - 1]} ${day.day}, ${day.year}`, "weekTitle", { component: "PageHeader", vAlign: "bottom" }),
     text("dl-subtitle", { x: a.x + 0.02, y: a.y + (S.header.subtitleY - S.header.top), w: S.header.dateW * kx, h: S.header.subtitleH }, w.dailyExecutionPage, "subheading", { component: "PageHeader", vAlign: "middle" }),
   );
   // Brand heading: right end 0.18" inside the divider's end (7.80 vs 7.98), as in the source.
@@ -229,7 +229,7 @@ function solveDaily(ctx: LayoutContext): SolvedPage {
   const verseX = b.x + (S.band.verse.x - S.band.x) * kb;
   nodes.push(
     box("dl-band", b, { component: "Section" }),
-    text("dl-weekday", { x: b.x + (S.band.weekday.x - S.band.x) * kb, y: b.y, w: S.band.weekday.w * kb, h: b.h }, WEEKDAY_NAMES[day.weekday], "subheading", { component: "SectionHeader", vAlign: "middle" }),
+    text("dl-weekday", { x: b.x + (S.band.weekday.x - S.band.x) * kb, y: b.y, w: S.band.weekday.w * kb, h: b.h }, isUndated(ctx.calendar) ? `Day ${FILL_IN}` : WEEKDAY_NAMES[day.weekday], "subheading", { component: "SectionHeader", vAlign: "middle" }),
     text("dl-verse", { x: verseX, y: b.y, w: Math.min(S.band.verse.w * kb, b.x + b.w - verseX - 0.1), h: b.h }, `${w.versePlaceholder}\u2003\u2003\u2003${w.themeLabel} ____________________`, "body", { component: "Text", vAlign: "middle" }),
   );
 
@@ -305,7 +305,7 @@ function solveDaily(ctx: LayoutContext): SolvedPage {
   // ── Footer: "<Month> Daily Planner" (+ page number) through the footer / page-number options ──
   if (f.footer) {
     nodes.push(group("p0-footer", "PageFooter", f.footer));
-    const label = [ctx.options.showFooter ? `${MONTH_NAMES[day.month - 1]} ${w.dailyPlannerFooter}` : "", ctx.options.showPageNumbers ? String(ctx.pageNumbers[0] ?? "") : ""].filter(Boolean).join("  ·  ");
+    const label = [ctx.options.showFooter ? (isUndated(ctx.calendar) ? w.dailyPlannerFooter : `${MONTH_NAMES[day.month - 1]} ${w.dailyPlannerFooter}`) : "", ctx.options.showPageNumbers ? String(ctx.pageNumbers[0] ?? "") : ""].filter(Boolean).join("  ·  ");
     if (label) nodes.push(text("p0-footer-text", f.footer, label, "footer", { component: "PageFooter", align: "center", vAlign: "middle" }));
   }
 

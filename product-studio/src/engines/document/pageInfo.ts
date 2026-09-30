@@ -114,7 +114,32 @@ function categoryOf(p: PageInstance): PageCategory {
 
 const monthLabel = (key: string) => `${MONTH_NAMES[Number(key.slice(5, 7)) - 1]} ${key.slice(0, 4)}`;
 
+/** An undated planner's pages are counted, never dated: "Month 3", "Week 12", "Day 40". */
+function undatedDateOf(doc: ResolvedDocument, p: PageInstance): { dateLabel?: string; monthKey?: string } {
+  const cal = doc.calendar!;
+  const period = p.period;
+  switch (period.kind) {
+    case "day": {
+      const i = cal.days.findIndex((d) => d.iso === period.iso);
+      return { dateLabel: `Day ${i + 1}`, monthKey: period.iso.slice(0, 7) };
+    }
+    case "week": {
+      const w = cal.weeks.find((x) => x.key === period.key);
+      return { dateLabel: `Week ${cal.weeks.findIndex((x) => x.key === period.key) + 1}`, monthKey: w?.ownerMonthKey };
+    }
+    case "month":
+      return { dateLabel: undatedMonth(doc, period.key), monthKey: period.key };
+    default:
+      return {};
+  }
+}
+
+const undatedMonth = (doc: ResolvedDocument, key: string) => `Month ${(doc.calendar?.months.findIndex((m) => m.key === key) ?? 0) + 1}`;
+/** A month's name in lists: "June 2027", or "Month 6" in an undated planner. */
+const monthName = (doc: ResolvedDocument, key: string) => (doc.calendar?.settings.undated ? undatedMonth(doc, key) : monthLabel(key));
+
 function dateOf(doc: ResolvedDocument, p: PageInstance): { dateLabel?: string; monthKey?: string } {
+  if (doc.calendar?.settings.undated) return undatedDateOf(doc, p);
   const period = p.period;
   switch (period.kind) {
     case "day": {
@@ -198,7 +223,7 @@ export function jumpTargets(doc: ResolvedDocument): JumpTarget[] {
   for (const i of info) if (i.monthKey && !months.has(i.monthKey)) months.set(i.monthKey, i.index);
   for (const [key, first] of [...months].sort((a, b) => a[0].localeCompare(b[0]))) {
     const own = doc.recipe.pages.findIndex((p) => p.period.kind === "month" && p.period.key === key);
-    out.push({ label: monthLabel(key), index: own >= 0 ? own : first, group: "Months" });
+    out.push({ label: monthName(doc, key), index: own >= 0 ? own : first, group: "Months" });
   }
   for (const i of info) if (i.category === "divider") out.push({ label: i.title ?? `Divider (page ${i.pageNumber})`, index: i.index, group: "Sections" });
   for (const c of PAGE_CATEGORIES) {

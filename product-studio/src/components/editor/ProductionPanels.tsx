@@ -1,3 +1,6 @@
+import { builderRows, stepPeriod } from "../../engines/recipe/pageBuilder";
+import { structureFromItems } from "../../engines/recipe/bookEdit";
+import { UNDATED_LIMIT } from "../../engines/calendar/calendar";
 import { layoutAvailability, solvePage, type ResolvedDocument } from "../../engines/document/resolve";
 import { sectionLineCounts, sectionPages } from "../../layouts/shared/promptPages";
 import { PROMPT_STARTERS } from "../../types/prompts";
@@ -183,14 +186,15 @@ export function repeatsFor(layoutId: string, isPad: boolean): RepeatRule["kind"]
 const GUIDED = "guided-page";
 const nextYear = new Date().getFullYear() + 1;
 
-export function PagesPanel({ project, update, doc, usage, nav }: PanelProps & { doc: ResolvedDocument; usage: ProjectUsage; nav: EditorNav }) {
-  const items = project.recipe.items;
+export function PagesPanel({ project, update, doc, usage, nav, onlyItemId, bare }: PanelProps & { doc: ResolvedDocument; usage: ProjectUsage; nav: EditorNav; onlyItemId?: string; bare?: boolean }) {
+  const all = project.recipe.items;
+  const items = onlyItemId ? all.filter((x) => x.id === onlyItemId) : all;
   const isPad = doc.binding.sheetCountIsMetadata;
   const sheets = project.production.sheetsPerPad ?? STUDIO_PAD.defaultSheets;
   const avail = layoutAvailability(doc).filter((a) => a.supportedType);
   const setItems = (next: RecipeItem[]) => update((p) => ({ ...p, recipe: { ...p.recipe, items: next } }));
 
-  const putItem = (id: string, patch: Partial<RecipeItem>) => setItems(items.map((x) => (x.id === id ? { ...x, ...patch } : x)));
+  const putItem = (id: string, patch: Partial<RecipeItem>) => setItems(all.map((x) => (x.id === id ? { ...x, ...patch } : x)));
   /** How a page type's sections fit: pages each time, a plain problem, and the lines each section gets. */
   const itemFit = (id: string): PromptFit | undefined => {
     const i = doc.recipe.pages.findIndex((p) => p.recipeItemId === id && !p.filler);
@@ -225,14 +229,7 @@ export function PagesPanel({ project, update, doc, usage, nav }: PanelProps & { 
       };
     });
 
-  const cal = project.calendar;
-  const setCal = (patch: Partial<NonNullable<ProductProject["calendar"]>>) =>
-    update((p) => ({ ...p, calendar: { ...(p.calendar ?? { startDate: `${nextYear}-01-01`, endDate: `${nextYear}-12-31`, weekStart: 1, sixRowMonths: true }), ...patch } }));
-
-  return (
-    <Section title={`Pages${isPad ? "" : ` · ${doc.recipe.pageCount} page${doc.recipe.pageCount === 1 ? "" : "s"}`}`} open>
-      {project.recipe.structure && <p className="hint">This product's pages are arranged under Book structure (below). Set its dates and the first day of the week here.</p>}
-      {!project.recipe.structure && items.map((it, i) => {
+  const cards = !project.recipe.structure && items.map((it, i) => {
         const a = avail.find((x) => x.layoutId === it.layoutId);
         const kinds = repeatsFor(it.layoutId, isPad);
         return (
@@ -278,9 +275,9 @@ export function PagesPanel({ project, update, doc, usage, nav }: PanelProps & { 
             )}
             {kinds.length > 1 ? (
               <div className="row">
-                <Select label="How often this page repeats" value={it.repeat.kind} options={kinds.map((k) => ({ value: k, label: REPEAT_LABELS[k] }))} onChange={(kind) => setItems(items.map((x) => (x.id === it.id ? { ...x, repeat: repeatFor(kind, x.repeat, sheets) } : x)))} />
+                <Select label="How often this page repeats" value={it.repeat.kind} options={kinds.map((k) => ({ value: k, label: REPEAT_LABELS[k] }))} onChange={(kind) => setItems(all.map((x) => (x.id === it.id ? { ...x, repeat: repeatFor(kind, x.repeat, sheets) } : x)))} />
                 {it.repeat.kind === "count" && (
-                  <NumberField label="Number of copies" step={1} min={1} value={it.repeat.count} onChange={(count) => setItems(items.map((x) => (x.id === it.id ? { ...x, repeat: { kind: "count", count: Math.max(1, Math.round(count)) } } : x)))} />
+                  <NumberField label="Number of copies" step={1} min={1} value={it.repeat.count} onChange={(count) => setItems(all.map((x) => (x.id === it.id ? { ...x, repeat: { kind: "count", count: Math.max(1, Math.round(count)) } } : x)))} />
                 )}
               </div>
             ) : (
@@ -288,15 +285,20 @@ export function PagesPanel({ project, update, doc, usage, nav }: PanelProps & { 
             )}
             {!isPad && items.length > 1 && (
               <div className="card-actions">
-                <button className="btn" disabled={i === 0} onClick={() => setItems(items.map((x, k) => (k === i - 1 ? it : k === i ? items[i - 1] : x)))}>Move up</button>
-                <button className="btn btn--danger" onClick={() => setItems(items.filter((x) => x.id !== it.id))}>Remove</button>
+                <button className="btn" disabled={i === 0} onClick={() => setItems(all.map((x, k) => (k === i - 1 ? it : k === i ? all[i - 1] : x)))}>Move up</button>
+                <button className="btn btn--danger" onClick={() => setItems(all.filter((x) => x.id !== it.id))}>Remove</button>
               </div>
             )}
           </div>
         );
-      })}
+      });
+  if (bare) return <>{cards}</>;
+
+  return (
+    <Section title={`Pages${isPad ? "" : ` · ${doc.recipe.pageCount} page${doc.recipe.pageCount === 1 ? "" : "s"}`}`} open>
+      {cards}
       {!isPad && !project.recipe.structure && (
-        <button className="btn" onClick={() => setItems([...items, { id: newId("r"), layoutId: "notes-page", repeat: { kind: "count", count: 1 } }])}>Add another page type</button>
+        <button className="btn" onClick={() => setItems([...all, { id: newId("r"), layoutId: "notes-page", repeat: { kind: "count", count: 1 } }])}>Add another page type</button>
       )}
       {!isPad && !project.recipe.structure && items.length > 1 && usage.calendar && (
         <Segmented
@@ -306,7 +308,62 @@ export function PagesPanel({ project, update, doc, usage, nav }: PanelProps & { 
           onChange={(ordering) => update((p) => ({ ...p, recipe: { ...p.recipe, ordering } }))}
         />
       )}
+    </Section>
+  );
+}
+
+/** The largest period an undated planner repeats by: its quantity is counted in months, weeks or days. */
+export function undatedUnit(project: ProductProject): "month" | "week" | "day" {
+  const rows = builderRows(project.recipe.structure ?? structureFromItems(project.recipe));
+  const periods = new Set(rows.map((r) => stepPeriod(r.step, r.parents)));
+  return periods.has("month") || periods.has("quarter") || periods.has("year") ? "month" : periods.has("week") ? "week" : "day";
+}
+
+/**
+ * PLANNER SETUP — the calendar behind a dated product: its date range, the
+ * first day of the week and the month grid's shape. Size and binding live in
+ * Page setup; which pages repeat lives in Pages.
+ */
+export function PlannerSetupPanel({ project, update, doc, usage, nav }: PanelProps & { doc: ResolvedDocument; usage: ProjectUsage; nav: EditorNav }) {
+  if (!usage.calendar && !usage.weekStart) return null;
+  const cal = project.calendar;
+  const setCal = (patch: Partial<NonNullable<ProductProject["calendar"]>>) =>
+    update((p) => ({ ...p, calendar: { ...(p.calendar ?? { startDate: `${nextYear}-01-01`, endDate: `${nextYear}-12-31`, weekStart: 1, sixRowMonths: true }), ...patch } }));
+  const undated = cal?.undated;
+  const unit = undatedUnit(project);
+  const UNIT_WORD = { month: "months", week: "weeks", day: "days" } as const;
+  const toUndated = () => {
+    const n = unit === "month" ? doc.calendar?.months.length : unit === "week" ? doc.calendar?.weeks.length : doc.calendar?.days.length;
+    setCal({ undated: { unit, count: Math.min(UNDATED_LIMIT[unit], n || (unit === "month" ? 12 : unit === "week" ? 52 : 90)) } });
+  };
+  return (
+    <Section title={usage.calendar ? "Planner setup" : "Week"} open>
       {usage.calendar && (
+        <>
+          <Segmented
+            label="Dates"
+            value={undated ? "undated" : "dated"}
+            options={[{ value: "dated", label: "Dated" }, { value: "undated", label: "Undated" }]}
+            onChange={(v) => (v === "undated" ? toUndated() : setCal({ undated: undefined }))}
+          />
+          <p className="hint">
+            {undated
+              ? "No dates are printed: months, weeks and days get a line to write the date on, so the planner can start any time."
+              : "Every month, week and day is printed with its real date."}
+          </p>
+        </>
+      )}
+      {usage.calendar && undated && (
+        <NumberField
+          label={`Number of ${UNIT_WORD[unit]}`}
+          step={1}
+          min={1}
+          max={UNDATED_LIMIT[unit]}
+          value={undated.unit === unit ? undated.count : 12}
+          onChange={(count) => setCal({ undated: { unit, count: Math.max(1, Math.min(UNDATED_LIMIT[unit], Math.round(count))) } })}
+        />
+      )}
+      {usage.calendar && !undated && (
         <>
           <div className="field-label">Date range</div>
           <div className="row">

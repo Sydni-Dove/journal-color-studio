@@ -38,7 +38,7 @@ describe("Page type lists page layouts only", () => {
 
 describe("Full planners & books", () => {
   it("every book recipe is still offered — as a template, none deleted", () => {
-    expect(BOOK_TEMPLATES.map((t) => t.id).sort()).toEqual(["book-daily-planner", "book-meetings-with-god", "book-meetings-with-god-daily", "book-planner-journal"]);
+    expect(BOOK_TEMPLATES.map((t) => t.id).sort()).toEqual(["book-daily-planner", "book-meetings-with-god", "book-meetings-with-god-daily", "book-planner-journal", "planner-monthly-weekly"]);
     // Each book structure the Book structure editor offers has a template that builds exactly it.
     for (const b of BOOK_PRESETS) {
       const s = noIds(b.build());
@@ -52,6 +52,8 @@ describe("Full planners & books", () => {
       "book-meetings-with-god": ["Meetings With God Planner", "Monthly and weekly planning with Meetings With God journal pages."],
       "book-meetings-with-god-daily": ["Meetings With God Planner + Daily Pages", "Monthly, weekly, Meetings With God and journal pages, plus a page for every day."],
       "book-planner-journal": ["Monthly + Weekly Journal Planner", "Monthly planning, weekly planning and a journal page every week."],
+      // A complete product, not a page: listed with the templates, never as a Monthly page layout.
+      "planner-monthly-weekly": ["Monthly + Weekly + Notes", "A calendar for every month, a weekly spread for every week, and notes pages."],
     });
     for (const t of [...BOOK_TEMPLATES.map((x) => x.label), ...BOOK_PRESETS.map((x) => x.label)]) {
       expect(t).not.toMatch(/Book:|·|\(|\)/);

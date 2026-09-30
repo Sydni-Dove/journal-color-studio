@@ -96,7 +96,7 @@ export function StationeryPanel({ project, update, usage, doc }: { project: Prod
     update((p) => ({ ...p, layoutOptions: { ...p.layoutOptions, stationery: { ...(p.layoutOptions.stationery ?? {}), [comboId]: c } } }));
   const fits = new Map(usage.layouts.map((l) => [l.layout.id, l.fit]));
   return (
-    <Section title="Page sections" open>
+    <Section title="What's on this page?" open>
       {recipes.map((r) => {
         const fit = fits.get(`stationery:${r.comboId}`);
         // Size-aware version in use (e.g. Compact Daily Reflection on small trims): say so, and show its sections only.

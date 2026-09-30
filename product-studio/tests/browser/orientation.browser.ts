@@ -4,6 +4,7 @@
  * switched to 7 × 9 in the editor — now gives a 7" × 9" portrait page, and
  * the print sheet has the same orientation.
  */
+import { openArea } from "./areas";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { chromium, type Browser } from "playwright-core";
 import { preview, type PreviewServer } from "vite";
@@ -30,9 +31,10 @@ describe("orientation follows the chosen size", () => {
     await page.locator("button.family-card", { hasText: /^Planner/ }).first().click();
     await page.waitForSelector("#wizard-build");
     await page.locator("label.field", { hasText: "Page size" }).locator("select").selectOption("11x17");
-    await page.getByRole("button", { name: "Generate" }).click();
+    await page.getByRole("button", { name: /^(Start planner|Create )/ }).click();
     await page.waitForSelector(".ps-page--editor");
     await expect.poll(() => page.locator(".preview-caption").innerText()).toMatch(/17" × 11" page/);
+    await openArea(page, "setup");
     const size = page.locator("details.section", { has: page.locator(":scope > summary", { hasText: /^Size/ }) });
     await size.evaluate((d) => ((d as HTMLDetailsElement).open = true));
     await size.locator("label.field", { hasText: "Page size" }).locator("select").selectOption("7x9");

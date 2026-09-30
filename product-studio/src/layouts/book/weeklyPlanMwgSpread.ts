@@ -7,7 +7,10 @@
  *   verso  Week of …  | open day sections (heading + lines, hairline rules; Sat | Sun share a row) + Priorities checklist
  *   recto  Meeting With God | open writing | What did God say? | Response / action steps
  */
-import { formatWeekRange } from "../../engines/calendar/calendar";
+import { formatWeekRange, FILL_IN, isUndated } from "../../engines/calendar/calendar";
+
+/** The week's dates; a fill-in line in an undated planner. */
+const weekText = (ctx: { calendar: import("../../types/calendar").CalendarData | null }, week: CalendarWeek) => (isUndated(ctx.calendar) ? FILL_IN : formatWeekRange(week));
 import { STUDIO_PLANNER, STUDIO_STROKES } from "../../presets/studioDefaults";
 import type { CalendarDay, CalendarWeek } from "../../types/calendar";
 import type { LayoutRegions } from "../../types/composition";
@@ -144,11 +147,11 @@ function drawPlan(id: string, rect: Rect, ctx: LayoutContext, week: CalendarWeek
       const lw = stacked ? labelW : inlineW;
       if (stacked) {
         nodes.push(text(`${did}-title`, { x: cell.x, y: cell.y + inset, w: labelW, h: m.nameH }, short[i], "subheading", { component: "SectionHeader" }));
-        nodes.push(text(`${did}-date`, { x: cell.x, y: cell.y + inset + m.nameH, w: labelW, h: m.dateH }, String(days[i].day), "pageTitle", { component: "SectionHeader" }));
+        nodes.push(text(`${did}-date`, { x: cell.x, y: cell.y + inset + m.nameH, w: labelW, h: m.dateH }, (isUndated(ctx.calendar) ? "" : String(days[i].day)), "pageTitle", { component: "SectionHeader" }));
       } else {
         const lineH = Math.max(m.nameH, m.dateH);
         nodes.push(text(`${did}-title`, { x: cell.x, y: cell.y + inset + (lineH - m.nameH) / 2, w: nameW, h: m.nameH }, short[i], "subheading", { component: "SectionHeader" }));
-        nodes.push(text(`${did}-date`, { x: cell.x + nameW + s.column, y: cell.y + inset + (lineH - m.dateH) / 2, w: dateW, h: m.dateH }, String(days[i].day), "pageTitle", { component: "SectionHeader" }));
+        nodes.push(text(`${did}-date`, { x: cell.x + nameW + s.column, y: cell.y + inset + (lineH - m.dateH) / 2, w: dateW, h: m.dateH }, (isUndated(ctx.calendar) ? "" : String(days[i].day)), "pageTitle", { component: "SectionHeader" }));
       }
       nodes.push(...writingSurface(`${did}-surface`, { x: cell.x + lw, y: cell.y, w: cell.w - lw, h: cell.h - pitch }, ctx));
       if (m.inlineH > cell.h + 1e-6) diagnostics.push({ severity: "error", rule: "layout-incompatible", componentId: did, message: `The ${short[i]} row is shorter than its day label at this size.` });
@@ -198,7 +201,7 @@ function solveSpread(ctx: LayoutContext): SolvedPage[] {
 
   // Verso — plan.
   const f0 = pageFrame(ctx, 0, { headerH });
-  const t0 = headerTitle("mw0-header", ctx, f0.zones, "weekOf", `${ctx.wording.weekOf} ${formatWeekRange(week)}`, "weekTitle", "header-left");
+  const t0 = headerTitle("mw0-header", ctx, f0.zones, "weekOf", `${ctx.wording.weekOf} ${weekText(ctx, week)}`, "weekTitle", "header-left");
   const plan = planOpen("mw0-days", f0.body, ctx, week);
   const verso: SolvedPage = {
     nodes: [...f0.nodes, ...t0.nodes, ...plan.nodes],

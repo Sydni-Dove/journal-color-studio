@@ -208,10 +208,40 @@ export function buildCalendar(settings: CalendarSettings): CalendarData {
   };
 }
 
+// ─── Undated planners ──────────────────────────────────────────────────────
+/**
+ * An undated planner still needs whole months, weeks and days to repeat its
+ * pages; it takes them from a fixed reference range that starts on the 1st of
+ * a month falling on the week's first day (Monday 1 Jan 2001, Sunday 1 Jan
+ * 2006), so its first week is whole. These dates are never printed.
+ */
+export const UNDATED_ANCHOR: Record<WeekStart, string> = { 1: "2001-01-01", 0: "2006-01-01" };
+export const UNDATED_LIMIT = { month: 36, week: 156, day: 1100 } as const;
+
+export function undatedRange(settings: CalendarSettings): { startDate: string; endDate: string } | null {
+  const u = settings.undated;
+  if (!u) return null;
+  const count = Math.max(1, Math.min(UNDATED_LIMIT[u.unit], Math.round(u.count)));
+  const start = UNDATED_ANCHOR[settings.weekStart];
+  if (u.unit === "day") return { startDate: start, endDate: addDays(start, count - 1) };
+  if (u.unit === "week") return { startDate: start, endDate: addDays(start, 7 * count - 1) };
+  const s = parseIso(start);
+  const lastMonth = s.month - 1 + count - 1;
+  const y = s.year + Math.floor(lastMonth / 12), m = (lastMonth % 12) + 1;
+  return { startDate: start, endDate: toIso(y, m, daysInMonth(y, m)) };
+}
+
+export const isUndated = (cal: CalendarData | null | undefined): boolean => !!cal?.settings.undated;
+
+/** A fill-in line where an undated planner would print a date. */
+export const FILL_IN = "____________";
+
 // ─── Cache: identical settings return the identical object ────────────────
 const cache = new Map<string, CalendarData>();
-export function getCalendar(settings: CalendarSettings): CalendarData {
-  const key = `${settings.startDate}|${settings.endDate}|${settings.weekStart}|${settings.sixRowMonths}`;
+export function getCalendar(input: CalendarSettings): CalendarData {
+  const range = undatedRange(input);
+  const settings = range ? { ...input, ...range } : input;
+  const key = `${settings.startDate}|${settings.endDate}|${settings.weekStart}|${settings.sixRowMonths}|${settings.undated ? "u" : "d"}`;
   let data = cache.get(key);
   if (!data) {
     data = buildCalendar(settings);

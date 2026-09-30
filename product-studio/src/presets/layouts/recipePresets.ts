@@ -1,7 +1,7 @@
 import type { ProductType } from "../../types/product";
 import type { ProductRecipe } from "../../types/recipe";
 import type { LayoutOptions } from "../../types/project";
-import { BOOK_PRESETS, dailyPlannerBook, meetingsWithGodBook, step } from "../bookRecipes";
+import { BOOK_PRESETS, dailyPlannerBook, meetingsWithGodBook, section, step, withCovers } from "../bookRecipes";
 import { PROMPT_STARTERS } from "../../types/prompts";
 import { STATIONERY_RECIPES, stationeryLayoutId } from "../stationery/catalog";
 import type { StationeryRecipe } from "../../types/stationery";
@@ -95,7 +95,7 @@ export const RECIPE_PRESETS: RecipePreset[] = [
   },
   {
     id: "planner-monthly",
-    label: "Monthly Calendar",
+    label: "Classic Monthly",
     productTypes: ["planner", "insert"],
     needsCalendar: true,
     build: () => ({ items: [{ id: "month", layoutId: "planner-monthly", repeat: { kind: "every-month" } }], ordering: "chronological" }),
@@ -103,7 +103,7 @@ export const RECIPE_PRESETS: RecipePreset[] = [
   },
   {
     id: "planner-weekly",
-    label: "Weekly Vertical Spread",
+    label: "Classic Weekly",
     productTypes: ["planner", "insert"],
     needsCalendar: true,
     build: () => ({ items: [{ id: "week", layoutId: "planner-weekly-spread", repeat: { kind: "every-week" } }], ordering: "chronological" }),
@@ -111,7 +111,7 @@ export const RECIPE_PRESETS: RecipePreset[] = [
   },
   {
     id: "planner-daily-page",
-    label: "Daily Planner Page",
+    label: "Standard Daily",
     productTypes: ["planner", "insert"],
     needsCalendar: true,
     build: () => ({ items: [{ id: "day", layoutId: "planner-daily", repeat: { kind: "every-day" } }], ordering: "chronological" }),
@@ -119,7 +119,7 @@ export const RECIPE_PRESETS: RecipePreset[] = [
   },
   {
     id: "planner-weekly-plan-spread",
-    label: "Weekly Plan Spread",
+    label: "Weekly Plan",
     productTypes: ["planner", "insert"],
     needsCalendar: true,
     build: () => ({ items: [{ id: "week", layoutId: "weekly-plan-spread", repeat: { kind: "every-week" } }], ordering: "chronological" }),
@@ -138,15 +138,17 @@ export const RECIPE_PRESETS: RecipePreset[] = [
     label: "Monthly + Weekly + Notes",
     productTypes: ["planner"],
     needsCalendar: true,
+    // A complete planner: cover, each month's calendar with its weeks, notes pages, end cover.
     build: ({ count }) => ({
-      items: [
-        { id: "month", layoutId: "planner-monthly", repeat: { kind: "every-month" } },
-        { id: "week", layoutId: "planner-weekly-spread", repeat: { kind: "every-week" } },
-        { id: "notes", layoutId: "notes-page", repeat: { kind: "count", count: Math.max(1, count) } },
-      ],
+      items: [],
       ordering: "chronological",
+      structure: withCovers([
+        section("Every Month", [step("monthly-calendar", { type: "once" }), section("Every Week", [step("weekly-planner", { type: "once" }, { layoutId: "planner-weekly-spread" })], "week")], "month"),
+        step("notes", { type: "copies", count: Math.max(1, Math.min(count, 10)) }),
+      ]),
     }),
     layoutOptions: { showSidebar: true, sidebarContent: "weeklyFocus" },
+    template: { summary: "A calendar for every month, a weekly spread for every week, and notes pages.", preview: ["planner-weekly-spread", "planner-weekly-spread#1", "planner-monthly", "notes-page"] },
   },
   {
     id: "book-daily-planner",

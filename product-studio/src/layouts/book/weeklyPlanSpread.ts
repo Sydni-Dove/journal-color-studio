@@ -12,7 +12,11 @@
  * whole lines on the writing pitch, a hairline as each day's last line, and
  * weekdays with the same number of lines on both pages.
  */
-import { formatWeekRange } from "../../engines/calendar/calendar";
+import { formatWeekRange, FILL_IN, isUndated } from "../../engines/calendar/calendar";
+import type { CalendarWeek } from "../../types/calendar";
+
+/** The week's dates; a fill-in line in an undated planner. */
+const weekText = (ctx: { calendar: import("../../types/calendar").CalendarData | null }, week: CalendarWeek) => (isUndated(ctx.calendar) ? FILL_IN : formatWeekRange(week));
 import { STUDIO_PLANNER } from "../../presets/studioDefaults";
 import type { LayoutRegions } from "../../types/composition";
 import type { LayoutDiagnostic, SolvedPage } from "../../types/layout";
@@ -36,8 +40,8 @@ function solvePlanSpread(ctx: LayoutContext): SolvedPage[] {
   const week = weekOf(ctx);
   const headerH = STUDIO_PLANNER.weeklyTitle.valueIn;
   const f = [pageFrame(ctx, 0, { headerH }), pageFrame(ctx, 1, { headerH })] as const;
-  const t0 = headerTitle("wp0-header", ctx, f[0].zones, "weekOf", `${ctx.wording.weekOf} ${formatWeekRange(week)}`, "weekTitle", "header-left");
-  const t1 = headerTitle("wp1-header", ctx, f[1].zones, "weekOf", formatWeekRange(week), "weekTitle", "header-right");
+  const t0 = headerTitle("wp0-header", ctx, f[0].zones, "weekOf", `${ctx.wording.weekOf} ${weekText(ctx, week)}`, "weekTitle", "header-left");
+  const t1 = headerTitle("wp1-header", ctx, f[1].zones, "weekOf", weekText(ctx, week), "weekTitle", "header-right");
   const plans = planAcross(["wp0-days", "wp1-days"], [f[0].body, f[1].body], ctx, week);
   return plans.map((plan, k): SolvedPage => {
     const t = k === 0 ? t0 : t1;
@@ -65,7 +69,7 @@ function solveMwgSpread(ctx: LayoutContext): SolvedPage[] {
   };
   // Recto — what God said, and the response.
   const f1 = pageFrame(ctx, 1, { headerH });
-  const t1 = headerTitle("mg1-header", ctx, f1.zones, "weekOf", week ? formatWeekRange(week) : ctx.wording.meetingWithGod, "weekTitle", "header-right");
+  const t1 = headerTitle("mg1-header", ctx, f1.zones, "weekOf", week ? weekText(ctx, week) : ctx.wording.meetingWithGod, "weekTitle", "header-right");
   const b = f1.body;
   const [said, resp] = weightedStack(b.y, b.h, MWG_RECTO_WEIGHTS, s.section).map((r) => ({ x: b.x, y: r.y, w: b.w, h: r.h }));
   const saidSec = section("mg1-said", said, ctx.wording.whatGodSaid, ctx, "surface", { titleRole: "sectionHeading" });

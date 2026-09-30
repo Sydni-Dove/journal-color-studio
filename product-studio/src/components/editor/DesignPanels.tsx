@@ -10,7 +10,7 @@ import type { ProjectUsage } from "../../engines/document/usage";
 import { GRID_PRESETS, RULING_PRESETS } from "../../engines/patterns/patterns";
 import { addVariantFromCurrent } from "../../persistence/projectStore";
 import { SPACING_LABELS } from "../../presets/spacing/spacingPresets";
-import { PALETTES, findPalette } from "../../presets/themes/palettes";
+import { findPalette } from "../../presets/themes/palettes";
 import { DEFAULT_ROLES, DESIGN_TYPE_PAIRINGS, FONT_CATALOG, FONT_CATEGORY_LABEL, ROLE_LABELS } from "../../presets/typography/typography";
 import { DEFAULT_WORDING } from "../../presets/wording";
 import { JCS_SNAPSHOT } from "../../design-library/library";
@@ -26,6 +26,9 @@ import { BACKGROUND_GROUPS, ELEMENT_GROUPS, defaultRoles, designValue, groupOf, 
 import { jcsPaletteId } from "../../design-library/palettes";
 import { isSurfaceStyle, NO_LAYER, splitLayers } from "../../themes/layers";
 import { DesignThumb } from "./DesignThumb";
+import { PalettePicker } from "./PalettePicker";
+import { useFontLoader } from "../../utils/useFontLoader";
+import { layoutName } from "../../presets/plainNames";
 import { TechnicalDetails, Visual } from "../help/visuals";
 
 type Update = (fn: (p: ProductProject) => ProductProject) => void;
@@ -33,20 +36,31 @@ type PanelProps = { project: ProductProject; update: Update; usage: ProjectUsage
 
 const SIDEBAR_HEADINGS: WordingKey[] = ["notes", "priorities", "topPriorities", "weeklyFocus", "toDo", "goals", "prayer", "prayerRequests", "gratitude", "scripture", "kingdomAssignments"];
 
-export function LayoutPanel({ project, update, usage, nav }: PanelProps) {
+export type LayoutPart = "layout" | "writing" | "add";
+const PART_TITLE: Record<LayoutPart, string> = { layout: "Page options", writing: "Writing space", add: "Extra sections" };
+
+/**
+ * Page-level options, in the part of the editor they belong to:
+ *   layout  — how the page is arranged (date position, schedule times, page numbers, footer)
+ *   writing — the writing space inside each day (sections and lines per day)
+ *   add     — extra content on the page (sidebar, daily sections)
+ */
+export function LayoutPanel({ project, update, usage, nav, part = "layout" }: PanelProps & { part?: LayoutPart }) {
   const o = project.layoutOptions;
   const set = (patch: Partial<ProductProject["layoutOptions"]>) => update((p) => ({ ...p, layoutOptions: { ...p.layoutOptions, ...patch } }));
-  const any = usage.datePlacement || usage.sidebar.supported || usage.sectionsPerDay || usage.writingRows || usage.dailySections || usage.scheduleTimes || usage.pageNumbers || usage.footer;
+  const is = { layout: part === "layout", writing: part === "writing", add: part === "add" };
+  const any = is.layout ? usage.weeklyOrientation.supported || usage.datePlacement || (usage.scheduleTimes && !usage.dailySections) || usage.pageNumbers || usage.footer : is.writing ? usage.sectionsPerDay || usage.writingRows : usage.sidebar.supported || usage.dailySections;
   if (!any) return null;
   return (
-    <Section title="Page options">
-      {usage.layouts.map(({ layout, fit }) => (
+    <Section title={PART_TITLE[part]} open={part !== "layout"}>
+      {is.layout && usage.layouts.map(({ layout, fit }) => (
         <p key={layout.id} className="hint">
-          {layout.label}: {fit.ok ? (fit.variantLabel === layout.label ? "fits this size" : `using the ${fit.variantLabel} version for this size`) : "not enough room at this size"}
+          {layoutName(layout.id, layout.label)}: {fit.ok ? (fit.variantLabel === layout.label ? "fits this size" : `using the ${fit.variantLabel} version for this size`) : "not enough room at this size"}
         </p>
       ))}
-      {usage.datePlacement && <AppliesTo ids={usage.consumers.datePlacement} nav={nav} />}
-      {usage.datePlacement && (
+      {is.layout && usage.weeklyOrientation.supported && <WeeklyOrientationControl usage={usage} value={o.weeklyOrientation} onChange={(weeklyOrientation) => set({ weeklyOrientation })} />}
+      {is.layout && usage.datePlacement && <AppliesTo ids={usage.consumers.datePlacement} nav={nav} />}
+      {is.layout && usage.datePlacement && (
         <Segmented
           label="Where dates sit in calendar boxes"
           value={o.datePlacement}
@@ -54,7 +68,7 @@ export function LayoutPanel({ project, update, usage, nav }: PanelProps) {
           onChange={(datePlacement) => set({ datePlacement })}
         />
       )}
-      {usage.sidebar.supported && (
+      {is.add && usage.sidebar.supported && (
         <>
           {usage.sidebar.available && <AppliesTo ids={usage.consumers.sidebar} nav={nav} />}
           <label className="check">
@@ -77,11 +91,11 @@ export function LayoutPanel({ project, update, usage, nav }: PanelProps) {
           )}
         </>
       )}
-      {usage.sectionsPerDay && <AppliesTo ids={usage.consumers.sectionsPerDay} nav={nav} />}
-      {usage.sectionsPerDay && <NumberField label="Sections per day" step={1} min={1} max={6} value={o.sectionsPerDay} onChange={(v) => set({ sectionsPerDay: Math.max(1, Math.round(v)) })} />}
-      {usage.writingRows && <NumberField label="Writing lines per day" step={1} min={1} max={8} value={o.writingRowsPerDay} onChange={(v) => set({ writingRowsPerDay: Math.max(1, Math.round(v)) })} />}
-      {usage.dailySections && <DailySectionsControl project={project} set={set} />}
-      {usage.scheduleTimes && !usage.dailySections && (
+      {is.writing && usage.sectionsPerDay && <AppliesTo ids={usage.consumers.sectionsPerDay} nav={nav} />}
+      {is.writing && usage.sectionsPerDay && <NumberField label="Sections per day" step={1} min={1} max={6} value={o.sectionsPerDay} onChange={(v) => set({ sectionsPerDay: Math.max(1, Math.round(v)) })} />}
+      {is.writing && usage.writingRows && <NumberField label="Writing lines per day" step={1} min={1} max={8} value={o.writingRowsPerDay} onChange={(v) => set({ writingRowsPerDay: Math.max(1, Math.round(v)) })} />}
+      {is.add && usage.dailySections && <DailySectionsControl project={project} set={set} />}
+      {is.layout && usage.scheduleTimes && !usage.dailySections && (
         <Segmented
           label="Schedule times"
           value={o.scheduleTimes ?? "printed"}
@@ -89,9 +103,36 @@ export function LayoutPanel({ project, update, usage, nav }: PanelProps) {
           onChange={(scheduleTimes) => set({ scheduleTimes })}
         />
       )}
-      {usage.pageNumbers && <Check label="Page numbers" checked={o.showPageNumbers} onChange={(showPageNumbers) => set({ showPageNumbers })} />}
-      {usage.footer && <Check label="Footer with the product name" checked={o.showFooter} onChange={(showFooter) => set({ showFooter })} />}
+      {is.layout && usage.pageNumbers && <Check label="Page numbers" checked={o.showPageNumbers} onChange={(showPageNumbers) => set({ showPageNumbers })} />}
+      {is.layout && usage.footer && <Check label="Footer with the product name" checked={o.showFooter} onChange={(showFooter) => set({ showFooter })} />}
     </Section>
+  );
+}
+
+/**
+ * Classic Weekly: how the week's days are arranged across its two pages —
+ * as columns (Vertical) or as rows (Horizontal). An arrangement that cannot
+ * fit at this size is shown, disabled, with the reason.
+ */
+function WeeklyOrientationControl({ usage, value, onChange }: { usage: ProjectUsage; value: ProductProject["layoutOptions"]["weeklyOrientation"]; onChange: (v: "vertical" | "horizontal") => void }) {
+  const w = usage.weeklyOrientation;
+  const current = w.current ?? "vertical";
+  const opts = [
+    { v: "vertical" as const, label: "Vertical", hint: "Two pages · days side by side in columns", ok: w.vertical },
+    { v: "horizontal" as const, label: "Horizontal", hint: "Two pages · days stacked in rows", ok: w.horizontal },
+  ];
+  return (
+    <div className="field" data-testid="weekly-orientation">
+      <span className="field-label">Classic Weekly: how the days are arranged</span>
+      <div className="segmented" role="group" aria-label="How the days are arranged">
+        {opts.map((o) => (
+          <button key={o.v} type="button" aria-pressed={current === o.v} disabled={!o.ok} onClick={() => onChange(o.v)} style={{ minHeight: 44 }}>
+            {o.label}
+          </button>
+        ))}
+      </div>
+      <p className="hint">{opts.find((o) => o.v === current)!.hint}.{!w.vertical ? " Columns need a wider page; this size uses rows." : !w.horizontal ? " Rows need a taller page at this size." : value === undefined || value === "auto" ? "" : ""}</p>
+    </div>
   );
 }
 
@@ -232,18 +273,11 @@ export function TypographyPanel({ project, update, usage }: PanelProps) {
   const groups = (Object.keys(GROUP_LABEL) as FontGroup[]).filter((g) => usage.fontGroups.includes(g));
   return (
     <Section title="Typography">
-      <Select
-        label="Font pairing"
-        value={DESIGN_TYPE_PAIRINGS.find((t) => Object.entries(t.fonts).every(([g, f]) => fonts[g as FontGroup] === f))?.id ?? "__custom"}
-        options={[{ value: "__custom", label: "Custom — choose each font below" }, ...DESIGN_TYPE_PAIRINGS.map((t) => ({ value: t.id, label: t.label }))]}
-        onChange={(id) => {
-          const t = DESIGN_TYPE_PAIRINGS.find((x) => x.id === id);
-          if (t) update((p) => ({ ...p, typography: { ...p.typography, fonts: { ...p.typography.fonts, ...t.fonts } } }));
-        }}
-      />
+      <TypePairings fonts={fonts} onPick={(f) => update((p) => ({ ...p, typography: { ...p.typography, fonts: { ...p.typography.fonts, ...f } } }))} />
+      <div className="field-label">Or choose each font</div>
       {groups.map((g) => (
         <Field key={g} label={GROUP_LABEL[g]}>
-          <select value={fonts[g]} onChange={(e) => update((p) => ({ ...p, typography: { ...p.typography, fonts: { ...p.typography.fonts, [g]: e.target.value } } }))}>
+          <select value={fonts[g]} style={{ fontFamily: `'${fonts[g]}'` }} onChange={(e) => update((p) => ({ ...p, typography: { ...p.typography, fonts: { ...p.typography.fonts, [g]: e.target.value } } }))}>
             {categories.map((c) => (
               <optgroup key={c} label={FONT_CATEGORY_LABEL[c]}>
                 {FONT_CATALOG.filter((f) => f.category === c).map((f) => (
@@ -269,6 +303,24 @@ export function TypographyPanel({ project, update, usage }: PanelProps) {
       </div>
       <p className="hint">If text no longer fits, Page check tells you — text is never made smaller without telling you.</p>
     </Section>
+  );
+}
+
+/** Font pairings shown as what they look like: a title in the heading font over a line of body text. */
+function TypePairings({ fonts, onPick }: { fonts: ProductProject["typography"]["fonts"]; onPick: (f: Partial<ProductProject["typography"]["fonts"]>) => void }) {
+  useFontLoader(fonts, [...new Set(DESIGN_TYPE_PAIRINGS.flatMap((t) => Object.values(t.fonts)))]);
+  const current = DESIGN_TYPE_PAIRINGS.find((t) => Object.entries(t.fonts).every(([g, f]) => fonts[g as FontGroup] === f))?.id;
+  return (
+    <div className="type-grid" role="group" aria-label="Font pairing">
+      {DESIGN_TYPE_PAIRINGS.map((t) => (
+        <button key={t.id} type="button" className="type-card" data-pairing={t.id} aria-pressed={t.id === current} aria-label={t.label} onClick={() => onPick(t.fonts)}>
+          <span className="type-card__title" style={{ fontFamily: `'${t.fonts.cover ?? t.fonts.headings}', serif` }}>Plan</span>
+          <span className="type-card__heading" style={{ fontFamily: `'${t.fonts.headings}', serif` }}>This Week</span>
+          <span className="type-card__body" style={{ fontFamily: `'${t.fonts.body ?? fonts.body}', sans-serif` }}>Write what God is saying today.</span>
+          <span className="type-card__name">{t.short ?? t.label}</span>
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -329,28 +381,13 @@ export function ColorPanel({ project, update, usage }: PanelProps) {
   const view = applyVariant(project);
   const effective = { ...palette.colors, ...view.colors.overrides };
   const active = project.variants.find((v) => v.id === project.activeVariantId);
-  const groups = [
-    { label: "Dove Expressions brand", list: PALETTES.filter((p) => p.brandPalette) },
-    { label: "Journal Color Studio palettes", list: PALETTES.filter((p) => p.source && p.group !== "family") },
-    { label: "Journal Color Studio color families", list: PALETTES.filter((p) => p.source && p.group === "family") },
-    { label: "Draft palettes (pending approval)", list: PALETTES.filter((p) => !p.brandPalette && !p.source) },
-  ];
   const editable = usage.colorTokens.filter((t) => HEX.test(effective[t]));
   return (
-    <Section title={"Theme & palette"}>
-      <Field label="Palette">
-        <select value={project.colors.paletteId} onChange={(e) => update((p) => ({ ...p, colors: { paletteId: e.target.value, overrides: {} } }))}>
-          {groups.map((g) => (
-            <optgroup key={g.label} label={g.label}>
-              {g.list.map((p) => (
-                <option key={p.id} value={p.id}>{p.label}</option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
-      </Field>
+    <Section title="Colors" open>
+      <PalettePicker value={project.colors.paletteId} onPick={(paletteId) => update((p) => ({ ...p, colors: { paletteId, overrides: {} } }))} />
       {palette.note && <p className="hint">{palette.brandPalette ? "" : "⚠ "}{palette.note}</p>}
       {active && <p className="hint">Editing the colors of the design option “{active.name}”.</p>}
+      {editable.length > 0 && <div className="field-label">Fine-tune each color</div>}
       <div className="row">
         {editable.map((t) => (
           <label key={t} className="field" style={{ flex: "0 0 auto" }}>
@@ -372,7 +409,7 @@ export function ColorPanel({ project, update, usage }: PanelProps) {
 export function WordingPanel({ project, update, usage }: PanelProps) {
   if (!usage.wordingKeys.length) return null;
   return (
-    <Section title="Wording">
+    <Section title="Titles & labels">
       <p className="hint">Renaming a label here changes it on every page that uses it.</p>
       {usage.wordingKeys.map((k) => (
         <Field key={k} label={DEFAULT_WORDING[k] || k}>
@@ -597,7 +634,7 @@ export function DecorationPanel({ project, update, usage, decor }: PanelProps & 
   // Show each token's actual colour: tokens that share a colour in this palette look identical on the page.
   const tokenOptions = DECOR_TOKENS.map((c) => ({ value: c, label: decor?.colors[c] ? `${TOKEN_LABEL[c]} · ${decor.colors[c]}` : TOKEN_LABEL[c] }));
   return (
-    <Section title="Decorative elements">
+    <Section title="Decorations">
       <p className="hint">One piece of artwork placed on a part of the page — beside the title, in the corners, along an edge, or at the top or bottom. It never moves your writing lines or calendars, and keeps a little space from them.</p>
       <TechnicalDetails>Artwork snapshot from Journal Color Studio, commit {JCS_SNAPSHOT.commit}.</TechnicalDetails>
       <DesignPicker label="Decorative element" groups={ELEMENT_GROUPS} value={designValue(d)} colors={decor?.colors} roles={d} original={original} onPick={(c) => set(pickDesign(d, c))} />
@@ -768,7 +805,7 @@ export function TextPlacementPanel({ project, update, usage, nav }: PanelProps) 
 
 export function VariantsPanel({ project, update }: PanelProps) {
   return (
-    <Section title={`Design options · ${project.variants.length}`}>
+    <Section title={`Saved looks · ${project.variants.length}`}>
       <p className="hint">Design options share the same pages and layout. Each can have its own colors, decoration and title — for example, one journal in several colorways.</p>
       <Select
         label="Showing"

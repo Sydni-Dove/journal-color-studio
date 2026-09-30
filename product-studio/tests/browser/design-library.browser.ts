@@ -6,6 +6,7 @@
  *   compat   a project saved before the split opens with its marble unchanged
  *   phone    no page-level horizontal overflow
  */
+import { openArea } from "./areas";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { chromium, type Browser, type Page } from "playwright-core";
 import { preview, type PreviewServer } from "vite";
@@ -40,6 +41,7 @@ async function open(p: ProductProject, viewport = { width: 1400, height: 1000 })
   await page.goto(base);
   await page.locator(".card", { hasText: p.name }).first().getByRole("button", { name: "Open" }).click();
   await page.waitForSelector(".ps-page--editor");
+  await openArea(page, "style");
   return page;
 }
 const section = (page: Page, title: string) => page.locator("details.section", { has: page.locator(":scope > summary", { hasText: new RegExp(`^${title}$`) }) }).first();
@@ -75,7 +77,7 @@ describe("Background vs Decorative elements", () => {
     const p = { ...TEST_PRODUCTS[2].build(), name: "DL monthly" };
     p.colors = { paletteId: "jcs-rose-marble", overrides: {} };
     const page = await open(p);
-    const bg = section(page, "Background"), el = section(page, "Decorative elements");
+    const bg = section(page, "Background"), el = section(page, "Decorations");
     await bg.locator(":scope > summary").click();
     await el.locator(":scope > summary").click();
     await expect(bg.getByRole("tab").allTextContents()).resolves.toEqual(["None", "Marble", "Watercolor", "Stripes", "Solid"]);
@@ -111,9 +113,11 @@ describe("Background vs Decorative elements", () => {
     const page = await open(p);
     await settled(page);
     const rose = (await bgColor(page))!;
-    const th = section(page, "Theme & palette");
-    await th.locator(":scope > summary").click();
-    await th.locator("select").first().selectOption("jcs-emerald-gold");
+    // Colors: palettes are swatch cards; show them all, pick emerald + gold.
+    const th = section(page, "Colors");
+    if ((await th.getAttribute("open")) === null) await th.locator(":scope > summary").click();
+    await th.getByRole("button", { name: /^All \(/ }).click();
+    await th.locator('.palette-card[data-palette="jcs-emerald-gold"]').click();
     await settled(page);
     await page.waitForTimeout(100);
     const emerald = (await bgColor(page))!;
@@ -157,7 +161,7 @@ describe("Background vs Decorative elements", () => {
     await page.context().close();
 
     page = await open(daily("DL luxury", "8.5x11", "daily-luxury-execution"));
-    const el = section(page, "Decorative elements");
+    const el = section(page, "Decorations");
     await el.locator(":scope > summary").click();
     await el.getByRole("tab", { name: "Floral" }).click();
     await el.locator('.design-card:has([data-thumb="jcs-floral-sprig"])').click();
@@ -169,7 +173,7 @@ describe("Background vs Decorative elements", () => {
 
   it("phone: both pickers fit, no page-level horizontal overflow", async () => {
     const page = await open({ ...TEST_PRODUCTS[0].build(), name: "DL phone" }, { width: 390, height: 844 });
-    for (const t of ["Background", "Decorative elements"]) {
+    for (const t of ["Background", "Decorations"]) {
       await section(page, t).locator(":scope > summary").click();
       await section(page, t).getByRole("tab").nth(1).click();
     }

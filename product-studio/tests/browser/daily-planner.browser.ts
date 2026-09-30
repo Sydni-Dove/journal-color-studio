@@ -7,6 +7,7 @@
  * and the 2 × 4 weekly grid, which gives each day more lines than the draft's
  * three. The flows checked are unchanged.
  */
+import { openArea, openOrder, openSection } from "./areas";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { chromium, type Browser, type Page } from "playwright-core";
 import { preview, type PreviewServer } from "vite";
@@ -87,9 +88,10 @@ describe("Daily planner browser QA", () => {
     const p = project();
     p.recipe.structure = [step("notes", { type: "copies", count: 1 }, { id: "edit-daily" })];
     const page = await open(p);
-    const card = page.locator('[data-step="edit-daily"]');
+    await openOrder(page);
+    const card = page.locator('details.book-step[data-step="edit-daily"]');
     await card.locator(":scope > summary").click();
-    await card.getByLabel("Page purpose").selectOption("daily-planner");
+    await card.getByLabel("Page type").selectOption("daily-planner");
     await card.getByLabel("How often").selectOption("daily");
     await card.getByRole("button", { name: "Show pages" }).click();
     await expect.poll(() => page.locator('.ps-page--editor [data-node="dy-header-title"]').textContent()).toBe("Friday, January 29");
@@ -99,8 +101,9 @@ describe("Daily planner browser QA", () => {
     await page.locator(".card", { hasText: p.name }).first().getByRole("button", { name: "Open", exact: true }).click();
     await expect.poll(() => page.locator('.ps-page--editor [data-node="dy-header-title"]').textContent()).toBe("Friday, January 29");
     await expect(page.locator('.ps-page--editor [data-node="dy-year"]').textContent()).resolves.toBe("2027");
-    const panel = page.locator("details.section", { has: page.locator(":scope > summary", { hasText: /^Page options/ }) });
-    if ((await panel.getAttribute("open")) === null) await panel.locator(":scope > summary").click();
+    // The daily sections and their schedule hours are extra content: Add to page.
+    await openArea(page, "add");
+    const panel = await openSection(page, /^Extra sections/);
     const start = panel.getByRole("spinbutton", { name: "First hour (0–23, e.g. 6 = 6 AM)" });
     await start.fill("8"); await start.press("Enter");
     await expect.poll(() => page.locator('.ps-page--editor [data-node="dy-hour-0"]').textContent()).toBe("8 AM");

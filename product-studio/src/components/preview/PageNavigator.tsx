@@ -93,9 +93,9 @@ export function PageNavigator({ doc, index, onIndex, filter, onFilter, onClose }
 
   return (
     <div className="sheet-backdrop" onClick={onClose}>
-      <div className="sheet" role="dialog" aria-modal="true" aria-label="Pages" onClick={(e) => e.stopPropagation()}>
+      <div className="sheet" role="dialog" aria-modal="true" aria-label="Browse pages" onClick={(e) => e.stopPropagation()}>
         <div className="sheet__head">
-          <h2>Pages</h2>
+          <h2>Browse pages</h2>
           <button ref={closeRef} type="button" className="btn" onClick={onClose}>Close</button>
         </div>
         <div className="sheet__controls">

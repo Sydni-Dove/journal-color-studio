@@ -3,6 +3,7 @@
  * first): the outline jumps to a module's page, a structure edit changes the
  * generated book, and neither panel overflows a phone screen.
  */
+import { openOrder, openOutline } from "./areas";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { chromium, type Browser, type Page } from "playwright-core";
 import { preview, type PreviewServer } from "vite";
@@ -50,13 +51,11 @@ async function open(viewport: { width: number; height: number }): Promise<Page> 
   await page.waitForSelector(".ps-page--editor");
   return page;
 }
-const section = (page: Page, re: RegExp) => page.locator("details.section", { has: page.locator(":scope > summary", { hasText: re }) });
 
 describe("Book Structure editor", () => {
   it("outline jumps to the week's plan spread; the plan and the Meeting With God spread after it render with no errors", async () => {
     const page = await open({ width: 1400, height: 1000 });
-    const outline = section(page, /^Book outline/);
-    await outline.locator(":scope > summary").click();
+    const outline = await openOutline(page);
     await outline.locator("button", { hasText: /Week of Jan 4/ }).click();
     await expect.poll(() => page.locator(".ps-page--editor .ps-text", { hasText: /^Week of Jan 4/ }).count()).toBeGreaterThan(0);
     await expect.poll(async () => (await page.locator(".badge").first().textContent()) ?? "").toMatch(/Page OK|warning/);
@@ -70,14 +69,15 @@ describe("Book Structure editor", () => {
 
   it("editing a step re-expands the book: 1 journal page per week → each next spread gets an intentional notes page", async () => {
     const page = await open({ width: 1400, height: 1000 });
-    const outline = section(page, /^Book outline/);
-    await outline.locator(":scope > summary").click();
+    let outline = await openOutline(page);
     await expect.poll(() => outline.locator("button", { hasText: /Journal × 2/ }).count()).toBeGreaterThan(10);
+    await openOrder(page);
     const journal = page.locator("details.book-step", { hasText: /Journal × 2/ });
     await journal.locator(":scope > summary").click();
     const field = journal.getByLabel("Pages each time");
     await field.fill("1");
     await field.press("Enter");
+    outline = await openOutline(page);
     // Spread (2) + 1 journal = 3 pages a week, so every following spread needs one notes page to open on the left.
     await expect.poll(() => outline.locator("button", { hasText: /Journal × 2/ }).count()).toBe(0);
     await expect.poll(() => outline.locator(".book-outline__filler").count()).toBeGreaterThan(10);
@@ -87,19 +87,19 @@ describe("Book Structure editor", () => {
 
   it("How often offers only the cadences a page purpose supports; a daily devotional adds a dated page per day", async () => {
     const page = await open({ width: 1400, height: 1000 });
+    await openOrder(page);
     // Pin the card by its step id: its title changes with the purpose.
     const id = await page.locator("details.book-step", { hasText: /Journal × 2/ }).first().getAttribute("data-step");
     const step = page.locator(`details.book-step[data-step="${id}"]`);
     await step.locator(":scope > summary").click();
     const often = () => step.getByLabel("How often").locator("option").allTextContents();
     await expect(often()).resolves.toContain("Every day of the week");
-    await step.getByLabel("Page purpose").selectOption("monthly-calendar");
+    await step.getByLabel("Page type").selectOption("monthly-calendar");
     await expect.poll(async () => (await often()).some((o) => /Every day/.test(o))).toBe(false);
-    await step.getByLabel("Page purpose").selectOption("devotional");
+    await step.getByLabel("Page type").selectOption("devotional");
     await expect.poll(async () => (await often()).includes("Every day of the week")).toBe(true);
     await step.getByLabel("How often").selectOption({ label: "Every day of the week" });
-    const outline = section(page, /^Book outline/);
-    await outline.locator(":scope > summary").click();
+    const outline = await openOutline(page);
     // Jan 1 – Mar 31 2027: 90 dated devotional pages.
     await expect.poll(() => outline.locator("button", { hasText: /Devotional/ }).count()).toBe(90);
     await page.context().close();
@@ -107,7 +107,8 @@ describe("Book Structure editor", () => {
 
   it("phone: structure + outline panels never widen the page", async () => {
     const page = await open({ width: 393, height: 852 });
-    await section(page, /^Book outline/).locator(":scope > summary").click();
+    await openOutline(page);
+    await openOrder(page);
     await page.locator("details.book-step").first().locator(":scope > summary").click();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(0);

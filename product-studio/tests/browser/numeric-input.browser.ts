@@ -3,6 +3,7 @@
  * Backspace / Delete behave normally: a field can be emptied while typing and
  * the number is committed on Enter / blur, then validated.
  */
+import { openArea, type Area } from "./areas";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { chromium, type Browser, type Locator, type Page } from "playwright-core";
 import { preview, type PreviewServer } from "vite";
@@ -37,7 +38,7 @@ afterAll(async () => {
   await new Promise<void>((r) => server?.httpServer.close(() => r()));
 });
 
-async function open(product: ProductProject) {
+async function open(product: ProductProject, area?: Area) {
   const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
   page = await ctx.newPage();
   await page.goto(base);
@@ -48,6 +49,7 @@ async function open(product: ProductProject) {
   await page.goto(base);
   await page.locator(".card", { hasText: product.name }).first().getByRole("button", { name: "Open" }).click();
   await page.waitForSelector(".ps-page--editor");
+  if (area) await openArea(page, area);
   await page.evaluate(() => document.querySelectorAll("aside details").forEach((d) => ((d as HTMLDetailsElement).open = true)));
 }
 
@@ -87,7 +89,7 @@ describe("numeric fields edit naturally (real keystrokes)", () => {
   }, 60_000);
 
   it("page count (Copies): 33 → ⌫ ⌫ → 120 commits 120 pages", async () => {
-    await open(journal());
+    await open(journal(), "layout");
     const field = page.getByLabel("Number of copies", { exact: true });
     await replace33with120(field, "Tab");
     await expect.poll(() => field.inputValue()).toBe("120");
@@ -96,7 +98,7 @@ describe("numeric fields edit naturally (real keystrokes)", () => {
   }, 60_000);
 
   it("sections per day: 3 → ⌫ → 2 commits and re-solves the spread", async () => {
-    await open(weekly());
+    await open(weekly(), "writing");
     await page.getByRole("button", { name: "Next page" }).click();
     const before = await page.locator(".ps-page--editor").first().innerHTML();
     const field = page.getByLabel("Sections per day", { exact: true });
@@ -111,7 +113,7 @@ describe("numeric fields edit naturally (real keystrokes)", () => {
   }, 60_000);
 
   it("decoration opacity: 1 → ⌫ → '' → '.5' commits 0.5", async () => {
-    await open(journal());
+    await open(journal(), "style");
     const field = page.locator("details", { has: page.locator("summary", { hasText: /^Background$/ }) }).getByLabel("Strength (0.05 faint – 1 full)", { exact: true });
     await caretToEnd(field);
     await field.press("Backspace");
@@ -124,7 +126,7 @@ describe("numeric fields edit naturally (real keystrokes)", () => {
   }, 60_000);
 
   it("text offset: '-' is a valid in-between state; '-0.25' commits", async () => {
-    await open(weekly());
+    await open(weekly(), "advanced");
     const field = page.getByLabel("Move left / right (inches)").first();
     await caretToEnd(field);
     await field.press("Backspace");
@@ -137,7 +139,7 @@ describe("numeric fields edit naturally (real keystrokes)", () => {
   }, 60_000);
 
   it("margins: blank means studio default (allowed); a value commits on blur", async () => {
-    await open(journal());
+    await open(journal(), "setup");
     // Custom margins live under "Custom margins (advanced)"; open() expands every section, including it.
     await expect(page.locator("details.advanced", { has: page.locator("summary", { hasText: "Custom margins (advanced)" }) }).evaluate((e) => (e as HTMLDetailsElement).open)).resolves.toBe(true);
     const top = page.getByLabel("Top (inches)", { exact: true });
@@ -154,7 +156,7 @@ describe("numeric fields edit naturally (real keystrokes)", () => {
   }, 60_000);
 
   it("invalid commit (empty required field) is reported and reverts; Escape cancels", async () => {
-    await open(journal());
+    await open(journal(), "layout");
     const field = page.getByLabel("Number of copies", { exact: true });
     const original = await field.inputValue();
     await caretToEnd(field);

@@ -13,7 +13,7 @@ import type { ColorToken, FontGroup, TypographyRole, WordingKey } from "../../ty
 import { anchorsFor } from "../../layouts/shared/components";
 import type { CompositionAnchor } from "../../types/composition";
 import type { SemanticTextKey, TextAnchor } from "../../types/layout";
-import { compositionFor, recipeLayouts, solvePage, type ResolvedDocument } from "./resolve";
+import { compositionFor, recipeLayouts, representativeGeometry, solvePage, type ResolvedDocument } from "./resolve";
 
 export type ProjectUsage = {
   layouts: { layout: LayoutDefinition; fit: FitResult }[];
@@ -22,6 +22,8 @@ export type ProjectUsage = {
   sidebar: { supported: boolean; available: boolean; reason?: string };
   datePlacement: boolean;
   sectionsPerDay: boolean;
+  /** A Classic Weekly spread is in the product: its days can be columns or rows. */
+  weeklyOrientation: { supported: boolean; vertical: boolean; horizontal: boolean; current?: "vertical" | "horizontal" };
   writingRows: boolean;
   /** A daily layout is in the product: its section list and schedule hours apply. */
   dailySections: boolean;
@@ -139,6 +141,7 @@ export function computeUsage(doc: ResolvedDocument): ProjectUsage {
     dailySections: daily,
     scheduleTimes: any((c) => !!c.supportsScheduleTimes),
     sectionsPerDay: layouts.some((l) => l.layout.capability.supportsSectionsPerDay && l.fit.ok && l.fit.variant === "vertical"),
+    weeklyOrientation: weeklyOrientationUsage(doc, layouts),
     writingRows: any((c) => c.supportsWritingRows),
     pageNumbers: any((c) => c.supportsPageNumbers),
     footer: any((c) => c.supportsFooter),
@@ -150,6 +153,22 @@ export function computeUsage(doc: ResolvedDocument): ProjectUsage {
     colorTokens: [...tokens],
     spreads: doc.recipe.pages.some((p) => p.side !== "single"),
     incompatible: layouts.filter((l) => !l.fit.ok).map((l) => ({ layoutId: l.layout.id, label: l.layout.label, reason: l.fit.ok ? "" : l.fit.reason })),
+  };
+}
+
+/** Which weekly arrangements fit this size (each tried as the maker's choice), and the one in use. */
+function weeklyOrientationUsage(doc: ResolvedDocument, layouts: { layout: LayoutDefinition; fit: FitResult }[]): ProjectUsage["weeklyOrientation"] {
+  const weekly = layouts.find((l) => l.layout.id === "planner-weekly-spread");
+  if (!weekly || !weekly.fit.ok) return { supported: false, vertical: false, horizontal: false };
+  const page = representativeGeometry(doc);
+  const tryFit = (weeklyOrientation: "vertical" | "horizontal") =>
+    weekly.layout.fit({ page, spacing: doc.spacing, typography: doc.typography, options: { ...doc.project.layoutOptions, weeklyOrientation }, pattern: doc.project.functionalPattern });
+  const v = tryFit("vertical"), h = tryFit("horizontal");
+  return {
+    supported: true,
+    vertical: !!v && v.ok && v.variant === "vertical",
+    horizontal: !!h && h.ok && h.variant === "horizontal",
+    current: weekly.fit.variant === "horizontal" ? "horizontal" : "vertical",
   };
 }
 

@@ -79,6 +79,10 @@ export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: 
   const [year, setYear] = useState(nextYear);
   const [weekStart, setWeekStart] = useState<WeekStart>(1);
   const [name, setName] = useState("");
+  const [changingStart, setChangingStart] = useState(false);
+  // A planner starts from ONE kind of page; complete products (Monthly + Weekly + Notes, …) are templates, and
+  // Meeting With God beside the week is added as content from Pages.
+  const plannerStarts = recipes.filter((r) => !r.template && r.id !== "planner-weekly-mwg");
 
   const pickType = (t: ProductType) => {
     const d = PRODUCT_TYPES[t];
@@ -236,30 +240,50 @@ export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: 
         </section>
 
         <section className="step">
-          <h3>4 · {type === "planner" ? "Planner pages" : "Page"}</h3>
+          <h3>4 · {type === "planner" ? "Start with a planner page" : "Page"}</h3>
           {type === "planner" ? (
-            <div className="planner-page-categories">
-              <p className="hint">Choose what kind of planner page you want first. Then choose the layout.</p>
-              {PLANNER_CATEGORY_ORDER.map((category) => {
-                const options = recipes.filter((r) => plannerCategoryFor(r.id) === category);
-                if (!options.length) return null;
-                return (
-                  <details className="wizard-category" key={category} open={options.some((r) => r.id === recipeId)}>
-                    <summary>{category}</summary>
-                    <div className="choice-row" role="group" aria-label={category}>
-                      {options.map((r) => {
-                        const problem = recipeFit(r);
-                        return (
-                          <button key={r.id} type="button" className="choice choice--layout" aria-pressed={r.id === recipeId} disabled={!!problem} title={problem ?? undefined} onClick={() => setRecipeId(r.id)}>
-                            <strong>{r.label}</strong>
-                            {problem && <span>Not enough room at this size</span>}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </details>
-                );
-              })}
+            <div className="planner-start" data-testid="planner-start">
+              {!changingStart ? (
+                <>
+                  <p className="planner-start__now">
+                    Starting with: <strong>{plannerCategoryFor(recipeId)}</strong>{" "}
+                    <button type="button" className="btn btn--ghost" onClick={() => setChangingStart(true)}>Change selection</button>
+                  </p>
+                  <div className="field-label">Choose layout</div>
+                  <div className="choice-row" role="group" aria-label="Choose layout">
+                    {plannerStarts.filter((r) => plannerCategoryFor(r.id) === plannerCategoryFor(recipeId)).map((r) => {
+                      const problem = recipeFit(r);
+                      return (
+                        <button key={r.id} type="button" className="choice choice--layout" aria-pressed={r.id === recipeId} disabled={!!problem} title={problem ?? undefined} onClick={() => setRecipeId(r.id)}>
+                          <strong>{r.label}</strong>
+                          {problem && <span>Not enough room at this size</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="hint">This is the first kind of page. Add a cover, more kinds of pages, dividers and tabs after you start, under Pages.</p>
+                </>
+              ) : (
+                <>
+                  <p className="hint">Choose the kind of page to start with.</p>
+                  <div className="choice-row" role="group" aria-label="Start with">
+                    {PLANNER_CATEGORY_ORDER.filter((c) => plannerStarts.some((r) => plannerCategoryFor(r.id) === c)).map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        className="choice"
+                        aria-pressed={plannerCategoryFor(recipeId) === c}
+                        onClick={() => {
+                          setRecipeId(plannerStarts.find((r) => plannerCategoryFor(r.id) === c && !recipeFit(r))?.id ?? plannerStarts.find((r) => plannerCategoryFor(r.id) === c)!.id);
+                          setChangingStart(false);
+                        }}
+                      >
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           ) : (
             <div className="choice-row" role="group">
@@ -327,12 +351,12 @@ export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: 
         </section>
 
         <section className="step">
-          <h3>6 · Generate</h3>
+          <h3>6 · Name & create</h3>
           <Field label="Project name (optional)">
             <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Prayer Journal — Burgundy" />
           </Field>
           <button className="btn btn--primary" onClick={generate} disabled={!!recipeProblem} style={{ justifySelf: "start" }}>
-            Generate
+            {type === "planner" ? "Start planner" : `Create ${def.label.toLowerCase()}`}
           </button>
         </section>
       </div>
