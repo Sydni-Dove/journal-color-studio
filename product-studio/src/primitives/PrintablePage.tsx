@@ -16,6 +16,7 @@ import type { DecorativeTheme } from "../types/theme";
 import type { ColorTokens, SpacingTokens, TypographySettings } from "../types/tokens";
 import { fontStack } from "../presets/typography/typography";
 import { DecorativeLayer } from "../themes/DecorativeLayer";
+import { coverSurfaceColors, coverSurfaceTheme } from "../design-library/coverSurfaces";
 import { PatternLayer, StructureLayer, TextLayer } from "./nodes";
 
 export function themeVars(colors: ColorTokens, typography: TypographySettings): CSSProperties {
@@ -58,6 +59,11 @@ const DEFAULT_SPACING = resolveSpacing("balanced");
 export const PrintablePage = memo(function PrintablePage({ geometry: g, solved, colors, typography, decorative, background, spacing = DEFAULT_SPACING, mode, overlay }: Props) {
   // Composition regions + protected content come from the SAME solved nodes drawn below.
   const composition = useMemo(() => resolveComposition(g, solved, typography, spacing), [g, solved, typography, spacing]);
+  // A cover's own surface (design library): drawn by the same renderer as a background, on this page only.
+  const surface = useMemo(() => {
+    if (!solved.surface) return null;
+    return { theme: coverSurfaceTheme(solved.surface.assetId), colors: coverSurfaceColors(solved.surface.assetId, solved.surface.ownColors, colors), composition: { ...composition, ownArtwork: false } };
+  }, [solved.surface, colors, composition]);
   const style: CSSProperties = {
     ...themeVars(colors, typography),
     width: `${g.mediaWidthIn}in`,
@@ -68,6 +74,7 @@ export const PrintablePage = memo(function PrintablePage({ geometry: g, solved, 
       {/* 1 background */}
       <div className="ps-layer ps-bg" />
       {/* 2 decorative */}
+      {surface && <DecorativeLayer geometry={g} theme={surface.theme} colors={surface.colors} composition={surface.composition} layer="surface" />}
       {background && <DecorativeLayer geometry={g} theme={background} colors={colors} composition={composition} layer="background" />}
       <DecorativeLayer geometry={g} theme={decorative} colors={colors} composition={composition} layer="elements" />
       {/* 3 functional pattern */}

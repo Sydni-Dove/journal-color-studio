@@ -3,7 +3,8 @@ import { TechnicalDetails } from "../help/visuals";
 import { useEffect, useMemo, useState } from "react";
 import type { ResolvedDocument } from "../../engines/document/resolve";
 import { planPrint } from "../../engines/print/printPlan";
-import { compositionFor, geometryFor } from "../../engines/document/resolve";
+import { compositionFor, geometryFor, solvePage } from "../../engines/document/resolve";
+import { coverSurfaceColors, coverSurfaceTheme } from "../../design-library/coverSurfaces";
 import { rasterRequests } from "../../themes/decorationPlan";
 import { prepareRasters } from "../../themes/recolor";
 import { createCanvasMeasurer, heuristicMeasurer } from "../../engines/typography/textMeasure";
@@ -93,7 +94,14 @@ export function ExportDialog({ doc, currentIndex, fontsReady, onClose, onGoTo, o
     setPrepError(null);
     try {
       const pages = [...new Set(plan.sequence)].map((i) => ({ g: geometryFor(doc, doc.recipe.pages[i]), comp: compositionFor(doc, i) }));
-      await prepareRasters([...rasterRequests(pages, doc.background, doc.colors), ...rasterRequests(pages, doc.decorative, doc.colors)]);
+      // Covers with their own design-library surface: prepared in that surface's colors, for those pages only.
+      const surfaces = [...new Set(plan.sequence)].flatMap((i) => {
+        const surface = solvePage(doc, i).surface;
+        if (!surface) return [];
+        const page = { g: geometryFor(doc, doc.recipe.pages[i]), comp: { ...compositionFor(doc, i), ownArtwork: false } };
+        return rasterRequests([page], coverSurfaceTheme(surface.assetId), coverSurfaceColors(surface.assetId, surface.ownColors, doc.colors));
+      });
+      await prepareRasters([...rasterRequests(pages, doc.background, doc.colors), ...rasterRequests(pages, doc.decorative, doc.colors), ...surfaces]);
       setPrinting(true);
     } catch (e) {
       setPrepError(`Decoration could not be prepared: ${(e as Error).message}`);

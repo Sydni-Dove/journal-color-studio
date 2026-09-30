@@ -39,6 +39,41 @@ page geometry → usable area → size class → protected text zones → fitted
 
 **Page check:** a page style elsewhere in the book that doesn't fit the size (e.g. Weekly Plan Spread on A6) is named and listed under "Other pages in this book"; it no longer counts against the cover in view.
 
+## Cover designs (front cover, end cover, divider)
+
+The **Cover design** picker shows every choice as a picture: Neutral Cheetah
+Luxe, Solid color, the Journal Color Studio surfaces, and Plain.
+
+| Choice | What it is | Stored as |
+|---|---|---|
+| Neutral Cheetah Luxe | circles, gold rings, cheetah circles, script title | `preset: "neutral-cheetah-luxe"` (default) |
+| Solid color | one palette color through the bleed | `preset: "solid"`, `solidColor` |
+| Burgundy + blush kintsugi · Rose kintsugi · Black ember · Peach · Gold leaf · White marble · Abstract watercolor | Journal Color Studio artwork from the approved design-library snapshot | `preset: "surface"`, `surfaceId` (the library asset id) |
+| Plain | the product's own background | `preset: "plain"` |
+
+**Cover-only.** A surface is stored on the cover step (`CoverDividerSettings`),
+never on the product's background. The solver returns it as the page's own
+`SolvedPage.surface`, and `PrintablePage` draws it with the same decoration
+renderer and recolor pipeline as a product background (one engine), edge to
+edge through the bleed, under the wording. Interior pages never receive it.
+The architecture stays Journal Color Studio → snapshot (`design-library/library.ts`)
+→ `design-library/coverSurfaces.ts` (pointers, no copies) → the cover.
+
+**Artwork colors:** *Its own colors* (default — the JCS palette the art was
+designed in, e.g. "Black Ember Marble") or *My palette* (recolored with the
+product's Style). Only the surface uses its own palette; the wording and the
+rest of the book keep the product's.
+
+**Wording** on every design: *Title + subtitle*, *Title only*, or *No wording*
+(end cover: *Line of text* / *No wording*). Scripture / quote, the small line,
+alignment and position stay available. With no wording the page keeps its name
+(Pages, tabs) but prints nothing. On solid and library covers the wording
+color is a palette role (each surface has a legible default), and a soft
+paper panel behind the wording is optional for busy art.
+
+The full-page solid fill is artwork, not content: it may cross the bleed and
+the binding edge without a page problem.
+
 ## Physical tabs
 
 Tabs are **interior printed markers**, not protruding die-cut tabs. No cutting outline, material extension or unsupported manufacturing claim is generated. The current print engine cannot represent die-cut tabs safely.

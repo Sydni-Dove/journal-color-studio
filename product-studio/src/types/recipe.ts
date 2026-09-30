@@ -182,13 +182,22 @@ export type PageInstance = {
 
 /** Additive, per-step settings; absent on legacy projects. Tabs are interior printed markers. */
 export type CoverDividerSettings = {
-  preset?: "neutral-cheetah-luxe" | "solid" | "plain";
+  /** "surface": a Journal Color Studio marble / watercolor from the design library (`surfaceId`), this page only. */
+  preset?: "neutral-cheetah-luxe" | "solid" | "surface" | "plain";
   /** Solid-cover fill from the current palette. */
   solidColor?: import("./tokens").ColorToken;
-  /** Solid-cover wording color from the current palette. */
+  /** Wording color (solid and design-library covers) from the current palette. */
   solidTextColor?: import("./tokens").ColorToken;
+  /** Design-library asset drawn edge to edge on this cover (design-library/coverSurfaces.ts). Never the interior's. */
+  surfaceId?: string;
+  /** The art in its own Journal Color Studio colors (default) or in this product's palette. */
+  surfaceColors?: "own" | "palette";
+  /** A soft paper panel behind the wording, so it reads on busy art (design-library covers; default on). */
+  textPanel?: boolean;
   /** False = artwork/color only; no title, subtitle, quote or rule is printed. */
   showText?: boolean;
+  /** Title only: the subtitle is not printed (it is kept, for switching back). */
+  titleOnly?: boolean;
   subtitle?: string;
   quote?: string;
   smallLine?: boolean;

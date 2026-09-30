@@ -17,7 +17,7 @@ import type { ArtTransform } from "../engines/composition/fit";
 import { planDecoration, type DecorPiece } from "./decorationPlan";
 import { ensureRaster, onRasterReady, rasterKey, rasterUrl } from "./recolor";
 
-type Props = { geometry: PageGeometry; theme: DecorativeTheme; colors: ColorTokens; composition: Composition; layer?: "background" | "elements" };
+type Props = { geometry: PageGeometry; theme: DecorativeTheme; colors: ColorTokens; composition: Composition; layer?: "surface" | "background" | "elements" };
 
 /** Re-render when any raster this layer uses finishes recoloring. */
 function useRasters(pieces: DecorPiece[]) {

@@ -181,4 +181,10 @@ export type SolvedPage = {
    * background and decorative elements are not drawn on it.
    */
   ownArtwork?: boolean;
+  /**
+   * This page's own surface from the design library (a cover or divider only):
+   * drawn under everything, edge to edge, by the decoration renderer.
+   * `ownColors`: in the art's own Journal Color Studio palette, not the product's.
+   */
+  surface?: { assetId: string; ownColors: boolean };
 };

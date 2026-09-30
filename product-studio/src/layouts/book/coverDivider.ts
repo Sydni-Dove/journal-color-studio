@@ -9,6 +9,7 @@ import { guidedPage } from "./guidedPage";
 import { minimumAreaFit, type LayoutContext, type LayoutDefinition } from "../shared/types";
 import { classifyComposition, fitSubtitle, fitTitle, placeDecoration, SCRIPT_ASCENT_EM, SCRIPT_DESCENT_EM, SCRIPT_DESCENT_SHORT_EM, type MeasureText, type ProtectedZone } from "./composition";
 import { COMPOSITION_PRESETS, LUXE_DECORATION } from "./luxeComposition";
+import { findCoverSurface } from "../../design-library/coverSurfaces";
 
 /**
  * The edge a tab prints on: the outer (fore) edge, away from the binding — the
@@ -198,26 +199,72 @@ function solveReference(ctx: LayoutContext, divider: boolean): SolvedPage[] {
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
 /**
- * SOLID COVER — a deliberately simple cover: one palette color from bleed edge
- * to bleed edge, with optional editable wording. It does not borrow the Luxe
- * shapes or typography; it uses the project's cover typography.
+ * SOLID AND DESIGN-LIBRARY COVERS — one palette color, or one Journal Color
+ * Studio marble / watercolor (design-library/coverSurfaces.ts), from bleed edge
+ * to bleed edge, with optional editable wording. They do not borrow the Luxe
+ * shapes or typography; they use the project's cover typography. A library
+ * surface is this page's own (`SolvedPage.surface`): the product's background
+ * and interior pages never receive it.
  */
-function solveSolid(ctx: LayoutContext, divider: boolean): SolvedPage[] {
+function surfaceOf(opt: CoverDividerSettings): SolvedPage["surface"] {
+  return opt.preset === "surface" && findCoverSurface(opt.surfaceId) ? { assetId: opt.surfaceId!, ownColors: opt.surfaceColors !== "palette" } : undefined;
+}
+function wordingColor(opt: CoverDividerSettings): ColorToken {
+  if (opt.solidTextColor) return opt.solidTextColor;
+  if (opt.preset !== "surface") return "background";
+  return opt.textPanel ? "text" : findCoverSurface(opt.surfaceId)?.wording ?? "text";
+}
+/** The full-media field (solid) or nothing (the surface is drawn by the decoration renderer). */
+function field(g: PageGeometry, opt: CoverDividerSettings, surface: SolvedPage["surface"]): LayoutNode[] {
+  if (surface) return [];
+  const media = { x: -g.trimOffset.x, y: -g.trimOffset.y, w: g.mediaWidthIn, h: g.mediaHeightIn };
+  // Artwork, not content: it is meant to run through the bleed and the binding edge.
+  return [{ ...box("cover-solid-bg", media, { fill: opt.solidColor ?? "primary" }), functional: false }];
+}
+/**
+ * A soft paper panel behind the wording on a library surface (optional): as wide
+ * as the longest printed line plus padding, never outside the trim.
+ */
+function wordingPanel(words: LayoutNode[], g: PageGeometry, ctx: LayoutContext, left: boolean): LayoutNode | null {
+  const texts = words.filter((n): n is Extract<LayoutNode, { type: "text" }> => n.type === "text");
+  if (!texts.length) return null;
+  const measure = getLayoutMeasurer().measure;
+  const padX = 0.28, padY = 0.2;
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (const n of [...texts, ...words.filter((w) => w.type === "rule")]) {
+    y0 = Math.min(y0, n.rect.y);
+    y1 = Math.max(y1, n.rect.y + n.rect.h);
+    if (n.type !== "text") continue;
+    const style = { ...styleForRole(ctx.typography, n.role), ...(n.fit ? { sizePt: n.fit.sizePt } : {}) };
+    const w = Math.min(n.rect.w, Math.max(...(n.fit?.lines ?? [n.text]).map((l) => measure(l, style))));
+    const a = left ? n.rect.x : n.rect.x + (n.rect.w - w) / 2;
+    x0 = Math.min(x0, a);
+    x1 = Math.max(x1, a + w);
+  }
+  const rect = { x: Math.max(0, x0 - padX), y: Math.max(0, y0 - padY), w: 0, h: 0 };
+  rect.w = Math.min(g.trimWidthIn, x1 + padX) - rect.x;
+  rect.h = Math.min(g.trimHeightIn, y1 + padY) - rect.y;
+  const panel = box("cover-panel", rect, { fill: "background", radiusIn: 0.08 });
+  return { ...panel, functional: false, ...(panel.type === "box" ? { fillOpacity: 0.86 } : {}) } as LayoutNode;
+}
+
+function solveFlat(ctx: LayoutContext, divider: boolean): SolvedPage[] {
   const g = ctx.pages[0], s = g.safeRect, opt = ctx.module?.cover ?? {};
   const nodes: LayoutNode[] = [], diagnostics: SolvedPage["diagnostics"] = [];
-  const media = { x: -g.trimOffset.x, y: -g.trimOffset.y, w: g.mediaWidthIn, h: g.mediaHeightIn };
-  nodes.push(box("cover-solid-bg", media, { fill: opt.solidColor ?? "primary" }));
+  const surface = surfaceOf(opt);
+  nodes.push(...field(g, opt, surface));
 
   const tab = opt.tab?.show ? tabGeometry(g, opt.tab) : null;
   if (opt.tab?.show && !tab) diagnostics.push({ severity: "error", rule: "tab-fit", componentId: "tab", message: "These tabs do not fit comfortably. Use fewer tabs or a larger page." });
   const tabRoom = tab ? tab.w + 0.26 : 0;
   const content = { ...s, x: tab && tabEdge(g) === "left" ? s.x + tabRoom : s.x, w: s.w - tabRoom };
   const left = opt.alignment === "left";
-  const color = opt.solidTextColor ?? "background";
+  const color = wordingColor(opt);
   const showText = opt.showText !== false;
   const title = (ctx.module?.title ?? (divider ? "Section" : "")).trim();
-  const subtitle = (opt.subtitle ?? "").trim();
+  const subtitle = opt.titleOnly ? "" : (opt.subtitle ?? "").trim();
   const quote = (opt.quote ?? "").trim();
+  const words: LayoutNode[] = [];
 
   if (showText) {
     const anchor = opt.position === "upper" ? 0.26 : opt.position === "lower" ? 0.66 : 0.46;
@@ -229,35 +276,41 @@ function solveSolid(ctx: LayoutContext, divider: boolean): SolvedPage[] {
       const n = text("cover-title", titleRect, title, "coverTitle", { align: left ? "left" : "center", color });
       n.fit = { ...fit, failed: !fit.ok };
       if (!fit.ok) diagnostics.push({ severity: "error", rule: "heading-fit", componentId: n.id, message: "This cover title is too long. Shorten it or choose a larger page." });
-      nodes.push(n);
+      words.push(n);
       below = titleRect.y + titleRect.h;
     }
 
     if (subtitle) {
       const r = { x: content.x, y: below + ctx.spacing.block, w: content.w, h: Math.min(0.8, Math.max(0.35, content.y + content.h - below - ctx.spacing.block)) };
       const fit = fitHeading(subtitle, "coverSubtitle", r, ctx);
-      const n = text("cover-subtitle", r, subtitle, "coverSubtitle", { align: left ? "left" : "center", color });
+      // The box ends with its printed lines, so what follows sits under the words, not under empty space.
+      const used = { ...r, h: Math.min(r.h, (fit.sizePt * fit.lineHeight * fit.lines.length) / 72) };
+      const n = text("cover-subtitle", used, subtitle, "coverSubtitle", { align: left ? "left" : "center", color, wrap: fit.lines.length > 1 });
       n.fit = { ...fit, failed: !fit.ok };
       if (!fit.ok) diagnostics.push({ severity: "error", rule: "heading-fit", componentId: n.id, message: "This cover subtitle is too long. Shorten it or choose a larger page." });
-      nodes.push(n);
-      below = r.y + r.h;
+      words.push(n);
+      below = used.y + used.h;
     }
 
     if (opt.smallLine !== false && (title || subtitle)) {
       const rw = Math.min(1.3, content.w * 0.2), x = left ? content.x : content.x + (content.w - rw) / 2, y = Math.min(content.y + content.h, below + ctx.spacing.block);
-      nodes.push(rule("cover-line", x, y, x + rw, y, { color, strokePt: RULE_PT }));
+      words.push(rule("cover-line", x, y, x + rw, y, { color, strokePt: RULE_PT }));
       below = y;
     }
 
     if (quote) {
       const r = { x: content.x, y: below + ctx.spacing.section, w: content.w, h: Math.max(0.45, content.y + content.h - below - ctx.spacing.section) };
       const fit = fitHeading(quote, "body", r, ctx);
-      const n = text("cover-quote", r, quote, "body", { align: left ? "left" : "center", color, wrap: true });
+      const used = surface ? { ...r, h: Math.min(r.h, (fit.sizePt * fit.lineHeight * fit.lines.length) / 72) } : r;
+      const n = text("cover-quote", used, quote, "body", { align: left ? "left" : "center", color, wrap: true });
       n.fit = { ...fit, failed: !fit.ok };
       if (!fit.ok) diagnostics.push({ severity: "warning", rule: "heading-fit", componentId: n.id, message: "This cover quote is too long for the available space." });
-      nodes.push(n);
+      words.push(n);
     }
   }
+  const panel = surface && opt.textPanel ? wordingPanel(words, g, ctx, left) : null;
+  if (panel) nodes.push(panel);
+  nodes.push(...words);
 
   if (tab && opt.tab) {
     nodes.push(box("tab", tab, { stroke: "background", strokePt: 1.5, fill: opt.tab.color ?? "secondary", radiusIn: opt.tab.style === "rounded" ? 0.12 : 0 }));
@@ -268,24 +321,37 @@ function solveSolid(ctx: LayoutContext, divider: boolean): SolvedPage[] {
     nodes.push(label);
   }
 
-  return [{ nodes, diagnostics, metrics: [], regions: { mainContent: content }, ownArtwork: true }];
+  return [{ nodes, diagnostics, metrics: [], regions: { mainContent: content }, ownArtwork: true, ...(surface ? { surface } : {}) }];
 }
 
-function solveSolidBack(ctx: LayoutContext): SolvedPage[] {
+function solveFlatBack(ctx: LayoutContext): SolvedPage[] {
   const g = ctx.pages[0], s = g.safeRect, opt = ctx.module?.cover ?? {};
   const nodes: LayoutNode[] = [], diagnostics: SolvedPage["diagnostics"] = [];
-  const media = { x: -g.trimOffset.x, y: -g.trimOffset.y, w: g.mediaWidthIn, h: g.mediaHeightIn };
-  nodes.push(box("cover-solid-bg", media, { fill: opt.solidColor ?? "primary" }));
+  const surface = surfaceOf(opt);
+  nodes.push(...field(g, opt, surface));
   const line = opt.showText === false ? "" : (opt.subtitle ?? "").trim();
   if (line) {
     const r = { x: s.x, y: Math.max(s.y, s.y + s.h * 0.44), w: s.w, h: Math.min(0.8, s.h * 0.16) };
     const fit = fitHeading(line, "coverSubtitle", r, ctx);
-    const n = text("back-line", r, line, "coverSubtitle", { align: "center", color: opt.solidTextColor ?? "background", wrap: true });
+    const n = text("back-line", r, line, "coverSubtitle", { align: "center", color: wordingColor(opt), wrap: true });
     n.fit = { ...fit, failed: !fit.ok };
     if (!fit.ok) diagnostics.push({ severity: "error", rule: "heading-fit", componentId: n.id, message: "This wording is too long. Shorten it or choose a larger page." });
+    const panel = surface && opt.textPanel ? wordingPanel([n], g, ctx, false) : null;
+    if (panel) nodes.push(panel);
     nodes.push(n);
   }
-  return [{ nodes, diagnostics, metrics: [], regions: { mainContent: s }, ownArtwork: true }];
+  return [{ nodes, diagnostics, metrics: [], regions: { mainContent: s }, ownArtwork: true, ...(surface ? { surface } : {}) }];
+}
+
+/**
+ * Wording choices on the Luxe design: "No wording" prints the artwork only; "Title only" drops the subtitle.
+ * The page's name is kept (Pages, tabs) — it just isn't printed.
+ */
+const WORDS = /^(cover-(title|subtitle|quote|line)|back-(line|rule))$/;
+function withWording(pages: SolvedPage[], opt: CoverDividerSettings): SolvedPage[] {
+  if (opt.showText !== false && !opt.titleOnly) return pages;
+  const drop = (id: string) => (opt.showText === false ? WORDS.test(id) : id === "cover-subtitle");
+  return pages.map((p) => ({ ...p, nodes: p.nodes.filter((n) => !drop(n.id)), diagnostics: p.diagnostics.filter((d) => !d.componentId || !drop(d.componentId)) }));
 }
 
 /**
@@ -432,12 +498,11 @@ function solveResponsive(ctx: LayoutContext, divider: boolean): SolvedPage[] {
   return [{ nodes, diagnostics, metrics, regions: { mainContent: content }, ownArtwork: opt.preset !== "plain" }];
 }
 
+const flat = (opt?: CoverDividerSettings) => opt?.preset === "solid" || opt?.preset === "surface";
 const solve = (ctx: LayoutContext, divider: boolean) =>
-  ctx.module?.cover?.preset === "solid"
-    ? solveSolid(ctx, divider)
-    : ctx.module?.cover?.autoFit === false
-      ? solveReference(ctx, divider)
-      : solveResponsive(ctx, divider);
+  flat(ctx.module?.cover)
+    ? solveFlat(ctx, divider)
+    : withWording(ctx.module?.cover?.autoFit === false ? solveReference(ctx, divider) : solveResponsive(ctx, divider), ctx.module?.cover ?? {});
 const capability = { ...guidedPage.capability, supportsPatterns: [], supportsLineStyle: false, supportsPageNumbers: false, supportsFooter: false, wordingKeys: [] };
 /**
  * END COVER (back of the book): the same design turned half a turn, so the
@@ -520,11 +585,9 @@ function solveBackResponsive(ctx: LayoutContext): SolvedPage[] {
   return [{ nodes, diagnostics, metrics: [], regions: { mainContent: s }, ownArtwork: opt.preset !== "plain" }];
 }
 const solveBack = (ctx: LayoutContext) =>
-  ctx.module?.cover?.preset === "solid"
-    ? solveSolidBack(ctx)
-    : ctx.module?.cover?.autoFit === false
-      ? solveBackReference(ctx)
-      : solveBackResponsive(ctx);
+  flat(ctx.module?.cover)
+    ? solveFlatBack(ctx)
+    : withWording(ctx.module?.cover?.autoFit === false ? solveBackReference(ctx) : solveBackResponsive(ctx), ctx.module?.cover ?? {});
 
 export const coverPage: LayoutDefinition = { id: "cover-page", label: "Cover page", description: "Reusable front cover, section cover or title page.", family: "shared", pages: 1, period: "none", capability, fit: minimumAreaFit(1.5, 2.5), solve: (ctx) => solve(ctx, false) };
 export const dividerPage: LayoutDefinition = { ...coverPage, id: "divider-page", label: "Divider / tab page", description: "Section opener with optional interior printed tab.", solve: (ctx) => solve(ctx, true) };

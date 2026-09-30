@@ -94,4 +94,44 @@ describe("Cover and divider browser QA", () => {
     expect(await page.locator('[data-node="cover-title"]').first().evaluate((e) => getComputedStyle(e).fontWeight)).toBe('700');
     await page.context().close();
   });
+  it("Journal Color Studio cover surface: picked from pictures, this page only, printed, wording choices persist", async () => {
+    const page = await open(project("6x9"));
+    await go(page, 1);
+    await openArea(page, "layout");
+    const card = page.locator(".this-page");
+    // Real artwork thumbnails, not a text list.
+    await expect.poll(() => card.locator('.cover-picker [data-cover^="surface:"] .thumb[data-ready="true"] img').count(), { timeout: 20000 }).toBe(7);
+    await card.locator('[data-cover="surface:jcs-marble-ember"]').click();
+    await expect.poll(() => page.locator('.ps-page--editor [data-layer="surface"] image').count(), { timeout: 20000 }).toBeGreaterThan(0);
+    expect(await page.locator('.ps-page--editor [data-node="cover-title"]').count()).toBe(1);
+    await card.getByRole("button", { name: "No wording", exact: true }).click();
+    await expect.poll(() => page.locator('.ps-page--editor [data-node="cover-title"]').count()).toBe(0);
+    await card.getByRole("button", { name: "Title only", exact: true }).click();
+    await expect.poll(() => page.locator('.ps-page--editor [data-node="cover-title"]').count()).toBe(1);
+    expect(await page.locator('.ps-page--editor [data-node="cover-subtitle"]').count()).toBe(0);
+    await page.waitForTimeout(900);
+    // Saved with the project; the interior never gets the cover's surface.
+    await page.reload();
+    await page.locator(".card", { hasText: "Cover QA" }).first().getByRole("button", { name: "Open", exact: true }).click();
+    await page.waitForSelector(".ps-page--editor");
+    await go(page, 1);
+    await expect.poll(() => page.locator('.ps-page--editor [data-layer="surface"] image').count(), { timeout: 20000 }).toBeGreaterThan(0);
+    const total = Number((await page.locator(".page-nav, body").first().innerText()).match(/of (\d+)/)?.[1] ?? 0);
+    expect(total).toBeGreaterThan(3);
+    for (const n of [3, total]) {
+      await go(page, n);
+      await page.waitForTimeout(300);
+      expect(await page.locator('.ps-page--editor [data-layer="surface"]').count(), `page ${n}`).toBe(0);
+    }
+    // The printed cover carries the surface too.
+    await go(page, 1);
+    await page.getByRole("button", { name: "Export", exact: true }).click();
+    expect(await page.getByRole("dialog", { name: "Export" }).locator(".issue--error").allTextContents()).toEqual([]);
+    await page.evaluate(() => { window.print = () => {}; });
+    await page.getByRole("button", { name: "Print / Save PDF", exact: true }).click();
+    await page.waitForSelector("#print-root .ps-print-sheet", { state: "attached" });
+    expect(await page.locator('.ps-page--print').first().locator('[data-layer="surface"] image').count()).toBeGreaterThan(0);
+    expect(await page.locator('.ps-page--print').nth(2).locator('[data-layer="surface"]').count()).toBe(0);
+    await page.context().close();
+  }, 90_000);
 });
