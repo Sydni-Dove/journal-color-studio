@@ -8,6 +8,8 @@ import { NewProductWizard } from "../components/wizard/NewProductWizard";
 import { resolveColors } from "../presets/themes/palettes";
 import { addVariantFromCurrent, duplicateProject, localProjectStore, projectKey, saveGuarded, type ProjectSummary } from "../persistence/projectStore";
 import type { ProductProject } from "../types/project";
+import { useCloud } from "./useCloud";
+import { CloudAccount, cloudLabel } from "../components/projects/CloudAccount";
 
 type View = { kind: "list" } | { kind: "new"; start?: WizardStart } | { kind: "edit"; project: ProductProject };
 
@@ -54,10 +56,38 @@ export function App() {
   /** Bumped when another tab's version replaces this tab's: the editor starts fresh (its undo history was of the old one). */
   const [generation, setGeneration] = useState(0);
 
+  const cloud = useCloud({
+    store,
+    onLocalChanged: (updated) => {
+      // Newer versions from another device: an open project with no unsaved edits follows them.
+      const open = current.current;
+      const mine = open && updated.find((u) => u.id === open.id);
+      if (mine && !dirty.current) openLoaded(mine);
+      refresh();
+    },
+    onConflict: (newer, copyName) => {
+      const open = current.current;
+      if (open && open.id === newer.id) {
+        base.current = newer.updatedAt;
+        current.current = newer;
+        dirty.current = false;
+        setView((v) => (v.kind === "edit" && v.project.id === newer.id ? { kind: "edit", project: newer } : v));
+        setGeneration((g) => g + 1);
+      }
+      setConflict(`${copyName}|device`);
+      refresh();
+    },
+  });
+  const cloudRef = useRef(cloud);
+  cloudRef.current = cloud;
+
   const persist = useCallback((p: ProductProject) => {
     window.clearTimeout(timer.current);
+    const startedFrom = base.current;
     try {
       const r = saveGuarded(store, p, base.current);
+      if (r.status === "saved") void cloudRef.current.saved(p, startedFrom);
+      else void cloudRef.current.saved(r.copy, null);
       if (r.status === "conflict") {
         // Never overwrite newer work: keep the newer version open, this tab's edits as a separate copy.
         base.current = r.stored.updatedAt;
@@ -131,12 +161,13 @@ export function App() {
     return (
       <>
       {banner}
-      {conflict && <div className="update-banner" role="alert"><span>This project was changed in another tab, so that newer version is open here. Your edits from this tab were kept as a separate project: “{conflict}”.</span><button type="button" className="btn" onClick={() => setConflict(null)}>OK</button></div>}
+      {conflict && <div className="update-banner" role="alert"><span>This project was changed {conflict.endsWith("|device") ? "on another device" : "in another tab"}, so that newer version is open here. Your edits were kept as a separate project: “{conflict.replace(/\|device$/, "")}”.</span><button type="button" className="btn" onClick={() => setConflict(null)}>OK</button></div>}
       <Editor
         key={`${view.project.id}:${generation}`}
         project={view.project}
         onChange={onChange}
         saveStatus={saveStatus}
+        cloudLabel={cloudLabel(cloud.status)}
         onBack={() => {
           flush();
           current.current = null;
@@ -169,8 +200,10 @@ export function App() {
       }}
       onDelete={(id) => {
         store.remove(id);
+        void cloud.removed(id);
         refresh();
       }}
+      account={<CloudAccount email={cloud.session?.user.email ?? null} status={cloud.status} error={cloud.error} onSignIn={cloud.signIn} onSignOut={() => void cloud.signOut()} onRetry={() => void cloud.sync()} />}
     />
     </>
   );

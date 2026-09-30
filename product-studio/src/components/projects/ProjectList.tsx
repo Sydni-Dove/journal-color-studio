@@ -21,6 +21,8 @@ type Props = {
   onDuplicateAsVariant: (id: string) => void;
   onDelete: (id: string) => void;
   now?: Date;
+  /** Online saving (sign in / status). */
+  account?: React.ReactNode;
 };
 
 const RECENT = 4;
@@ -109,7 +111,7 @@ function describe(p: ProjectSummary, m: ProjectMeta): string {
   return `${type} · ${size}${pages}`;
 }
 
-export function ProjectList({ projects, meta, onStart, onOpen, onDuplicate, onDuplicateAsVariant, onDelete, now }: Props) {
+export function ProjectList({ projects, meta, onStart, onOpen, onDuplicate, onDuplicateAsVariant, onDelete, now, account }: Props) {
   const metas = useMemo(() => new Map(projects.map((p) => [p.id, meta(p.id)])), [projects, meta]);
   const recent = projects.slice(0, RECENT);
   const hasProjects = projects.length > 0;
@@ -131,6 +133,7 @@ export function ProjectList({ projects, meta, onStart, onOpen, onDuplicate, onDu
           <p className="lede">Build print-ready stationery without sorting through every tool at once. Choose a product, choose its pages, then design it.</p>
           <p className="hint build-stamp" data-testid="build">Version {__BUILD__}</p>
         </section>
+        {account}
 
         {hasProjects ? (
           <section aria-labelledby="h-continue">

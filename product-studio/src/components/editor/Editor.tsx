@@ -46,6 +46,8 @@ type Props = {
   onChange: (p: ProductProject) => void;
   onBack: () => void;
   saveStatus: "saved" | "saving" | "error";
+  /** Where the project is saved beyond this device ("Saved online", "On this device only"…). */
+  cloudLabel?: string;
 };
 
 function tryResolve(p: ProductProject): { doc: ResolvedDocument | null; error: string | null } {
@@ -56,7 +58,7 @@ function tryResolve(p: ProductProject): { doc: ResolvedDocument | null; error: s
   }
 }
 
-export function Editor({ project, onChange, onBack, saveStatus }: Props) {
+export function Editor({ project, onChange, onBack, saveStatus, cloudLabel }: Props) {
   // Open on the first real page (spread products start with a filler page).
   const [index, setIndex] = useState(() => {
     try {
@@ -216,6 +218,7 @@ export function Editor({ project, onChange, onBack, saveStatus }: Props) {
         <input className="name-input" value={project.name} aria-label="Project name" onChange={(e) => update((p) => ({ ...p, name: e.target.value }))} />
         <span className={`save-status ${saveStatus === "error" ? "save-status--error" : ""}`}>
           {saveStatus === "saved" ? "Saved" : saveStatus === "saving" ? "Saving…" : "Save failed (storage full?)"}
+          {cloudLabel && saveStatus !== "error" ? <span className="save-status__cloud"> · {cloudLabel}</span> : null}
         </span>
         <span className="history-buttons" role="group" aria-label="Undo and redo">
           <button type="button" className="btn btn--ghost" onClick={undo} disabled={!past.current.length} aria-label="Undo" title="Undo (Ctrl/⌘ Z)">↶ Undo</button>

@@ -1895,3 +1895,11 @@ button.family-card:focus-visible {
 .repeat-pages__row { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 8px; border: 1px solid var(--ui-border, #e5e0da); border-radius: 10px; min-width: 0; }
 .repeat-pages__row .builder-row__name { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .repeat-pages__row .builder-row__detail { flex: 0 0 auto; }
+
+/* Online saving (Projects screen) */
+.cloud-account { border: 1px solid var(--ui-border, #e5e0da); border-radius: 14px; padding: 14px 16px; margin: 0 0 20px; background: var(--ui-surface, #fff); max-width: 640px; }
+.cloud-account p { margin: 0 0 10px; }
+.cloud-account__form { display: grid; gap: 8px; max-width: 360px; }
+.cloud-account__actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.cloud-account__problem { color: #9b1c1c; }
+.save-status__cloud { opacity: 0.8; }
