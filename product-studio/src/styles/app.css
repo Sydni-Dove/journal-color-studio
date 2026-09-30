@@ -1400,6 +1400,8 @@ button.family-card:focus-visible {
 /* ── Pages builder ── */
 .builder {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
   gap: 10px;
   padding: 10px 0 14px;
   border-bottom: 1px solid var(--ui-line);
@@ -1413,6 +1415,8 @@ button.family-card:focus-visible {
 }
 .builder-cat {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
   gap: 6px;
   padding: 10px 12px;
   background: #fff;
@@ -1453,6 +1457,8 @@ button.family-card:focus-visible {
 }
 .builder-row__actions {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 6px;
 }
 .builder-cat__add {
@@ -1480,6 +1486,9 @@ button.family-card:focus-visible {
 }
 .builder__more {
   justify-self: start;
+  max-width: 100%;
+  white-space: normal;
+  text-align: left;
 }
 
 /* ── Colors (palette picker) ── */
@@ -1725,4 +1734,22 @@ button.family-card:focus-visible {
   height: 1px;
   overflow: hidden;
   clip: rect(0 0 0 0);
+}
+
+/* ── Real thumbnails: readable on a phone ── */
+.spread-preview {
+  display: flex;
+  line-height: 0;
+  justify-self: start;
+  box-shadow: 0 0 0 1px var(--ui-line);
+  max-width: 100%;
+  overflow: hidden;
+}
+@media (max-width: 600px) {
+  .orientation-cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .choice--thumb {
+    width: 100%;
+  }
 }

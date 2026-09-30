@@ -8,6 +8,8 @@ import { CoverDividerControls } from "./CoverDividerControls";
  */
 import { Visual } from "../help/visuals";
 import { useState } from "react";
+import { PageThumb } from "../preview/PageThumb";
+import { thumbHeight, usePhone } from "../../utils/usePhone";
 import { savePageDesign } from "../../engines/recipe/pageDesigns";
 import { PromptEditor, type PromptFit } from "./PromptEditor";
 import { sectionLineCounts, sectionPages } from "../../layouts/shared/promptPages";
@@ -156,7 +158,7 @@ export function StepFields({ s, siblings, scope, props, parts }: { s: BookStep; 
           {two ? (
             <>
               <p className="hint">Two facing pages: it always starts on a left-hand page so both pages face each other. A notes page is added before it when needed.</p>
-              <Visual kind="page-sides" side="both" caption="Two facing pages of an open book." />
+              <SpreadPreview doc={doc} stepId={s.id} />
             </>
           ) : (
             <>
@@ -219,6 +221,20 @@ function SaveDesign({ step, props }: { step: BookStep; props: Props }) {
         Save page design
       </button>
       {saved && <p className="hint" role="status">Saved “{saved}”. Add it from Pages → Your page designs.</p>}
+    </div>
+  );
+}
+
+/** The step's first open spread, drawn by the real renderer (larger on a phone). */
+function SpreadPreview({ doc, stepId }: { doc: ResolvedDocument; stepId: string }) {
+  const phone = usePhone();
+  const i = doc.recipe.pages.findIndex((p) => p.recipeItemId === stepId && p.spreadPart === 0);
+  if (i < 0 || i + 1 >= doc.recipe.pages.length) return <Visual kind="page-sides" side="both" caption="Two facing pages of an open book." />;
+  const h = thumbHeight(phone, 120, 170);
+  return (
+    <div className="spread-preview" aria-label="This page's two facing pages">
+      <PageThumb doc={doc} index={i} heightPx={h} />
+      <PageThumb doc={doc} index={i + 1} heightPx={h} />
     </div>
   );
 }

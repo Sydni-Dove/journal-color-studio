@@ -7,6 +7,7 @@
  *   Theme → Fonts → Dates / sheets / pages → Generate
  */
 import { PageThumb } from "../preview/PageThumb";
+import { thumbHeight, usePhone } from "../../utils/usePhone";
 import { recipeSteps } from "../../engines/recipe/recipe";
 import { useEffect, useMemo, useState } from "react";
 import type { WizardStart } from "../../presets/products/productFamilies";
@@ -46,10 +47,11 @@ function Choices<T extends string>({ value, options, onChange }: { value: T; opt
 /** The real first page(s) of a layout choice, recomputed only when the size, colors or binding change. */
 function LayoutThumb<R>({ preview, r, deps }: { preview: (r: R) => { doc: ResolvedDocument; pages: number[] } | null; r: R; deps: string }) {
   const p = useMemo(() => preview(r), [r, deps]);
+  const phone = usePhone();
   if (!p) return null;
   return (
     <span className="choice__thumb" aria-hidden="true">
-      {p.pages.filter((i) => i < p.doc.recipe.pages.length).map((i) => <PageThumb key={i} doc={p.doc} index={i} heightPx={84} />)}
+      {p.pages.filter((i) => i < p.doc.recipe.pages.length).map((i) => <PageThumb key={i} doc={p.doc} index={i} heightPx={thumbHeight(phone, 96, p.pages.length > 1 ? 150 : 200)} />)}
     </span>
   );
 }

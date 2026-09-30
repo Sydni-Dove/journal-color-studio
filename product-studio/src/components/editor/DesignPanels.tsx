@@ -7,6 +7,7 @@ import { DAILY_SECTIONS, dailySectionsOf, type DailySection } from "../../layout
 import { findAsset } from "../../design-library/library";
 import { applyVariant, resolveDocument, type ResolvedDocument } from "../../engines/document/resolve";
 import { PageThumb } from "../preview/PageThumb";
+import { thumbHeight, usePhone } from "../../utils/usePhone";
 import type { ProjectUsage } from "../../engines/document/usage";
 import { GRID_PRESETS, RULING_PRESETS } from "../../engines/patterns/patterns";
 import { addVariantFromCurrent } from "../../persistence/projectStore";
@@ -119,6 +120,7 @@ function WeeklyOrientationControl({ project, usage, value, onChange }: { project
   void value;
   const w = usage.weeklyOrientation;
   const current = w.current ?? "vertical";
+  const phone = usePhone();
   const opts = [
     { v: "vertical" as const, label: "Vertical", hint: "Two pages · days side by side in columns", ok: w.vertical },
     { v: "horizontal" as const, label: "Horizontal", hint: "Two pages · days stacked in rows", ok: w.horizontal },
@@ -147,8 +149,8 @@ function WeeklyOrientationControl({ project, usage, value, onChange }: { project
             <span className="orientation-card__thumb">
               {previews[o.v] && (
                 <>
-                  <PageThumb doc={previews[o.v]!.doc} index={previews[o.v]!.index} heightPx={96} />
-                  <PageThumb doc={previews[o.v]!.doc} index={previews[o.v]!.index + 1} heightPx={96} />
+                  <PageThumb doc={previews[o.v]!.doc} index={previews[o.v]!.index} heightPx={thumbHeight(phone, 96, 150)} />
+                  <PageThumb doc={previews[o.v]!.doc} index={previews[o.v]!.index + 1} heightPx={thumbHeight(phone, 96, 150)} />
                 </>
               )}
             </span>
