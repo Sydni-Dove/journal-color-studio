@@ -26,6 +26,13 @@ import { SIZE_PRESETS } from "../../presets/sizes/sizePresets";
 import { BINDING_PROFILES } from "../../presets/bindingProfiles/bindingProfiles";
 import { Section, type EditorNav } from "./ui";
 import { getLayout } from "../../layouts/registry";
+import { bookSteps } from "../../engines/recipe/bookRecipe";
+
+/** A page built from sections (a custom page or one made from a saved design): edited in "Add to page". */
+function isComposedStep(project: ProductProject, id: string): boolean {
+  const s = bookSteps(project.recipe.structure ?? []).find((x) => x.step.id === id)?.step;
+  return !!s && (s.module === "custom" || !!s.designId);
+}
 
 type Props = {
   project: ProductProject;
@@ -110,7 +117,8 @@ export function Editor({ project, onChange, onBack, saveStatus }: Props) {
     layoutLabel: (id) => getLayout(id).label,
   };
   const goToPage = (n: number) => doc && setIndex(Math.max(0, doc.recipe.pages.findIndex((p) => p.pageNumber === n)));
-  const [area, setArea] = useArea();
+  // A Custom Page is built from sections: it opens straight on "Add to page".
+  const [area, setArea] = useArea(project.productType === "custom" ? "add" : undefined);
   const currentItemId = doc?.recipe.pages[current]?.recipeItemId;
   const summaries: Partial<Record<AreaId, string>> = doc
     ? {
@@ -155,7 +163,7 @@ export function Editor({ project, onChange, onBack, saveStatus }: Props) {
                     <PagesPanel nav={nav} project={project} update={update} doc={doc} usage={usage} />
                   ) : (
                     <>
-                      <PagesBuilder project={project} update={update} doc={doc} onEdit={(id) => { nav.goToItem(id); setArea("layout"); }} />
+                      <PagesBuilder project={project} update={update} doc={doc} onEdit={(id) => { nav.goToItem(id); setArea(isComposedStep(project, id) ? "add" : "layout"); }} />
                       <BookStructurePanel project={project} update={update} doc={doc} goToStep={nav.goToItem} />
                     </>
                   )}

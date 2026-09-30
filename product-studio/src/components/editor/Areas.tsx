@@ -22,9 +22,14 @@ export const AREAS: { id: AreaId; title: string; blurb: string }[] = [
 
 const KEY = "dove-product-studio:v1:editor-area";
 
-/** The open area, remembered for this browser (a convenience only: it falls back to the area list). */
-export function useArea(): [AreaId | null, (a: AreaId | null) => void] {
+/**
+ * The open area, remembered for this browser (a convenience only: it falls
+ * back to the area list). `start` opens a given area instead — a Custom Page
+ * opens on "Add to page", where it is built.
+ */
+export function useArea(start?: AreaId): [AreaId | null, (a: AreaId | null) => void] {
   const [area, setArea] = useState<AreaId | null>(() => {
+    if (start) return start;
     try {
       const v = localStorage.getItem(KEY);
       return AREAS.some((a) => a.id === v) ? (v as AreaId) : null;

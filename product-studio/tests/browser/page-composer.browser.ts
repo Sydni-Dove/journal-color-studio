@@ -1,5 +1,5 @@
 /**
- * Page Composer in a real browser: a blank Custom Page → + Add something
+ * Page Composer in a real browser: a blank Custom Page → + Add a section
  * (heading, info row, divider, spacer, table) → the page draws each piece →
  * save it as a page design → Pages adds three pages made from it. Desktop and
  * phone (no page overflow).
@@ -53,6 +53,32 @@ async function add(page: Page, label: string) {
 }
 
 describe("Page Composer", () => {
+  it("a new Custom Page opens straight on its building pieces (no menus to find)", async () => {
+    const custom = createProject("custom", {
+      name: "Blank Custom Page",
+      dimensions: { sizePresetId: "8.5x11", orientation: "portrait" },
+      recipe: { items: [], ordering: "sequential", structure: [step("custom", { type: "copies", count: 1 }, { title: "Custom Page", promptSet: { blocks: [] } })] },
+    });
+    const page = await (await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })).newPage();
+    await page.goto(base);
+    // Even when another area was open last time.
+    await page.evaluate((x) => {
+      localStorage.clear();
+      localStorage.setItem("dove-product-studio:v1:editor-area", "pages");
+      localStorage.setItem(`dove-product-studio:v1:project:${x.id}`, JSON.stringify(x));
+      localStorage.setItem("dove-product-studio:v1:index", JSON.stringify([{ id: x.id, name: x.name, productType: x.productType, sizePresetId: x.dimensions.sizePresetId, updatedAt: x.updatedAt, variantCount: 0 }]));
+    }, custom);
+    await page.goto(base);
+    await page.locator(".card", { hasText: custom.name }).first().getByRole("button", { name: "Open" }).click();
+    await page.waitForSelector(".ps-page--editor");
+    await expect.poll(() => page.locator('section.area[data-area="add"]').count()).toBe(1);
+    for (const piece of ["Heading / text", "Info row", "Divider line", "Spacer / open space"]) {
+      expect(await page.getByRole("button", { name: piece, exact: true }).first().isVisible(), piece).toBe(true);
+    }
+    expect(await page.getByTestId("save-design").isVisible()).toBe(true);
+    await page.context().close();
+  }, 60_000);
+
   for (const phone of [false, true]) {
     it(`${phone ? "phone" : "desktop"}: compose a page from structured pieces, save it as a design, add it × 3 from Pages`, async () => {
       const page = await open(blank(), phone);

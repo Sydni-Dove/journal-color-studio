@@ -368,8 +368,9 @@ export function PromptEditor({
           );
         })}
       </ol>
-      <details className="subsection add-section-menu">
-        <summary>+ Add something</summary>
+      {/* Open from the start: the pieces a page is built from are the first thing a maker needs. */}
+      <details className="subsection add-section-menu" open>
+        <summary>+ Add a section</summary>
         <p className="hint">Choose what you want to add. Product Studio keeps it aligned, printable, and inside the page.</p>
         {ADD_GROUPS.map((g) => (
           <div key={g.title} className="add-group">
