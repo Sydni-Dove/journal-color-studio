@@ -1530,6 +1530,9 @@ button.family-card:focus-visible {
 .palette-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  /* Rows take their cards' full height: inside the scrolling box they were squeezed, so names ran under the highlight. */
+  grid-auto-rows: max-content;
+  align-content: start;
   gap: 8px;
   max-height: 460px;
   overflow-y: auto;

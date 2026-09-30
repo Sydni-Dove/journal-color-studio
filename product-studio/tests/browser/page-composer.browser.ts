@@ -313,6 +313,10 @@ describe("Page Composer", () => {
       const key = Object.keys(localStorage).find((k) => k.startsWith("dove-product-studio:v1:project:"))!;
       return JSON.parse(localStorage.getItem(key)!).colors;
     });
+    // Every palette card is tall enough for its swatches, name and brand (the highlight never runs through the name).
+    await page.getByRole("button", { name: /^All \(/ }).click();
+    const squeezed = await page.evaluate(() => [...document.querySelectorAll(".palette-card")].filter((c) => c.scrollHeight > c.clientHeight + 1).length);
+    expect(squeezed).toBe(0);
     const current = page.locator('.palette-card[aria-pressed="true"]').first();
     const note = page.getByTestId("color-arrangement");
     if (await note.count()) {
