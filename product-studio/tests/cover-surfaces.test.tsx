@@ -226,3 +226,27 @@ describe("wording choices on the other cover designs", () => {
     expect(ids(s)).toContain("cover-solid-bg");
   });
 });
+
+describe("panel width: hugs the words, or runs off both sides — never almost the page", () => {
+  const solveWith = (panel: CoverDividerSettings["panel"], subtitle = "FROM REVELATION TO EXECUTION") => {
+    const doc = resolveDocument(project({ preset: "surface", surfaceId: "jcs-marble-ember", textPanel: true, subtitle, panel }, "6x9"));
+    const i = pageOf(doc, "cover-page");
+    return { s: solvePage(doc, i), g: geometryFor(doc, doc.recipe.pages[i]) };
+  };
+  it("across the page: through the bleed on both sides", () => {
+    const { s, g } = solveWith({ shape: "rectangle", width: "band" });
+    const p = s.nodes.find((n) => n.id === "cover-panel")!;
+    expect(p.rect.x).toBeCloseTo(-g.trimOffset.x, 6);
+    expect(p.rect.w).toBeCloseTo(g.mediaWidthIn, 6);
+  });
+  it("automatic: never almost the width of the page — a band through the bleed, or at most 78 % of the trim", () => {
+    for (const subtitle of ["FROM REVELATION TO EXECUTION", "", "WORD"]) {
+      const { s, g } = solveWith({ shape: "rounded" }, subtitle);
+      const p = s.nodes.find((n) => n.id === "cover-panel")!;
+      const band = Math.abs(p.rect.w - g.mediaWidthIn) < 1e-6 && Math.abs(p.rect.x + g.trimOffset.x) < 1e-6;
+      expect(band || p.rect.w <= 0.78 * g.trimWidthIn + 1e-6, `${subtitle}: ${p.rect.w}`).toBe(true);
+    }
+    const fit = solveWith({ shape: "rounded", width: "fit" });
+    expect(fit.s.nodes.find((n) => n.id === "cover-panel")!.rect.w).toBeLessThan(fit.g.trimWidthIn);
+  });
+});

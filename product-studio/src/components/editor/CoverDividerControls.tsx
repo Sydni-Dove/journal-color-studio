@@ -88,6 +88,8 @@ export function CoverDividerControls({ step, set, applyPreset, titleFont, onTitl
       {surface && showText && <label style={{ display: "block", minHeight: 44 }}><input type="checkbox" checked={!!o.textPanel} onChange={(e) => change({ textPanel: e.target.checked })}/> Panel behind the wording (easier to read on busy art)</label>}
       {surface && showText && o.textPanel && <div className="cover-panel-controls">
         <Segmented label="Panel shape" value={panel.shape} options={[{ value: "rectangle", label: "Rectangle" }, { value: "rounded", label: "Rounded" }, { value: "oval", label: "Oval" }, { value: "circle", label: "Circle" }]} onChange={(shape) => setPanel({ shape })} />
+        {(panel.shape === "rectangle" || panel.shape === "rounded") && <Segmented label="Panel width" value={panel.width} options={[{ value: "auto", label: "Automatic" }, { value: "fit", label: "Fit the words" }, { value: "band", label: "Across the page" }]} onChange={(width) => setPanel({ width })} />}
+        {(panel.shape === "rectangle" || panel.shape === "rounded") && <p className="hint">{panel.width === "band" ? "A band that runs off both sides of the page." : panel.width === "fit" ? "Hugs the words." : "Hugs the words — and runs off both sides of the page when it would nearly fill the width."}</p>}
         <div className="row">
           <Select label="Panel color" value={panel.fill} options={colorOptions} onChange={(fill) => setPanel({ fill })}/>
           <NumberField label="Panel opacity (0.1 see-through – 1 solid)" min={0.1} max={1} step={0.05} value={panel.opacity} onChange={(opacity) => setPanel({ opacity: Math.max(0.1, Math.min(1, opacity)) })}/>

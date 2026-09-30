@@ -22,11 +22,17 @@
  * next page is on the wrong side. Spreads always open on a verso.
  */
 import { formatWeekRange, MONTH_NAMES } from "../calendar/calendar";
-import { modulePrompts, moduleStart, moduleTitle, type PeriodKind } from "../../presets/modules";
+import { getModule, modulePrompts, moduleStart, moduleTitle, type PeriodKind } from "../../presets/modules";
 import type { CalendarData } from "../../types/calendar";
 import type { PageSide } from "../../types/geometry";
 import type { BookGroup, BookNode, BookStep, PageInstance, PageStartRule, PeriodRef, RecipePeriod } from "../../types/recipe";
 import type { ExpandedRecipe, RecipeContext, RecipeDiagnostic } from "./recipe";
+
+/** The name a person knows a page by, for messages: its title, else its page type. */
+const stepName = (s: BookStep) => s.title?.trim() || getModule(s.module).label.split(" · ").pop() || s.module;
+/** No dates: say which page (or section) repeats by date, and the two ways to fix it. */
+const needsDates = (name: string, when: string) =>
+  `"${name}" is set to print ${when}, but this product has no dates. In Pages → Order & repeats, set it to a number of copies instead — or add a start and end date in Page setup.`;
 
 export type BookContext = RecipeContext & {
   /** Period a layout needs from its page ("none" = any). */
@@ -246,7 +252,7 @@ function expandList(nodes: BookNode[], scope: PeriodRef, path: string, ctx: Book
       case "after-module":
         return; // placed after its target below
       case "end-of-period": {
-        if (!cal) return void diags.push({ severity: "error", itemId: step.id, message: `"End of ${c.period}" needs the project's date range.` });
+        if (!cal) return void diags.push({ severity: "error", itemId: step.id, message: needsDates(stepName(step), `at the end of every ${c.period}`) });
         const periods = periodsWithin(cal, scope, c.period);
         if (!periods.length) diags.push({ severity: "error", itemId: step.id, message: `"End of ${c.period}" has no ${c.period}s inside this ${scopeLabel} section.` });
         for (const p of periods) items.push({ leaves: leavesFor(step, p, path, n), sort: endKey(cal, p), order });
@@ -254,7 +260,7 @@ function expandList(nodes: BookNode[], scope: PeriodRef, path: string, ctx: Book
       }
       default: {
         const kind = CADENCE_PERIOD[c.type];
-        if (!cal) return void diags.push({ severity: "error", itemId: step.id, message: `"Every ${kind}" needs the project's date range.` });
+        if (!cal) return void diags.push({ severity: "error", itemId: step.id, message: needsDates(stepName(step), `every ${kind}`) });
         const periods = periodsWithin(cal, scope, kind);
         if (!periods.length && !hasSharedWeek(cal, scope, kind)) diags.push({ severity: "error", itemId: step.id, message: `"Every ${kind}" has no ${kind}s inside this ${scopeLabel} section.` });
         for (const p of periods) items.push({ leaves: leavesFor(step, p, path, n), sort: startKey(cal, p), order });
@@ -303,7 +309,7 @@ function expandGroup(g: BookGroup, scope: PeriodRef, path: string, order: number
   if (!g.period) return [{ leaves: expandList(g.children, scope, `${path}/${g.id}`, ctx, diags), sort: null, order }];
   const cal = ctx.calendar;
   if (!cal) {
-    diags.push({ severity: "error", itemId: g.id, message: `"Every ${g.period}" needs the project's date range.` });
+    diags.push({ severity: "error", itemId: g.id, message: needsDates(g.label ?? "A section", `every ${g.period}`) });
     return [];
   }
   const periods = periodsWithin(cal, scope, g.period);

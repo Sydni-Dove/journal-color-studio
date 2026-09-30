@@ -230,11 +230,15 @@ function field(g: PageGeometry, opt: CoverDividerSettings, surface: SolvedPage["
  * padding that grows with the title size, so the edge never touches a letter.
  * An oval or circle is drawn around that box. Kept inside the trim.
  */
-export const PANEL_DEFAULTS = { shape: "rounded", fill: "background", opacity: 0.86, outline: "none", outlinePt: 1, trim: false } as const;
+export const PANEL_DEFAULTS = { shape: "rounded", fill: "background", opacity: 0.86, outline: "none", outlinePt: 1, trim: false, width: "auto" } as const;
+/** A fitted panel wider than this share of the trim reads as "almost the page": it becomes a band (auto width). */
+export const PANEL_BAND_AT = 0.78;
 function wordingPanel(words: LayoutNode[], g: PageGeometry, ctx: LayoutContext, left: boolean, look: CoverPanel = {}): LayoutNode[] {
   const texts = words.filter((n): n is Extract<LayoutNode, { type: "text" }> => n.type === "text");
   if (!texts.length) return [];
   const o = { ...PANEL_DEFAULTS, ...look };
+  const shape0 = (id: string, r: Rect, fill: ColorToken | null, opacity: number, stroke: ColorToken | null, pt: number, radiusIn: number): LayoutNode =>
+    ({ ...box(id, r, { fill, fillOpacity: opacity, stroke, strokePt: stroke ? pt : 0, radiusIn }), functional: false });
   const measure = getLayoutMeasurer().measure;
   let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, em = 0;
   for (const n of [...texts, ...words.filter((w) => w.type === "rule")]) {
@@ -263,8 +267,20 @@ function wordingPanel(words: LayoutNode[], g: PageGeometry, ctx: LayoutContext, 
     const [w, h] = o.shape === "circle" ? [Math.hypot(rect.w, rect.h), Math.hypot(rect.w, rect.h)] : [rect.w * Math.SQRT2, rect.h * Math.SQRT2];
     rect = { x: cx - w / 2, y: cy - h / 2, w, h };
   }
-  // Inside the trim (a circle stays round: it shrinks evenly).
   const W = g.trimWidthIn, H = g.trimHeightIn;
+  // Never almost-the-width: a rectangle either hugs the words or runs off both sides of the page.
+  const straight = o.shape === "rectangle" || o.shape === "rounded";
+  const band = straight && (o.width === "band" || (o.width === "auto" && rect.w > PANEL_BAND_AT * W));
+  if (band) {
+    const r = { x: -g.trimOffset.x, y: Math.max(0, rect.y), w: g.mediaWidthIn, h: Math.min(H, rect.y + rect.h) - Math.max(0, rect.y) };
+    const out = [shape0("cover-panel", r, o.fill, o.opacity, o.outline !== "none" ? o.outline : null, o.outlinePt, 0)];
+    if (o.trim) {
+      const inset = Math.max(0.06, o.outlinePt / 72 + 0.05);
+      out.push(shape0("cover-panel-trim", { x: r.x, y: r.y + inset, w: r.w, h: r.h - 2 * inset }, null, 0, "lineArt", 0.6, 0));
+    }
+    return out;
+  }
+  // Inside the trim (a circle stays round: it shrinks evenly).
   if (o.shape === "circle" && (rect.w > W || rect.h > H)) {
     const d = Math.min(W, H), cx = rect.x + rect.w / 2, cy = rect.y + rect.h / 2;
     rect = { x: cx - d / 2, y: cy - d / 2, w: d, h: d };
@@ -276,7 +292,7 @@ function wordingPanel(words: LayoutNode[], g: PageGeometry, ctx: LayoutContext, 
   const shape = (id: string, r: Rect, fill: ColorToken | null, opacity: number, stroke: ColorToken | null, pt: number): LayoutNode =>
     o.shape === "oval" || o.shape === "circle"
       ? { id, type: "circle", component: "Section", rect: r, functional: false, fill, fillOpacity: opacity, ...(stroke ? { outline: true, stroke, strokePt: pt } : {}) }
-      : { ...box(id, r, { fill, fillOpacity: opacity, stroke, strokePt: stroke ? pt : 0, radiusIn: radius }), functional: false };
+      : shape0(id, r, fill, opacity, stroke, pt, radius);
   const out = [shape("cover-panel", rect, o.fill, o.opacity, outline, o.outlinePt)];
   if (o.trim) {
     const inset = Math.max(0.06, o.outlinePt / 72 + 0.05);

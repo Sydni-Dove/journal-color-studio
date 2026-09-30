@@ -191,6 +191,11 @@ export type CoverPanel = {
   outlinePt?: number;
   /** A thin inner line just inside the edge (the palette's line-art color). */
   trim?: boolean;
+  /**
+   * Width: "fit" hugs the words; "band" runs off both sides of the page (through the bleed);
+   * "auto" (default) fits, and becomes a band when it would nearly fill the width.
+   */
+  width?: "auto" | "fit" | "band";
 };
 
 /** Additive, per-step settings; absent on legacy projects. Tabs are interior printed markers. */
