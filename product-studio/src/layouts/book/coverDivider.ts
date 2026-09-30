@@ -230,10 +230,17 @@ function solveResponsive(ctx: LayoutContext, divider: boolean): SolvedPage[] {
   // Aspect ratio, not only area: a relatively narrow portrait page (6 × 9, 5.5 × 8.5) gets a narrower title zone,
   // so the script doesn't run edge to edge where a squarer page of the same class has room around it.
   const aspectW = comp.landscape ? 1 : comp.aspect < 0.5 ? 0.85 : comp.aspect < 0.62 ? 0.92 : 1;
-  const zone = { w: Math.min(content.w, variant.title.maxW * aspectW * content.w), h: variant.title.maxH * content.h };
+  let zone = { w: Math.min(content.w, variant.title.maxW * aspectW * content.w), h: variant.title.maxH * content.h };
   // The role's size is a ceiling (a size set in Typography still caps the design).
   const preferredPt = Math.min(variant.title.preferredPt * scale * narrow, titleStyle.sizePt);
-  const tf = fitTitle(title, mTitle, { preferredPt, minPt: Math.min(variant.title.minPt, preferredPt) }, zone, titleStyle.trackingEm);
+  const titleSpec = { preferredPt, minPt: Math.min(variant.title.minPt, preferredPt) };
+  let tf = fitTitle(title, mTitle, titleSpec, zone, titleStyle.trackingEm);
+  // The narrower zone is a preference for the look: a title that can't fit it at its minimum takes the full
+  // content width (clear of the tab) before anything is reported.
+  if (!tf.ok && zone.w < content.w) {
+    zone = { ...zone, w: content.w };
+    tf = fitTitle(title, mTitle, titleSpec, zone, titleStyle.trackingEm);
+  }
   const em = tf.sizePt / 72, lineH = ctx.typography.roles.coverTitle.lineHeight;
   const inkAbove = SCRIPT_ASCENT_EM * em, inkBelow = (/[gjpqy]/.test(title) ? SCRIPT_DESCENT_EM : SCRIPT_DESCENT_SHORT_EM) * em;
   const tOff = opt.titleOffset ?? { x: 0, y: 0 }, sOff = opt.subtitleOffset ?? { x: 0, y: 0 };

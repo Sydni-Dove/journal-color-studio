@@ -3,6 +3,7 @@
  * They never compute geometry — positions come from the layout solvers —
  * so the editor preview and the print output are the same drawing.
  */
+import { LEOPARD_ART } from "../design-library/leopardArt";
 import { fontStack } from "../presets/typography/typography";
 import { useId, memo, type CSSProperties } from "react";
 import type { BoxNode, CheckboxNode, DotsNode, LayoutNode, LinesNode, RuleNode, TextNode } from "../types/layout";
@@ -124,48 +125,14 @@ export const PatternLayer = memo(function PatternLayer({ nodes }: { nodes: Layou
 });
 
 /**
- * Cheetah print: one tile (a third of the circle, so every circle shows the same
- * number of rosettes) of broken dark rings around warm centres, with fine
- * speckles, on the palette's pattern ground. Fixed, seeded geometry — preview
- * and print draw the identical pattern.
+ * The leopard print inside Neutral Cheetah Luxe's cheetah circles: Sydni's own artwork, the largest circle of
+ * original pixels in the "Plan with purpose" Canva export (design-library/SNAPSHOT.md). It keeps its own
+ * colors, as designed. Every second cheetah shape shows it turned half a turn, so two circles never repeat.
  */
-const CHEETAH_TILE = 0.4;
-/** Rosette positions below are laid out on a tile of 1/3; they scale with the tile. */
-const K = CHEETAH_TILE * 3;
-const CHEETAH = (() => {
-  let seed = 7;
-  const rnd = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
-  // [cx, cy, size] — each rosette (with its ring of spots) stays inside the tile, so tiles join without seams.
-  const rosettes = [
-    [0.1, 0.1, 0.075], [0.245, 0.19, 0.065], [0.1, 0.258, 0.055], [0.275, 0.045, 0.03],
-  ].map(([x, y, z]) => {
-    const cx = x * K, cy = y * K, s = z * K;
-    const rot = rnd() * Math.PI * 2, n = 4 + Math.round(rnd());
-    // Chunky, nearly round spots in a broken ring (as in a real cheetah/leopard rosette).
-    const blobs = Array.from({ length: n }, (_, k) => {
-      const a = rot + (k / n) * Math.PI * 2 + (rnd() - 0.5) * 0.45, d = s * (0.68 + rnd() * 0.1);
-      return { cx: cx + Math.cos(a) * d, cy: cy + Math.sin(a) * d, rx: s * (0.42 + rnd() * 0.1), ry: s * (0.33 + rnd() * 0.07), deg: (a * 180) / Math.PI + 90 };
-    });
-    return { cx, cy, core: s * 0.6, blobs };
-  });
-  const specks = Array.from({ length: 22 }, () => ({ cx: 0.01 + rnd() * (CHEETAH_TILE - 0.02), cy: 0.01 + rnd() * (CHEETAH_TILE - 0.02), r: 0.003 + rnd() * 0.005 }));
-  return { rosettes, specks };
-})();
-
-function CheetahPattern({ id }: { id: string }) {
-  const ink = { fill: colorVar("patternInk") };
+function CheetahPattern({ id, turned }: { id: string; turned?: boolean }) {
   return (
-    <pattern id={id} width={CHEETAH_TILE} height={CHEETAH_TILE} patternUnits="objectBoundingBox" patternContentUnits="objectBoundingBox">
-      <rect width={CHEETAH_TILE} height={CHEETAH_TILE} style={{ fill: colorVar("patternGround") }} />
-      <ellipse cx={0.2 * K} cy={0.08 * K} rx={0.09 * K} ry={0.05 * K} style={{ fill: colorVar("background"), opacity: 0.18 }} />
-      <ellipse cx={0.06 * K} cy={0.3 * K} rx={0.07 * K} ry={0.04 * K} style={{ fill: colorVar("background"), opacity: 0.14 }} />
-      {CHEETAH.rosettes.map((r, i) => (
-        <g key={i}>
-          <circle cx={r.cx} cy={r.cy} r={r.core} style={{ ...ink, opacity: 0.42 }} />
-          {r.blobs.map((b, j) => <ellipse key={j} cx={b.cx} cy={b.cy} rx={b.rx} ry={b.ry} transform={`rotate(${b.deg} ${b.cx} ${b.cy})`} style={ink} />)}
-        </g>
-      ))}
-      {CHEETAH.specks.map((d, i) => <circle key={i} cx={d.cx} cy={d.cy} r={d.r} style={ink} />)}
+    <pattern id={id} width={1} height={1} patternUnits="objectBoundingBox" patternContentUnits="objectBoundingBox">
+      <image href={LEOPARD_ART} x={0} y={0} width={1} height={1} preserveAspectRatio="xMidYMid slice" transform={turned ? "rotate(180 0.5 0.5)" : undefined} />
     </pattern>
   );
 }
@@ -173,13 +140,14 @@ function CheetahPattern({ id }: { id: string }) {
 /** Layer 4 — layout structure (boxes, cells, rules, checkboxes). */
 export const StructureLayer = memo(function StructureLayer({ nodes }: { nodes: LayoutNode[] }) {
   const patternId = `leopard-${useId().replace(/:/g, "")}`;
+  const leopards = nodes.filter((n) => n.type === "circle" && n.leopard).map((n) => n.id);
   return (
     <>
-      {nodes.some((n) => n.type === "circle" && n.leopard) && <defs><CheetahPattern id={patternId} /></defs>}
+      {leopards.length > 0 && <defs><CheetahPattern id={patternId} /><CheetahPattern id={`${patternId}-t`} turned /></defs>}
       {nodes.map((n) => {
         switch (n.type) {
           case "circle":
-            return <ellipse key={n.id} cx={n.rect.x + n.rect.w / 2} cy={n.rect.y + n.rect.h / 2} rx={n.rect.w / 2} ry={n.rect.h / 2} style={{ fill: n.leopard ? `url(#${patternId})` : n.fill ? colorVar(n.fill) : "none", stroke: n.outline ? colorVar(n.stroke ?? "text") : "none" }} strokeWidth={n.outline ? ptToIn(n.strokePt ?? 0.58) : 0} data-node={n.id} />;
+            return <ellipse key={n.id} cx={n.rect.x + n.rect.w / 2} cy={n.rect.y + n.rect.h / 2} rx={n.rect.w / 2} ry={n.rect.h / 2} style={{ fill: n.leopard ? `url(#${patternId}${leopards.indexOf(n.id) % 2 ? "-t" : ""})` : n.fill ? colorVar(n.fill) : "none", stroke: n.outline ? colorVar(n.stroke ?? "text") : "none" }} strokeWidth={n.outline ? ptToIn(n.strokePt ?? 0.58) : 0} data-node={n.id} />;
           case "box":
             return <Box key={n.id} node={n} />;
           case "checkbox":

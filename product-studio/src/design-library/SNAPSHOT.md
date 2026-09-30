@@ -172,3 +172,14 @@ and print always use the full files.
 | Prayer / Prayer Warrior / Warring Woman palettes (JCS `JOURNAL_PALETTES`) | Their roles mean different things (stone = the journal's watercolor figure, plate = title lettering…) — tied to those journals' artwork. |
 | JCS "Dove Signature" palette | Product Studio's own Dove Signature brand palette is canonical for the same brand colors. |
 | JCS editor UI, state, cover templates, title plates, experimental accent layouts | Application code, not the visual library. |
+
+## Derived from Sydni's "Plan with purpose" cover art (2026-09-30)
+
+| Asset | Source | Derived file | SHA-1 |
+|---|---|---|---|
+| Leopard print (Neutral Cheetah Luxe cheetah circles, cheetah tabs) | Journal Color Studio `claude/plan-with-purpose-cover` @ `c4846fc`, `canva/circles/layer-03.png` (Sydni's 295 DPI transparent Canva export, SHA-1 21ff33b31a8137701aa5fdc3b3c286505afecf93) | `assets/leopard-plan-with-purpose.jpg` | b3f1b4f59453cd7698011b67bdfd0d614aa0918e |
+
+The largest circle made only of the artwork's own pixels: inside the leopard circle (centre 476, 473; radius 470 px)
+and left of x = 650 px, where Canva's edge mirror begins — a 644 px square centred at (328, 473), flattened onto the
+print's own median ground colour outside its soft edge. No mirroring, no redrawing, colours as designed. It replaces
+the procedurally drawn spots Product Studio used before (those were never Sydni's artwork).
