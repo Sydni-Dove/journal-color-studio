@@ -78,7 +78,7 @@ export function PagesBuilder({ project, update, doc, onEdit }: Props) {
 
   return (
     <section className="builder" aria-label={`${productLabel} pages`}>
-      <h3 className="builder__title">{productLabel} pages</h3>
+      <h3 className="builder__title">{/page$/i.test(productLabel) ? "Pages" : `${productLabel} pages`}</h3>
       <p className="hint">What this {productLabel.toLowerCase()} contains. Add a kind of page and it goes in the right place; choose Edit to change its layout, writing space and content.</p>
       {shown.map((cat) => (
         <Category key={cat} cat={cat} rows={rows} allRows={rows} edit={edit} onEdit={onEdit} doc={doc} />
@@ -225,10 +225,13 @@ export function renameStep(nodes: BookNode[], id: string, title: string): BookNo
 function PageDesigns({ project, edit, update }: { project: ProductProject; edit: (fn: (n: BookNode[]) => BookNode[]) => void; update: Update }) {
   const designs = project.pageDesigns ?? [];
   const [copies, setCopies] = useState<Record<string, number>>({});
-  if (!designs.length) return null;
   return (
     <div className="builder-cat" data-category="designs">
-      <div className="builder-cat__head"><strong>Your page designs</strong></div>
+      <div className="builder-cat__head">
+        <strong>Your page designs</strong>
+        {!designs.length && <span className="builder-cat__empty">None yet</span>}
+      </div>
+      {!designs.length && <p className="hint">Build a page from sections (Edit → Add to page), then “Save page design”. It appears here to add as many times as you need.</p>}
       {designs.map((d) => (
         <div key={d.id} className="builder-row" data-design={d.id}>
           <div className="builder-row__text">
