@@ -48,7 +48,7 @@ export function PrintSheets({ doc, plan }: { doc: ResolvedDocument; plan: PrintP
         return (
         // The sheet is the page, or home paper with the page centred on it (no browser margins either way).
         <div className="ps-print-sheet" key={`${i}-${k}`} style={{ position: "relative", width: `${plan.sheetWidthIn}in`, height: `${plan.sheetHeightIn}in`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          {home && <CutMarks g={g} sheetW={plan.sheetWidthIn} sheetH={plan.sheetHeightIn} />}
+          {home && plan.showTrimMarks && <CutMarks g={g} sheetW={plan.sheetWidthIn} sheetH={plan.sheetHeightIn} />}
           <PrintablePage
             geometry={g}
             solved={solvePage(doc, i)}
