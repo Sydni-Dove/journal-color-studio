@@ -769,6 +769,11 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
   // their own spec and no binding margin. Layouts keep 3/8 in or more at each side of the trim, so moving the whole
   // design 1/8 in away from the binding edge gives 1/2 in there and still leaves 1/4 in at the outer edge.
   const SAFE_BIND_PT = 36, SAFE_EDGE_PT = 18, BIND_SHIFT_PT = (SAFE_BIND_PT - SAFE_EDGE_PT) / 2;
+  // In design (trim) coordinates, wording and border lines stay 3/8 in from each side: after the 1/8 in binding shift
+  // that is 1/2 in at the binding edge and 1/4 in at the outer edge. The thin border line along the top of a page is
+  // an edge element instead: 1/8 in deep, running off the page into the bleed (composeBleed mirrors it outward).
+  const safeInset = (W) => W * (SAFE_BIND_PT - BIND_SHIFT_PT) / TRIM_W;
+  const topBorder = (H) => H * BLEED_PT / TRIM_H;
   // Marble layer maps: R = stone detail (or vein shading), G = gold veins, B = cream highlights.
   // The "canva" marble comes from Sydni's Canva cover: flat stone, so the gold carries its own light-to-dark shading.
   const TEXTURES = {
@@ -3229,6 +3234,8 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
   function drawHeaderTitle(ctx, W, H, s, title, { sub = '', pref = 'rule', x0 = 0, x1 = W, id = null, subId = null } = {}) {
     const p = s.palette, w = x1 - x0, cx = x0 + w / 2, maxW = w * .9;
     const style = headerStyleFor(s, pref);
+    // Border lines under a title stop at the safe area wherever they would otherwise reach the page's side edge.
+    const rx0 = x0 <= 0 ? x0 + safeInset(W) : x0, rx1 = x1 >= W ? x1 - safeInset(W) : x1;
     const ink = inkColor(p);
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     let bottom;
@@ -3246,7 +3253,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     } else if (style === 'bar') {                  // title on paper, thick dark bar beneath (Dream)
       const [ty, by] = snugHeader(s) ? [.054, .087] : [.07, .115];
       ctx.fillStyle = ink; ctx.font = headFont(H * .05); fillFit(ctx, s, id, title, cx, H * ty, maxW);
-      stoneBar(ctx, x0, H * by, w, H * .028, s);
+      stoneBar(ctx, rx0, H * by, rx1 - rx0, H * .028, s);
       bottom = H * (by + .028);
     } else if (style === 'band') {                 // marble band with the cover's title plate
       const band = H * .125;
@@ -3275,10 +3282,10 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
       bottom = H * .09;
     } else {                                       // 'rule': thin top bar, dark title, gold rule (Draw, Brainstorm, Keys, Notes)
       const isFloral = s.marble === 'floral';
-      if (s.footer === 'on' && !isFloral) stoneBar(ctx, x0, 0, w, H * .022, s);
+      if (s.footer === 'on' && !isFloral) stoneBar(ctx, x0, 0, w, topBorder(H), s);
       const [ty, ry] = snugHeader(s) ? [.054, .083] : [.068, .105];
       ctx.fillStyle = ink; ctx.font = headFont(H * .045); fillFit(ctx, s, id, title, cx, H * ty, maxW);
-      headerRule(ctx, x0, H * ry, w, H * .012, s);
+      headerRule(ctx, rx0, H * ry, rx1 - rx0, H * .012, s);
       if (isFloral) floralFlank(ctx, cx, H * (ry + .003) - H * .05, w * .07, H * .1, s);
       bottom = H * (ry + .012);
     }
@@ -3453,7 +3460,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
       const { k } = canvaFit(W, H);
       tx = cX(W, H, 212); tw = 507 * k; bodyPx = 16.44 * k; lh = bodyPx * 1.4; r = 42.7 * k; cx = cX(W, H, 137.5); y = cY(W, H, 259.3);
     } else {
-      if (s.footer === 'on') stoneBar(ctx, 0, 0, W, H * .022, s);
+      if (s.footer === 'on') stoneBar(ctx, 0, 0, W, topBorder(H), s);
       ctx.fillStyle = ink; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
       withRole(ctx, s, 'pageTitle', () => { ctx.font = font(H * .042, { weight: 700 }); fillFit(ctx, s, 'howtoTitle', T(s, 'howtoTitle'), W * .09, H * .125, W * .82); });
     }
@@ -3507,7 +3514,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
         drawFloralArt(ctx, W, H, s, FLORAL_ART.belongs);
       } else {
         const bar = H * .038;
-        stoneBar(ctx, 0, 0, W, bar, s);
+        stoneBar(ctx, 0, 0, W, topBorder(H), s);                 // top border line: 1/8 in, bleeding off the edge
         stoneBar(ctx, 0, H - bar, W, bar, s);
         if (s.showTrim) goldRule(ctx, 0, H - bar - H * .012, W, H * .012, p.trim);
       }
@@ -3551,7 +3558,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
           ctx.font = headFont(H * .06 * sc, { weight: 600, italic: true }); fillFit(ctx, s, 'howtoTitle', title, W / 2, H * .118, W * .77);
         });
       } else {
-        if (s.footer === 'on') stoneBar(ctx, 0, 0, W, H * .022, s);
+        if (s.footer === 'on') stoneBar(ctx, 0, 0, W, topBorder(H), s);
         ctx.fillStyle = ink; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
         withRole(ctx, s, 'pageTitle', () => { ctx.font = font(H * .036, { weight: 700 }); fillFit(ctx, s, 'howtoTitle', T(s, 'howtoTitle'), W * .07, H * .09, W * .86); });
       }
@@ -3620,7 +3627,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
         ctx.strokeStyle = p.line; ctx.lineWidth = Math.max(1, 1.2 * k); ctx.strokeRect(cX(W, H, 83.3), cY(W, H, 315.3), 652.3 * k, 736.7 * k);
         return;
       } else {
-        if (s.footer === 'on') stoneBar(ctx, 0, 0, W, H * .022, s);
+        if (s.footer === 'on') stoneBar(ctx, 0, 0, W, topBorder(H), s);
         ctx.fillStyle = ink; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         withRole(ctx, s, 'pageTitle', () => { ctx.font = font(H * .05); fillFit(ctx, s, 'summaryTableTitle', T(s, 'summaryTableTitle'), W / 2, H * .08, W * .88); });
       }
@@ -3672,7 +3679,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
       const LEGEND = [['Status', .1], ['N = Not Interpreted', .3], ['I = Interpreted', .6], ['A = Application', .8]];
       const panel = pagePanel(s, 'contents'), onPage = !panel && wordsOffArt(s);
       const legendY = onPage ? H * .05 : ly + lh / 2;                           // the legend line's centre
-      if (onPage) { stoneBar(ctx, 0, 0, W, H * .028, s); stoneBar(ctx, 0, H * .072, W, H * .022, s); } else stoneBar(ctx, 0, ly, W, lh, s);
+      if (onPage) { stoneBar(ctx, 0, 0, W, topBorder(H), s); stoneBar(ctx, 0, H * .072, W, H * .022, s); } else stoneBar(ctx, 0, ly, W, lh, s);
       if (panel) {
         // Edge to edge (bleeds off both sides like the strip); padding sets how much of the strip's height it covers.
         const iy = [lh * .16, lh * .08, 0][panel.lvl + 1];
@@ -3692,9 +3699,10 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
       });
       ctx.fillRect(W * .175, legendY - lh * .3, Math.max(1, W * .002), lh * .6);
       ctx.fillStyle = ink; withRole(ctx, s, 'pageTitle', () => { ctx.font = font(H * .045); fillFit(ctx, s, 'contentsTitle', T(s, 'contentsTitle'), W / 2, H * .135, W * .88); });
-      headerRule(ctx, 0, H * .17, W, H * .011, s);
+      const si = safeInset(W);
+      headerRule(ctx, si, H * .17, W - 2 * si, H * .011, s);
       ctx.fillStyle = ink; withRole(ctx, s, 'columnHeadings', () => { ctx.font = font(H * .028, { italic: true }); [['#', .07], ['Date', .23], ['Title', .44], ['Type', .66], ['Status', .87]].forEach(([t, f]) => ctx.fillText(t, W * f, H * .207)); });
-      ctx.fillRect(0, H * .232, W, Math.max(2, H * .004));
+      ctx.fillRect(si, H * .232, W - 2 * si, Math.max(2, H * .004));
     },
     title(ctx, W, H, s) {
       const p = s.palette, ink = inkColor(p);
@@ -3720,7 +3728,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
         return;
       }
       const isFloral = s.marble === 'floral';
-      if (!isFloral && s.footer === 'on') stoneBar(ctx, 0, 0, W, H * .038, s);
+      if (!isFloral && s.footer === 'on') stoneBar(ctx, 0, 0, W, topBorder(H), s);
       ctx.fillStyle = ink; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       withRole(ctx, s, 'pageTitle', () => { ctx.font = font(H * .06); fillFit(ctx, s, 'entryTitle', T(s, 'entryTitle'), W / 2, H * .135, W * .78); });
       headerRule(ctx, W * .1, H * .17, W * .8, H * .007, s);
