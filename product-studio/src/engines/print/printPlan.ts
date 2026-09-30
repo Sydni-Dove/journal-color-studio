@@ -16,6 +16,8 @@ export type PrintPlan = {
   sheetWidthIn: number;
   sheetHeightIn: number;
   errors: string[];
+  /** Home-paper only: whether to draw trim/cut marks around the finished page. */
+  showTrimMarks: boolean;
 };
 
 /** Home printer paper, portrait (inches). */
@@ -71,5 +73,5 @@ export function planPrint(doc: ResolvedDocument, settings: ExportSettings, curre
       errors.push(`A ${g0.mediaWidthIn.toFixed(2)}" × ${g0.mediaHeightIn.toFixed(2)}" page is larger than ${paper.label} paper. Choose “Page size” and print at a print shop, or save as PDF.`);
     }
   }
-  return { sequence, mediaWidthIn: g0.mediaWidthIn, mediaHeightIn: g0.mediaHeightIn, sheetWidthIn: sheetW, sheetHeightIn: sheetH, pageCss: pageRuleCss(sheetW, sheetH), errors };
+  return { sequence, mediaWidthIn: g0.mediaWidthIn, mediaHeightIn: g0.mediaHeightIn, sheetWidthIn: sheetW, sheetHeightIn: sheetH, pageCss: pageRuleCss(sheetW, sheetH), errors, showTrimMarks: !!paper && settings.showTrimMarks === true };
 }
