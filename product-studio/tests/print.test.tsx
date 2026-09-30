@@ -60,7 +60,7 @@ describe("print plan", () => {
     expect(plan.errors.length).toBeGreaterThan(0);
   });
 
-  it("each printed sheet is the paper size with the page centred on it", () => {
+  it("each printed sheet is the paper size with the page centred on it; trim marks are off by default", () => {
     const p = TEST_PRODUCTS[1].build();
     const doc = resolveDocument(p);
     const plan = planPrint(doc, { ...p.exportSettings, paper: "letter", scope: "current-page" }, 0);
@@ -68,6 +68,19 @@ describe("print plan", () => {
     expect(html).toContain("width:8.5in");
     expect(html).toContain("height:11in");
     expect(html).toContain("justify-content:center");
+    expect(plan.showTrimMarks).toBe(false);
+    expect(html).not.toContain('data-testid="cut-marks"');
+  });
+
+  it("home printing can show trim marks when the user turns them on", () => {
+    const p = TEST_PRODUCTS[1].build();
+    const doc = resolveDocument(p);
+    const plan = planPrint(doc, { ...p.exportSettings, paper: "letter", scope: "current-page", showTrimMarks: true }, 0);
+    expect(plan.showTrimMarks).toBe(true);
+    const html = renderToStaticMarkup(<PrintSheets doc={doc} plan={plan} />);
+    expect(html).toContain('data-testid="cut-marks"');
+    // Page-size / print-shop output never uses trim marks, even if an old setting remains on.
+    expect(planPrint(doc, { ...p.exportSettings, paper: "page", showTrimMarks: true }).showTrimMarks).toBe(false);
   });
 });
 
