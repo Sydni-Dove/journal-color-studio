@@ -3251,7 +3251,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
       headerRule(ctx, x0, hb, w, H * .011, s);
       bottom = hb + H * .011;
     } else if (style === 'bar') {                  // title on paper, thick dark bar beneath (Dream)
-      const [ty, by] = snugHeader(s) ? [.054, .087] : [.07, .115];
+      const [ty, by] = snugHeader(s) ? [.054, .097] : [.07, .115];   // snug still leaves a clear gap between title and bar
       ctx.fillStyle = ink; ctx.font = headFont(H * .05); fillFit(ctx, s, id, title, cx, H * ty, maxW);
       stoneBar(ctx, rx0, H * by, rx1 - rx0, H * .028, s);
       bottom = H * (by + .028);
@@ -3283,7 +3283,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     } else {                                       // 'rule': thin top bar, dark title, gold rule (Draw, Brainstorm, Keys, Notes)
       const isFloral = s.marble === 'floral';
       if (s.footer === 'on' && !isFloral) stoneBar(ctx, x0, 0, w, topBorder(H), s);
-      const [ty, ry] = snugHeader(s) ? [.054, .083] : [.068, .105];
+      const [ty, ry] = snugHeader(s) ? [.054, .095] : [.068, .105];   // snug still leaves a clear gap between title and rule
       ctx.fillStyle = ink; ctx.font = headFont(H * .045); fillFit(ctx, s, id, title, cx, H * ty, maxW);
       headerRule(ctx, rx0, H * ry, rx1 - rx0, H * .012, s);
       if (isFloral) floralFlank(ctx, cx, H * (ry + .003) - H * .05, w * .07, H * .1, s);
@@ -3346,7 +3346,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     // Snug: lines centred between the header and the footer's gold rule (or the bottom margin without a footer).
     const edge = s.footer === 'on' && !floralDesign(s) ? H - H * .035 - (s.showTrim ? H * .01 : 0) : bottom;
     if (!snugHeader(s)) writingLines(ctx, W, H, s, W * .045, W * .955, top, bottom);
-    else writingLines(ctx, W, H, s, W * .045, W * .955, top, bottom, (style === 'rule' || style === 'bar') && !subId ? .6 : 1.25, edge);
+    else writingLines(ctx, W, H, s, W * .045, W * .955, top, bottom, (style === 'rule' || style === 'bar') && !subId ? 1 : 1.25, edge);   // never closer than one line space
   };
 
   // Dark sidebar used on the first Dream and first Brainstorm page of each cycle.
@@ -3391,7 +3391,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     if (s.accent !== 'none' && s.accentLined) drawAccent(ctx, W, H, s, true);
     const sx = W * .6;
     const top = drawHeader(ctx, W, H, s, T(s, id), { pref: 'bar', x1: sx, id });
-    if (snugHeader(s)) writingLines(ctx, W, H, s, W * .045, sx - W * .03, top, H * .965, ['mixed', 'rule', 'bar'].includes(s.headerStyle) ? .6 : 1.25, H * .975);
+    if (snugHeader(s)) writingLines(ctx, W, H, s, W * .045, sx - W * .03, top, H * .965, ['mixed', 'rule', 'bar'].includes(s.headerStyle) ? 1 : 1.25, H * .975);
     else writingLines(ctx, W, H, s, W * .045, sx - W * .03, top, H * .965);
     if (floralDesign(s)) { const [r, g, b] = hexRgb(s.palette.paper); ctx.fillStyle = `rgb(${r * .945},${g * .945},${b * .945})`; ctx.fillRect(sx, 0, W - sx, H); }
     else stoneBar(ctx, sx, 0, W - sx, H, s);
@@ -3731,8 +3731,8 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
       if (!isFloral && s.footer === 'on') stoneBar(ctx, 0, 0, W, topBorder(H), s);
       ctx.fillStyle = ink; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       withRole(ctx, s, 'pageTitle', () => { ctx.font = font(H * .06); fillFit(ctx, s, 'entryTitle', T(s, 'entryTitle'), W / 2, H * .135, W * .78); });
-      headerRule(ctx, W * .1, H * .17, W * .8, H * .007, s);
-      if (isFloral) floralFlank(ctx, W / 2, H * .17 - H * .045, W * .14, H * .09, s);
+      headerRule(ctx, W * .1, H * .183, W * .8, H * .007, s);   // clear gap under the title, like the other section rules
+      if (isFloral) floralFlank(ctx, W / 2, H * .183 - H * .045, W * .14, H * .09, s);
       ctx.fillStyle = ink; withRole(ctx, s, 'fieldLabels', () => { ctx.font = font(H * .038); fillFit(ctx, s, 'dateLabel', T(s, 'dateLabel'), W * .24, H * .295, W * .4); fillFit(ctx, s, 'timeLabel', T(s, 'timeLabel'), W * .74, H * .295, W * .4); });
       headerRule(ctx, W * .1, H * .385, W * .8, H * .011, s);
       ctx.fillStyle = ink; withRole(ctx, s, 'dreamTypeHeading', () => { ctx.font = font(H * .04); fillFit(ctx, s, 'dreamTypeHeading', T(s, 'dreamTypeHeading'), W / 2, H * .445, W * .78); });
