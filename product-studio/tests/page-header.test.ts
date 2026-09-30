@@ -126,6 +126,24 @@ describe("section number circle and line at left", () => {
 });
 
 describe("right-side mark", () => {
+  // Reported on 6 × 9: the mark typed on one line with all four details dropped everything under the title.
+  for (const size of ["6x9", "7x9", "5.5x8.5", "a5", "8.5x11"])
+    it(`${size}: a mark typed on one line stays at the right, stacked; the details go below the band if they don't fit beside it`, () => {
+      const header = { ...STEP_HEADERS[1], mark: "FROM REVELATION TO EXECUTION", meta: ["Date", "Time", "Received through", "Type"] };
+      const { solved, g } = solve(stepPage(header), size);
+      const title = byId(solved.nodes, "-intro-title")!;
+      const lines = solved.nodes.filter((n) => /-intro-mark\d$/.test(n.id));
+      expect(lines.length, size).toBeGreaterThan(1);
+      for (const l of lines) expect(l.rect.x, size).toBeGreaterThanOrEqual(title.rect.x + title.rect.w - 1e-6);
+      expect(lines.map((n) => (n.type === "text" ? n.text : "")).join(" ")).toBe("FROM REVELATION TO EXECUTION");
+      const date = byId(solved.nodes, "-intro-meta0-label")!;
+      expect(date).toBeDefined();
+      const texts = solved.nodes.filter((n) => n.id.includes("-intro-") && n.type === "text");
+      for (let a = 0; a < texts.length; a++) for (let b = a + 1; b < texts.length; b++) expect(overlaps(texts[a].rect, texts[b].rect), `${texts[a].id} × ${texts[b].id}`).toBe(false);
+      for (const n of solved.nodes.filter((n) => n.functional !== false && n.type !== "group")) expect(rectContains(g.safeRect, n.rect), n.id).toBe(true);
+      expect(byId(solved.nodes, "-word-title")!.rect.y).toBeGreaterThan(Math.max(...texts.map((t) => t.rect.y + t.rect.h)));
+    });
+
   it("sits between two short rules: one above its first line, one below its last", () => {
     const { solved } = solve(stepPage(STEP_HEADERS[1]), "8.5x11");
     const top = byId(solved.nodes, "-intro-mark-top")!, bottom = byId(solved.nodes, "-intro-mark-bottom")!;

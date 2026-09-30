@@ -323,7 +323,7 @@ function composedHeader(id: string, h: GuidedHeader, body: Rect, ctx: LayoutCont
   const tight = s.block / 2;
   const clean = (v?: string) => v?.trim() || "";
   const meta = (h.meta ?? []).map(clean).filter(Boolean);
-  const markLines = clean(h.mark) ? clean(h.mark).split(/\n+/).map((l) => l.trim().toUpperCase()).filter(Boolean) : [];
+  const typedMark = clean(h.mark) ? clean(h.mark).split(/\n+/).map((l) => l.trim().toUpperCase()).filter(Boolean) : [];
   const dividers = h.dividers !== false;
   const draw: (() => void)[] = [];
   const put = (key: string, rect: Rect, value: string, role: TypographyRole, o: { sizePt?: number; trackingEm?: number; align?: "left" | "center" | "right"; color?: ColorToken; component?: "PageHeader" | "SectionHeader"; vAlign?: "top" | "bottom"; lines?: string[] } = {}) => {
@@ -354,19 +354,32 @@ function composedHeader(id: string, h: GuidedHeader, body: Rect, ctx: LayoutCont
   // ── Right zone: the mark and / or the details.
   const markTrack = 0.3;
   const markPt = roles.label.sizePt * 1.25;
+  // A mark typed on one long line ("FROM REVELATION TO EXECUTION") is set as a short stacked column, the way the
+  // reference sets it; lines the user broke themselves are kept (and wrapped only if still too wide).
+  const longestWord = Math.max(0, ...typedMark.flatMap((l) => l.split(/\s+/)).map((w) => widthAt(w, "label", markPt, markTrack)));
+  const markWrapW = Math.min(body.w * 0.4, Math.max(longestWord, body.w * 0.16));
+  const markLines = typedMark.flatMap((l) => wrapAt(l, "label", markWrapW, markPt, markTrack));
   const markW = markLines.length ? Math.max(...markLines.map((l) => widthAt(l, "label", markPt, markTrack))) : 0;
   const rowH = fillInIn(ctx);
   const labelW = meta.length ? Math.max(...meta.map((f) => widthAt(f, "label"))) : 0;
   const metaW = meta.length ? labelW + s.checkboxGap + HEADER_META_LINE_IN : 0;
-  let rightW = Math.min(body.w * 0.4, Math.max(markW, metaW));
   const centerX = body.x + leftW + (leftW ? gap : 0);
-  let centerW = body.x + body.w - centerX - (rightW ? rightW + gap : 0);
-  let rightBelow = false;
-  if (rightW && centerW < HEADER_CENTER_MIN_IN) {
-    rightBelow = true;
-    rightW = 0;
-    centerW = body.x + body.w - centerX;
+  const centerFor = (w: number) => body.x + body.w - centerX - (w ? w + gap : 0);
+  // Beside the titles: the mark and the details together when both fit; else the mark alone (the details go
+  // below the band); else everything below the titles.
+  let side = { mark: markLines.length > 0, meta: meta.length > 0 };
+  let rightW = Math.min(body.w * 0.4, Math.max(markW, metaW));
+  if (rightW && centerFor(rightW) < HEADER_CENTER_MIN_IN && side.mark && side.meta && centerFor(markW) >= HEADER_CENTER_MIN_IN) {
+    side = { mark: true, meta: false };
+    rightW = markW;
   }
+  if (rightW && centerFor(rightW) < HEADER_CENTER_MIN_IN) {
+    side = { mark: false, meta: false };
+    rightW = 0;
+  }
+  const centerW = centerFor(rightW);
+  const below = { mark: markLines.length > 0 && !side.mark, meta: meta.length > 0 && !side.meta };
+  const rightBelow = below.mark || below.meta;
 
   // ── Left zone: step label over the large number.
   let ly = body.y;
@@ -429,25 +442,27 @@ function composedHeader(id: string, h: GuidedHeader, body: Rect, ctx: LayoutCont
   const centerH = Math.max(0, cy - body.y - (cy > body.y ? tight : 0));
 
   // ── Right zone (beside the titles, or below them on a narrow page).
-  const rightBlock = (x: number, w: number, y0: number, align: "right" | "left"): number => {
+  const rightBlock = (x: number, w: number, y0: number, align: "right" | "left", what: { mark: boolean; meta: boolean }): number => {
     let y = y0;
-    if (markLines.length && align === "right") {
+    const markLines$ = what.mark ? markLines : [], meta$ = what.meta ? meta : [];
+    if (markLines$.length && align === "right") {
       const ruleW = Math.min(w, 0.8);
-      const rx0 = x + w - ruleW;
+      // Centred in the column, the rules above and below it, as in the reference.
+      const rx0 = x + (w - ruleW) / 2;
       const top = y;
       draw.push(() => nodes.push(rule(`${id}-mark-top`, rx0, top, rx0 + ruleW, top, { component: "PageHeader", color: "lineArt", strokePt: 1 })));
       y += s.block;
       const lh = ptIn(markPt, roles.label.lineHeight);
-      markLines.forEach((l, i) => {
-        put(`mark${i}`, { x, y: y + i * lh, w, h: lh }, l, "label", { sizePt: markPt, trackingEm: markTrack, align, color: "text" });
+      markLines$.forEach((l, i) => {
+        put(`mark${i}`, { x, y: y + i * lh, w, h: lh }, l, "label", { sizePt: markPt, trackingEm: markTrack, align: "center", color: "text" });
       });
-      y += markLines.length * lh + s.block;
+      y += markLines$.length * lh + s.block;
       const yy = y;
       draw.push(() => nodes.push(rule(`${id}-mark-bottom`, rx0, yy, rx0 + ruleW, yy, { component: "PageHeader", color: "lineArt", strokePt: 1 })));
-      y += meta.length ? s.block : 0;
-    } else if (markLines.length) {
+      y += meta$.length ? s.block : 0;
+    } else if (markLines$.length) {
       // Below the titles on a narrow page: the mark as one centred line between two short rules.
-      const line = markLines.join(" ");
+      const line = markLines$.join(" ");
       const pt = sizeToFit(line, "label", Math.max(0, w - 2 * 0.5 - 2 * s.column), markPt, roles.label.sizePt * 0.8, markTrack);
       const lh = ptIn(pt, roles.label.lineHeight);
       const tw = Math.min(w, widthAt(line, "label", pt, markTrack));
@@ -462,39 +477,39 @@ function composedHeader(id: string, h: GuidedHeader, body: Rect, ctx: LayoutCont
         });
       }
       put("mark0", { x, y, w, h: lh }, line, "label", { sizePt: pt, trackingEm: markTrack, align: "center", color: "text" });
-      y += lh + (meta.length ? s.block : 0);
+      y += lh + (meta$.length ? s.block : 0);
     }
-    if (meta.length) {
+    if (meta$.length) {
       if (align === "right") {
         // The details never reach past their zone: the writing lines take what is left after the labels.
         const rx = x + w - Math.min(metaW, w);
         const lx = rx + labelW + s.checkboxGap;
-        meta.forEach((f, i) => {
+        meta$.forEach((f, i) => {
           const yy = y + i * rowH;
           put(`meta${i}-label`, { x: rx, y: yy, w: labelW, h: rowH }, f, "label", { component: "SectionHeader", vAlign: "bottom" });
           draw.push(() => nodes.push(rule(`${id}-meta${i}-line`, lx, yy + rowH, x + w, yy + rowH, { strokePt: ctx.pattern.lineWeightPt, component: "WritingLines" })));
         });
-        y += meta.length * rowH;
+        y += meta$.length * rowH;
       } else {
         // Below the titles: two aligned columns when the labels leave room for a line, else one.
         const colGap = s.column + s.block;
         const cols = (w - colGap) / 2 >= labelW + s.checkboxGap + 0.6 ? 2 : 1;
         const cellW = (w - colGap) / 2;
-        if (cols === 1 && meta.length > 1 && cellW >= Math.max(labelW, 0.9)) {
+        if (cols === 1 && meta$.length > 1 && cellW >= Math.max(labelW, 0.9)) {
           // Small page: a grid of two, each label above its own writing line.
           const cellH = lineBoxIn(ctx.typography, "label") + HEADER_WRITE_IN;
-          meta.forEach((f, i) => {
+          meta$.forEach((f, i) => {
             const cx0 = x + (i % 2) * (cellW + colGap);
             const yy = y + Math.floor(i / 2) * (cellH + s.block);
             put(`meta${i}-label`, { x: cx0, y: yy, w: cellW, h: lineBoxIn(ctx.typography, "label") }, f, "label", { component: "SectionHeader" });
             draw.push(() => nodes.push(rule(`${id}-meta${i}-line`, cx0, yy + cellH, cx0 + cellW, yy + cellH, { strokePt: ctx.pattern.lineWeightPt, component: "WritingLines" })));
           });
-          const rowsN = Math.ceil(meta.length / 2);
+          const rowsN = Math.ceil(meta$.length / 2);
           return y + rowsN * cellH + (rowsN - 1) * s.block - y0;
         }
         const colW = (w - colGap * (cols - 1)) / cols;
-        const perCol = Math.ceil(meta.length / cols);
-        meta.forEach((f, i) => {
+        const perCol = Math.ceil(meta$.length / cols);
+        meta$.forEach((f, i) => {
           const c = Math.floor(i / perCol), r = i % perCol;
           const cx0 = x + c * (colW + colGap);
           const yy = y + r * rowH;
@@ -508,7 +523,7 @@ function composedHeader(id: string, h: GuidedHeader, body: Rect, ctx: LayoutCont
     return y - y0;
   };
   let rightH = 0;
-  if (rightW) rightH = rightBlock(body.x + body.w - rightW, rightW, body.y, "right");
+  if (rightW) rightH = rightBlock(body.x + body.w - rightW, rightW, body.y, "right", side);
   let used = Math.max(ly - body.y, centerH, rightH);
 
   // Thin rules between the zones, the height of the band.
@@ -525,7 +540,7 @@ function composedHeader(id: string, h: GuidedHeader, body: Rect, ctx: LayoutCont
   // Narrow page: the right side below the titles.
   if (rightBelow) {
     const y = body.y + used + s.block;
-    used = y - body.y + rightBlock(body.x, body.w, y, "left");
+    used = y - body.y + rightBlock(body.x, body.w, y, "left", below);
   }
   draw.forEach((f) => f());
   if (h.rule) {
