@@ -167,7 +167,26 @@ export type GuidedHeader = {
   rule?: boolean;
   /** Small fill-in fields on one row ("Date", "Source"). */
   fields?: string[];
+  /** Composed header: a small overline above the main title ("PROPHETIC WORD"). */
+  overline?: string;
+  /** Composed header: the dominant title ("RECEIVE"). */
+  title?: string;
+  /**
+   * Composed header: details to fill in, each its own label and writing line,
+   * stacked at the right ("Date", "Time", "Received through", "Type").
+   */
+  meta?: string[];
 };
+
+/** Details the page header offers as ready choices. */
+export const HEADER_META_CHOICES = ["Date", "Time", "Received through", "Type"] as const;
+
+/**
+ * A header is composed (step at the left, titles in the centre, details at the
+ * right) when it uses any of the composed parts; headers saved before keep the
+ * stacked look they had.
+ */
+export const isComposedHeader = (h: GuidedHeader | undefined): boolean => !!h && (!!h.title?.trim() || !!h.overline?.trim() || !!h.meta?.some((m) => m.trim()));
 
 /** Space between prompt sections. */
 export type PromptSpacing = "tight" | "standard" | "roomy";

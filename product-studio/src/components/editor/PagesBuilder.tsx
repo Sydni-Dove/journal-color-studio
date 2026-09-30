@@ -19,7 +19,7 @@ import {
   BUILDER_CATEGORIES, builderRows, categoryOf, primaryCategories, stepPeriod, WEEKLY_JOURNAL, type BuilderCategory, type BuilderRow, type WeeklyJournalKind,
 } from "../../engines/recipe/pageBuilder";
 import { getLayout } from "../../layouts/registry";
-import { addPageFromDesign, isDesignGroup, MAX_DESIGN_PAGES, moveAmong, removePageDesign, setDesignPageCount, stepFromDesign } from "../../engines/recipe/pageDesigns";
+import { addPageFromDesign, duplicatePage, isDesignGroup, MAX_DESIGN_PAGES, moveAmong, removePageDesign, setDesignPageCount, stepFromDesign } from "../../engines/recipe/pageDesigns";
 import { PageThumb } from "../preview/PageThumb";
 import { usePhone } from "../../utils/usePhone";
 import { neutralLuxeDividers } from "../../presets/bookRecipes";
@@ -148,6 +148,9 @@ function Category({ cat, rows, allRows, edit, onEdit, doc, structure, project }:
             </div>
             <div className="builder-row__actions">
               <button type="button" className="btn" onClick={() => onEdit(it.r.step.id)} aria-label={`Edit ${rowName(it.r.step)}`}>Edit</button>
+              {movable && (
+                <button type="button" className="btn" onClick={() => edit((n) => duplicatePage(n, it.r.step.id)?.nodes ?? n)} aria-label={`Duplicate ${rowName(it.r.step)}`}>Duplicate</button>
+              )}
               {moveButtons(it.r.step.id, rowName(it.r.step))}
               <button type="button" className="btn btn--ghost" onClick={() => edit((n) => removeNode(n, it.r.step.id))} aria-label={`Remove ${rowName(it.r.step)}`}>Remove</button>
             </div>
@@ -284,7 +287,10 @@ function DesignGroupRow({ g, design, edit, onEdit, moveButtons }: { g: BookGroup
           {pages.map((s, k) => (
             <li key={s.id}>
               <span>{name} {k + 1}</span>
-              <button type="button" className="btn" onClick={() => onEdit(s.id)} aria-label={`Edit ${name} ${k + 1}`}>Edit</button>
+              <span className="design-pages__actions">
+                <button type="button" className="btn" onClick={() => onEdit(s.id)} aria-label={`Edit ${name} ${k + 1}`}>Edit</button>
+                <button type="button" className="btn" onClick={() => edit((x) => duplicatePage(x, s.id)?.nodes ?? x)} aria-label={`Duplicate ${name} ${k + 1}`}>Duplicate</button>
+              </span>
             </li>
           ))}
           <li className="hint">Each page is its own copy: editing one never changes the others or your saved design.</li>

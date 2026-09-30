@@ -12,7 +12,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import {
-  amountOf, canSitBeside, TABLE_ROW_SCALE, DEFAULT_MIN_LINES, kindOf, MAX_INFO_FIELDS, newPromptId, PROMPT_STARTERS, spaceOf, WRITING_AMOUNTS,
+  amountOf, canSitBeside, HEADER_META_CHOICES, TABLE_ROW_SCALE, DEFAULT_MIN_LINES, kindOf, MAX_INFO_FIELDS, newPromptId, PROMPT_STARTERS, spaceOf, WRITING_AMOUNTS,
   type GuidedHeader, type HeadingTextStyle, type InfoFieldStyle, type TableRowSpace, type PromptBlockKind, type SectionFrame, type SpacerSize, type PromptBlock, type PromptSet, type PromptSpacing, type ResponseStyle, type SpaceMode, type TaskMarker, type TaskMarkerPosition, type WritingAmount,
 } from "../../types/prompts";
 import { Check, Field, LabeledNumeric, NumberField, Segmented, Select } from "./ui";
@@ -58,39 +58,76 @@ const KIND_SUMMARY: Record<Exclude<PromptBlockKind, "prompt">, (b: PromptBlock) 
   spacer: (b) => `${(b.spacer ?? "medium")[0].toUpperCase()}${(b.spacer ?? "medium").slice(1)} space`,
 };
 
-function HeaderEditor({ header, onChange }: { header: GuidedHeader | undefined; onChange: (h: GuidedHeader | undefined) => void }) {
+function HeaderEditor({ header, onChange, open }: { header: GuidedHeader | undefined; onChange: (h: GuidedHeader | undefined) => void; open?: boolean }) {
   const h = header ?? {};
   const put = (patch: Partial<GuidedHeader>) => {
     const next = { ...h, ...patch };
-    const empty = !next.eyebrow && !next.number && !next.subtitle && !next.reference && !next.rule && !next.fields?.length;
+    const empty = !next.eyebrow && !next.number && !next.subtitle && !next.reference && !next.rule && !next.fields?.length && !next.overline && !next.title && !next.meta?.length;
     onChange(empty ? undefined : next);
   };
   const fields = (v: string) => {
     const list = v.split(",").map((f) => f.trim());
     return list.some(Boolean) ? list : undefined;
   };
+  const meta = h.meta ?? [];
+  const preset = new Set<string>(HEADER_META_CHOICES);
+  const others = meta.filter((m) => !preset.has(m));
+  const toggle = (m: string, on: boolean) => {
+    // Keep the ready choices in their usual order, then the maker's own.
+    const chosen = HEADER_META_CHOICES.filter((c) => (c === m ? on : meta.includes(c)));
+    put({ meta: [...chosen, ...others].length ? [...chosen, ...others] : undefined });
+  };
   return (
-    <details className="subsection prompt-header-editor">
+    <details className="subsection prompt-header-editor" data-testid="page-header" open={open}>
       <summary>Page header (optional)</summary>
-      <p className="hint">Shown above the sections on the page's first side. The writing space is measured below it.</p>
+      <p className="hint">
+        One compact header at the top of the page: the step at the left, the titles in the centre, details to fill in at the right. Leave everything empty for no header. The writing space starts below it.
+      </p>
       <div className="row">
         <Field label="Step label">
-          <input type="text" value={h.eyebrow ?? ""} placeholder="e.g. STEP TWO" onChange={(e) => put({ eyebrow: e.target.value || undefined })} />
+          <input type="text" value={h.eyebrow ?? ""} placeholder="e.g. STEP ONE" onChange={(e) => put({ eyebrow: e.target.value || undefined })} />
         </Field>
         <Field label="Step number">
-          <input type="text" value={h.number ?? ""} placeholder="e.g. 02" onChange={(e) => put({ number: e.target.value || undefined })} />
+          <input type="text" value={h.number ?? ""} placeholder="e.g. 01" onChange={(e) => put({ number: e.target.value || undefined })} />
         </Field>
       </div>
+      <Field label="Overline (small text above the title)">
+        <input type="text" value={h.overline ?? ""} placeholder="e.g. PROPHETIC WORD" onChange={(e) => put({ overline: e.target.value || undefined })} />
+      </Field>
+      <Field label="Main title">
+        <input type="text" value={h.title ?? ""} placeholder="e.g. RECEIVE" onChange={(e) => put({ title: e.target.value || undefined })} />
+      </Field>
       <Field label="Subtitle">
-        <input type="text" value={h.subtitle ?? ""} placeholder="e.g. The Word" onChange={(e) => put({ subtitle: e.target.value || undefined })} />
+        <input type="text" value={h.subtitle ?? ""} placeholder="e.g. THE WORD" onChange={(e) => put({ subtitle: e.target.value || undefined })} />
       </Field>
       <Field label="Scripture or reference">
         <input type="text" value={h.reference ?? ""} placeholder="e.g. Habakkuk 2:2" onChange={(e) => put({ reference: e.target.value || undefined })} />
       </Field>
-      <Check label="Short decorative rule under the header" checked={!!h.rule} onChange={(rule) => put({ rule: rule || undefined })} />
-      <Field label="Small fields (comma separated)">
-        <input type="text" value={(h.fields ?? []).join(", ")} placeholder="e.g. Date, Source" onChange={(e) => put({ fields: fields(e.target.value) })} />
+      <div className="field-label">Details to fill in (right side of the header)</div>
+      <div className="header-meta-choices">
+        {HEADER_META_CHOICES.map((m) => (
+          <Check key={m} label={m} checked={meta.includes(m)} onChange={(on) => toggle(m, on)} />
+        ))}
+      </div>
+      <Field label="Other details (comma separated)">
+        <input
+          type="text"
+          value={others.join(", ")}
+          placeholder="e.g. Speaker, Place"
+          onChange={(e) => {
+            const own = e.target.value.split(",").map((x) => x.trimStart()).filter((x, i, a) => x || i === a.length - 1);
+            const chosen = HEADER_META_CHOICES.filter((c) => meta.includes(c));
+            const all = [...chosen, ...own];
+            put({ meta: all.some((x) => x.trim()) ? all : undefined });
+          }}
+        />
       </Field>
+      <Check label="Short decorative rule under the header" checked={!!h.rule} onChange={(rule) => put({ rule: rule || undefined })} />
+      {!!h.fields?.length && (
+        <Field label="A row of blanks above the sections (comma separated)">
+          <input type="text" value={(h.fields ?? []).join(", ")} placeholder="e.g. Date, Source" onChange={(e) => put({ fields: fields(e.target.value) })} />
+        </Field>
+      )}
     </details>
   );
 }
@@ -587,10 +624,10 @@ export function PromptEditor({
         {!blocks.length && <p className="hint">Nothing on the page yet — tap a piece above.</p>}
         {list}
         {fitIssues}
+        {allowHeader && <HeaderEditor header={set.header} onChange={(h) => put({ header: h })} open={!!set.header} />}
         <details className="subsection page-options" data-testid="page-options">
           <summary>Page options</summary>
           {starters}
-          {header}
           {instructions}
           {sectionOptions}
           {whenFull}

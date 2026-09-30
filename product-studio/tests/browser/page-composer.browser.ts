@@ -367,4 +367,104 @@ describe("Page Composer", () => {
     await expect(page.getByTestId("page-label").innerText()).resolves.toMatch(/Custom Page/i);
     await page.context().close();
   }, 60_000);
+
+  const pageCount = async (page: Page) => Number((await page.locator(".page-counter").innerText()).match(/of (\d+)/)![1]);
+  const pageNo = async (page: Page) => Number(await page.getByLabel("Page number", { exact: true }).inputValue());
+  const goToPage = async (page: Page, n: number) => {
+    await page.getByLabel("Page number", { exact: true }).fill(String(n));
+    await page.getByLabel("Page number", { exact: true }).press("Enter");
+  };
+
+  it("Duplicate page: Discern 1 → Discern 2, edit the copy, the original stays; both survive a reload", async () => {
+    const page = await open(blank(), false);
+    await openArea(page, "add");
+    await add(page, "Heading / text");
+    await add(page, "Prompt + response");
+    await (await section(page, 1)).getByRole("textbox", { name: "Heading" }).fill("1");
+    await (await section(page, 2)).getByRole("textbox", { name: "Prompt (optional)" }).fill("What is the cohesive message?");
+    await page.waitForTimeout(800);
+    const before = await pageCount(page);
+    const original = await pageNo(page);
+    await page.getByRole("button", { name: "Duplicate page" }).click();
+    await expect.poll(() => pageCount(page)).toBe(before + 1);
+    // The editor now shows the copy.
+    await expect.poll(() => pageNo(page)).toBe(original + 1);
+    await expect.poll(() => page.getByTestId("this-page").innerText()).toMatch(/Master Dashboard 2/);
+    await (await section(page, 1)).getByRole("textbox", { name: "Heading" }).fill("2");
+    await (await section(page, 2)).getByRole("textbox", { name: "Prompt (optional)" }).fill("What confirms it?");
+    const pageText = async (n: number) => {
+      await goToPage(page, n);
+      await expect.poll(() => pageNo(page)).toBe(n);
+      return (await page.locator(".ps-page--editor").first().textContent()) ?? "";
+    };
+    await expect.poll(async () => pageText(original + 1)).toMatch(/What confirms it\?/);
+    const first = await pageText(original);
+    expect(first).toMatch(/What is the cohesive message\?/);
+    expect(first).not.toMatch(/What confirms it/);
+    await page.waitForTimeout(800);
+    await page.reload();
+    await page.locator(".card").first().getByRole("button", { name: "Open" }).click();
+    await page.waitForSelector(".ps-page--editor");
+    expect(await pageCount(page)).toBe(before + 1);
+    expect(await pageText(original)).toMatch(/What is the cohesive message\?/);
+    expect(await pageText(original + 1)).toMatch(/What confirms it\?/);
+    await page.context().close();
+  }, 90_000);
+
+  it("Page header: step, titles and details from one panel — one compact header, details as separate labelled lines", async () => {
+    const page = await open(blank(), false);
+    await openArea(page, "add");
+    await add(page, "Writing lines");
+    const header = page.getByTestId("page-header");
+    await header.evaluate((d) => ((d as HTMLDetailsElement).open = true));
+    await header.getByRole("textbox", { name: "Step label" }).fill("STEP ONE");
+    await header.getByRole("textbox", { name: "Step number" }).fill("01");
+    await header.getByRole("textbox", { name: /^Overline/ }).fill("PROPHETIC WORD");
+    await header.getByRole("textbox", { name: "Main title" }).fill("RECEIVE");
+    await header.getByRole("textbox", { name: "Subtitle" }).fill("THE WORD");
+    for (const m of ["Date", "Time", "Received through", "Type"]) await header.getByRole("checkbox", { name: m }).check();
+    const drawn = page.locator(".ps-page--editor").first();
+    await expect.poll(() => drawn.locator('[data-node$="-intro-meta3-label"]').count()).toBe(1);
+    const box = (sel: string) => drawn.locator(sel).first().boundingBox();
+    const title = (await box('[data-node$="-intro-title"]'))!, step = (await box('[data-node$="-intro-eyebrow"]'))!, date = (await box('[data-node$="-intro-meta0-label"]'))!;
+    // Step at the left, title in the middle, details at the right — all in one band at the top.
+    expect(step.x).toBeLessThan(title.x);
+    expect(date.x).toBeGreaterThan(title.x);
+    expect(Math.abs(step.y - title.y)).toBeLessThan(title.height);
+    for (const m of ["Date", "Time", "Received through", "Type"]) await expect(drawn.textContent()).resolves.toContain(m);
+    await expect(drawn.textContent()).resolves.not.toMatch(/DATE \| TIME|Date \| Time/);
+    const writing = (await box('[data-node$="-title"]:not([data-node*="-intro-"])'))!;
+    expect(writing.y).toBeGreaterThan(date.y);
+    await expect.poll(async () => (await page.locator(".badge").first().textContent()) ?? "").toMatch(/Page OK/);
+    await page.context().close();
+  }, 60_000);
+
+  it("Undo and Redo: buttons and keyboard", async () => {
+    const page = await open(blank(), false);
+    await openArea(page, "add");
+    const undo = page.getByRole("button", { name: "Undo", exact: true }), redo = page.getByRole("button", { name: "Redo", exact: true });
+    await expect(undo.isDisabled()).resolves.toBe(true);
+    const count = () => page.getByTestId("prompt-editor").first().locator(".prompt-block").count();
+    await add(page, "Writing lines");
+    await page.waitForTimeout(800);
+    await add(page, "Divider line");
+    await expect.poll(count).toBe(2);
+    await undo.click();
+    await expect.poll(count).toBe(1);
+    await undo.click();
+    await expect.poll(count).toBe(0);
+    await expect(undo.isDisabled()).resolves.toBe(true);
+    await redo.click();
+    await expect.poll(count).toBe(1);
+    // Keyboard, outside a text box.
+    await page.locator("body").click({ position: { x: 5, y: 5 } });
+    await page.keyboard.press("Control+Shift+Z");
+    await expect.poll(count).toBe(2);
+    await page.keyboard.press("Control+Z");
+    await expect.poll(count).toBe(1);
+    // A new change clears what could be redone.
+    await add(page, "Spacer / open space");
+    await expect(redo.isDisabled()).resolves.toBe(true);
+    await page.context().close();
+  }, 60_000);
 });

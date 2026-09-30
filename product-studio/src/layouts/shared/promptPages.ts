@@ -20,9 +20,9 @@ import { DEFAULT_WORDING } from "../../presets/wording";
 import type { Rect } from "../../types/geometry";
 import type { LayoutDiagnostic, LayoutMetric, LayoutNode, SolvedPage, TextNode } from "../../types/layout";
 import { minZoneHeight } from "../../engines/stationery/geometry";
-import { canSitBeside, frameOf as sectionFrameOf, kindOf, requestedLines, TABLE_ROW_SCALE, spaceOf, SPACER_HEIGHTS, SPACING_FACTOR, type GuidedHeader, type PromptBlock, type PromptSet, type ResponseStyle, type SectionFrame } from "../../types/prompts";
+import { canSitBeside, frameOf as sectionFrameOf, isComposedHeader, kindOf, requestedLines, TABLE_ROW_SCALE, spaceOf, SPACER_HEIGHTS, SPACING_FACTOR, type GuidedHeader, type PromptBlock, type PromptSet, type ResponseStyle, type SectionFrame } from "../../types/prompts";
 import type { StationeryZone, SurfaceKind } from "../../types/stationery";
-import { fillInRows, isFixedSurface, SURFACES, tableHeaderIn } from "../stationery/surfaces";
+import { fillInIn, fillInRows, isFixedSurface, SURFACES, tableHeaderIn } from "../stationery/surfaces";
 import { fitHeading, headerTitle, pageFrame } from "./components";
 import { box, group, lineBoxIn, rule, text } from "./nodes";
 import type { FitContext, LayoutContext } from "./types";
@@ -241,6 +241,124 @@ function requestOf(m: Measured, ctx: LayoutContext, width: number, pitch: number
   return { zone: m.zone, overheadIn, promptTextIn: Math.max(a.promptTextIn ?? a.overheadIn, b.promptTextIn ?? b.overheadIn), minIn: Math.max(0, need - overheadIn) };
 }
 
+/** Narrowest the header's centre (its titles) may get before the details move below it. */
+export const HEADER_CENTER_MIN_IN = 1.6;
+/** Room a header detail's writing line gets after its label. */
+export const HEADER_META_LINE_IN = 1.1;
+
+/**
+ * A COMPOSED PAGE HEADER — one measured region, three zones:
+ *
+ *   [ step label ]   [   overline    ]   [ Date     ________ ]
+ *   [ step number]   [  MAIN TITLE   ]   [ Time     ________ ]
+ *                    [   subtitle    ]   [ Type     ________ ]
+ *
+ * The step sits at the left, the titles centred, the details at the right —
+ * each with its own label and writing line, lines aligned. When the page is
+ * too narrow for the titles between them, the details drop below as rows of
+ * blanks (wrapping, never squeezed). Everything is measured once in the
+ * typography roles (label, weekTitle, monthTitle, subheading, prompt); the
+ * height used — band, details and the gap after — is returned, and the page's
+ * sections start below it.
+ */
+function composedHeader(id: string, h: GuidedHeader, body: Rect, ctx: LayoutContext, nodes: LayoutNode[], diagnostics: LayoutDiagnostic[]): number {
+  const s = ctx.spacing;
+  const measure = getLayoutMeasurer().measure;
+  const widthOf = (v: string, role: "label" | "weekTitle") => measure(v, styleForRole(ctx.typography, role));
+  const gap = s.column + s.block;
+  const tight = s.block / 2;
+  const clean = (v?: string) => v?.trim() || "";
+  const meta = (h.meta ?? []).map(clean).filter(Boolean);
+
+  // Left: step label over the step number.
+  const left = [
+    ...(clean(h.eyebrow) ? [{ key: "eyebrow", v: clean(h.eyebrow), role: "label" as const }] : []),
+    ...(clean(h.number) ? [{ key: "number", v: clean(h.number), role: "weekTitle" as const }] : []),
+  ];
+  const leftW = left.length ? Math.min(body.w * 0.3, Math.max(...left.map((i) => widthOf(i.v, i.role)))) : 0;
+  // Right: the details, one label + line each; labels share one width so the lines align.
+  const rowH = fillInIn(ctx);
+  const labelW = meta.length ? Math.max(...meta.map((f) => widthOf(f, "label"))) : 0;
+  let rightW = meta.length ? Math.min(body.w * 0.42, labelW + s.checkboxGap + HEADER_META_LINE_IN) : 0;
+  const centerX = body.x + leftW + (leftW ? gap : 0);
+  let centerW = body.x + body.w - centerX - (rightW ? rightW + gap : 0);
+  let metaBelow = false;
+  if (meta.length && centerW < HEADER_CENTER_MIN_IN) {
+    metaBelow = true;
+    rightW = 0;
+    centerW = body.x + body.w - centerX;
+  }
+
+  // Left column.
+  let ly = body.y;
+  left.forEach((it, k) => {
+    const lh = lineBoxIn(ctx.typography, it.role);
+    nodes.push(text(`${id}-${it.key}`, { x: body.x, y: ly, w: leftW, h: lh }, it.v, it.role, { component: "PageHeader", vAlign: "top" }));
+    ly += lh + (k < left.length - 1 ? tight : 0);
+  });
+
+  // Centre column: overline, main title (fitted, up to two lines), subtitle, reference.
+  let cy = body.y;
+  const center: (() => void)[] = [];
+  const push = (key: string, value: string, role: "label" | "subheading" | "prompt") => {
+    const lines = role === "label" ? [value] : wrapText(value, centerW, ctx, role === "prompt" ? "prompt" : "body");
+    const lh = lineBoxIn(ctx.typography, role);
+    const y = cy;
+    center.push(() => {
+      const t = text(`${id}-${key}`, { x: centerX, y, w: centerW, h: lh * lines.length }, lines.join(" "), role, { component: "PageHeader", align: "center", vAlign: "top", wrap: lines.length > 1 });
+      if (lines.length > 1) t.fit = { sizePt: ctx.typography.roles[role].sizePt, lineHeight: ctx.typography.roles[role].lineHeight, lines };
+      nodes.push(t);
+    });
+    cy += lh * lines.length + tight;
+  };
+  if (clean(h.overline)) push("overline", clean(h.overline), "label");
+  if (clean(h.title)) {
+    const role = "monthTitle" as const;
+    const fit = fitHeading(clean(h.title), role, { w: centerW, h: 2 * lineBoxIn(ctx.typography, role) }, ctx);
+    const y = cy;
+    center.push(() => {
+      const t = text(`${id}-title`, { x: centerX, y, w: centerW, h: fit.heightIn }, clean(h.title), role, { component: "PageHeader", align: "center", vAlign: "top" });
+      if (fit.lines.length > 1 || fit.sizePt !== ctx.typography.roles[role].sizePt || !fit.ok) t.fit = { sizePt: fit.sizePt, lineHeight: fit.lineHeight, lines: fit.lines, ...(fit.ok ? {} : { failed: true }) };
+      nodes.push(t);
+    });
+    cy += fit.heightIn + tight;
+  }
+  if (clean(h.subtitle)) push("subtitle", clean(h.subtitle), "subheading");
+  if (clean(h.reference)) push("reference", clean(h.reference), "prompt");
+  const centerH = Math.max(0, cy - body.y - (cy > body.y ? tight : 0));
+  center.forEach((f) => f());
+
+  // Right column.
+  let rightH = 0;
+  if (meta.length && !metaBelow) {
+    const rx = body.x + body.w - rightW;
+    const lx = rx + labelW + s.checkboxGap;
+    meta.forEach((f, i) => {
+      const y = body.y + i * rowH;
+      nodes.push(text(`${id}-meta${i}-label`, { x: rx, y, w: labelW, h: rowH }, f, "label", { component: "SectionHeader", vAlign: "bottom" }));
+      nodes.push(rule(`${id}-meta${i}-line`, lx, y + rowH, body.x + body.w, y + rowH, { strokePt: ctx.pattern.lineWeightPt, component: "WritingLines" }));
+    });
+    rightH = meta.length * rowH;
+  }
+  let used = Math.max(ly - body.y, centerH, rightH);
+
+  // Narrow page: the details as rows of blanks below the step and titles.
+  if (meta.length && metaBelow) {
+    const y = body.y + used + (used ? s.block : 0);
+    const rows = fillInRows(meta, body.w, ctx);
+    const out = SURFACES["fill-in"](`${id}-meta`, { x: body.x, y, w: body.w, h: rows.heightIn }, { key: "meta", label: "", surface: "fill-in", weight: 0, fields: meta }, ctx);
+    nodes.push(...out.nodes);
+    diagnostics.push(...out.diagnostics);
+    used = y + rows.heightIn - body.y;
+  }
+  if (h.rule) {
+    const y = body.y + used + s.block;
+    nodes.push(rule(`${id}-rule`, body.x, y, body.x + body.w, y, { component: "PageHeader", color: "lineArt" }));
+    used = y - body.y;
+  }
+  return used + s.section;
+}
+
 /** The page frame, header and (first page) instructions; returns the body left for the zones. */
 function frameOf(spec: ZonePageSpec, ctx: LayoutContext, pageIndex: number, first: boolean) {
   const frame = pageFrame(ctx, pageIndex, { headerH: spec.title ? STUDIO_PLANNER.weeklyTitle.valueIn : 0, headerRule: !!spec.title });
@@ -258,7 +376,10 @@ function frameOf(spec: ZonePageSpec, ctx: LayoutContext, pageIndex: number, firs
     nodes.push(text(`${id}-period`, { x: z.x, y: z.y, w: z.w, h: z.h - ctx.spacing.titleToRuleGap }, right, "label", { component: "PageHeader", align: "right", vAlign: "bottom" }));
   }
   let body: Rect = frame.body;
-  if (first && spec.intro) {
+  if (first && spec.intro && isComposedHeader(spec.intro)) {
+    const used = composedHeader(`${id}-intro`, spec.intro, body, ctx, nodes, diagnostics);
+    body = { ...body, y: body.y + used, h: Math.max(0, body.h - used) };
+  } else if (first && spec.intro) {
     // The designed header: each line measured in its role, stacked; the sections get what is left below it.
     const h = spec.intro;
     const items: { key: string; value: string; role: "label" | "weekTitle" | "subheading" | "prompt" }[] = [];

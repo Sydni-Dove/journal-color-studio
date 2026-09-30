@@ -15,7 +15,8 @@ import { rectContains } from "../src/engines/layout/math";
 import { planPrint } from "../src/engines/print/printPlan";
 import { updateNode } from "../src/engines/recipe/bookEdit";
 import { addDivider, addEndCover, addFrontCover, addMonthly, addPageOfType } from "../src/engines/recipe/pageBuilder";
-import { addPageFromDesign, designGroupOf, isDesignGroup, moveAmong, savePageDesign, setDesignPageCount } from "../src/engines/recipe/pageDesigns";
+import { addPageFromDesign, designGroupOf, duplicatePage, isDesignGroup, moveAmong, nextPageName, savePageDesign, setDesignPageCount } from "../src/engines/recipe/pageDesigns";
+import { STEP_HEADERS } from "./fixtures/propheticSteps";
 import { heuristicMeasurer } from "../src/engines/typography/textMeasure";
 import { validateProject } from "../src/engines/validation/validate";
 import { step } from "../src/presets/bookRecipes";
@@ -233,5 +234,91 @@ describe("page sizes, Style and export", () => {
     const printed = plan.sequence.filter((i) => ids.has(doc.recipe.pages[i].recipeItemId ?? ""));
     expect(printed.length).toBeGreaterThanOrEqual(8);
     expect([...printed].sort((x, y) => x - y)).toEqual(printed);
+  });
+});
+
+describe("duplicate page", () => {
+  const discern = () =>
+    createProject("custom", {
+      name: "Prophetic",
+      dimensions: { sizePresetId: "6x9", orientation: "portrait" },
+      production: { bindingType: "coil", printProfileId: "coil-generic", duplex: true } as never,
+      recipe: {
+        items: [],
+        ordering: "sequential",
+        structure: [
+          step("custom", { type: "copies", count: 1 }, {
+            id: "d1",
+            layoutId: "guided-page",
+            title: "Discern 1",
+            promptSet: {
+              header: STEP_HEADERS[1],
+              frame: "outline",
+              spacing: "roomy",
+              blocks: [
+                { id: "n", kind: "heading", label: "1", textStyle: "heading" },
+                { id: "say", label: "What I believe God is saying", prompt: "What is the cohesive message?", space: "fixed", lineCount: 6, frame: "panel" },
+                { id: "w", label: "Writing", space: "fill", responseStyle: "ruled" },
+              ],
+            },
+          }),
+        ],
+      },
+    });
+
+  it("Discern 1 → Discern 2: everything copied (sections, styles, space, header and details, page options), right after it", () => {
+    const p = discern();
+    const res = duplicatePage(p.recipe.structure!, "d1")!;
+    const [a, b] = res.nodes as BookStep[];
+    expect(res.nodes).toHaveLength(2);
+    expect(b.id).toBe(res.id);
+    expect(b.id).not.toBe(a.id);
+    expect(b.title).toBe("Discern 2");
+    expect(b.promptSet).toEqual(a.promptSet);
+    expect(b.promptSet).not.toBe(a.promptSet);
+    expect(b.promptSet!.header).not.toBe(a.promptSet!.header);
+    expect(b.promptSet!.blocks[1]).not.toBe(a.promptSet!.blocks[1]);
+  });
+
+  it("editing the copy (1 → 2, new instruction) leaves the original unchanged — also after save and reload", () => {
+    const p = discern();
+    const res = duplicatePage(p.recipe.structure!, "d1")!;
+    const edited = updateNode(res.nodes, res.id, (n) => {
+      const s = n as BookStep;
+      return { ...s, promptSet: { ...s.promptSet!, blocks: s.promptSet!.blocks.map((b) => (b.id === "n" ? { ...b, label: "2" } : b.id === "say" ? { ...b, prompt: "What confirms it?" } : b)) } } as BookNode;
+    });
+    const saved = reload(withStructure(p, edited));
+    const [a, b] = saved.recipe.structure as BookStep[];
+    expect(a.promptSet!.blocks.map((x) => x.label)).toEqual(["1", "What I believe God is saying", "Writing"]);
+    expect(a.promptSet!.blocks[1].prompt).toBe("What is the cohesive message?");
+    expect(b.promptSet!.blocks[0].label).toBe("2");
+    expect(b.promptSet!.blocks[1].prompt).toBe("What confirms it?");
+    const doc = resolveDocument(saved);
+    const pages = doc.recipe.pages.filter((x) => x.layoutId === "guided-page" && !x.filler);
+    expect(pages.map((x) => x.recipeItemId)).toEqual([a.id, b.id]);
+  });
+
+  it("a page repeated many times duplicates as one page; a design page joins its group and never touches the saved design", () => {
+    const many = createProject("custom", { name: "m", recipe: { items: [], ordering: "sequential", structure: [step("custom", { type: "copies", count: 120 }, { id: "c", layoutId: "guided-page", title: "Custom Page", promptSet: { blocks: [] } })] } } as never);
+    const r = duplicatePage(many.recipe.structure!, "c")!;
+    expect((r.nodes[1] as BookStep).cadence).toEqual({ type: "copies", count: 1 });
+    expect((r.nodes[1] as BookStep).title).toBe("Custom Page 2");
+
+    const { p, d } = save(base(), "Project Snapshot");
+    const s = addPageFromDesign(p.recipe.structure!, d, 3);
+    const g = groups(s)[0];
+    const res = duplicatePage(s, g.children[1].id)!;
+    const g2 = groups(res.nodes)[0];
+    expect(g2.children).toHaveLength(4);
+    expect(g2.children[2].id).toBe(res.id);
+    expect((g2.children[2] as BookStep).designId).toBe(d.id);
+    expect((g2.children[2] as BookStep).title).toBe((g.children[1] as BookStep).title);
+    expect(p.pageDesigns![0]).toEqual(d);
+  });
+
+  it("names move on without clashing", () => {
+    expect(nextPageName("Discern 1", new Set())).toBe("Discern 2");
+    expect(nextPageName("Discern 1", new Set(["Discern 2"]))).toBe("Discern 3");
+    expect(nextPageName("Custom Page", new Set())).toBe("Custom Page 2");
   });
 });

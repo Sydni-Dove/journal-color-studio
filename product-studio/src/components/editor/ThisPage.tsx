@@ -7,9 +7,12 @@ import type { ResolvedDocument } from "../../engines/document/resolve";
 import type { ProjectUsage } from "../../engines/document/usage";
 import { pageInfo } from "../../engines/document/pageInfo";
 
-export function ThisPageHeading({ doc, current }: { doc: ResolvedDocument; current: number }) {
+export function ThisPageHeading({ doc, current, onDuplicate }: { doc: ResolvedDocument; current: number; onDuplicate?: () => void }) {
   if (!doc.recipe.pages[current]) return null;
   const info = pageInfo(doc, current);
+  const page = doc.recipe.pages[current];
+  // Pages that don't follow the calendar (custom, guided, journal, notes pages) can be duplicated as a whole.
+  const canDuplicate = !!onDuplicate && !!page.recipeItemId && !page.filler && (page.period.kind === "none" || page.period.kind === "copy") && page.layoutId !== "cover-page" && page.layoutId !== "back-cover-page";
   return (
     <div className="this-page-heading" data-testid="this-page">
       <span className="this-page-heading__eyebrow">Edit this page</span>
@@ -20,6 +23,11 @@ export function ThisPageHeading({ doc, current }: { doc: ResolvedDocument; curre
         Page {info.pageNumber}
         {info.dateLabel ? ` · ${info.dateLabel}` : ""}
       </span>
+      {canDuplicate && (
+        <button type="button" className="btn this-page-heading__duplicate" onClick={onDuplicate}>
+          Duplicate page
+        </button>
+      )}
     </div>
   );
 }

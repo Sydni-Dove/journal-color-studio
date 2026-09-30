@@ -1,5 +1,5 @@
 import { LUXE_TITLE_FONT } from "../../presets/coverLuxe";
-import { useCallback, useMemo, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { PanelResizer, usePanelWidth } from "./PanelResizer";
 import { compositionFor, geometryFor, resolveDocument, solvePage, type ResolvedDocument } from "../../engines/document/resolve";
 import { planDecoration } from "../../themes/decorationPlan";
@@ -27,12 +27,19 @@ import { BINDING_PROFILES } from "../../presets/bindingProfiles/bindingProfiles"
 import { Section, type EditorNav } from "./ui";
 import { getLayout } from "../../layouts/registry";
 import { bookSteps } from "../../engines/recipe/bookRecipe";
+import { structureFromItems } from "../../engines/recipe/bookEdit";
+import { duplicatePage } from "../../engines/recipe/pageDesigns";
 
 /** A page built from sections (a custom page or one made from a saved design): edited in "Add to page". */
 function isComposedStep(project: ProductProject, id: string): boolean {
   const s = bookSteps(project.recipe.structure ?? []).find((x) => x.step.id === id)?.step;
   return !!s && (s.module === "custom" || !!s.designId);
 }
+
+/** Changes closer together than this are one undo step. */
+const HISTORY_GROUP_MS = 700;
+/** Undo steps kept per project while it is open. */
+const HISTORY_LIMIT = 100;
 
 type Props = {
   project: ProductProject;
@@ -65,10 +72,64 @@ export function Editor({ project, onChange, onBack, saveStatus }: Props) {
   const fontsReady = useFontLoader(project.typography.fonts, [LUXE_TITLE_FONT]);
   const facesLoaded = useFontFacesLoaded();
 
+  // UNDO / REDO — every change the editor makes goes through `update`, so the history lives here.
+  // Quick successive changes (typing a word, a stepper held down) count as one step.
+  const past = useRef<ProductProject[]>([]);
+  const future = useRef<ProductProject[]>([]);
+  const lastChange = useRef(0);
+  const historyOf = useRef(project.id);
+  const [, setHistoryTick] = useState(0);
+  if (historyOf.current !== project.id) {
+    historyOf.current = project.id;
+    past.current = [];
+    future.current = [];
+  }
   const update = useCallback(
-    (fn: (p: ProductProject) => ProductProject) => onChange({ ...fn(project), updatedAt: new Date().toISOString() }),
+    (fn: (p: ProductProject) => ProductProject) => {
+      const next = { ...fn(project), updatedAt: new Date().toISOString() };
+      const now = Date.now();
+      if (!past.current.length || now - lastChange.current > HISTORY_GROUP_MS) {
+        past.current.push(project);
+        if (past.current.length > HISTORY_LIMIT) past.current.shift();
+      }
+      lastChange.current = now;
+      future.current = [];
+      setHistoryTick((t) => t + 1);
+      onChange(next);
+    },
     [project, onChange],
   );
+  const undo = useCallback(() => {
+    const prev = past.current.pop();
+    if (!prev) return;
+    future.current.push(project);
+    lastChange.current = 0;
+    setHistoryTick((t) => t + 1);
+    onChange({ ...prev, updatedAt: new Date().toISOString() });
+  }, [project, onChange]);
+  const redo = useCallback(() => {
+    const next = future.current.pop();
+    if (!next) return;
+    past.current.push(project);
+    lastChange.current = 0;
+    setHistoryTick((t) => t + 1);
+    onChange({ ...next, updatedAt: new Date().toISOString() });
+  }, [project, onChange]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.altKey) return;
+      const k = e.key.toLowerCase();
+      if (k !== "z" && k !== "y") return;
+      // Inside a text box the browser's own undo edits the text being typed.
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || (t.tagName === "INPUT" && !["checkbox", "radio", "button", "range", "color"].includes((t as HTMLInputElement).type)) || t.tagName === "TEXTAREA")) return;
+      e.preventDefault();
+      if (k === "y" || e.shiftKey) redo();
+      else undo();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [undo, redo]);
 
   // Layouts fit headings with the same real glyph metrics the live check uses, once the fonts have loaded
   // (and again whenever another face finishes loading, so nothing stays measured with a fallback's widths).
@@ -118,6 +179,24 @@ export function Editor({ project, onChange, onBack, saveStatus }: Props) {
   };
   const goToPage = (n: number) => doc && setIndex(Math.max(0, doc.recipe.pages.findIndex((p) => p.pageNumber === n)));
   // A Custom Page is built from sections: it opens straight on "Add to page".
+  // Duplicate page: a new independent copy right after this one; the editor then shows the copy.
+  const [pendingPage, setPendingPage] = useState<string | null>(null);
+  const duplicateCurrent = () => {
+    const id = doc?.recipe.pages[current]?.recipeItemId;
+    if (!id) return;
+    const res = duplicatePage(project.recipe.structure ?? structureFromItems(project.recipe), id);
+    if (!res) return;
+    update((p) => ({ ...p, recipe: { ...p.recipe, structure: res.nodes } }));
+    setPendingPage(res.id);
+  };
+  useEffect(() => {
+    if (!pendingPage || !doc) return;
+    const i = doc.recipe.pages.findIndex((p) => p.recipeItemId === pendingPage && !p.filler);
+    if (i >= 0) {
+      setIndex(i);
+      setPendingPage(null);
+    }
+  }, [doc, pendingPage]);
   const [area, setArea] = useArea(project.productType === "custom" ? "add" : undefined);
   const currentItemId = doc?.recipe.pages[current]?.recipeItemId;
   const summaries: Partial<Record<AreaId, string>> = doc
@@ -137,6 +216,10 @@ export function Editor({ project, onChange, onBack, saveStatus }: Props) {
         <input className="name-input" value={project.name} aria-label="Project name" onChange={(e) => update((p) => ({ ...p, name: e.target.value }))} />
         <span className={`save-status ${saveStatus === "error" ? "save-status--error" : ""}`}>
           {saveStatus === "saved" ? "Saved" : saveStatus === "saving" ? "Saving…" : "Save failed (storage full?)"}
+        </span>
+        <span className="history-buttons" role="group" aria-label="Undo and redo">
+          <button type="button" className="btn btn--ghost" onClick={undo} disabled={!past.current.length} aria-label="Undo" title="Undo (Ctrl/⌘ Z)">↶ Undo</button>
+          <button type="button" className="btn btn--ghost" onClick={redo} disabled={!future.current.length} aria-label="Redo" title="Redo (Ctrl/⌘ Shift Z)">↷ Redo</button>
         </span>
         <span className="spacer" />
         {check && (
@@ -172,7 +255,7 @@ export function Editor({ project, onChange, onBack, saveStatus }: Props) {
               )}
               {area === "layout" && doc && usage && (
                 <>
-                  <ThisPageHeading doc={doc} current={current} />
+                  <ThisPageHeading doc={doc} current={current} onDuplicate={duplicateCurrent} />
                   {project.recipe.structure ? (
                     <ThisPagePanel project={project} update={update} doc={doc} current={current} parts={["basics", "cover"]} />
                   ) : (
@@ -185,7 +268,7 @@ export function Editor({ project, onChange, onBack, saveStatus }: Props) {
               )}
               {area === "writing" && doc && usage && (
                 <>
-                  <ThisPageHeading doc={doc} current={current} />
+                  <ThisPageHeading doc={doc} current={current} onDuplicate={duplicateCurrent} />
                   <PatternPanel nav={nav} project={project} update={update} usage={usage} />
                   <LayoutPanel nav={nav} project={project} update={update} usage={usage} part="writing" />
                   {!usage.patterns.length && !usage.lineStyle && !usage.sectionsPerDay && !usage.writingRows && <p className="hint">This product has no writing-line settings.</p>}
@@ -193,7 +276,7 @@ export function Editor({ project, onChange, onBack, saveStatus }: Props) {
               )}
               {area === "add" && doc && usage && (
                 <>
-                  <ThisPageHeading doc={doc} current={current} />
+                  <ThisPageHeading doc={doc} current={current} onDuplicate={duplicateCurrent} />
                   {project.recipe.structure && <ThisPagePanel project={project} update={update} doc={doc} current={current} parts={["sections"]} />}
                   <StationeryPanel project={project} update={update} usage={usage} doc={doc} />
                   <LayoutPanel nav={nav} project={project} update={update} usage={usage} part="add" />

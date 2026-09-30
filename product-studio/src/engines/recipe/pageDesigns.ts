@@ -113,3 +113,42 @@ export function moveAmong(nodes: BookNode[], id: string, dir: -1 | 1, among: (n:
   out.splice(j, 0, moved);
   return out;
 }
+
+/** "Discern 1" → "Discern 2", "Custom Page" → "Custom Page 2" — the next name not already used. */
+export function nextPageName(name: string, taken: Set<string>): string {
+  const m = /^(.*?)(\s*)(\d+)$/.exec(name.trim());
+  const stem = m ? m[1] : name.trim();
+  let n = m ? Number(m[3]) + 1 : 2;
+  const sep = m ? m[2] || " " : " ";
+  while (taken.has(`${stem}${sep}${n}`)) n++;
+  return `${stem}${sep}${n}`;
+}
+
+/**
+ * DUPLICATE PAGE — one more page just like this one, right after it, with its
+ * own deep copy of everything (sections, section styles, writing space, page
+ * header and details, page options). Editing either never changes the other.
+ * A page repeated many times (a step of 120 copies) duplicates as one page. A
+ * page inside a page-design group joins that group (the saved design is never
+ * touched). A Custom Page's name moves on ("Discern 1" → "Discern 2"); other
+ * pages keep their printed title.
+ */
+export function duplicatePage(nodes: BookNode[], stepId: string): { nodes: BookNode[]; id: string } | null {
+  const all: BookStep[] = [];
+  (function walk(ns: BookNode[]) {
+    for (const n of ns) n.kind === "group" ? walk(n.children) : all.push(n);
+  })(nodes);
+  const src = all.find((s) => s.id === stepId);
+  if (!src) return null;
+  const copy: BookStep = JSON.parse(JSON.stringify(src));
+  copy.id = nodeId("s");
+  if (copy.cadence.type === "copies" && copy.cadence.count > 1) copy.cadence = { type: "copies", count: 1 };
+  // Pages of a page-design group are numbered by the group; a lone Custom Page gets the next name.
+  if (copy.module === "custom" && !designGroupOf(nodes, stepId)) copy.title = nextPageName(src.title || "Custom Page", new Set(all.map((s) => s.title ?? "")));
+  const insert = (ns: BookNode[]): BookNode[] => {
+    const i = ns.findIndex((n) => n.id === stepId);
+    if (i >= 0) return [...ns.slice(0, i + 1), copy, ...ns.slice(i + 1)];
+    return ns.map((n) => (n.kind === "group" ? { ...n, children: insert(n.children) } : n));
+  };
+  return { nodes: insert(nodes), id: copy.id };
+}

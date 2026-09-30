@@ -1869,3 +1869,23 @@ button.family-card:focus-visible {
     grid-column: 1 / -1;
   }
 }
+.design-pages__actions {
+  display: inline-flex;
+  gap: 6px;
+}
+.this-page-heading__duplicate {
+  justify-self: start;
+  margin-top: 6px;
+}
+.header-meta-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+.history-buttons {
+  display: inline-flex;
+  gap: 4px;
+}
+.history-buttons .btn {
+  padding: 0 10px;
+}
