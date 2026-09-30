@@ -429,10 +429,15 @@ describe("Page Composer", () => {
     await expect.poll(() => drawn.locator('[data-node$="-intro-meta3-label"]').count()).toBe(1);
     const box = (sel: string) => drawn.locator(sel).first().boundingBox();
     const title = (await box('[data-node$="-intro-title"]'))!, step = (await box('[data-node$="-intro-eyebrow"]'))!, date = (await box('[data-node$="-intro-meta0-label"]'))!;
-    // Step at the left, title in the middle, details at the right — all in one band at the top.
+    // Step at the left, title in the middle, one band at the top; the details under it (the default).
     expect(step.x).toBeLessThan(title.x);
-    expect(date.x).toBeGreaterThan(title.x);
     expect(Math.abs(step.y - title.y)).toBeLessThan(title.height);
+    expect(date.y).toBeGreaterThan(title.y + title.height);
+    // "At the right" moves them beside the titles.
+    await header.getByRole("checkbox", { name: "Put the details at the right of the titles instead" }).check();
+    await expect.poll(async () => (await box('[data-node$="-intro-meta0-label"]'))!.x).toBeGreaterThan(title.x);
+    await header.getByRole("checkbox", { name: "Put the details at the right of the titles instead" }).uncheck();
+    await expect.poll(async () => (await box('[data-node$="-intro-meta0-label"]'))!.y).toBeGreaterThan(title.y + title.height);
     for (const m of ["Date", "Time", "Received through", "Type"]) await expect(drawn.textContent()).resolves.toContain(m);
     await expect(drawn.textContent()).resolves.not.toMatch(/DATE \| TIME|Date \| Time/);
     const writing = (await box('[data-node$="-title"]:not([data-node*="-intro-"])'))!;
