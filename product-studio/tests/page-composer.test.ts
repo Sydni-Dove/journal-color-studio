@@ -84,19 +84,26 @@ describe("saved page designs", () => {
     let p = composed(DASHBOARD);
     const s = p.recipe.structure![0];
     if (s.kind !== "step") throw new Error("step");
-    p = savePageDesign(p, s, "Project Snapshot", "2026-09-30T00:00:00Z");
+    const res = savePageDesign(p, s, "Project Snapshot", "2026-09-30T00:00:00Z");
+    if ("error" in res) throw new Error(res.error);
+    p = res.project;
     expect(p.pageDesigns).toHaveLength(1);
     const d = p.pageDesigns![0];
     expect(d.promptSet.blocks.map((b) => b.id)).toEqual(DASHBOARD.map((b) => b.id));
-    // Saving again under the same name updates it (no duplicate).
-    expect(savePageDesign(p, s, "Project Snapshot").pageDesigns).toHaveLength(1);
+    // Saving again under the same name never overwrites the saved design: it is refused (no duplicate either).
+    const again = savePageDesign(p, s, "project snapshot");
+    expect("error" in again && again.error).toMatch(/already exists/);
 
     const structure = addPageFromDesign(addEndCover(addFrontCover(p.recipe.structure!)), d, 8);
     const doc = resolveDocument({ ...p, recipe: { ...p.recipe, structure } });
-    const made = structure.find((n) => n.kind === "step" && n.designId === d.id)!;
-    expect(doc.recipe.pages.filter((x) => x.recipeItemId === made.id && !x.filler).length).toBeGreaterThanOrEqual(8);
+    const group = structure.find((n) => n.kind === "group" && n.designId === d.id)!;
+    if (group.kind !== "group") throw new Error("group");
+    expect(group.children).toHaveLength(8);
+    const ids = new Set(group.children.map((c) => c.id));
+    expect(doc.recipe.pages.filter((x) => ids.has(x.recipeItemId ?? "") && !x.filler).length).toBeGreaterThanOrEqual(8);
     expect(doc.recipe.pages.filter((x) => !x.filler).at(-1)!.layoutId).toBe("back-cover-page");
-    // The page's sections are a copy: changing them never changes the saved design.
+    // The pages' sections are copies: changing one never changes the saved design.
+    const made = group.children[0];
     if (made.kind !== "step") throw new Error("step");
     made.promptSet!.blocks[0].label = "Changed";
     expect(d.promptSet.blocks[0].label).toBe("Master Dashboard");

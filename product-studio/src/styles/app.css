@@ -1800,3 +1800,66 @@ button.family-card:focus-visible {
 .page-options > summary {
   font-weight: 600;
 }
+
+/* ── Saved page designs (Pages) ── */
+.hint--error {
+  color: var(--ui-error, #a4262c);
+}
+.design-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px 12px;
+  align-items: center;
+}
+.design-row__thumb {
+  grid-row: span 2;
+  min-width: 0;
+}
+.design-row__thumb .page-thumb {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  background: #fff;
+  overflow: hidden;
+}
+.design-row__actions {
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+.design-row .copies-field {
+  display: grid;
+  gap: 2px;
+}
+.design-row .copies-field input {
+  width: 88px;
+}
+.page-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.page-count__n {
+  min-width: 2.2em;
+  text-align: center;
+  font-weight: 600;
+}
+.design-pages {
+  flex-basis: 100%;
+  display: grid;
+  gap: 4px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.design-pages li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+@media (max-width: 600px) {
+  .design-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .design-row__actions {
+    grid-column: 1 / -1;
+  }
+}

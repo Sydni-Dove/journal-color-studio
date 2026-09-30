@@ -124,6 +124,12 @@ export type BookGroup = {
   label?: string;
   period?: "year" | "quarter" | "month" | "week";
   children: BookNode[];
+  /**
+   * Pages added from a saved page design ("Project Snapshot × 8"): each child
+   * is its own page with its own copy of the design's sections, so editing one
+   * never changes the others or the saved design.
+   */
+  designId?: string;
 };
 
 export type BookNode = BookStep | BookGroup;

@@ -190,19 +190,89 @@ describe("Page Composer", () => {
       await expect.poll(() => page.locator(".ps-page--editor").first().textContent()).toMatch(/Project Snapshot/);
       // Save as a page design, then add three pages made from it.
       const save = page.getByTestId("save-design");
-      await save.getByRole("textbox", { name: "Design name" }).fill("Project Snapshot");
-      await save.getByRole("button", { name: "Save page design" }).click();
+      await save.getByRole("textbox", { name: "Page design name" }).fill("Project Snapshot");
+      await save.getByRole("button", { name: "Save", exact: true }).click();
       await expect(save.getByRole("status").textContent()).resolves.toMatch(/Saved “Project Snapshot”/);
       const before = Number((await page.locator(".page-counter").innerText()).match(/of (\d+)/)![1]);
       await openArea(page, "pages");
       const row = page.locator('.builder-cat[data-category="designs"] .builder-row').first();
-      await row.getByRole("spinbutton", { name: "Copies of Project Snapshot" }).fill("3");
-      await row.getByRole("button", { name: "Add Project Snapshot" }).click();
+      await row.getByRole("spinbutton", { name: "Number of Project Snapshot pages" }).fill("3");
+      await row.getByRole("button", { name: "Add Project Snapshot to product" }).click();
       await expect.poll(async () => Number((await page.locator(".page-counter").innerText()).match(/of (\d+)/)![1])).toBeGreaterThanOrEqual(before + 3);
       if (phone) {
         expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
       }
       await page.context().close();
     }, 60_000);
+  }
+
+  for (const phone of [false, true]) {
+    it(`${phone ? "phone" : "desktop"}: save a page design, reload, add 8 pages at once, reload, edit copy #4 — the others and the saved design stay as they were`, async () => {
+      const page = await open(blank(), phone);
+      await openArea(page, "add");
+      for (const piece of ["Heading / text", "Writing lines", "Task list"]) await add(page, piece);
+      const title = await section(page, 1);
+      await title.getByRole("textbox", { name: "Heading" }).fill("Project Snapshot");
+      const purpose = await section(page, 2);
+      await purpose.getByRole("textbox", { name: "Heading" }).fill("Purpose");
+      await purpose.getByRole("group", { name: "Writing space" }).getByRole("button", { name: "Compact" }).click();
+      const save = page.getByTestId("save-design");
+      await save.getByRole("textbox", { name: "Page design name" }).fill("Project Snapshot");
+      await save.getByRole("button", { name: "Save", exact: true }).click();
+      await expect.poll(() => save.getByRole("status").textContent()).toMatch(/Saved “Project Snapshot”/);
+      // A second save under the same name is refused, never overwriting the design.
+      await save.getByRole("textbox", { name: "Page design name" }).fill("project snapshot");
+      await expect(save.getByRole("button", { name: "Save", exact: true }).isDisabled()).resolves.toBe(true);
+      await expect(save.getByText(/already exists/).count()).resolves.toBeGreaterThan(0);
+
+      // Close and reopen the project: the design is still there.
+      const reopen = async () => {
+        await page.waitForTimeout(700); // autosave
+        await page.reload();
+        await page.locator(".card").first().getByRole("button", { name: "Open" }).click();
+        await page.waitForSelector(".ps-page--editor");
+      };
+      await reopen();
+      await openArea(page, "pages");
+      const design = page.locator('.builder-cat[data-category="designs"] .builder-row').first();
+      await expect(design.textContent()).resolves.toMatch(/Project Snapshot/);
+      // A small preview drawn by the real renderer.
+      await expect.poll(() => design.locator(".page-thumb").count()).toBe(1);
+      // 8 pages in one step.
+      const before = Number((await page.locator(".page-counter").innerText()).match(/of (\d+)/)![1]);
+      await design.getByRole("spinbutton", { name: "Number of Project Snapshot pages" }).fill("8");
+      await design.getByRole("button", { name: "Add Project Snapshot to product" }).click();
+      await expect.poll(async () => Number((await page.locator(".page-counter").innerText()).match(/of (\d+)/)![1])).toBe(before + 8);
+      const group = page.locator(".builder-row--design").first();
+      await expect(group.textContent()).resolves.toMatch(/Project Snapshot.*8 pages/);
+      if (phone) {
+        expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+        const add = await design.getByRole("button", { name: "Add Project Snapshot to product" }).boundingBox();
+        expect(add!.height).toBeGreaterThanOrEqual(43);
+      }
+      await reopen();
+      await openArea(page, "pages");
+      await expect(page.locator(".builder-row--design").first().textContent()).resolves.toMatch(/8 pages/);
+
+      // Edit copy #4 only.
+      await page.locator(".builder-row--design").first().getByRole("button", { name: "Edit Project Snapshot pages" }).click();
+      await page.getByRole("button", { name: "Edit Project Snapshot 4", exact: true }).click();
+      await page.locator('section.area[data-area="add"]').waitFor();
+      const p4 = await section(page, 2);
+      await p4.getByRole("textbox", { name: "Heading" }).fill("Why this project");
+      await expect.poll(() => page.locator(".ps-page--editor").first().textContent()).toMatch(/Why this project/);
+      await page.waitForTimeout(700);
+      const stored = await page.evaluate(() => {
+        const key = Object.keys(localStorage).find((k) => k.startsWith("dove-product-studio:v1:project:"))!;
+        const p = JSON.parse(localStorage.getItem(key)!);
+        const group = p.recipe.structure.find((n: { designId?: string; kind: string }) => n.kind === "group" && n.designId);
+        const label = (step: { promptSet: { blocks: { label: string }[] } }) => step.promptSet.blocks[1].label;
+        return { copies: group.children.map(label), design: p.pageDesigns[0].promptSet.blocks[1].label };
+      });
+      expect(stored.copies).toEqual(["Purpose", "Purpose", "Purpose", "Why this project", "Purpose", "Purpose", "Purpose", "Purpose"]);
+      expect(stored.design).toBe("Purpose");
+      if (phone) expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+      await page.context().close();
+    }, 90_000);
   }
 });

@@ -11,21 +11,23 @@
  * detailed order and repeating sections stay available under "Order & repeats".
  * This defines the product; moving between printed pages is Browse pages.
  */
-import { useState } from "react";
-import type { ResolvedDocument } from "../../engines/document/resolve";
+import { useMemo, useState } from "react";
+import { resolveDocument, type ResolvedDocument } from "../../engines/document/resolve";
 import { removeNode, structureFromItems, updateNode } from "../../engines/recipe/bookEdit";
 import {
   addDaily, addDivider, addEndCover, addFrontCover, addMonthly, addPageOfType, addToEachMonth, addToEachWeek, addWeekly, addYearly,
-  BUILDER_CATEGORIES, builderRows, primaryCategories, stepPeriod, WEEKLY_JOURNAL, type BuilderCategory, type BuilderRow, type WeeklyJournalKind,
+  BUILDER_CATEGORIES, builderRows, categoryOf, primaryCategories, stepPeriod, WEEKLY_JOURNAL, type BuilderCategory, type BuilderRow, type WeeklyJournalKind,
 } from "../../engines/recipe/pageBuilder";
 import { getLayout } from "../../layouts/registry";
-import { addPageFromDesign, removePageDesign } from "../../engines/recipe/pageDesigns";
+import { addPageFromDesign, isDesignGroup, MAX_DESIGN_PAGES, moveAmong, removePageDesign, setDesignPageCount, stepFromDesign } from "../../engines/recipe/pageDesigns";
+import { PageThumb } from "../preview/PageThumb";
+import { usePhone } from "../../utils/usePhone";
 import { neutralLuxeDividers } from "../../presets/bookRecipes";
 import { moduleTitle } from "../../presets/modules";
 import { layoutName, pageTypeName } from "../../presets/plainNames";
 import { PRODUCT_TYPES } from "../../presets/products/productTypes";
-import type { ProductProject } from "../../types/project";
-import type { BookNode, BookStep, PageModuleType } from "../../types/recipe";
+import type { PageDesign, ProductProject } from "../../types/project";
+import type { BookGroup, BookNode, BookStep, PageModuleType } from "../../types/recipe";
 
 type Update = (fn: (p: ProductProject) => ProductProject) => void;
 type Props = { project: ProductProject; update: Update; doc: ResolvedDocument; onEdit: (stepId: string) => void };
@@ -81,7 +83,7 @@ export function PagesBuilder({ project, update, doc, onEdit }: Props) {
       <h3 className="builder__title">{/page$/i.test(productLabel) ? "Pages" : `${productLabel} pages`}</h3>
       <p className="hint">What this {productLabel.toLowerCase()} contains. Add a kind of page and it goes in the right place; choose Edit to change its layout, writing space and content.</p>
       {shown.map((cat) => (
-        <Category key={cat} cat={cat} rows={rows} allRows={rows} edit={edit} onEdit={onEdit} doc={doc} />
+        <Category key={cat} cat={cat} rows={rows} allRows={rows} edit={edit} onEdit={onEdit} doc={doc} structure={structure} project={project} />
       ))}
       <PageDesigns project={project} edit={edit} update={update} />
       {more.length > 0 && (
@@ -93,9 +95,34 @@ export function PagesBuilder({ project, update, doc, onEdit }: Props) {
   );
 }
 
-function Category({ cat, rows, allRows, edit, onEdit, doc }: { cat: BuilderCategory; rows: BuilderRow[]; allRows: BuilderRow[]; edit: (fn: (n: BookNode[]) => BookNode[], needsDates?: boolean) => void; onEdit: (id: string) => void; doc: ResolvedDocument }) {
+/** A row in a category: one kind of page, or a group of pages made from a saved page design. */
+type Item = { kind: "row"; r: BuilderRow } | { kind: "design"; g: BookGroup; r: BuilderRow };
+
+function Category({ cat, rows, allRows, edit, onEdit, doc, structure, project }: { cat: BuilderCategory; rows: BuilderRow[]; allRows: BuilderRow[]; edit: (fn: (n: BookNode[]) => BookNode[], needsDates?: boolean) => void; onEdit: (id: string) => void; doc: ResolvedDocument; structure: BookNode[]; project: ProductProject }) {
   const def = BUILDER_CATEGORIES.find((c) => c.id === cat)!;
   const mine = rows.filter((r) => r.category === cat);
+  // Pages made from a saved design show as one row ("Project Snapshot · 8 pages"), in book order.
+  const items: Item[] = [];
+  const seen = new Set<string>();
+  for (const r of mine) {
+    const g = r.parents.find(isDesignGroup);
+    if (!g) items.push({ kind: "row", r });
+    else if (!seen.has(g.id)) {
+      seen.add(g.id);
+      items.push({ kind: "design", g, r });
+    }
+  }
+  // Custom and saved-design pages can be put in order among themselves (the rest keep their planned places).
+  const movable = cat === "journal";
+  const among = (n: BookNode) => isDesignGroup(n) || (n.kind === "step" && categoryOf(n, []) === cat);
+  const topIds = structure.filter(among).map((n) => n.id);
+  const moveButtons = (id: string, name: string) =>
+    movable && topIds.includes(id) && topIds.length > 1 ? (
+      <>
+        <button type="button" className="btn" disabled={topIds[0] === id} onClick={() => edit((n) => moveAmong(n, id, -1, among))} aria-label={`Move ${name} up`}>Move up</button>
+        <button type="button" className="btn" disabled={topIds.at(-1) === id} onClick={() => edit((n) => moveAmong(n, id, 1, among))} aria-label={`Move ${name} down`}>Move down</button>
+      </>
+    ) : null;
   const has = (m: PageModuleType) => allRows.some((r) => r.step.module === m);
   const dated = DATED_CATEGORIES.includes(cat);
   const add = (fn: (n: BookNode[]) => BookNode[]) => edit(fn, dated);
@@ -107,21 +134,26 @@ function Category({ cat, rows, allRows, edit, onEdit, doc }: { cat: BuilderCateg
         <strong>{def.label}</strong>
         {!mine.length && <span className="builder-cat__empty">{def.empty}</span>}
       </div>
-      {mine.map((r) => (
-        <div key={r.step.id} className="builder-row" data-step={r.step.id}>
-          <div className="builder-row__text">
-            <span className="builder-row__name">{rowName(r.step, stepPeriod(r.step, r.parents))}</span>
-            <span className="builder-row__detail">
-              {layoutName(r.step.layoutId, getLayout(r.step.layoutId).label)} · {howOften(r, allRows)}
-              {r.step.module === "divider-page" ? ` · ${r.step.cover?.tab?.show ? `Tab: ${(r.step.cover.tab.label ?? r.step.title ?? "").toUpperCase() || "on"}` : "No tab"}` : ""}
-            </span>
+      {items.map((it) =>
+        it.kind === "design" ? (
+          <DesignGroupRow key={it.g.id} g={it.g} design={project.pageDesigns?.find((d) => d.id === it.g.designId)} edit={edit} onEdit={onEdit} moveButtons={moveButtons(it.g.id, it.g.label ?? "pages")} />
+        ) : (
+          <div key={it.r.step.id} className="builder-row" data-step={it.r.step.id}>
+            <div className="builder-row__text">
+              <span className="builder-row__name">{rowName(it.r.step, stepPeriod(it.r.step, it.r.parents))}</span>
+              <span className="builder-row__detail">
+                {layoutName(it.r.step.layoutId, getLayout(it.r.step.layoutId).label)} · {howOften(it.r, allRows)}
+                {it.r.step.module === "divider-page" ? ` · ${it.r.step.cover?.tab?.show ? `Tab: ${(it.r.step.cover.tab.label ?? it.r.step.title ?? "").toUpperCase() || "on"}` : "No tab"}` : ""}
+              </span>
+            </div>
+            <div className="builder-row__actions">
+              <button type="button" className="btn" onClick={() => onEdit(it.r.step.id)} aria-label={`Edit ${rowName(it.r.step)}`}>Edit</button>
+              {moveButtons(it.r.step.id, rowName(it.r.step))}
+              <button type="button" className="btn btn--ghost" onClick={() => edit((n) => removeNode(n, it.r.step.id))} aria-label={`Remove ${rowName(it.r.step)}`}>Remove</button>
+            </div>
           </div>
-          <div className="builder-row__actions">
-            <button type="button" className="btn" onClick={() => onEdit(r.step.id)} aria-label={`Edit ${rowName(r.step)}`}>Edit</button>
-            <button type="button" className="btn btn--ghost" onClick={() => edit((n) => removeNode(n, r.step.id))} aria-label={`Remove ${rowName(r.step)}`}>Remove</button>
-          </div>
-        </div>
-      ))}
+        ),
+      )}
       <div className="builder-cat__add">
         {cat === "cover" && (
           <>
@@ -222,32 +254,112 @@ export function renameStep(nodes: BookNode[], id: string, title: string): BookNo
 }
 
 /** Your page designs: Custom Pages saved for reuse; each adds pages that are a copy of it. */
+/**
+ * Pages made from a saved design, as one row: how many pages, each page's
+ * Edit (every page is its own copy), order, remove.
+ */
+function DesignGroupRow({ g, design, edit, onEdit, moveButtons }: { g: BookGroup; design?: PageDesign; edit: (fn: (n: BookNode[]) => BookNode[]) => void; onEdit: (id: string) => void; moveButtons: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const pages = g.children.filter((c): c is BookStep => c.kind === "step");
+  const name = g.label || design?.name || "Page design";
+  const setCount = (n: number) => edit((x) => setDesignPageCount(x, g.id, n, design));
+  return (
+    <div className="builder-row builder-row--design" data-design-group={g.id}>
+      <div className="builder-row__text">
+        <span className="builder-row__name">{name}</span>
+        <span className="builder-row__detail">{pages.length} page{pages.length === 1 ? "" : "s"} · your page design{design ? "" : " (design deleted; the pages stay)"}</span>
+      </div>
+      <div className="builder-row__actions">
+        <div className="page-count" role="group" aria-label={`Number of ${name} pages`}>
+          <button type="button" className="btn btn--icon" aria-label={`One ${name} page fewer`} disabled={pages.length <= 1} onClick={() => setCount(pages.length - 1)}>−</button>
+          <span className="page-count__n" aria-live="polite">{pages.length}</span>
+          <button type="button" className="btn btn--icon" aria-label={`One ${name} page more`} disabled={pages.length >= MAX_DESIGN_PAGES} onClick={() => setCount(pages.length + 1)}>+</button>
+        </div>
+        <button type="button" className="btn" aria-expanded={open} onClick={() => setOpen(!open)} aria-label={`Edit ${name} pages`}>Edit pages</button>
+        {moveButtons}
+        <button type="button" className="btn btn--ghost" onClick={() => edit((x) => removeNode(x, g.id))} aria-label={`Remove ${name} pages`}>Remove</button>
+      </div>
+      {open && (
+        <ol className="design-pages" aria-label={`${name} pages`}>
+          {pages.map((s, k) => (
+            <li key={s.id}>
+              <span>{name} {k + 1}</span>
+              <button type="button" className="btn" onClick={() => onEdit(s.id)} aria-label={`Edit ${name} ${k + 1}`}>Edit</button>
+            </li>
+          ))}
+          <li className="hint">Each page is its own copy: editing one never changes the others or your saved design.</li>
+        </ol>
+      )}
+    </div>
+  );
+}
+
+/** A small preview of a saved design, drawn by the real page renderer in this product's size and Style. */
+function DesignThumb({ project, design, heightPx }: { project: ProductProject; design: PageDesign; heightPx: number }) {
+  const doc = useMemo(() => {
+    try {
+      return resolveDocument({ ...project, recipe: { ...project.recipe, items: [], ordering: "sequential", structure: [stepFromDesign(design)] } });
+    } catch {
+      return null;
+    }
+    // The preview depends on the design and the product's size and Style.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [design, project.dimensions, project.colors, project.typography, project.decorativeTheme, project.backgroundTheme, project.spacing, project.functionalPattern, project.production, project.layoutOptions]);
+  const i = doc ? doc.recipe.pages.findIndex((p) => p.layoutId === "guided-page") : -1;
+  return doc && i >= 0 ? <PageThumb doc={doc} index={i} heightPx={heightPx} /> : null;
+}
+
 function PageDesigns({ project, edit, update }: { project: ProductProject; edit: (fn: (n: BookNode[]) => BookNode[]) => void; update: Update }) {
   const designs = project.pageDesigns ?? [];
-  const [copies, setCopies] = useState<Record<string, number>>({});
+  const phone = usePhone();
+  const [copies, setCopies] = useState<Record<string, string>>({});
+  const [added, setAdded] = useState<string | null>(null);
+  const count = (d: PageDesign) => Math.max(1, Math.min(MAX_DESIGN_PAGES, Math.round(Number(copies[d.id] ?? 1) || 1)));
   return (
     <div className="builder-cat" data-category="designs">
       <div className="builder-cat__head">
         <strong>Your page designs</strong>
         {!designs.length && <span className="builder-cat__empty">None yet</span>}
       </div>
-      {!designs.length && <p className="hint">Build a page from sections (Edit → Add to page), then “Save page design”. It appears here to add as many times as you need.</p>}
+      {!designs.length && <p className="hint">Build a page from sections (Edit → Add to page), then “Save page design”. It appears here to add as many pages as you need.</p>}
       {designs.map((d) => (
-        <div key={d.id} className="builder-row" data-design={d.id}>
+        <div key={d.id} className="builder-row design-row" data-design={d.id}>
+          <div className="design-row__thumb"><DesignThumb project={project} design={d} heightPx={phone ? 96 : 72} /></div>
           <div className="builder-row__text">
             <span className="builder-row__name">{d.name}</span>
             <span className="builder-row__detail">{d.promptSet.blocks.length} section{d.promptSet.blocks.length === 1 ? "" : "s"}</span>
           </div>
-          <div className="builder-row__actions">
+          <div className="builder-row__actions design-row__actions">
             <label className="copies-field">
-              <span className="visually-hidden">Copies of {d.name}</span>
-              <input type="number" min={1} max={200} value={copies[d.id] ?? 1} aria-label={`Copies of ${d.name}`} onChange={(e) => setCopies({ ...copies, [d.id]: Math.max(1, Math.min(200, Math.round(+e.target.value || 1))) })} />
+              <span className="field-label">Number of pages</span>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={MAX_DESIGN_PAGES}
+                value={copies[d.id] ?? "1"}
+                aria-label={`Number of ${d.name} pages`}
+                onChange={(e) => setCopies({ ...copies, [d.id]: e.target.value })}
+                onBlur={() => setCopies({ ...copies, [d.id]: String(count(d)) })}
+              />
             </label>
-            <button type="button" className="btn" onClick={() => edit((n) => addPageFromDesign(n, d, copies[d.id] ?? 1))} aria-label={`Add ${d.name}`}>+ Add</button>
-            <button type="button" className="btn btn--ghost" onClick={() => update((p) => removePageDesign(p, d.id))} aria-label={`Delete design ${d.name}`}>Delete</button>
+            <button
+              type="button"
+              className="btn btn--primary"
+              aria-label={`Add ${d.name} to product`}
+              onClick={() => {
+                const n = count(d);
+                edit((x) => addPageFromDesign(x, d, n));
+                setAdded(`Added ${n} “${d.name}” page${n === 1 ? "" : "s"}.`);
+              }}
+            >
+              Add to product
+            </button>
+            <button type="button" className="btn btn--ghost" onClick={() => update((p) => removePageDesign(p, d.id))} aria-label={`Delete design ${d.name}`}>Delete design</button>
           </div>
         </div>
       ))}
+      {added && <p className="hint" role="status">{added} They're listed under Journal &amp; guided pages.</p>}
     </div>
   );
 }

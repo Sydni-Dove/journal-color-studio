@@ -80,22 +80,48 @@ Every block records what it holds (`PromptBlock.content`, read with
 `content.key` (defaults to the block id) is the stable name a later Fill Mode
 will store answers under. Phase 1 only records it; nothing is filled in yet.
 
-## Saved page designs
+## Saved page designs (Phase 2)
 
-"Save page design" (under the section list) stores the page's title and
-sections on the project (`project.pageDesigns`), replacing a design with the
-same name. In **Pages → Your page designs**, a design can be added any number
-of times (copies), before the end cover, each copy an independent page (a deep
-copy, so editing one page does not change the others or the design). This is
-how a book like "Cover → Master Dashboard → Project Snapshot × 8 → …" is
-built.
+**Saved page design** = the reusable master (a name, a page title and the
+sections — structure only). **Inserted pages** = independent copies inside
+a product.
 
-Code: `engines/recipe/pageDesigns.ts`, `components/editor/BookPanels.tsx`
-(`SaveDesign`), `components/editor/PagesBuilder.tsx` (`PageDesigns`).
+* **Save page design** (under a Custom Page's sections): a *Page design
+  name* and **Save**. A name already in use (any case) is refused — saving
+  never overwrites a design. On a page that is itself a copy, the panel says
+  so: changes stay on that page; to reuse that version, save it under a new
+  name. There is no "update the saved design" action.
+* **Pages → Your page designs**: each design with a small preview (the real
+  page renderer, in this product's size and Style), its sections, **Number of
+  pages** and **Add to product** — 8 pages in one step — and *Delete design*
+  (pages already added stay).
+* **Inserted pages** are a group in the book structure (`BookGroup.designId`,
+  label = the design's name) holding one Custom Page step per page, each with
+  its own deep copy of the sections and `designId`. Editing page 4 edits that
+  step only. In Pages they show as one row — "Project Snapshot · 8 pages" —
+  with − / + for the number of pages (more pages are fresh copies of the
+  saved design; fewer removes pages from the end), **Edit pages** (Project
+  Snapshot 1 … 8, each with its own Edit), Move up / Move down among the
+  custom and page-design pages, and Remove. Under Order & repeats the group
+  is a section that never "repeats"; its pages are listed inside it.
+* **Style** stays separate: a design stores no colors, fonts, background or
+  coordinates, so a palette, typography, writing-line or section-style change
+  restyles every page without touching its structure. Explicit per-section
+  styles chosen in the Composer travel with the design.
+* **Page size**: pages reflow with Product Studio geometry at every trim; a
+  design that doesn't fit a smaller page continues on another page (never
+  squashed).
+* Scope: designs live in the project (saved with it, locally). No sharing,
+  marketplace or import.
 
-## Not in Phase 1
+Code: `engines/recipe/pageDesigns.ts` (save, `designGroup`,
+`addPageFromDesign`, `setDesignPageCount`, `moveAmong`),
+`components/editor/BookPanels.tsx` (`SaveDesign`),
+`components/editor/PagesBuilder.tsx` (`PageDesigns`, `DesignGroupRow`).
 
-Drag and drop, free positioning, and filling answers in (Fill Mode).
+## Not yet
+
+Drag and drop, free positioning, filling answers in (Fill Mode), growing lists, paste / import, and the product assembly preview.
 
 ## Tests
 
@@ -106,6 +132,11 @@ Drag and drop, free positioning, and filling answers in (Fill Mode).
   (1–3 blanks, line / box, wrapping on a Filofax Personal page); grid;
   checklist without lines; theme change moves nothing.
 
+* `tests/page-designs.test.ts` — save / reload / no overwrite; structure
+  only (no colors or coordinates); one and eight copies; editing copy #4
+  changes nothing else; number of pages; order; a whole product (cover,
+  dashboard, 8 snapshots, divider, 20 Revelation to Execution pages, monthly
+  pages, notes, end cover); Letter / 7 × 9 / 5.5 × 8.5; Style changes; export.
 * `tests/page-composer.test.ts` — every piece at three sizes stays inside the
   safe area without errors; heading / spacer / divider specifics; reordering;
   field vs list; saved designs.
@@ -114,4 +145,7 @@ Drag and drop, free positioning, and filling answers in (Fill Mode).
   no sideways scrolling on a phone. A new Custom Page opens on Build your
   page, with Page options below and closed. Revelation to Execution built by
   tapping pieces and typing (plain amounts, a boxed blank, two columns, a
-  panel), page OK.
+  panel), page OK. Master Dashboard: page title, three column boxes, table
+  filling the page. Desktop and phone: save a page design, reload, add 8
+  pages at once, reload, edit copy #4 — the others and the saved design
+  unchanged; no sideways scroll, 44px Add button.

@@ -10,7 +10,7 @@ import { Visual } from "../help/visuals";
 import { useState } from "react";
 import { PageThumb } from "../preview/PageThumb";
 import { thumbHeight, usePhone } from "../../utils/usePhone";
-import { savePageDesign } from "../../engines/recipe/pageDesigns";
+import { designNameTaken, savePageDesign } from "../../engines/recipe/pageDesigns";
 import { PromptEditor, type PromptFit } from "./PromptEditor";
 import { sectionLineCounts, sectionPages } from "../../layouts/shared/promptPages";
 import { promptSetFromList } from "../../types/prompts";
@@ -210,30 +210,32 @@ export function StepFields({ s, siblings, scope, props, parts }: { s: BookStep; 
 function SaveDesign({ step, props }: { step: BookStep; props: Props }) {
   const { project, update } = props;
   const from = project.pageDesigns?.find((d) => d.id === step.designId);
-  const [name, setName] = useState(from?.name ?? step.title ?? "");
-  const [saved, setSaved] = useState<string | null>(null);
+  const [name, setName] = useState(from || !step.title || step.title === "Custom Page" ? "" : step.title);
+  const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
+  const taken = !!name.trim() && designNameTaken(project, name);
+  const save = () => {
+    const res = savePageDesign(project, step, name);
+    if ("error" in res) return setNote({ ok: false, text: res.error });
+    update((p) => ({ ...p, pageDesigns: res.project.pageDesigns }));
+    setNote({ ok: true, text: `Saved “${res.design.name}”. Add it from Pages → Your page designs.` });
+    setName("");
+  };
   return (
     <div className="save-design" data-testid="save-design">
-      <div className="field-label">Reuse this page</div>
-      <p className="hint">{from ? `Made from your page design “${from.name}”. Saving again updates that design; pages already in the book keep their own copy.` : "Save it as a page design, then add it anywhere in Pages — as many copies as you need."}</p>
-      <div className="row">
-        <Field label="Design name">
-          <input type="text" value={name} placeholder="e.g. Project Snapshot" onChange={(e) => setName(e.target.value)} />
-        </Field>
-      </div>
-      <button
-        type="button"
-        className="btn"
-        disabled={!step.promptSet?.blocks.length}
-        onClick={() => {
-          const clean = name.trim() || step.title || "Page design";
-          update((p) => savePageDesign(p, step, clean));
-          setSaved(clean);
-        }}
-      >
-        Save page design
+      <div className="field-label">Save page design</div>
+      <p className="hint">
+        {from
+          ? `This page is a copy of your page design “${from.name}”. Changes here stay on this page — the saved design and your other “${from.name}” pages don't change. To reuse this version, save it under a new name.`
+          : "Save this page's sections to reuse them: add it anywhere in Pages, as many pages as you need. Colors, fonts and background follow the product's Style."}
+      </p>
+      <Field label="Page design name">
+        <input type="text" value={name} placeholder="e.g. Project Snapshot" onChange={(e) => { setName(e.target.value); setNote(null); }} onKeyDown={(e) => e.key === "Enter" && !taken && name.trim() && save()} />
+      </Field>
+      {taken && <p className="hint" role="status">A page design named “{name.trim()}” already exists. Choose a different name.</p>}
+      <button type="button" className="btn btn--primary" disabled={!step.promptSet?.blocks.length || !name.trim() || taken} onClick={save}>
+        Save
       </button>
-      {saved && <p className="hint" role="status">Saved “{saved}”. Add it from Pages → Your page designs.</p>}
+      {note && <p className={note.ok ? "hint" : "hint hint--error"} role="status">{note.text}</p>}
     </div>
   );
 }
@@ -318,7 +320,7 @@ function GroupCard({ g, scope, props, first, last, edit }: { g: BookGroup; scope
   const set = (patch: Partial<BookGroup>) => edit((n) => updateNode(n, g.id, (x) => ({ ...x, ...patch }) as BookNode));
   return (
     <fieldset className="book-section" data-section={g.id}>
-      <legend>{g.label || SECTION_LABEL[g.period ?? "none"]}</legend>
+      <legend>{g.label || SECTION_LABEL[g.period ?? "none"]}{g.designId ? ` · ${g.children.length} page${g.children.length === 1 ? "" : "s"} from your page design` : ""}</legend>
       <NodeList nodes={g.children} scope={inner} parentId={g.id} props={props} />
       <details className="book-section__settings">
         <summary>Section settings</summary>
@@ -326,7 +328,8 @@ function GroupCard({ g, scope, props, first, last, edit }: { g: BookGroup; scope
           <Field label="Section name">
             <input type="text" value={g.label ?? ""} placeholder={SECTION_LABEL[g.period ?? "none"]} onChange={(e) => set({ label: e.target.value })} />
           </Field>
-          <Select label="How often this section repeats" value={g.period ?? "none"} options={periods.map((p) => ({ value: p, label: SECTION_LABEL[p] }))} onChange={(v) => set({ period: v === "none" ? undefined : (v as BookGroup["period"]) })} />
+          {/* Pages from a page design are a set number of pages (Pages → Number of pages), never a repeating section. */}
+          {!g.designId && <Select label="How often this section repeats" value={g.period ?? "none"} options={periods.map((p) => ({ value: p, label: SECTION_LABEL[p] }))} onChange={(v) => set({ period: v === "none" ? undefined : (v as BookGroup["period"]) })} />}
         </div>
         <div className="card-actions">
           <button className="btn" disabled={first} onClick={() => edit((n) => moveNode(n, g.id, -1))}>Move section up</button>
