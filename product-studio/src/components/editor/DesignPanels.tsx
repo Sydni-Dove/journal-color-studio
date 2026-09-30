@@ -12,7 +12,7 @@ import type { ProjectUsage } from "../../engines/document/usage";
 import { GRID_PRESETS, RULING_PRESETS } from "../../engines/patterns/patterns";
 import { addVariantFromCurrent } from "../../persistence/projectStore";
 import { SPACING_LABELS } from "../../presets/spacing/spacingPresets";
-import { findPalette } from "../../presets/themes/palettes";
+import { arrangementsOf, findPalette, resolveColors, WHITE_PAPER } from "../../presets/themes/palettes";
 import { DEFAULT_ROLES, DESIGN_TYPE_PAIRINGS, FONT_CATALOG, FONT_CATEGORY_LABEL, ROLE_LABELS } from "../../presets/typography/typography";
 import { DEFAULT_WORDING } from "../../presets/wording";
 import { JCS_SNAPSHOT } from "../../design-library/library";
@@ -406,12 +406,37 @@ const HEX = /^#[0-9a-f]{6}$/i;
 export function ColorPanel({ project, update, usage }: PanelProps) {
   const palette = findPalette(project.colors.paletteId);
   const view = applyVariant(project);
-  const effective = { ...palette.colors, ...view.colors.overrides };
+  const effective = resolveColors(project.colors.paletteId, view.colors.overrides, project.colors);
   const active = project.variants.find((v) => v.id === project.activeVariantId);
   const editable = usage.colorTokens.filter((t) => HEX.test(effective[t]));
+  const paper = project.colors.paper ?? "palette";
+  const count = arrangementsOf(palette.colors, paper === "white" ? WHITE_PAPER : palette.colors.background).length;
+  const at = Math.abs(project.colors.arrangement ?? 0) % count;
+  const nextArrangement = () => update((p) => ({ ...p, colors: { ...p.colors, overrides: {}, arrangement: ((p.colors.arrangement ?? 0) + 1) % count || undefined } }));
   return (
     <Section title="Colors" open>
-      <PalettePicker value={project.colors.paletteId} onPick={(paletteId) => update((p) => ({ ...p, colors: { paletteId, overrides: {} } }))} />
+      <PalettePicker
+        value={project.colors.paletteId}
+        onPick={(paletteId) =>
+          paletteId === project.colors.paletteId
+            ? nextArrangement()
+            : update((p) => ({ ...p, colors: { paletteId, overrides: {}, ...(p.colors.paper === "white" ? { paper: "white" as const } : {}) } }))
+        }
+      />
+      {count > 1 && (
+        <div className="color-arrangement" data-testid="color-arrangement">
+          <p className="hint">
+            Color arrangement {at + 1} of {count}: tap the chosen palette again (or the button) to swap which color is used for titles, lines and accents. Only this palette's colors are used.
+          </p>
+          <button type="button" className="btn" onClick={nextArrangement}>Try another arrangement</button>
+        </div>
+      )}
+      <Segmented<"palette" | "white">
+        label="Paper"
+        value={paper}
+        options={[{ value: "palette", label: "Palette's paper color" }, { value: "white", label: "White" }]}
+        onChange={(v) => update((p) => ({ ...p, colors: { ...p.colors, paper: v === "white" ? "white" : undefined, arrangement: undefined } }))}
+      />
       {palette.note && <p className="hint">{palette.brandPalette ? "" : "⚠ "}{palette.note}</p>}
       {active && <p className="hint">Editing the colors of the design option “{active.name}”.</p>}
       {editable.length > 0 && <div className="field-label">Fine-tune each color</div>}

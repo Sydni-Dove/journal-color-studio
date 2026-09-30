@@ -188,7 +188,7 @@ export function resolveDocument(input: ProductProject): ResolvedDocument {
     recipe,
     spacing: resolveSpacing(project.spacing.density, project.spacing.overrides),
     typography: bookTypography(project, recipe),
-    colors: resolveColors(project.colors.paletteId, project.colors.overrides),
+    colors: resolveColors(project.colors.paletteId, project.colors.overrides, project.colors),
     wording: resolveWording(project.wording),
     // Projects saved before the design-library snapshot may carry retired
     // styles (geometric, abstract, …) or lack role colors: normalize them.

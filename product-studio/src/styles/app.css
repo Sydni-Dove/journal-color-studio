@@ -299,12 +299,15 @@ input[type="color"] {
   overflow: hidden;
 }
 .segmented button {
-  flex: 1;
+  /* Each choice gets room for its own words (a long label is never squeezed to three lines); spare room is shared. */
+  flex: 1 1 auto;
   border: 0;
   background: #fff;
   cursor: pointer;
-  padding: 0 8px;
+  padding: 4px 10px;
   font-size: 13px;
+  line-height: 1.25;
+  text-align: center;
 }
 .segmented button[aria-pressed="true"] {
   background: var(--ui-brand);

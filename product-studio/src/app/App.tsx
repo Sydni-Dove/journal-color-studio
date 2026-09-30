@@ -121,7 +121,7 @@ export function App() {
       onDuplicateAsVariant={(id) => {
         const p = store.load(id);
         if (!p) return;
-        const withVariant = addVariantFromCurrent(p, `Variant ${p.variants.length + 1}`, resolveColors(p.colors.paletteId, p.colors.overrides));
+        const withVariant = addVariantFromCurrent(p, `Variant ${p.variants.length + 1}`, resolveColors(p.colors.paletteId, p.colors.overrides, p.colors));
         open({ ...withVariant, updatedAt: new Date().toISOString() });
       }}
       onDelete={(id) => {

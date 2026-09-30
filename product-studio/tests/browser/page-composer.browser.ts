@@ -299,4 +299,33 @@ describe("Page Composer", () => {
       await page.context().close();
     }, 90_000);
   }
+
+  it("Style: tapping the chosen palette again rearranges its colors; white paper keeps the palette; long choices never squeeze to three lines", async () => {
+    const page = await open(blank(), false);
+    await openArea(page, "add");
+    await add(page, "Writing lines");
+    const b = await section(page, 1);
+    const fill = b.getByRole("group", { name: "Writing space" }).getByRole("button", { name: "Fill remaining space" });
+    const lineH = await fill.evaluate((el) => parseFloat(getComputedStyle(el).lineHeight));
+    expect((await fill.boundingBox())!.height).toBeLessThanOrEqual(Math.max(44, lineH * 2 + 10));
+    await openArea(page, "style");
+    const stored = () => page.evaluate(() => {
+      const key = Object.keys(localStorage).find((k) => k.startsWith("dove-product-studio:v1:project:"))!;
+      return JSON.parse(localStorage.getItem(key)!).colors;
+    });
+    const current = page.locator('.palette-card[aria-pressed="true"]').first();
+    const note = page.getByTestId("color-arrangement");
+    if (await note.count()) {
+      await expect(note.textContent()).resolves.toMatch(/arrangement 1 of \d/);
+      await current.click();
+      await expect.poll(() => note.textContent()).toMatch(/arrangement 2 of \d/);
+      await expect.poll(async () => (await stored()).arrangement).toBe(1);
+    }
+    await page.getByRole("group", { name: "Paper" }).getByRole("button", { name: "White" }).click();
+    await expect.poll(async () => (await stored()).paper).toBe("white");
+    // A different palette keeps the white paper.
+    await page.locator('.palette-card[aria-pressed="false"]').first().click();
+    await expect.poll(async () => (await stored()).paper).toBe("white");
+    await page.context().close();
+  }, 60_000);
 });

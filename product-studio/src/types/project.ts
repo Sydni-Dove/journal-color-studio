@@ -130,7 +130,14 @@ export type ProductProject = {
     fonts: FontSelection;
     roleOverrides: Partial<Record<TypographyRole, Partial<TypographyRoleStyle>>>;
   };
-  colors: { paletteId: string; overrides: Partial<ColorTokens> };
+  colors: {
+    paletteId: string;
+    overrides: Partial<ColorTokens>;
+    /** Which of the palette's colors does which job (0 = as designed); tapping the palette again steps through them. */
+    arrangement?: number;
+    /** The page's paper: the palette's own paper color (default) or plain white. */
+    paper?: "palette" | "white";
+  };
   spacing: { density: SpacingDensity; overrides: Partial<SpacingTokens> };
   functionalPattern: FunctionalPattern;
   /** Decorative ELEMENTS: florals and line art placed against page structure. */

@@ -114,6 +114,56 @@ export function findPalette(id: string): ColorPalette {
   return PALETTES.find((p) => p.id === id) ?? PALETTES[0];
 }
 
-export function resolveColors(paletteId: string, overrides: Partial<ColorTokens> = {}): ColorTokens {
-  return { ...findPalette(paletteId).colors, ...overrides };
+/** How the palette's colors are used on the page: an arrangement and the paper. */
+export type ColorLook = { arrangement?: number; paper?: "palette" | "white" };
+
+export const WHITE_PAPER = "#FFFFFF";
+
+/** The roles an arrangement moves the palette's colors between (titles and headings, rules, line art). */
+const ARRANGED = ["primary", "accent", "decorativeAccent"] as const;
+/** Headings and titles keep at least this contrast against the paper (WCAG large-text minimum). */
+export const HEADING_CONTRAST = 3;
+
+function luminance(hex: string): number | null {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  const lin = (v: number) => ((v /= 255) <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
+  return 0.2126 * lin((n >> 16) & 255) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255);
+}
+export function contrast(a: string, b: string): number {
+  const x = luminance(a), y = luminance(b);
+  if (x === null || y === null) return Infinity;
+  return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+}
+
+/**
+ * The palette's arrangements: its colors rotated through titles / headings,
+ * rules and line art. The first is always the palette as designed; the rest
+ * keep headings readable on the paper. Colors only move between roles — no new
+ * colors appear.
+ */
+export function arrangementsOf(base: ColorTokens, paper: string = base.background): ColorTokens[] {
+  const colors = [...new Set([...ARRANGED.map((r) => base[r]), base.secondary].filter((h) => luminance(h) !== null && h.toLowerCase() !== base.background.toLowerCase()))];
+  const out: ColorTokens[] = [];
+  for (let k = 0; k < Math.max(1, colors.length); k++) {
+    const next = { ...base };
+    if (k > 0) {
+      ARRANGED.forEach((r, i) => (next[r] = colors[(i + k) % colors.length]));
+      // Line art follows its color when the palette derived it that way.
+      if (base.lineArt === base.decorativeAccent) next.lineArt = next.decorativeAccent;
+      if (contrast(next.primary, paper) < HEADING_CONTRAST) continue;
+      if (out.some((o) => ARRANGED.every((r) => o[r] === next[r]))) continue;
+    }
+    out.push(next);
+  }
+  return out;
+}
+
+export function resolveColors(paletteId: string, overrides: Partial<ColorTokens> = {}, look: ColorLook = {}): ColorTokens {
+  const base = findPalette(paletteId).colors;
+  const paper = look.paper === "white" ? WHITE_PAPER : base.background;
+  const options = arrangementsOf(base, paper);
+  const arranged = options[Math.abs(Math.round(look.arrangement ?? 0)) % options.length];
+  return { ...arranged, background: paper, ...overrides };
 }
