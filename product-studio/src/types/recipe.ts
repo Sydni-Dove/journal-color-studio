@@ -180,6 +180,19 @@ export type PageInstance = {
   flowCount?: number;
 };
 
+export type CoverPanel = {
+  shape?: "rectangle" | "rounded" | "oval" | "circle";
+  /** Palette role; default the paper color. */
+  fill?: import("./tokens").ColorToken;
+  /** 0–1; default 0.86. */
+  opacity?: number;
+  /** Outline color (palette role), or none (default). */
+  outline?: import("./tokens").ColorToken | "none";
+  outlinePt?: number;
+  /** A thin inner line just inside the edge (the palette's line-art color). */
+  trim?: boolean;
+};
+
 /** Additive, per-step settings; absent on legacy projects. Tabs are interior printed markers. */
 export type CoverDividerSettings = {
   /** "surface": a Journal Color Studio marble / watercolor from the design library (`surfaceId`), this page only. */
@@ -192,8 +205,10 @@ export type CoverDividerSettings = {
   surfaceId?: string;
   /** The art in its own Journal Color Studio colors (default) or in this product's palette. */
   surfaceColors?: "own" | "palette";
-  /** A soft paper panel behind the wording, so it reads on busy art (design-library covers; default on). */
+  /** A panel behind the wording, so it reads on busy art (design-library covers). */
   textPanel?: boolean;
+  /** The panel's look (Journal Color Studio's title plate): shape, fill, opacity, outline, inner trim line. */
+  panel?: CoverPanel;
   /** False = artwork/color only; no title, subtitle, quote or rule is printed. */
   showText?: boolean;
   /** Title only: the subtitle is not printed (it is kept, for switching back). */

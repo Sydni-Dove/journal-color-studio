@@ -71,6 +71,12 @@ alignment and position stay available. With no wording the page keeps its name
 color is a palette role (each surface has a legible default), and a soft
 paper panel behind the wording is optional for busy art.
 
+**Panel behind the wording** (Journal Color Studio's title plate): shape
+(rectangle, rounded, oval, circle), panel color (palette role), opacity,
+outline color and thickness, and a thin inner gold line. Its size comes from
+the printed words, with padding that grows with the title size (at least ¼"),
+so its edge never touches a letter; it stays inside the trim.
+
 The full-page solid fill is artwork, not content: it may cross the bleed and
 the binding edge without a page problem.
 

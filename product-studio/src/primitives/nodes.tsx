@@ -147,7 +147,7 @@ export const StructureLayer = memo(function StructureLayer({ nodes }: { nodes: L
       {nodes.map((n) => {
         switch (n.type) {
           case "circle":
-            return <ellipse key={n.id} cx={n.rect.x + n.rect.w / 2} cy={n.rect.y + n.rect.h / 2} rx={n.rect.w / 2} ry={n.rect.h / 2} style={{ fill: n.leopard ? `url(#${patternId}${leopards.indexOf(n.id) % 2 ? "-t" : ""})` : n.fill ? colorVar(n.fill) : "none", stroke: n.outline ? colorVar(n.stroke ?? "text") : "none" }} strokeWidth={n.outline ? ptToIn(n.strokePt ?? 0.58) : 0} data-node={n.id} />;
+            return <ellipse key={n.id} cx={n.rect.x + n.rect.w / 2} cy={n.rect.y + n.rect.h / 2} rx={n.rect.w / 2} ry={n.rect.h / 2} style={{ fill: n.leopard ? `url(#${patternId}${leopards.indexOf(n.id) % 2 ? "-t" : ""})` : n.fill ? colorVar(n.fill) : "none", ...(n.fillOpacity !== undefined ? { fillOpacity: n.fillOpacity } : {}), stroke: n.outline ? colorVar(n.stroke ?? "text") : "none" }} strokeWidth={n.outline ? ptToIn(n.strokePt ?? 0.58) : 0} data-node={n.id} />;
           case "box":
             return <Box key={n.id} node={n} />;
           case "checkbox":

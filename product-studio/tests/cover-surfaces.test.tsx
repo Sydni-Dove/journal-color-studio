@@ -135,6 +135,54 @@ describe("cover surface on the page", () => {
   });
 });
 
+describe("panel behind the wording (Journal Color Studio title plate)", () => {
+  const solveWith = (panel: CoverDividerSettings["panel"], size = "6x9") => {
+    const doc = resolveDocument(project({ preset: "surface", surfaceId: "jcs-marble-ember", textPanel: true, titleOnly: false, panel }, size));
+    const i = pageOf(doc, "cover-page");
+    return { s: solvePage(doc, i), g: geometryFor(doc, doc.recipe.pages[i]) };
+  };
+  // Reported: "the square is too short at the top. it shouldn't touch the words."
+  for (const size of ["6x9", "7x9", "8.5x11", "5.5x8.5"])
+    for (const shape of ["rectangle", "rounded", "oval", "circle"] as const)
+      it(`${size} · ${shape}: clear space on every side of every printed line, inside the trim`, () => {
+        const { s, g } = solveWith({ shape }, size);
+        const panel = s.nodes.find((n) => n.id === "cover-panel")!;
+        expect(panel.type).toBe(shape === "oval" || shape === "circle" ? "circle" : "box");
+        expect(rectContains({ x: 0, y: 0, w: g.trimWidthIn, h: g.trimHeightIn }, panel.rect)).toBe(true);
+        const title = s.nodes.find((n) => n.id === "cover-title")!;
+        if (title.type !== "text") throw new Error();
+        const lineH = (title.fit!.sizePt * title.fit!.lineHeight) / 72;
+        // At least ¼" (and half the title's size) above the title's first line and below the last printed item.
+        const clear = Math.max(0.25, (title.fit!.sizePt / 72) * 0.45);
+        if (shape === "rectangle" || shape === "rounded") {
+          expect(title.rect.y - panel.rect.y, "top").toBeGreaterThanOrEqual(clear - 1e-6);
+          const last = Math.max(...s.nodes.filter((n) => /^cover-(title|subtitle|quote|line)$/.test(n.id)).map((n) => n.type === "text" ? n.rect.y + Math.min(n.rect.h, ((n.fit?.sizePt ?? 10) * (n.fit?.lineHeight ?? 1.2) * (n.fit?.lines.length ?? 1)) / 72) : n.rect.y + n.rect.h));
+          expect(panel.rect.y + panel.rect.h - last, "bottom").toBeGreaterThanOrEqual(clear - 1e-6);
+        } else {
+          // An ellipse contains the title's corners with room to spare.
+          const cy = panel.rect.y + panel.rect.h / 2, ry = panel.rect.h / 2;
+          const top = ((title.rect.y - cy) / ry) ** 2;
+          expect(top).toBeLessThan(1);
+        }
+        expect(lineH).toBeGreaterThan(0);
+      });
+
+  it("fill, opacity, outline and the thin inner line are the user's", () => {
+    const { s } = solveWith({ shape: "rectangle", fill: "primary", opacity: 0.5, outline: "decorativeAccent", outlinePt: 2, trim: true });
+    const panel = s.nodes.find((n) => n.id === "cover-panel")!;
+    if (panel.type !== "box") throw new Error();
+    expect([panel.fill, panel.fillOpacity, panel.stroke, panel.strokePt]).toEqual(["primary", 0.5, "decorativeAccent", 2]);
+    const trim = s.nodes.find((n) => n.id === "cover-panel-trim")!;
+    expect(trim.type === "box" && trim.stroke).toBe("lineArt");
+    expect(rectContains(panel.rect, trim.rect)).toBe(true);
+    // Words on a dark panel print in the paper color.
+    const title = s.nodes.find((n) => n.id === "cover-title")!;
+    expect(title.type === "text" && title.color).toBe("background");
+    const oval = solveWith({ shape: "oval", opacity: 0.4, outline: "lineArt" }).s.nodes.find((n) => n.id === "cover-panel")!;
+    expect(oval.type === "circle" && [oval.fillOpacity, oval.outline, oval.stroke]).toEqual([0.4, true, "lineArt"]);
+  });
+});
+
 describe("export checks", () => {
   // Reported on the solid cover: the edge-to-edge fill was checked as content ("too close to the cut edge").
   for (const cover of [{ preset: "solid" }, ...COVER_SURFACES.map((c) => ({ preset: "surface", surfaceId: c.assetId })), { preset: "surface", surfaceId: "jcs-marble-ember", textPanel: true }] as CoverDividerSettings[])

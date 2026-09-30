@@ -1,6 +1,6 @@
 import type { CircleNode, LayoutNode, SolvedPage, TextFit } from "../../types/layout";
 import type { PageGeometry, Rect } from "../../types/geometry";
-import type { CoverDividerSettings } from "../../types/recipe";
+import type { CoverDividerSettings, CoverPanel } from "../../types/recipe";
 import type { ColorToken } from "../../types/tokens";
 import { getLayoutMeasurer, styleForRole } from "../../engines/typography/textMeasure";
 import { text, box, rule } from "../shared/nodes";
@@ -209,10 +209,12 @@ const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v
 function surfaceOf(opt: CoverDividerSettings): SolvedPage["surface"] {
   return opt.preset === "surface" && findCoverSurface(opt.surfaceId) ? { assetId: opt.surfaceId!, ownColors: opt.surfaceColors !== "palette" } : undefined;
 }
-function wordingColor(opt: CoverDividerSettings): ColorToken {
+export function wordingColor(opt: CoverDividerSettings): ColorToken {
   if (opt.solidTextColor) return opt.solidTextColor;
   if (opt.preset !== "surface") return "background";
-  return opt.textPanel ? "text" : findCoverSurface(opt.surfaceId)?.wording ?? "text";
+  // On a panel: ink on a light panel, paper-colored on a dark one.
+  if (opt.textPanel) return (["primary", "text", "decorBase", "accent", "decorativeAccent"] as ColorToken[]).includes(opt.panel?.fill ?? "background") ? "background" : "text";
+  return findCoverSurface(opt.surfaceId)?.wording ?? "text";
 }
 /** The full-media field (solid) or nothing (the surface is drawn by the decoration renderer). */
 function field(g: PageGeometry, opt: CoverDividerSettings, surface: SolvedPage["surface"]): LayoutNode[] {
@@ -222,30 +224,65 @@ function field(g: PageGeometry, opt: CoverDividerSettings, surface: SolvedPage["
   return [{ ...box("cover-solid-bg", media, { fill: opt.solidColor ?? "primary" }), functional: false }];
 }
 /**
- * A soft paper panel behind the wording on a library surface (optional): as wide
- * as the longest printed line plus padding, never outside the trim.
+ * The panel behind the wording on a library surface (Journal Color Studio's
+ * title plate): its shape, fill, opacity, outline and inner trim line are the
+ * user's; its size comes from the printed words — the longest line plus
+ * padding that grows with the title size, so the edge never touches a letter.
+ * An oval or circle is drawn around that box. Kept inside the trim.
  */
-function wordingPanel(words: LayoutNode[], g: PageGeometry, ctx: LayoutContext, left: boolean): LayoutNode | null {
+export const PANEL_DEFAULTS = { shape: "rounded", fill: "background", opacity: 0.86, outline: "none", outlinePt: 1, trim: false } as const;
+function wordingPanel(words: LayoutNode[], g: PageGeometry, ctx: LayoutContext, left: boolean, look: CoverPanel = {}): LayoutNode[] {
   const texts = words.filter((n): n is Extract<LayoutNode, { type: "text" }> => n.type === "text");
-  if (!texts.length) return null;
+  if (!texts.length) return [];
+  const o = { ...PANEL_DEFAULTS, ...look };
   const measure = getLayoutMeasurer().measure;
-  const padX = 0.28, padY = 0.2;
-  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, em = 0;
   for (const n of [...texts, ...words.filter((w) => w.type === "rule")]) {
-    y0 = Math.min(y0, n.rect.y);
-    y1 = Math.max(y1, n.rect.y + n.rect.h);
-    if (n.type !== "text") continue;
+    if (n.type !== "text") {
+      y0 = Math.min(y0, n.rect.y);
+      y1 = Math.max(y1, n.rect.y + n.rect.h);
+      continue;
+    }
     const style = { ...styleForRole(ctx.typography, n.role), ...(n.fit ? { sizePt: n.fit.sizePt } : {}) };
-    const w = Math.min(n.rect.w, Math.max(...(n.fit?.lines ?? [n.text]).map((l) => measure(l, style))));
+    const lines = n.fit?.lines ?? [n.text];
+    const lineH = (style.sizePt * (n.fit?.lineHeight ?? ctx.typography.roles[n.role].lineHeight)) / 72;
+    const w = Math.min(n.rect.w, Math.max(...lines.map((l) => measure(l, style))));
     const a = left ? n.rect.x : n.rect.x + (n.rect.w - w) / 2;
     x0 = Math.min(x0, a);
     x1 = Math.max(x1, a + w);
+    y0 = Math.min(y0, n.rect.y);
+    y1 = Math.max(y1, n.rect.y + Math.min(n.rect.h, lineH * lines.length));
+    em = Math.max(em, style.sizePt / 72);
   }
-  const rect = { x: Math.max(0, x0 - padX), y: Math.max(0, y0 - padY), w: 0, h: 0 };
-  rect.w = Math.min(g.trimWidthIn, x1 + padX) - rect.x;
-  rect.h = Math.min(g.trimHeightIn, y1 + padY) - rect.y;
-  const panel = box("cover-panel", rect, { fill: "background", radiusIn: 0.08 });
-  return { ...panel, functional: false, ...(panel.type === "box" ? { fillOpacity: 0.86 } : {}) } as LayoutNode;
+  // Room around the words: at least ¼", and more for large display type (its capitals and accents).
+  const padX = Math.max(0.3, em * 0.55), padY = Math.max(0.28, em * 0.5);
+  let rect = { x: x0 - padX, y: y0 - padY, w: x1 - x0 + 2 * padX, h: y1 - y0 + 2 * padY };
+  if (o.shape === "oval" || o.shape === "circle") {
+    // Around the box: an ellipse of the same proportions (√2 larger), or the circle through its corners.
+    const cx = rect.x + rect.w / 2, cy = rect.y + rect.h / 2;
+    const [w, h] = o.shape === "circle" ? [Math.hypot(rect.w, rect.h), Math.hypot(rect.w, rect.h)] : [rect.w * Math.SQRT2, rect.h * Math.SQRT2];
+    rect = { x: cx - w / 2, y: cy - h / 2, w, h };
+  }
+  // Inside the trim (a circle stays round: it shrinks evenly).
+  const W = g.trimWidthIn, H = g.trimHeightIn;
+  if (o.shape === "circle" && (rect.w > W || rect.h > H)) {
+    const d = Math.min(W, H), cx = rect.x + rect.w / 2, cy = rect.y + rect.h / 2;
+    rect = { x: cx - d / 2, y: cy - d / 2, w: d, h: d };
+  }
+  const x = Math.max(0, rect.x), y = Math.max(0, rect.y);
+  rect = { x, y, w: Math.min(W, rect.x + rect.w) - x, h: Math.min(H, rect.y + rect.h) - y };
+  const outline = o.outline !== "none" ? o.outline : null;
+  const radius = o.shape === "rounded" ? Math.min(0.18, Math.min(rect.w, rect.h) * 0.12) : 0;
+  const shape = (id: string, r: Rect, fill: ColorToken | null, opacity: number, stroke: ColorToken | null, pt: number): LayoutNode =>
+    o.shape === "oval" || o.shape === "circle"
+      ? { id, type: "circle", component: "Section", rect: r, functional: false, fill, fillOpacity: opacity, ...(stroke ? { outline: true, stroke, strokePt: pt } : {}) }
+      : { ...box(id, r, { fill, fillOpacity: opacity, stroke, strokePt: stroke ? pt : 0, radiusIn: radius }), functional: false };
+  const out = [shape("cover-panel", rect, o.fill, o.opacity, outline, o.outlinePt)];
+  if (o.trim) {
+    const inset = Math.max(0.06, o.outlinePt / 72 + 0.05);
+    out.push(shape("cover-panel-trim", { x: rect.x + inset, y: rect.y + inset, w: rect.w - 2 * inset, h: rect.h - 2 * inset }, null, 0, "lineArt", 0.6));
+  }
+  return out;
 }
 
 function solveFlat(ctx: LayoutContext, divider: boolean): SolvedPage[] {
@@ -308,8 +345,7 @@ function solveFlat(ctx: LayoutContext, divider: boolean): SolvedPage[] {
       words.push(n);
     }
   }
-  const panel = surface && opt.textPanel ? wordingPanel(words, g, ctx, left) : null;
-  if (panel) nodes.push(panel);
+  if (surface && opt.textPanel) nodes.push(...wordingPanel(words, g, ctx, left, opt.panel));
   nodes.push(...words);
 
   if (tab && opt.tab) {
@@ -336,8 +372,7 @@ function solveFlatBack(ctx: LayoutContext): SolvedPage[] {
     const n = text("back-line", r, line, "coverSubtitle", { align: "center", color: wordingColor(opt), wrap: true });
     n.fit = { ...fit, failed: !fit.ok };
     if (!fit.ok) diagnostics.push({ severity: "error", rule: "heading-fit", componentId: n.id, message: "This wording is too long. Shorten it or choose a larger page." });
-    const panel = surface && opt.textPanel ? wordingPanel([n], g, ctx, false) : null;
-    if (panel) nodes.push(panel);
+    if (surface && opt.textPanel) nodes.push(...wordingPanel([n], g, ctx, false, opt.panel));
     nodes.push(n);
   }
   return [{ nodes, diagnostics, metrics: [], regions: { mainContent: s }, ownArtwork: true, ...(surface ? { surface } : {}) }];

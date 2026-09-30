@@ -146,7 +146,7 @@ export type GroupNode = NodeBase & {
 };
 
 /** Decorative circle: filled, an outline ring (stroke color/width; default text, hairline), or a cheetah-print fill. */
-export type CircleNode = NodeBase & { type: "circle"; fill: ColorToken | null; outline?: boolean; stroke?: ColorToken; strokePt?: number; leopard?: boolean };
+export type CircleNode = NodeBase & { type: "circle"; fill: ColorToken | null; fillOpacity?: number; outline?: boolean; stroke?: ColorToken; strokePt?: number; leopard?: boolean };
 export type LayoutNode = CircleNode | BoxNode | TextNode | LinesNode | DotsNode | CheckboxNode | RuleNode | GroupNode;
 
 export type LayoutDiagnosticSeverity = "error" | "warning" | "info";

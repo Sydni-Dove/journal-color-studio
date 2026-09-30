@@ -1,4 +1,5 @@
-import type { BookStep, CoverDividerSettings } from "../../types/recipe";
+import type { BookStep, CoverDividerSettings, CoverPanel } from "../../types/recipe";
+import { PANEL_DEFAULTS, wordingColor } from "../../layouts/book/coverDivider";
 import { Field, NumberField, Segmented, Select } from "./ui";
 import { LUXE_TITLE_FONT } from "../../presets/coverLuxe";
 import type { ColorToken, ColorTokens } from "../../types/tokens";
@@ -58,6 +59,8 @@ export function CoverDividerControls({ step, set, applyPreset, titleFont, onTitl
   const back = step.module === "back-cover";
   const page = back ? "end cover" : step.module === "divider-page" ? "divider" : "cover";
   const showText = o.showText !== false;
+  const panel = { ...PANEL_DEFAULTS, ...(o.panel ?? {}) } as Required<CoverPanel>;
+  const setPanel = (p: Partial<CoverPanel>) => change({ panel: { ...(o.panel ?? {}), ...p } });
   const wording = !showText ? "none" : o.titleOnly && !back ? "title" : "full";
   const colorOptions: { value: ColorToken; label: string }[] = [
     { value: "primary", label: "Primary" },
@@ -81,8 +84,20 @@ export function CoverDividerControls({ step, set, applyPreset, titleFont, onTitl
     </>}
     {(solid || surface) && <>
       {solid && <Select label="Cover color" value={o.solidColor ?? "primary"} options={colorOptions} onChange={(solidColor) => change({ solidColor })}/>}
-      {showText && <Select label="Wording color" value={o.solidTextColor ?? (surface ? (o.textPanel ? "text" : surface.wording) : "background")} options={colorOptions} onChange={(solidTextColor) => change({ solidTextColor })}/>}
-      {surface && showText && <label style={{ display: "block", minHeight: 44 }}><input type="checkbox" checked={!!o.textPanel} onChange={(e) => change({ textPanel: e.target.checked })}/> Soft panel behind the wording (easier to read on busy art)</label>}
+      {showText && <Select label="Wording color" value={wordingColor(o)} options={colorOptions} onChange={(solidTextColor) => change({ solidTextColor })}/>}
+      {surface && showText && <label style={{ display: "block", minHeight: 44 }}><input type="checkbox" checked={!!o.textPanel} onChange={(e) => change({ textPanel: e.target.checked })}/> Panel behind the wording (easier to read on busy art)</label>}
+      {surface && showText && o.textPanel && <div className="cover-panel-controls">
+        <Segmented label="Panel shape" value={panel.shape} options={[{ value: "rectangle", label: "Rectangle" }, { value: "rounded", label: "Rounded" }, { value: "oval", label: "Oval" }, { value: "circle", label: "Circle" }]} onChange={(shape) => setPanel({ shape })} />
+        <div className="row">
+          <Select label="Panel color" value={panel.fill} options={colorOptions} onChange={(fill) => setPanel({ fill })}/>
+          <NumberField label="Panel opacity (0.1 see-through – 1 solid)" min={0.1} max={1} step={0.05} value={panel.opacity} onChange={(opacity) => setPanel({ opacity: Math.max(0.1, Math.min(1, opacity)) })}/>
+        </div>
+        <div className="row">
+          <Select label="Outline" value={panel.outline} options={[{ value: "none", label: "No outline" }, ...colorOptions]} onChange={(outline) => setPanel({ outline })}/>
+          {panel.outline !== "none" && <NumberField label="Outline thickness (pt)" min={0.5} max={6} step={0.5} value={panel.outlinePt} onChange={(outlinePt) => setPanel({ outlinePt: Math.max(0.5, Math.min(6, outlinePt)) })}/>}
+        </div>
+        <label style={{ display: "block", minHeight: 44 }}><input type="checkbox" checked={panel.trim} onChange={(e) => setPanel({ trim: e.target.checked })}/> Thin inner line (gold trim)</label>
+      </div>}
       <p className="hint">Wording colors come from the current palette, so changing the palette can recolor them without rebuilding the cover.</p>
     </>}
     <Segmented label="Wording" value={wording} options={back ? [{ value: "full", label: "Line of text" }, { value: "none", label: "No wording" }] : [{ value: "full", label: "Title + subtitle" }, { value: "title", label: "Title only" }, { value: "none", label: "No wording" }]} onChange={(w) => change(w === "none" ? { showText: false } : { showText: true, titleOnly: w === "title" })} />
