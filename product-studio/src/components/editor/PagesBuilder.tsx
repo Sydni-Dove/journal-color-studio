@@ -19,7 +19,8 @@ import {
   BUILDER_CATEGORIES, builderRows, categoryOf, primaryCategories, stepPeriod, WEEKLY_JOURNAL, type BuilderCategory, type BuilderRow, type WeeklyJournalKind,
 } from "../../engines/recipe/pageBuilder";
 import { getLayout } from "../../layouts/registry";
-import { addPageFromDesign, duplicatePage, isDesignGroup, MAX_DESIGN_PAGES, moveAmong, removePageDesign, setDesignPageCount, stepFromDesign } from "../../engines/recipe/pageDesigns";
+import { addPageFromDesign, duplicatePage, isDesignGroup, MAX_DESIGN_PAGES, MAX_REPEATS, moveAmong, removePageDesign, repeatableNodes, repeatIndex, repeatPages, setDesignPageCount, stepFromDesign, stepsOf, type RepeatPlace } from "../../engines/recipe/pageDesigns";
+import { Segmented } from "./ui";
 import { PageThumb } from "../preview/PageThumb";
 import { usePhone } from "../../utils/usePhone";
 import { neutralLuxeDividers } from "../../presets/bookRecipes";
@@ -85,6 +86,7 @@ export function PagesBuilder({ project, update, doc, onEdit }: Props) {
       {shown.map((cat) => (
         <Category key={cat} cat={cat} rows={rows} allRows={rows} edit={edit} onEdit={onEdit} doc={doc} structure={structure} project={project} />
       ))}
+      <RepeatPages structure={structure} doc={doc} edit={edit} />
       <PageDesigns project={project} edit={edit} update={update} />
       {more.length > 0 && (
         <button type="button" className="btn btn--ghost builder__more" aria-expanded={showMore} onClick={() => setShowMore(!showMore)}>
@@ -313,6 +315,86 @@ function DesignThumb({ project, design, heightPx }: { project: ProductProject; d
   }, [design, project.dimensions, project.colors, project.typography, project.decorativeTheme, project.backgroundTheme, project.spacing, project.functionalPattern, project.production, project.layoutOptions]);
   const i = doc ? doc.recipe.pages.findIndex((p) => p.layoutId === "guided-page") : -1;
   return doc && i >= 0 ? <PageThumb doc={doc} index={i} heightPx={heightPx} /> : null;
+}
+
+/**
+ * REPEAT PAGES — pick one or more rows of the book (one kind of page, or
+ * several kinds together), how many more times, and where the copies start.
+ */
+function RepeatPages({ structure, doc, edit }: { structure: BookNode[]; doc: ResolvedDocument; edit: (fn: (n: BookNode[]) => BookNode[]) => void }) {
+  const rows = repeatableNodes(structure);
+  const [picked, setPicked] = useState<string[]>([]);
+  const [times, setTimes] = useState("1");
+  const [place, setPlace] = useState<"after" | "page" | "end">("after");
+  const [page, setPage] = useState("");
+  const [done, setDone] = useState<string | null>(null);
+  const pagesOf = (n: BookNode) => {
+    const ids = new Set(stepsOf(n).map((s) => s.id));
+    return doc.recipe.pages.filter((p) => ids.has(p.recipeItemId) && !p.filler).map((p) => p.pageNumber);
+  };
+  const firstPage = (n: BookNode) => (pagesOf(n).length ? Math.min(...pagesOf(n)) : null);
+  const nameOf = (n: BookNode) => (n.kind === "step" ? rowName(n) : n.label ?? "Section");
+  const range = (n: BookNode) => {
+    const ps = pagesOf(n);
+    if (!ps.length) return "no pages yet";
+    const a = Math.min(...ps), b = Math.max(...ps);
+    return a === b ? `page ${a}` : `pages ${a}–${b} (${ps.length})`;
+  };
+  if (!rows.length) return null;
+  const count = Math.max(1, Math.min(MAX_REPEATS, Math.round(Number(times)) || 1));
+  const chosen = rows.filter((n) => picked.includes(n.id));
+  const perSet = chosen.reduce((sum, n) => sum + pagesOf(n).length, 0);
+  const where: RepeatPlace = place === "page" ? { at: "page", page: Math.max(1, Math.round(Number(page)) || 1) } : { at: place };
+  const at = repeatIndex(structure, picked, where, firstPage);
+  const startPage = at < structure.length ? firstPage(structure[at]) ?? doc.recipe.pageCount + 1 : doc.recipe.pageCount + 1;
+  const toggle = (id: string, on: boolean) => setPicked((p) => (on ? [...p, id] : p.filter((x) => x !== id)));
+  return (
+    <div className="builder-cat repeat-pages" data-category="repeat">
+      <div className="builder-cat__head"><strong>Repeat pages</strong></div>
+      <p className="hint">Copy a set of pages as many more times as you need — one kind of page, or several kinds together in their order. Every copy is its own page to edit.</p>
+      <div className="repeat-pages__rows" role="group" aria-label="Pages to repeat">
+        {rows.map((n) => (
+          <label key={n.id} className="repeat-pages__row">
+            <input type="checkbox" checked={picked.includes(n.id)} onChange={(e) => toggle(n.id, e.target.checked)} />
+            <span className="builder-row__name">{nameOf(n)}</span>
+            <span className="builder-row__detail">{range(n)}</span>
+          </label>
+        ))}
+      </div>
+      <div className="row">
+        <label className="field">
+          <span className="field-label">How many more times</span>
+          <input type="number" inputMode="numeric" min={1} max={MAX_REPEATS} value={times} onChange={(e) => setTimes(e.target.value)} onBlur={() => setTimes(String(count))} />
+        </label>
+      </div>
+      <Segmented label="Where the copies start" value={place} options={[{ value: "after", label: "Right after them" }, { value: "page", label: "At a page" }, { value: "end", label: "At the end" }]} onChange={setPlace} />
+      {place === "page" && (
+        <label className="field">
+          <span className="field-label">Start at page</span>
+          <input type="number" inputMode="numeric" min={1} value={page} placeholder={String(doc.recipe.pageCount + 1)} onChange={(e) => setPage(e.target.value)} />
+        </label>
+      )}
+      {chosen.length > 0 && (
+        <p className="hint" data-testid="repeat-summary">
+          Adds {perSet * count} page{perSet * count === 1 ? "" : "s"} ({chosen.map(nameOf).join(" + ")}{count > 1 ? `, ${count} times` : ""}), starting at page {startPage}.
+          {place === "page" && Number(page) > 0 && startPage !== Number(page) ? " (That page is in the middle of other pages, so the copies start after them.)" : ""}
+        </p>
+      )}
+      <button
+        type="button"
+        className="btn btn--primary"
+        disabled={!chosen.length}
+        onClick={() => {
+          edit((n) => repeatPages(n, picked, count, repeatIndex(n, picked, where, firstPage)));
+          setDone(`Added ${perSet * count} pages, starting at page ${startPage}.`);
+          setPicked([]);
+        }}
+      >
+        Repeat
+      </button>
+      {done && <p className="hint" role="status">{done}</p>}
+    </div>
+  );
 }
 
 function PageDesigns({ project, edit, update }: { project: ProductProject; edit: (fn: (n: BookNode[]) => BookNode[]) => void; update: Update }) {

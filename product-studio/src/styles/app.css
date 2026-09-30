@@ -1889,3 +1889,9 @@ button.family-card:focus-visible {
 .history-buttons .btn {
   padding: 0 10px;
 }
+
+/* Repeat pages (Pages area) */
+.repeat-pages__rows { display: grid; gap: 4px; margin: 8px 0; }
+.repeat-pages__row { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 8px; border: 1px solid var(--ui-border, #e5e0da); border-radius: 10px; min-width: 0; }
+.repeat-pages__row .builder-row__name { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.repeat-pages__row .builder-row__detail { flex: 0 0 auto; }

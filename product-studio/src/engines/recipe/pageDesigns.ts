@@ -152,3 +152,61 @@ export function duplicatePage(nodes: BookNode[], stepId: string): { nodes: BookN
   };
   return { nodes: insert(nodes), id: copy.id };
 }
+
+/**
+ * REPEAT PAGES — copy a set of pages (whole rows of the book: one kind of page,
+ * several kinds together, or a page-design group) as many more times as asked,
+ * in their order, starting at a chosen place. Every copy is independent (new
+ * ids all the way down); a Custom Page's copy takes the next free name. A step
+ * that prints several pages (e.g. 10 copies) repeats all of them.
+ */
+export const MAX_REPEATS = 50;
+const isCover = (n: BookNode) => n.kind === "step" && (n.module === "cover-page" || n.module === "back-cover");
+/** The rows that can be repeated (everything but the front and end covers). */
+export const repeatableNodes = (nodes: BookNode[]) => nodes.filter((n) => !isCover(n));
+/** Every step inside a row (itself, or a group's pages). */
+export function stepsOf(n: BookNode): BookStep[] {
+  return n.kind === "step" ? [n] : n.children.flatMap(stepsOf);
+}
+
+export type RepeatPlace = { at: "after" } | { at: "end" } | { at: "page"; page: number };
+
+/**
+ * Where the copies go, as a top-level index. "page": before the first row that
+ * starts at or after that page (a row that is already under way finishes first);
+ * past the last page, at the end. "end": before a closing end cover.
+ */
+export function repeatIndex(nodes: BookNode[], ids: string[], place: RepeatPlace, firstPage: (n: BookNode) => number | null): number {
+  const end = nodes.length && isCover(nodes[nodes.length - 1]) && (nodes[nodes.length - 1] as BookStep).module === "back-cover" ? nodes.length - 1 : nodes.length;
+  if (place.at === "after") {
+    const last = Math.max(...nodes.map((n, i) => (ids.includes(n.id) ? i : -1)));
+    return last < 0 ? end : last + 1;
+  }
+  if (place.at === "end") return end;
+  const i = nodes.findIndex((n, k) => k > 0 && (firstPage(n) ?? -1) >= place.page);
+  return i < 0 ? end : Math.min(i, end);
+}
+
+export function repeatPages(nodes: BookNode[], ids: string[], times: number, index: number): BookNode[] {
+  const chosen = nodes.filter((n) => ids.includes(n.id) && !isCover(n));
+  const n = Math.max(0, Math.min(MAX_REPEATS, Math.floor(times)));
+  if (!chosen.length || !n) return nodes;
+  const taken = new Set(nodes.flatMap(stepsOf).map((s) => s.title ?? ""));
+  const fresh = (node: BookNode, inDesign: boolean): BookNode => {
+    if (node.kind === "group") {
+      const g: BookGroup = JSON.parse(JSON.stringify(node));
+      return { ...g, id: nodeId("g"), children: node.children.map((c) => fresh(c, inDesign || !!node.designId)) };
+    }
+    const s: BookStep = JSON.parse(JSON.stringify(node));
+    s.id = nodeId("s");
+    if (s.module === "custom" && !inDesign) {
+      s.title = nextPageName(node.title || "Custom Page", taken);
+      taken.add(s.title);
+    }
+    return s;
+  };
+  const copies: BookNode[] = [];
+  for (let k = 0; k < n; k++) for (const c of chosen) copies.push(fresh(c, false));
+  const at = Math.max(0, Math.min(nodes.length, index));
+  return [...nodes.slice(0, at), ...copies, ...nodes.slice(at)];
+}
