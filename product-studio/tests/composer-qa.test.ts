@@ -157,3 +157,68 @@ describe("framed pages pass the studio's own spacing checks", () => {
     }
   });
 });
+
+describe("cleanups: heading text style, table space, column labels", () => {
+  it("Heading / text prints in the studio's own roles: page title, section heading or body text (no point sizes of its own)", () => {
+    const { doc, nodes } = solve({ blocks: [
+      { id: "t", kind: "heading", label: "Master Dashboard", textStyle: "title" },
+      { id: "h", kind: "heading", label: "Next 3 Moves" },
+      { id: "b", kind: "heading", label: "Use this page every Monday.", prompt: "Keep it short.", textStyle: "body" },
+    ] }, "7x9");
+    const t = byId(nodes, "-t-title")!, h = byId(nodes, "-h-title")!, b = byId(nodes, "-b-prompt")!;
+    expect(t.type === "text" && t.role).toBe("pageTitle");
+    expect(h.type === "text" && h.role).toBe("sectionHeading");
+    expect(b.type === "text" && b.role).toBe("body");
+    expect(b.type === "text" && b.text).toMatch(/Use this page every Monday\. Keep it short\./);
+    expect(byId(nodes, "-b-title")).toBeUndefined();
+    // Sizes come from the typography roles, so a Style change follows.
+    if (t.type === "text" && !t.fit) expect(doc.typography.roles.pageTitle.sizePt).toBeGreaterThan(doc.typography.roles.sectionHeading.sizePt);
+  });
+
+  it("Master Dashboard: a real page title, and the table uses the page's height at every size", () => {
+    for (const size of SIZES) {
+      const { pages } = solve(MASTER_DASHBOARD(), size);
+      expect(pages).toHaveLength(1);
+      const { solved, g } = pages[0];
+      const title = byId(solved.nodes, "-title-title")!;
+      expect(title.type === "text" && title.role).toBe("pageTitle");
+      const grid = solved.nodes.find((n) => n.id.endsWith("-projects-surface") && n.type === "group")!;
+      const body = solved.regions!.mainContent!;
+      // The table runs to the bottom of the page body (within one row).
+      expect(body.y + body.h - (grid.rect.y + grid.rect.h), size).toBeLessThan(0.4);
+      const rows = solved.nodes.filter((n) => /-projects-surface-r\d+$/.test(n.id)).map((n) => n.rect.y);
+      expect(rows.length, size).toBeGreaterThanOrEqual(12);
+      const heights = rows.slice(1).map((y, i) => y - rows[i]);
+      expect(Math.max(...heights) - Math.min(...heights), size).toBeLessThan(1e-6); // even rows
+      expect(heights[0], size).toBeGreaterThanOrEqual(0.32 - 1e-6);
+      expect(heights[0], size).toBeLessThanOrEqual(0.4 * 1.6 + 1e-6);
+      void g;
+    }
+  });
+
+  it("a filling table stops at the next section, never overlapping it", () => {
+    const set: PromptSet = { blocks: [...MASTER_DASHBOARD().blocks, { id: "after", label: "Notes", space: "fixed", lineCount: 4, responseStyle: "ruled" }] };
+    for (const size of SIZES) expectClean(set, size);
+    const { nodes } = solve(set, "7x9");
+    const grid = nodes.find((n) => n.id.endsWith("-projects-surface") && n.type === "group")!;
+    expect(grid.rect.y + grid.rect.h).toBeLessThanOrEqual(byId(nodes, "-after-title")!.rect.y);
+  });
+
+  it("table space: compact rows are shorter than standard, spacious taller; the exact row count is kept", () => {
+    const rowH = (rowSpace?: "compact" | "spacious") => {
+      const { nodes } = solve({ blocks: [{ id: "tb", label: "", space: "fixed", lineCount: 5, responseStyle: "table", table: { columns: ["A", "B"], rows: 5, rowSpace } }] }, "7x9");
+      const r = nodes.filter((n) => /-tb-surface-r\d+$/.test(n.id)).map((n) => n.rect.y);
+      expect(r).toHaveLength(5);
+      return r[1] - r[0];
+    };
+    expect(rowH("compact")).toBeLessThan(rowH());
+    expect(rowH("spacious")).toBeGreaterThan(rowH());
+  });
+
+  it("column labels are separate values (a label may contain a slash or be left empty while typing)", () => {
+    const { nodes } = solve({ blocks: [{ id: "tb", label: "", space: "fixed", lineCount: 3, responseStyle: "table", table: { columns: ["Project / Area", "", "Next Step / Notes"], rows: 3 } }] }, "7x9");
+    const heads = nodes.filter((n) => /-tb-surface-h-c\d+$/.test(n.id)).map((n) => (n.type === "text" ? n.text : ""));
+    expect(heads).toEqual(["Project / Area", "", "Next Step / Notes"]);
+    expectClean({ blocks: [{ id: "tb", label: "", space: "fixed", lineCount: 3, responseStyle: "table", table: { columns: ["Project / Area", "", "Next Step / Notes"], rows: 3 } }] }, "7x9");
+  });
+});

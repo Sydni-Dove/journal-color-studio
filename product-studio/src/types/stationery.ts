@@ -51,6 +51,10 @@ export type TableSpec = {
   showHeader?: boolean;
   /** Visual rules only; geometry stays the same. */
   borders?: "grid" | "horizontal" | "minimal" | "none";
+  /** Row height as a share of the list-row token (default 1). */
+  rowScale?: number;
+  /** Filling the space: at least this many rows, stretched evenly (TABLE_MAX_STRETCH). */
+  minRows?: number;
 };
 
 export type StationeryZone = {
@@ -58,6 +62,10 @@ export type StationeryZone = {
   key: string;
   /** Default heading. */
   label: string;
+  /** Text role of the heading (default sectionHeading; a Page Composer heading may be the page title). */
+  labelRole?: "pageTitle" | "sectionHeading";
+  /** Text role of the prompt line (default prompt; body text for a Heading / text piece set to body). */
+  promptRole?: "prompt" | "body";
   /** Optional guidance line under the heading (prompt-response surfaces). */
   prompt?: string;
   surface: SurfaceKind;

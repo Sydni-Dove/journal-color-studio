@@ -20,7 +20,7 @@ import { DEFAULT_WORDING } from "../../presets/wording";
 import type { Rect } from "../../types/geometry";
 import type { LayoutDiagnostic, LayoutMetric, LayoutNode, SolvedPage, TextNode } from "../../types/layout";
 import { minZoneHeight } from "../../engines/stationery/geometry";
-import { canSitBeside, frameOf as sectionFrameOf, kindOf, requestedLines, spaceOf, SPACER_HEIGHTS, SPACING_FACTOR, type GuidedHeader, type PromptBlock, type PromptSet, type ResponseStyle, type SectionFrame } from "../../types/prompts";
+import { canSitBeside, frameOf as sectionFrameOf, kindOf, requestedLines, TABLE_ROW_SCALE, spaceOf, SPACER_HEIGHTS, SPACING_FACTOR, type GuidedHeader, type PromptBlock, type PromptSet, type ResponseStyle, type SectionFrame } from "../../types/prompts";
 import type { StationeryZone, SurfaceKind } from "../../types/stationery";
 import { fillInRows, isFixedSurface, SURFACES, tableHeaderIn } from "../stationery/surfaces";
 import { fitHeading, headerTitle, pageFrame } from "./components";
@@ -88,9 +88,15 @@ export function blocksToZones(set: PromptSet, surfaceOf: (b: PromptBlock) => { s
 function blockZone(set: PromptSet, b: PromptBlock, surfaceOf: (b: PromptBlock) => { surface: SurfaceKind; treatment?: StationeryZone["treatment"] }): StationeryZone {
   // Page Composer sections without writing space.
   switch (kindOf(b)) {
-    case "heading":
-      // A heading and its optional text line, with no writing space below.
-      return { key: b.id, label: b.label, ...(b.prompt?.trim() ? { prompt: b.prompt.trim() } : {}), surface: "blank", weight: 0, optional: true, lines: 0, minLines: 0 };
+    case "heading": {
+      // A heading and its optional text line, with no writing space below; in the page title, section heading or body text role.
+      const base = { key: b.id, surface: "blank" as const, weight: 0, optional: true, lines: 0, minLines: 0 };
+      if (b.textStyle === "body") {
+        const body = [b.label.trim(), b.prompt?.trim()].filter(Boolean).join("\n");
+        return { ...base, label: "", ...(body ? { prompt: body } : {}), promptRole: "body" };
+      }
+      return { ...base, label: b.label, ...(b.textStyle === "title" ? { labelRole: "pageTitle" as const } : {}), ...(b.prompt?.trim() ? { prompt: b.prompt.trim() } : {}) };
+    }
     case "info": {
       // Blanks keep their style by position; empty labels are skipped.
       const kept = (b.fields ?? []).map((f, i) => ({ f: f.trim(), style: b.fieldStyles?.[i] ?? "line" })).filter((x) => x.f);
@@ -119,6 +125,9 @@ function blockZone(set: PromptSet, b: PromptBlock, surfaceOf: (b: PromptBlock) =
             basis: "Custom page table — equal columns",
             showHeader: b.table?.showHeader !== false,
             borders: b.table?.borders ?? "grid",
+            ...(b.table?.rowSpace && b.table.rowSpace !== "standard" ? { rowScale: TABLE_ROW_SCALE[b.table.rowSpace] } : {}),
+            // Filling the space: the chosen rows are the least it draws.
+            ...(lines === undefined ? { minRows: Math.max(1, b.table?.rows ?? b.lineCount ?? 6) } : {}),
           },
         }
       : {}),
@@ -178,9 +187,10 @@ export const halfWidthIn = (width: number, ctx: Pick<LayoutContext, "spacing">) 
 function measureOne(zone: StationeryZone, width: number, ctx: LayoutContext): Measured {
   const s = ctx.spacing;
   const inner = Math.max(0, width - 2 * framePadIn(zone.frame, ctx));
-  const headingLine = lineBoxIn(ctx.typography, "sectionHeading"), promptLine = lineBoxIn(ctx.typography, "prompt");
-  const heading = zone.label ? fitHeading(zone.label, "sectionHeading", { w: inner, h: 2 * headingLine }, ctx) : null;
-  const promptLines = zone.prompt ? wrapText(zone.prompt, inner, ctx) : [];
+  const role = zone.labelRole ?? "sectionHeading", pRole = zone.promptRole ?? "prompt";
+  const headingLine = lineBoxIn(ctx.typography, role), promptLine = lineBoxIn(ctx.typography, pRole);
+  const heading = zone.label ? fitHeading(zone.label, role, { w: inner, h: 2 * headingLine }, ctx) : null;
+  const promptLines = zone.prompt ? wrapText(zone.prompt, inner, ctx, pRole) : [];
   const headingH = heading ? heading.heightIn : 0;
   const promptH = promptLines.length * promptLine;
   const overhead = headingH + (promptH ? s.block + promptH : 0) + (headingH || promptH ? s.headingToContentGap : 0);
@@ -208,9 +218,11 @@ function requestOne(m: Measured, ctx: LayoutContext, width: number): ZoneRequest
     promptTextIn: m.promptText,
     lines: m.zone.lines,
     minLines: m.zone.minLines,
-    ...(m.zone.surface === "checkbox" || m.zone.surface === "table" ? { rowIn: ctx.spacing.listRow } : {}),
-    // A table draws its header row above the requested rows.
-    ...(m.zone.surface === "table" ? { headIn: tableHeaderIn(m.zone, inner, ctx) } : {}),
+    ...(m.zone.surface === "checkbox" ? { rowIn: ctx.spacing.listRow } : {}),
+    // A table draws its header row above the requested rows; filling the space, it never gets fewer than its chosen rows.
+    ...(m.zone.surface === "table"
+      ? { rowIn: ctx.spacing.listRow * (m.zone.table?.rowScale ?? 1), headIn: tableHeaderIn(m.zone, inner, ctx), ...(m.zone.table?.minRows ? { minLines: m.zone.table.minRows } : {}) }
+      : {}),
   };
 }
 
@@ -370,14 +382,16 @@ export function solveZonePages(spec: ZonePageSpec, ctx: LayoutContext, pageIndex
       // Fixed rows (info rows, dividers, spacers) carry no heading of their own.
       const fixed = isFixedSurface(z.surface);
       if (!fixed && m.heading && m.headingH) {
-        const t = text(`${id}-title`, { x: inner.x, y: inner.y, w: inner.w, h: m.headingH }, z.label, "sectionHeading", { component: "SectionHeader" });
-        if (m.heading.lines.length > 1 || m.heading.sizePt !== ctx.typography.roles.sectionHeading.sizePt || !m.heading.ok) t.fit = { sizePt: m.heading.sizePt, lineHeight: m.heading.lineHeight, lines: m.heading.lines, ...(m.heading.ok ? {} : { failed: true }) };
+        const role = z.labelRole ?? "sectionHeading";
+        const t = text(`${id}-title`, { x: inner.x, y: inner.y, w: inner.w, h: m.headingH }, z.label, role, { component: "SectionHeader" });
+        if (m.heading.lines.length > 1 || m.heading.sizePt !== ctx.typography.roles[role].sizePt || !m.heading.ok) t.fit = { sizePt: m.heading.sizePt, lineHeight: m.heading.lineHeight, lines: m.heading.lines, ...(m.heading.ok ? {} : { failed: true }) };
         nodes.push(t);
       }
       if (!fixed && m.promptLines.length) {
         const y = inner.y + m.headingH + (m.headingH ? s.block : 0);
-        const pt: TextNode = text(`${id}-prompt`, { x: inner.x, y, w: inner.w, h: m.promptH }, m.promptLines.join(" "), "prompt", { component: "Text", vAlign: "top", wrap: true });
-        pt.fit = { sizePt: ctx.typography.roles.prompt.sizePt, lineHeight: ctx.typography.roles.prompt.lineHeight, lines: m.promptLines };
+        const pRole = z.promptRole ?? "prompt";
+        const pt: TextNode = text(`${id}-prompt`, { x: inner.x, y, w: inner.w, h: m.promptH }, m.promptLines.join(" "), pRole, { component: "Text", vAlign: "top", wrap: true });
+        pt.fit = { sizePt: ctx.typography.roles[pRole].sizePt, lineHeight: ctx.typography.roles[pRole].lineHeight, lines: m.promptLines };
         nodes.push(pt);
       }
       const response = fixed ? inner : { x: inner.x, y: responseTop, w: inner.w, h: Math.max(0, responseH) };

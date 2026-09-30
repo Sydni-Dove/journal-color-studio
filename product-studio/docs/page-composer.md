@@ -42,7 +42,8 @@ Per section, in plain words:
 | Writing area | Your writing lines style, Ruled lines, Blank, Dotted, Grid, Checklist, Table | `responseStyle` (`graph-grid` → surface `graph-grid`) |
 | Writing space | Compact (3 lines), Standard (6), Spacious (10), Fill remaining space | `space` + `lineCount` (`WRITING_AMOUNTS`); exact lines, equal share and "never fewer than" under **More** |
 | Checklist / task list | Rows, Marker (circle / square / none), Position (left / right), Writing line (on / off) | `lineCount`, `taskMarker`, `taskMarkerPosition`, `taskLines` |
-| Table | Column labels, Rows, Lines (grid / horizontal / minimal / none), Header row | `table` |
+| Heading / text | Text style: Page title, Section heading, Body text (the typography roles `pageTitle`, `sectionHeading`, `body`; no point sizes of its own). The first heading added to a page starts as its title. | `textStyle` (pages saved before: section heading) |
+| Table | One box per column label (+ Add column / Remove), Rows, Lines (grid / horizontal / minimal / none), Header row, Table space: Compact / Standard / Spacious rows (0.85× / 1× / 1.35× the list-row token) or Fill remaining space | `table.columns`, `table.rows`, `table.rowSpace`; fill = `space: "fill"` |
 | Info row | 1–3 blanks, each a label and "A line" or "A box" | `fields`, `fieldStyles` |
 | Beside the section above | two writing sections as two columns | `beside` |
 | Section style | Same as the page, Open, Line below, Soft outline, Filled panel, Rounded panel | `frame` (page default: `PromptSet.frame`) |
@@ -57,6 +58,11 @@ Geometry stays automatic:
   `accent` at low opacity), so they follow Style; the padding inside a frame
   is never less than the heading / label border insets, so the studio's own
   spacing checks pass.
+* **Tables that fill** keep the chosen rows as their minimum and stretch
+  them evenly to the next section or the bottom of the page; rows never grow
+  past 1.6× their normal height (`TABLE_MAX_STRETCH`) — beyond that a few more
+  rows are drawn so each stays a comfortable writing height. They never
+  overlap what follows; when the rows can't fit, the page continues.
 * **Info rows** (`fillInRows` in `layouts/stationery/surfaces.ts`) keep every
   label whole and every blank at least 0.9″; blanks that don't fit wrap to
   another row instead of being squeezed.

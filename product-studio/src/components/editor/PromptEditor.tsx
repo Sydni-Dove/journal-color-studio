@@ -12,8 +12,8 @@
  */
 import { useEffect, useRef, useState } from "react";
 import {
-  amountOf, canSitBeside, contentOf, DEFAULT_MIN_LINES, kindOf, MAX_INFO_FIELDS, newPromptId, PROMPT_STARTERS, spaceOf, WRITING_AMOUNTS,
-  type GuidedHeader, type InfoFieldStyle, type PromptBlockKind, type SectionFrame, type SpacerSize, type PromptBlock, type PromptSet, type PromptSpacing, type ResponseStyle, type SpaceMode, type TaskMarker, type TaskMarkerPosition, type WritingAmount,
+  amountOf, canSitBeside, TABLE_ROW_SCALE, contentOf, DEFAULT_MIN_LINES, kindOf, MAX_INFO_FIELDS, newPromptId, PROMPT_STARTERS, spaceOf, WRITING_AMOUNTS,
+  type GuidedHeader, type HeadingTextStyle, type InfoFieldStyle, type TableRowSpace, type PromptBlockKind, type SectionFrame, type SpacerSize, type PromptBlock, type PromptSet, type PromptSpacing, type ResponseStyle, type SpaceMode, type TaskMarker, type TaskMarkerPosition, type WritingAmount,
 } from "../../types/prompts";
 import { Check, Field, LabeledNumeric, NumberField, Segmented, Select } from "./ui";
 
@@ -29,6 +29,8 @@ const STYLE_LABEL: Record<ResponseStyle | "own", string> = {
 };
 const SPACE_LABEL: Record<SpaceMode, string> = { fixed: "Exact number of lines", fill: "Fill remaining space", equal: "Equal share with the other “Equal share” sections" };
 const AMOUNT_LABEL: Record<WritingAmount, string> = { compact: "Compact", standard: "Standard", spacious: "Spacious" };
+const TEXT_STYLE_LABEL: Record<HeadingTextStyle, string> = { title: "Page title", heading: "Section heading", body: "Body text" };
+const ROW_SPACE_LABEL: Record<TableRowSpace, string> = { compact: "Compact", standard: "Standard", spacious: "Spacious" };
 const FRAME_LABEL: Record<SectionFrame, string> = { open: "Open (no border)", divider: "Line below", outline: "Soft outline", panel: "Filled panel", rounded: "Rounded panel" };
 
 /** How the current sections fit: pages each time, a plain problem when they can't, and the lines each section gets. */
@@ -51,7 +53,7 @@ function spaceSummary(set: PromptSet, b: PromptBlock, got: number | undefined): 
 
 /** A non-writing section's one-line summary in its row. */
 const KIND_SUMMARY: Record<Exclude<PromptBlockKind, "prompt">, (b: PromptBlock) => string> = {
-  heading: (b) => (b.prompt?.trim() ? "Heading + text" : "Heading"),
+  heading: (b) => `${TEXT_STYLE_LABEL[b.textStyle ?? "heading"]}${b.textStyle !== "body" && b.prompt?.trim() ? " + text" : ""}`,
   info: (b) => `Info row · ${plural(Math.min(MAX_INFO_FIELDS, (b.fields ?? []).filter((f) => f.trim()).length) || 1, "blank")}`,
   divider: () => "Line",
   spacer: (b) => `${(b.spacer ?? "medium")[0].toUpperCase()}${(b.spacer ?? "medium").slice(1)} space`,
@@ -184,6 +186,31 @@ function InfoFields({ b, putBlock }: { b: PromptBlock; putBlock: (id: string, pa
   );
 }
 
+/** A table's column labels, one box each; add or remove columns. */
+function TableColumns({ b, putBlock }: { b: PromptBlock; putBlock: (id: string, patch: Partial<PromptBlock>) => void }) {
+  const table = b.table ?? { columns: ["Task", "Due", "Done"], rows: b.lineCount ?? 6 };
+  const cols = table.columns.length ? table.columns : ["Column 1"];
+  const put = (columns: string[]) => putBlock(b.id, { table: { ...table, columns } });
+  return (
+    <div className="table-columns" data-testid="table-columns">
+      {cols.map((c, i) => (
+        <div key={i} className="table-column">
+          <Field label={`Column ${i + 1}`}>
+            <input type="text" value={c} placeholder={`Column ${i + 1}`} onChange={(e) => put(cols.map((x, k) => (k === i ? e.target.value : x)))} />
+          </Field>
+          {cols.length > 1 && (
+            <button type="button" className="btn btn--ghost" aria-label={`Remove column ${i + 1}`} onClick={() => put(cols.filter((_, k) => k !== i))}>Remove</button>
+          )}
+        </div>
+      ))}
+      {cols.length < MAX_TABLE_COLUMNS && (
+        <button type="button" className="btn" onClick={() => put([...cols, ""])}>+ Add column</button>
+      )}
+    </div>
+  );
+}
+const MAX_TABLE_COLUMNS = 8;
+
 export function PromptEditor({
   set,
   onChange,
@@ -222,7 +249,9 @@ export function PromptEditor({
   };
   const addBlock = (label: string, block: Omit<PromptBlock, "id">) => {
     const id = newPromptId();
-    putSpace({ blocks: [...blocks, { id, ...block }] });
+    // A heading that opens the page is its title; later ones head sections.
+    const piece = block.kind === "heading" && !block.textStyle ? { ...block, textStyle: (blocks.length ? "heading" : "title") as HeadingTextStyle } : block;
+    putSpace({ blocks: [...blocks, { id, ...piece }] });
     setAdded({ id, label });
   };
   // The piece just added opens, in view, ready to name; the others close so the list stays short.
@@ -345,12 +374,20 @@ export function PromptEditor({
               <div className="prompt-block__body">
                 {k === "heading" && (
                   <>
-                    <Field label="Heading">
+                    <Segmented<HeadingTextStyle>
+                      label="Text style"
+                      value={b.textStyle ?? "heading"}
+                      options={(["title", "heading", "body"] as const).map((v) => ({ value: v, label: TEXT_STYLE_LABEL[v] }))}
+                      onChange={(textStyle) => putBlock(b.id, { textStyle })}
+                    />
+                    <Field label={b.textStyle === "body" ? "Text" : "Heading"}>
                       <input type="text" value={b.label} placeholder="e.g. Master Dashboard" onChange={(e) => putBlock(b.id, { label: e.target.value })} />
                     </Field>
-                    <Field label="Text under it (optional)">
-                      <textarea rows={2} value={b.prompt ?? ""} placeholder="A short line of text" onChange={(e) => putBlock(b.id, { prompt: e.target.value || undefined })} />
-                    </Field>
+                    {b.textStyle !== "body" && (
+                      <Field label="Text under it (optional)">
+                        <textarea rows={2} value={b.prompt ?? ""} placeholder="A short line of text" onChange={(e) => putBlock(b.id, { prompt: e.target.value || undefined })} />
+                      </Field>
+                    )}
                   </>
                 )}
                 {k === "info" && <InfoFields b={b} putBlock={putBlock} />}
@@ -426,16 +463,7 @@ export function PromptEditor({
                     )}
                     {b.responseStyle === "table" && (
                       <div className="subsection custom-table-controls">
-                        <Field label="Column labels (comma separated)">
-                          <input
-                            type="text"
-                            value={(b.table?.columns ?? ["Task", "Due", "Done"]).join(", ")}
-                            onChange={(e) => {
-                              const columns = e.target.value.split(",").map((x) => x.trim()).filter(Boolean).slice(0, 8);
-                              putBlock(b.id, { table: { ...(b.table ?? { rows: b.lineCount ?? 6 }), columns: columns.length ? columns : ["Column 1", "Column 2"] } });
-                            }}
-                          />
-                        </Field>
+                        <TableColumns b={b} putBlock={putBlock} />
                         <div className="row">
                           <NumberField
                             label="Rows"
@@ -445,7 +473,7 @@ export function PromptEditor({
                             value={b.table?.rows ?? b.lineCount ?? 6}
                             onChange={(rows) => {
                               const n = Math.max(1, Math.min(30, Math.round(rows)));
-                              putBlock(b.id, { space: "fixed", lineCount: n, table: { ...(b.table ?? { columns: ["Task", "Due", "Done"] }), rows: n } });
+                              putBlock(b.id, { ...(mode === "fill" ? {} : { space: "fixed" as const, lineCount: n }), table: { ...(b.table ?? { columns: ["Task", "Due", "Done"] }), rows: n } });
                             }}
                           />
                           <Select
@@ -460,6 +488,20 @@ export function PromptEditor({
                             onChange={(v) => putBlock(b.id, { table: { ...(b.table ?? { columns: ["Task", "Due", "Done"], rows: b.lineCount ?? 6 }), borders: v as "grid" | "horizontal" | "minimal" | "none" } })}
                           />
                         </div>
+                        {!same && (
+                          <Segmented<string>
+                            label="Table space"
+                            value={mode === "fill" ? "fill" : b.table?.rowSpace ?? "standard"}
+                            options={[...(Object.keys(TABLE_ROW_SCALE) as TableRowSpace[]).map((v) => ({ value: v, label: ROW_SPACE_LABEL[v] })), { value: "fill", label: "Fill remaining space" }]}
+                            onChange={(v) => {
+                              const t = b.table ?? { columns: ["Task", "Due", "Done"], rows: b.lineCount ?? 6 };
+                              const rows = t.rows ?? b.lineCount ?? 6;
+                              if (v === "fill") putBlock(b.id, { space: "fill", table: { ...t, rows, rowSpace: undefined } });
+                              else putBlock(b.id, { space: "fixed", lineCount: rows, table: { ...t, rows, rowSpace: v === "standard" ? undefined : (v as TableRowSpace) } });
+                            }}
+                          />
+                        )}
+                        {mode === "fill" && <p className="hint">The rows stretch evenly down to the next section or the bottom of the page. If they would get very tall, a few more rows are drawn so each stays a comfortable height.</p>}
                         <Check
                           label="Header row with the column labels"
                           checked={b.table?.showHeader !== false}

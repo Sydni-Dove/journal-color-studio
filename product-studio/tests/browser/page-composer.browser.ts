@@ -92,6 +92,45 @@ describe("Page Composer", () => {
     await page.context().close();
   }, 60_000);
 
+  it("Master Dashboard: a page title, three column labels edited one by one, the table filling the page", async () => {
+    const page = await open(blank(), false);
+    await openArea(page, "add");
+    await add(page, "Heading / text");
+    await add(page, "Table");
+    const heading = await section(page, 1);
+    // The first heading on a page is its title.
+    await expect(heading.getByRole("group", { name: "Text style" }).getByRole("button", { name: "Page title" }).getAttribute("aria-pressed")).resolves.toBe("true");
+    await heading.getByRole("textbox", { name: "Heading" }).fill("Master Dashboard");
+    const table = await section(page, 2);
+    await table.getByRole("textbox", { name: "Heading" }).fill("");
+    const cols = table.getByTestId("table-columns");
+    // Three separate boxes (the piece starts with three columns); each edited on its own.
+    await expect(cols.getByRole("textbox").count()).resolves.toBe(3);
+    await cols.getByRole("textbox", { name: "Column 1" }).fill("Project / Area");
+    await cols.getByRole("textbox", { name: "Column 2" }).fill("Status / Priority");
+    await cols.getByRole("textbox", { name: "Column 3" }).fill("Next Step / Notes");
+    await expect(cols.getByRole("textbox", { name: "Column 1" }).inputValue()).resolves.toBe("Project / Area");
+    // Add and remove a column: the boxes follow.
+    await cols.getByRole("button", { name: "+ Add column" }).click();
+    await expect(cols.getByRole("textbox").count()).resolves.toBe(4);
+    await cols.getByRole("button", { name: "Remove column 4" }).click();
+    await expect(cols.getByRole("textbox").count()).resolves.toBe(3);
+    await table.getByRole("group", { name: "Table space" }).getByRole("button", { name: "Fill remaining space" }).click();
+    const drawn = page.locator(".ps-page--editor").first();
+    await expect.poll(() => drawn.textContent()).toMatch(/Next Step \/ Notes/);
+    for (const want of ["Master Dashboard", "Project / Area", "Status / Priority"]) expect((await drawn.textContent()) ?? "").toContain(want);
+    // The table reaches the bottom of the page's writing area.
+    const fill = await page.evaluate(() => {
+      const page = document.querySelector(".ps-page--editor svg")!.getBoundingClientRect();
+      const rows = [...document.querySelectorAll('.ps-page--editor [data-node*="-surface-r"]')].map((e) => e.getBoundingClientRect().bottom);
+      return { last: Math.max(...rows), pageBottom: page.bottom, pageH: page.height, n: rows.length };
+    });
+    expect(fill.n).toBeGreaterThanOrEqual(6);
+    expect((fill.pageBottom - fill.last) / fill.pageH).toBeLessThan(0.12);
+    await expect.poll(async () => (await page.locator(".badge").first().textContent()) ?? "").toMatch(/Page OK/);
+    await page.context().close();
+  }, 60_000);
+
   it("Revelation to Execution, built by tapping pieces and typing (no custom code for the page)", async () => {
     const page = await open(blank(), false);
     await openArea(page, "add");

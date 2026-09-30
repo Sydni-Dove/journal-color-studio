@@ -12,6 +12,7 @@ import { STUDIO_STROKES } from "../../presets/studioDefaults";
 import type { Rect } from "../../types/geometry";
 import type { LayoutDiagnostic, LayoutMetric, LayoutNode } from "../../types/layout";
 import type { StationeryZone, SurfaceKind } from "../../types/stationery";
+import { TABLE_MAX_STRETCH } from "../../types/prompts";
 import { getLayoutMeasurer, styleForRole } from "../../engines/typography/textMeasure";
 import { checklistRows, fitHeading, HEADING_MIN_PT, writingSurface } from "../shared/components";
 import { box, group, lineBoxIn, rule, text } from "../shared/nodes";
@@ -85,8 +86,17 @@ function table(id: string, rect: Rect, zone: StationeryZone, ctx: LayoutContext)
   const inset = ctx.spacing.labelToBorderInset;
   const { cols, heads, headerH } = tableHead(spec, rect, ctx);
   const showHeader = spec.showHeader !== false;
-  const rowH = tableRowIn(ctx);
-  const rows = zone.lines !== undefined ? Math.max(1, Math.min(Math.round(zone.lines), tableRows(rect.h, headerH, rowH))) : tableRows(rect.h, headerH, rowH);
+  const baseRow = tableRowIn(ctx) * (spec.rowScale ?? 1);
+  let rowH = baseRow;
+  let rows: number;
+  if (zone.lines !== undefined) rows = Math.max(1, Math.min(Math.round(zone.lines), tableRows(rect.h, headerH, rowH)));
+  else if (spec.minRows) {
+    // Fill the space: the chosen rows stretch evenly; past TABLE_MAX_STRETCH × their height, more rows keep them comfortable.
+    const room = Math.max(0, rect.h - headerH);
+    const most = tableRows(rect.h, headerH, baseRow);
+    rows = Math.min(most, Math.max(spec.minRows, Math.ceil(room / (TABLE_MAX_STRETCH * baseRow) - 1e-6)));
+    rowH = rows > 0 ? room / rows : baseRow;
+  } else rows = tableRows(rect.h, headerH, rowH);
   const h = headerH + rows * rowH;
   const t: Rect = { x: rect.x, y: rect.y, w: rect.w, h };
   const stroke = STUDIO_STROKES.gridRulePt;

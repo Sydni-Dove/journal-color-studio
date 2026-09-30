@@ -7,7 +7,7 @@ import type { PromptSet } from "../../src/types/prompts";
 /** PROJECT SNAPSHOT: heading, two info blanks, paired writing areas, "Next 3 moves", blockers / dates, notes. */
 export const PROJECT_SNAPSHOT = (): PromptSet => ({
   blocks: [
-    { id: "title", kind: "heading", label: "PROJECT SNAPSHOT" },
+    { id: "title", kind: "heading", label: "PROJECT SNAPSHOT", textStyle: "title" },
     { id: "info", kind: "info", label: "", fields: ["Updated", "Stage / Status"] },
     { id: "purpose", label: "Purpose", space: "fixed", lineCount: 3, responseStyle: "ruled" },
     { id: "focus", label: "Current focus", space: "fixed", lineCount: 3, responseStyle: "ruled", beside: true },
@@ -23,7 +23,7 @@ export const PROJECT_SNAPSHOT = (): PromptSet => ({
 /** REVELATION TO EXECUTION: heading, four equal writing areas, then Status / Review date. */
 export const REVELATION_TO_EXECUTION = (): PromptSet => ({
   blocks: [
-    { id: "title", kind: "heading", label: "Revelation to Execution" },
+    { id: "title", kind: "heading", label: "Revelation to Execution", textStyle: "title" },
     { id: "received", label: "What I received", space: "equal", responseStyle: "ruled" },
     { id: "concerns", label: "What I believe it concerns", space: "equal", responseStyle: "ruled" },
     { id: "discern", label: "Scripture + what needs discernment", space: "equal", responseStyle: "ruled" },
@@ -32,15 +32,14 @@ export const REVELATION_TO_EXECUTION = (): PromptSet => ({
   ],
 });
 
-/** MASTER DASHBOARD: one structured table filling the page. */
-export const MASTER_DASHBOARD = (rows = 16): PromptSet => ({
+/** MASTER DASHBOARD: a page title, then one structured table filling the rest of the page (at least `rows` rows). */
+export const MASTER_DASHBOARD = (rows = 12): PromptSet => ({
   blocks: [
-    { id: "title", kind: "heading", label: "Master Dashboard" },
+    { id: "title", kind: "heading", label: "Master Dashboard", textStyle: "title" },
     {
       id: "projects",
       label: "",
-      space: "fixed",
-      lineCount: rows,
+      space: "fill",
       responseStyle: "table",
       table: { columns: ["Project / Area", "Status / Priority", "Next Step / Notes"], rows, showHeader: true, borders: "horizontal" },
     },

@@ -25,7 +25,22 @@ export type PromptTable = {
   showHeader?: boolean;
   /** Visual rule treatment; never changes table geometry. */
   borders?: "grid" | "horizontal" | "minimal" | "none";
+  /** Row height in plain words (default standard); "Fill remaining space" is the block's `fill` space. */
+  rowSpace?: TableRowSpace;
 };
+
+/** Table row heights, as a share of the studio's list-row token. */
+export const TABLE_ROW_SCALE = { compact: 0.85, standard: 1, spacious: 1.35 } as const;
+export type TableRowSpace = keyof typeof TABLE_ROW_SCALE;
+/**
+ * A table set to fill the page stretches its rows evenly; rows never grow past
+ * this many times their normal height — beyond it more rows are drawn, so
+ * every row stays a comfortable writing height.
+ */
+export const TABLE_MAX_STRETCH = 1.6;
+
+/** Heading / text piece: which of the studio's text roles it prints in. */
+export type HeadingTextStyle = "title" | "heading" | "body";
 
 /**
  * How a section's writing space is set:
@@ -96,6 +111,8 @@ export type PromptBlock = {
   id: string;
   /** What the section is (default "prompt": a section with writing space). */
   kind?: PromptBlockKind;
+  /** Heading / text: its text role (default section heading; pages saved before this print as before). */
+  textStyle?: HeadingTextStyle;
   /** Info row: its labelled blanks, left to right (up to MAX_INFO_FIELDS). */
   fields?: string[];
   /** Info row: each blank's style, by position (default: a line). */
