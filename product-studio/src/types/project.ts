@@ -93,6 +93,8 @@ export type ExportSettings = {
    * to Letter with its own margins, header and footer around the page.
    */
   paper?: "page" | "letter" | "a4";
+  /** Home printing only: show corner trim/cut marks around the finished page. Default false. */
+  showTrimMarks?: boolean;
 };
 
 export type ProductVariant = {
