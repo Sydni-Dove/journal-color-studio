@@ -17,6 +17,7 @@ import { BackgroundPanel, ColorPanel, DecorationPanel, LayoutPanel, PatternPanel
 import { PagesPanel, PlannerSetupPanel, ProductPanel, ProductionPanel } from "./ProductionPanels";
 import { BookOutlinePanel, BookStructurePanel, ThisPagePanel } from "./BookPanels";
 import { PagesBuilder } from "./PagesBuilder";
+import { DesignPresetsPanel } from "./DesignPresetsPanel";
 import { AreaList, AreaView, useArea, type AreaId } from "./Areas";
 import { ThisPageHeading, AddToPageHint } from "./ThisPage";
 import { pageInfo } from "../../engines/document/pageInfo";
@@ -184,7 +185,8 @@ export function Editor({ project, onChange, onBack, saveStatus }: Props) {
                 </>
               )}
               {area === "style" && doc && usage && (
-                <>
+                  <>
+                  <DesignPresetsPanel project={project} update={update} doc={doc} current={current} />
                   <ColorPanel nav={nav} project={project} update={update} usage={usage} />
                   <BackgroundPanel nav={nav} project={project} update={update} usage={usage} colors={doc.colors} />
                   <DecorationPanel nav={nav} project={project} update={update} usage={usage} decor={decor} />

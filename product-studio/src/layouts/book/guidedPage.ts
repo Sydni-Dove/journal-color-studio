@@ -8,6 +8,7 @@
  * prompts the first one gets twice the writing space.
  */
 import { DEFAULT_WORDING } from "../../presets/wording";
+import { STUDIO_PLANNER } from "../../presets/studioDefaults";
 import { promptSetFromList } from "../../types/prompts";
 import type { PageModuleContent } from "../../types/recipe";
 import type { SpacingTokens } from "../../types/tokens";
@@ -58,6 +59,9 @@ export function guidedSpec(module: PageModuleContent | undefined, fallbackTitle:
 }
 
 export const guidedPage: LayoutDefinition = {
+  // Declares its header so a facing page lines up with it; it does not grow its own (its page count depends on its body).
+  headerIn: () => STUDIO_PLANNER.weeklyTitle.valueIn,
+  alignsHeader: true,
   id: "guided-page",
   label: "Guided Lined Page (title + prompt sections)",
   family: "journal",

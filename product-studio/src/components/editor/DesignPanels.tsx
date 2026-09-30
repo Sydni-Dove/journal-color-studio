@@ -5,7 +5,8 @@
 import { ROLE_LABEL, rolesFor } from "../../design-library/placement";
 import { DAILY_SECTIONS, dailySectionsOf, type DailySection } from "../../layouts/planner/dailyConfigurable";
 import { findAsset } from "../../design-library/library";
-import { applyVariant } from "../../engines/document/resolve";
+import { applyVariant, resolveDocument, type ResolvedDocument } from "../../engines/document/resolve";
+import { PageThumb } from "../preview/PageThumb";
 import type { ProjectUsage } from "../../engines/document/usage";
 import { GRID_PRESETS, RULING_PRESETS } from "../../engines/patterns/patterns";
 import { addVariantFromCurrent } from "../../persistence/projectStore";
@@ -21,7 +22,7 @@ import type { ProductProject } from "../../types/project";
 import type { CornerSet, DecorativePlacement, DecorativeTheme, EdgeTreatment, FunctionalPatternKind, TitleAccentPosition } from "../../types/theme";
 import type { ColorToken, ColorTokens, FontCategory, FontGroup, SpacingDensity, WordingKey } from "../../types/tokens";
 import { AppliesTo, Check, Field, NumberField, Section, Segmented, Select, type EditorNav } from "./ui";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BACKGROUND_GROUPS, ELEMENT_GROUPS, defaultRoles, designValue, groupOf, type CatalogDesign, type CatalogGroup } from "../../design-library/catalog";
 import { jcsPaletteId } from "../../design-library/palettes";
 import { isSurfaceStyle, NO_LAYER, splitLayers } from "../../themes/layers";
@@ -52,13 +53,13 @@ export function LayoutPanel({ project, update, usage, nav, part = "layout" }: Pa
   const any = is.layout ? usage.weeklyOrientation.supported || usage.datePlacement || (usage.scheduleTimes && !usage.dailySections) || usage.pageNumbers || usage.footer : is.writing ? usage.sectionsPerDay || usage.writingRows : usage.sidebar.supported || usage.dailySections;
   if (!any) return null;
   return (
-    <Section title={PART_TITLE[part]} open={part !== "layout"}>
-      {is.layout && usage.layouts.map(({ layout, fit }) => (
+    <Section title={PART_TITLE[part]} open={part !== "layout" || usage.weeklyOrientation.supported}>
+      {is.layout && usage.layouts.filter(({ layout }) => layout.id === nav.currentLayoutId).map(({ layout, fit }) => (
         <p key={layout.id} className="hint">
           {layoutName(layout.id, layout.label)}: {fit.ok ? (fit.variantLabel === layout.label ? "fits this size" : `using the ${fit.variantLabel} version for this size`) : "not enough room at this size"}
         </p>
       ))}
-      {is.layout && usage.weeklyOrientation.supported && <WeeklyOrientationControl usage={usage} value={o.weeklyOrientation} onChange={(weeklyOrientation) => set({ weeklyOrientation })} />}
+      {is.layout && usage.weeklyOrientation.supported && <WeeklyOrientationControl project={project} usage={usage} value={o.weeklyOrientation} onChange={(weeklyOrientation) => set({ weeklyOrientation })} />}
       {is.layout && usage.datePlacement && <AppliesTo ids={usage.consumers.datePlacement} nav={nav} />}
       {is.layout && usage.datePlacement && (
         <Segmented
@@ -114,24 +115,48 @@ export function LayoutPanel({ project, update, usage, nav, part = "layout" }: Pa
  * as columns (Vertical) or as rows (Horizontal). An arrangement that cannot
  * fit at this size is shown, disabled, with the reason.
  */
-function WeeklyOrientationControl({ usage, value, onChange }: { usage: ProjectUsage; value: ProductProject["layoutOptions"]["weeklyOrientation"]; onChange: (v: "vertical" | "horizontal") => void }) {
+function WeeklyOrientationControl({ project, usage, value, onChange }: { project: ProductProject; usage: ProjectUsage; value: ProductProject["layoutOptions"]["weeklyOrientation"]; onChange: (v: "vertical" | "horizontal") => void }) {
+  void value;
   const w = usage.weeklyOrientation;
   const current = w.current ?? "vertical";
   const opts = [
     { v: "vertical" as const, label: "Vertical", hint: "Two pages · days side by side in columns", ok: w.vertical },
     { v: "horizontal" as const, label: "Horizontal", hint: "Two pages · days stacked in rows", ok: w.horizontal },
   ];
+  // Each arrangement drawn by the real renderer: this product's first weekly spread, both pages.
+  const previews = useMemo(() => {
+    const out: Partial<Record<"vertical" | "horizontal", { doc: ResolvedDocument; index: number }>> = {};
+    for (const o of opts) {
+      if (!o.ok) continue;
+      try {
+        const doc = resolveDocument({ ...project, layoutOptions: { ...project.layoutOptions, weeklyOrientation: o.v } });
+        const index = doc.recipe.pages.findIndex((p) => p.layoutId === "planner-weekly-spread" && p.spreadPart === 0);
+        if (index >= 0) out[o.v] = { doc, index };
+      } catch {
+        /* no preview */
+      }
+    }
+    return out;
+  }, [project, w.vertical, w.horizontal]);
   return (
     <div className="field" data-testid="weekly-orientation">
       <span className="field-label">Classic Weekly: how the days are arranged</span>
-      <div className="segmented" role="group" aria-label="How the days are arranged">
+      <div className="orientation-cards" role="group" aria-label="How the days are arranged">
         {opts.map((o) => (
-          <button key={o.v} type="button" aria-pressed={current === o.v} disabled={!o.ok} onClick={() => onChange(o.v)} style={{ minHeight: 44 }}>
-            {o.label}
+          <button key={o.v} type="button" className="orientation-card" aria-pressed={current === o.v} disabled={!o.ok} onClick={() => onChange(o.v)}>
+            <span className="orientation-card__thumb">
+              {previews[o.v] && (
+                <>
+                  <PageThumb doc={previews[o.v]!.doc} index={previews[o.v]!.index} heightPx={96} />
+                  <PageThumb doc={previews[o.v]!.doc} index={previews[o.v]!.index + 1} heightPx={96} />
+                </>
+              )}
+            </span>
+            <strong>{o.label}</strong>
+            <span className="hint">{o.ok ? o.hint : "Doesn't fit this page size"}</span>
           </button>
         ))}
       </div>
-      <p className="hint">{opts.find((o) => o.v === current)!.hint}.{!w.vertical ? " Columns need a wider page; this size uses rows." : !w.horizontal ? " Rows need a taller page at this size." : value === undefined || value === "auto" ? "" : ""}</p>
     </div>
   );
 }

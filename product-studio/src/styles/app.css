@@ -1606,3 +1606,103 @@ button.family-card:focus-visible {
   font-size: 12px;
   font-weight: 700;
 }
+
+/* ── Design presets ── */
+.preset-grid {
+  display: grid;
+  gap: 10px;
+}
+.preset-card {
+  display: flex;
+  gap: 12px;
+  padding: 10px;
+  border: 1px solid var(--ui-line);
+  border-radius: var(--ui-radius);
+  background: #fff;
+}
+.preset-card[aria-current="true"] {
+  border-color: var(--ui-brand);
+}
+.preset-card__preview {
+  flex: 0 0 auto;
+  border: 1px solid var(--ui-line);
+  line-height: 0;
+  align-self: flex-start;
+}
+.preset-card__body {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  min-width: 0;
+}
+.preset-card__facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 8px;
+  margin: 0;
+  font-size: 12px;
+}
+.preset-card__facts dt {
+  color: var(--ui-muted);
+}
+.preset-card__facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* ── Weekly orientation cards (real thumbnails) ── */
+.orientation-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+.orientation-card {
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+  text-align: left;
+  padding: 8px;
+  border: 1px solid var(--ui-line);
+  border-radius: var(--ui-radius);
+  background: #fff;
+  cursor: pointer;
+  min-width: 0;
+}
+.orientation-card[aria-pressed="true"] {
+  border-color: var(--ui-brand);
+  box-shadow: 0 0 0 2px var(--ui-brand) inset;
+}
+.orientation-card:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.orientation-card__thumb {
+  display: flex;
+  gap: 0;
+  line-height: 0;
+  box-shadow: 0 0 0 1px var(--ui-line);
+  max-width: 100%;
+  overflow: hidden;
+}
+
+/* ── Layout choices with real thumbnails ── */
+.choice--thumb {
+  display: inline-grid;
+  justify-items: center;
+  gap: 6px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+.choice__thumb {
+  display: flex;
+  line-height: 0;
+  box-shadow: 0 0 0 1px var(--ui-line);
+  background: #fff;
+}
+.planner-start__now {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 6px;
+}

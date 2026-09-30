@@ -96,6 +96,9 @@ export function positionText(
   let y: number;
   if (inFooter) y = zone.y + (zone.h - lineH) / 2;
   else if (anchor.startsWith("above-content")) y = zones.belowHeaderY - s.titleToRuleGap - lineH;
+  // Facing pages share one header zone: both titles sit just above the shared rule, so they line up
+  // across the open book whatever their sizes. A page on its own keeps its title centred in its header.
+  else if (ctx.facingHeaderIn !== undefined) y = zones.belowHeaderY - s.titleToRuleGap - lineH;
   else y = Math.min(zone.y + (zone.h - lineH) / 2, zones.belowHeaderY - s.titleToRuleGap - lineH);
   const align = alignOf(anchor);
   let x = align === "left" ? zone.x : align === "right" ? zone.x + zone.w - inkW : zone.x + (zone.w - inkW) / 2;
@@ -145,9 +148,12 @@ export function pageFrame(
     h: g.safeRect.h - 2 * s.page,
   };
   const footerH = footerOn ? lineBoxIn(ctx.typography, "footer") : 0;
+  // Facing pages share one header zone: a page grows its header to the one opposite it (never shrinks),
+  // so the header rules and title bottoms line up across the open book.
+  const headerH = opts.headerH > 0 && ctx.facingHeaderIn && ctx.facingHeaderIn > opts.headerH ? ctx.facingHeaderIn : opts.headerH;
   const modules: StackModule[] = [
-    { id: "header", kind: "fixed", size: opts.headerH },
-    { id: "headerGap", kind: "fixed", size: opts.headerH > 0 ? s.headerGap : 0 },
+    { id: "header", kind: "fixed", size: headerH },
+    { id: "headerGap", kind: "fixed", size: headerH > 0 ? s.headerGap : 0 },
     { id: "body", kind: "elastic", min: 0 },
     { id: "footerGap", kind: "fixed", size: footerOn ? s.footerGap : 0 },
     { id: "footer", kind: "fixed", size: footerH },

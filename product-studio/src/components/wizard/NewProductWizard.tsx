@@ -6,6 +6,7 @@
  *   Type → Size → Orientation → Binding → Printer → Layout → Spacing →
  *   Theme → Fonts → Dates / sheets / pages → Generate
  */
+import { PageThumb } from "../preview/PageThumb";
 import { recipeSteps } from "../../engines/recipe/recipe";
 import { useEffect, useMemo, useState } from "react";
 import type { WizardStart } from "../../presets/products/productFamilies";
@@ -27,7 +28,7 @@ import type { SpacingDensity } from "../../types/tokens";
 import type { WeekStart } from "../../types/calendar";
 import { Field, NumberField } from "../editor/ui";
 import { TechnicalDetails } from "../help/visuals";
-import { layoutAvailability, resolveDocument } from "../../engines/document/resolve";
+import { layoutAvailability, resolveDocument, type ResolvedDocument } from "../../engines/document/resolve";
 import { BookTemplates } from "./BookTemplates";
 
 function Choices<T extends string>({ value, options, onChange }: { value: T; options: { value: T; label: string }[]; onChange: (v: T) => void }) {
@@ -39,6 +40,17 @@ function Choices<T extends string>({ value, options, onChange }: { value: T; opt
         </button>
       ))}
     </div>
+  );
+}
+
+/** The real first page(s) of a layout choice, recomputed only when the size, colors or binding change. */
+function LayoutThumb<R>({ preview, r, deps }: { preview: (r: R) => { doc: ResolvedDocument; pages: number[] } | null; r: R; deps: string }) {
+  const p = useMemo(() => preview(r), [r, deps]);
+  if (!p) return null;
+  return (
+    <span className="choice__thumb" aria-hidden="true">
+      {p.pages.filter((i) => i < p.doc.recipe.pages.length).map((i) => <PageThumb key={i} doc={p.doc} index={i} heightPx={84} />)}
+    </span>
   );
 }
 
@@ -143,6 +155,28 @@ export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: 
     return bad && !bad.ok ? bad.reason : null;
   };
   const recipeProblem = recipeFit(recipe);
+  /** A layout choice drawn by the real renderer at the chosen size and colors (first page, or both pages of a spread). */
+  const previewOf = (r: (typeof recipes)[number]): { doc: ResolvedDocument; pages: number[] } | null => {
+    try {
+      const b = getBindingProfile(binding.bindingType);
+      const doc = resolveDocument(
+        createProject(type, {
+          dimensions: { sizePresetId: sizeId, custom: sizeId === CUSTOM_SIZE_ID ? custom : undefined, orientation },
+          production: { bindingType: binding.bindingType, boundEdge: binding.boundEdge ?? b.defaultBoundEdge ?? undefined, printProfileId: profileId, duplex: b.boundEdgeMode === "book-spine" },
+          recipe: r.build({ count: 1, sheets: 1 }),
+          calendar: r.needsCalendar ? { startDate: `${year}-01-01`, endDate: `${year}-01-31`, weekStart, sixRowMonths: true } : undefined,
+          spacing: { density, overrides: {} },
+          colors: { paletteId, overrides: {} },
+          layoutOptions: r.layoutOptions,
+        }),
+      );
+      const i = doc.recipe.pages.findIndex((p) => !p.filler);
+      if (i < 0) return null;
+      return { doc, pages: doc.recipe.pages[i].spreadPart === 0 ? [i, i + 1] : [i] };
+    } catch {
+      return null;
+    }
+  };
   const stationery = recipe.id.startsWith("stationery:");
   const needsCount = recipe.id === "journal-lined" || recipe.id === "guided-lined" || recipe.id === "planner-monthly-weekly" || stationery;
 
@@ -254,7 +288,8 @@ export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: 
                     {plannerStarts.filter((r) => plannerCategoryFor(r.id) === plannerCategoryFor(recipeId)).map((r) => {
                       const problem = recipeFit(r);
                       return (
-                        <button key={r.id} type="button" className="choice choice--layout" aria-pressed={r.id === recipeId} disabled={!!problem} title={problem ?? undefined} onClick={() => setRecipeId(r.id)}>
+                        <button key={r.id} type="button" className="choice choice--layout choice--thumb" aria-pressed={r.id === recipeId} disabled={!!problem} title={problem ?? undefined} onClick={() => setRecipeId(r.id)}>
+                          <LayoutThumb preview={previewOf} r={r} deps={`${sizeId}|${orientation}|${paletteId}|${bindingChoice}|${weekStart}`} />
                           <strong>{r.label}</strong>
                           {problem && <span>Not enough room at this size</span>}
                         </button>

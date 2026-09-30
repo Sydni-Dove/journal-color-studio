@@ -341,8 +341,9 @@ describe("Guided Lined Page in the simple page list", () => {
       await page.locator("button.family-card", { hasText: /^Planner/ }).first().click();
       await page.waitForSelector("#wizard-build");
       // One starting page: Classic Monthly (the planner's default start). Other pages are added under Pages.
-      await expect(page.getByTestId("planner-start").innerText()).resolves.toMatch(/Starting with: Monthly/);
-      await page.locator("button.choice", { hasText: /^Classic Monthly/ }).click();
+      await expect(page.getByTestId("planner-start").innerText()).resolves.toMatch(/Starting with:\s*Monthly/);
+      // Layout choices show the real page as a thumbnail, then their name.
+      await page.locator("button.choice", { has: page.locator("strong", { hasText: /^Classic Monthly$/ }) }).click();
       await page.getByRole("button", { name: /^(Start planner|Create )/ }).click();
       await page.waitForSelector(".ps-page--editor");
       // Page label and Pages control beside the page number.

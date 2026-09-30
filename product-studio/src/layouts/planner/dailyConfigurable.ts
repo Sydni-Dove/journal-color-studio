@@ -344,6 +344,8 @@ const capability = (dated: boolean): LayoutDefinition["capability"] => ({
 });
 
 export const dailyPlanner: LayoutDefinition = {
+  headerIn: () => STUDIO_PLANNER.dailyDateHeader.valueIn,
+  alignsHeader: true,
   id: "planner-daily",
   label: "Daily planner (choose sections)",
   family: "planner",
@@ -356,6 +358,8 @@ export const dailyPlanner: LayoutDefinition = {
 };
 
 export const dailyPlannerSheet: LayoutDefinition = {
+  headerIn: () => STUDIO_PLANNER.dailyDateHeader.valueIn,
+  alignsHeader: true,
   id: "notepad-daily",
   label: "Daily planner sheet (undated)",
   family: "notepad",

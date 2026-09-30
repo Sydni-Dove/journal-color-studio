@@ -58,6 +58,8 @@ function writingPage(ctx: LayoutContext, heading: string | null): SolvedPage {
 }
 
 export const linedJournal: LayoutDefinition = {
+  headerIn: (ctx) => STUDIO_JOURNAL.headingZone.valueIn - ctx.spacing.headerGap,
+  alignsHeader: true,
   id: "journal-lined",
   label: "Lined Journal Page",
   family: "journal",
@@ -71,6 +73,8 @@ export const linedJournal: LayoutDefinition = {
 };
 
 export const notesPage: LayoutDefinition = {
+  headerIn: (ctx) => STUDIO_JOURNAL.headingZone.valueIn - ctx.spacing.headerGap,
+  alignsHeader: true,
   id: "notes-page",
   label: "Notes Page",
   family: "shared",

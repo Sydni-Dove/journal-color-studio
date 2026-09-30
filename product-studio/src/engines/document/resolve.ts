@@ -232,12 +232,38 @@ export function instancePages(doc: ResolvedDocument, index: number): PageInstanc
   return [doc.recipe.pages[first], doc.recipe.pages[first + 1]];
 }
 
+/**
+ * FACING PAGES — the page opposite this one in the open book (a left-hand
+ * page faces the next page, a right-hand page the one before), when that page
+ * is a single-page layout that declares its header zone. Two-page spreads and
+ * one-sided products have no separate facing page.
+ */
+export function facingIndex(doc: ResolvedDocument, index: number): number | null {
+  const p = doc.recipe.pages[index];
+  if (!p || p.side === "single" || p.spreadPart !== undefined) return null;
+  const j = p.side === "verso" ? index + 1 : index - 1;
+  const q = doc.recipe.pages[j];
+  if (!q || q.spreadPart !== undefined || q.side === p.side) return null;
+  return j;
+}
+
+function facingHeader(doc: ResolvedDocument, index: number): number | undefined {
+  const j = facingIndex(doc, index);
+  if (j === null) return undefined;
+  const q = doc.recipe.pages[j];
+  const other = getLayout(q.layoutId);
+  if (!other.headerIn || other.pages !== 1) return undefined;
+  const h = other.headerIn({ page: geometryFor(doc, q), spacing: doc.spacing, typography: doc.typography, options: doc.project.layoutOptions, pattern: doc.project.functionalPattern, module: q.module });
+  return h > 0 ? h : undefined;
+}
+
 /** Solve the page at `index` (solving its whole spread when needed). */
 export function solvePage(doc: ResolvedDocument, index: number): SolvedPage {
   const group = instancePages(doc, index);
   const layout = getLayout(group[0].layoutId);
   const geometries = group.map((p) => geometryFor(doc, p));
   const typeSizes = Object.fromEntries(Object.entries(doc.typography.roles).map(([k, r]) => [k, [r.sizePt, r.lineHeight, r.group, r.weight, r.style, r.trackingEm, r.transform]]));
+  const facingHeaderIn = layout.alignsHeader && group.length === 1 ? facingHeader(doc, index) : undefined;
   // The layout id is part of the key: two recipe steps (or one step whose
   // layout changed) can share a page key, and must never share solved output.
   const key = JSON.stringify([
@@ -254,6 +280,7 @@ export function solvePage(doc: ResolvedDocument, index: number): SolvedPage {
     doc.project.layoutOptions,
     doc.weekStart,
     doc.calendar?.settings,
+    facingHeaderIn ?? null,
   ]);
   const solved = solveCache.get(key, () => {
     const ctx: LayoutContext = {
@@ -268,6 +295,7 @@ export function solvePage(doc: ResolvedDocument, index: number): SolvedPage {
       weekStart: doc.weekStart,
       period: group[0].period,
       module: group[0].module,
+      ...(facingHeaderIn ? { facingHeaderIn } : {}),
     };
     try {
       return layout.solve(ctx);

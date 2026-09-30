@@ -28,6 +28,13 @@ export type LayoutContext = {
   period: PeriodRef;
   /** Composite books: the page's module (purpose title + prompts). Layouts may use it or ignore it. */
   module?: PageModuleContent;
+  /**
+   * Facing pages: the header zone height the page opposite asks for (its
+   * layout's headerIn). pageFrame grows this page's header to it so both
+   * pages' header rules and title bottoms line up across the open book.
+   * Only given to layouts that align their header (alignsHeader).
+   */
+  facingHeaderIn?: number;
 };
 
 /** Inputs a layout needs to decide whether (and how) it fits a page. */
@@ -96,6 +103,14 @@ export type LayoutDefinition = {
    * geometry per page and returns one solved page each.
    */
   flowPages?: (ctx: FitContext) => number;
+  /**
+   * The page's header zone height (title + rule), so a facing page can line
+   * up with it. Layouts with their own designed header (covers, dividers,
+   * Luxury Daily, stationery) leave it out: they are the declared exceptions.
+   */
+  headerIn?: (ctx: FitContext) => number;
+  /** Grows its header to the facing page's (facingHeaderIn). Off for layouts whose page count depends on their body height. */
+  alignsHeader?: boolean;
 };
 
 /** Fit helper for layouts with a single structure and a minimum usable area. */

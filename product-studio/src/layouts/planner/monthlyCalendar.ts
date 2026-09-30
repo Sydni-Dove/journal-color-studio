@@ -98,6 +98,11 @@ export function fitMonthly(ctx: FitContext): FitResult {
 }
 
 export const monthlyCalendar: LayoutDefinition = {
+  headerIn: (ctx) => {
+    const f = fitMonthly(ctx);
+    return f.ok ? (VARIANTS.find((v) => v.id === f.variant) ?? VARIANTS[0]).zones.titleH.valueIn : 0;
+  },
+  alignsHeader: true,
   id: "planner-monthly",
   label: "Monthly Calendar",
   family: "planner",
