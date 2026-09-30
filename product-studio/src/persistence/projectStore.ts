@@ -13,7 +13,7 @@ import { newId } from "../presets/products/projectFactory";
 
 const PREFIX = "dove-product-studio:v1";
 const INDEX_KEY = `${PREFIX}:index`;
-const projectKey = (id: string) => `${PREFIX}:project:${id}`;
+export const projectKey = (id: string) => `${PREFIX}:project:${id}`;
 
 export type ProjectSummary = {
   id: string;
@@ -112,6 +112,25 @@ export const localProjectStore: ProjectStore = {
     }
   },
 };
+
+export type GuardedSave = { status: "saved" } | { status: "conflict"; stored: ProductProject; copy: ProductProject };
+
+/**
+ * Save without ever overwriting newer work. `base` is the updatedAt of the
+ * version this tab loaded (or last saved). If the stored project is newer —
+ * another tab (or an older tab of an earlier build) saved it since — this
+ * tab's version is saved as a separate copy instead, so both survive.
+ */
+export function saveGuarded(store: ProjectStore, project: ProductProject, base: string | null): GuardedSave {
+  const stored = store.load(project.id);
+  if (stored && base && stored.updatedAt > base) {
+    const copy = duplicateProject(project, `${project.name} (changes from another tab)`);
+    store.save(copy);
+    return { status: "conflict", stored, copy };
+  }
+  store.save(project);
+  return { status: "saved" };
+}
 
 export function duplicateProject(p: ProductProject, name?: string): ProductProject {
   const now = new Date().toISOString();

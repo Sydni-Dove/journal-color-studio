@@ -6,7 +6,7 @@ import { resolveDocument } from "../engines/document/resolve";
 import type { WizardStart } from "../presets/products/productFamilies";
 import { NewProductWizard } from "../components/wizard/NewProductWizard";
 import { resolveColors } from "../presets/themes/palettes";
-import { addVariantFromCurrent, duplicateProject, localProjectStore, type ProjectSummary } from "../persistence/projectStore";
+import { addVariantFromCurrent, duplicateProject, localProjectStore, projectKey, saveGuarded, type ProjectSummary } from "../persistence/projectStore";
 import type { ProductProject } from "../types/project";
 
 type View = { kind: "list" } | { kind: "new"; start?: WizardStart } | { kind: "edit"; project: ProductProject };
@@ -45,23 +45,56 @@ export function App() {
   const timer = useRef<number | undefined>(undefined);
 
   const refresh = () => setProjects(store.list());
+  /** Edits made in this tab that are not saved yet. Only then does anything write to storage. */
+  const dirty = useRef(false);
+  /** updatedAt of the version this tab loaded or last saved: a newer stored one came from another tab. */
+  const base = useRef<string | null>(null);
+  const current = useRef<ProductProject | null>(null);
+  const [conflict, setConflict] = useState<string | null>(null);
+  /** Bumped when another tab's version replaces this tab's: the editor starts fresh (its undo history was of the old one). */
+  const [generation, setGeneration] = useState(0);
 
   const persist = useCallback((p: ProductProject) => {
+    window.clearTimeout(timer.current);
     try {
-      store.save(p);
+      const r = saveGuarded(store, p, base.current);
+      if (r.status === "conflict") {
+        // Never overwrite newer work: keep the newer version open, this tab's edits as a separate copy.
+        base.current = r.stored.updatedAt;
+        current.current = r.stored;
+        setView((v) => (v.kind === "edit" && v.project.id === p.id ? { kind: "edit", project: r.stored } : v));
+        setGeneration((g) => g + 1);
+        setConflict(r.copy.name);
+      } else base.current = p.updatedAt;
+      dirty.current = false;
       setSaveStatus("saved");
     } catch {
       setSaveStatus("error");
     }
     refresh();
   }, []);
+  /** Save only unsaved edits (leaving, reloading, going back): an unchanged tab never writes. */
+  const flush = useCallback(() => {
+    if (dirty.current && current.current) persist(current.current);
+  }, [persist]);
 
-  const open = (p: ProductProject) => {
-    persist(p);
+  const openLoaded = (p: ProductProject) => {
+    base.current = p.updatedAt;
+    current.current = p;
+    dirty.current = false;
+    setConflict(null);
+    setGeneration((g) => g + 1);
     setView({ kind: "edit", project: p });
+  };
+  const open = (p: ProductProject) => {
+    base.current = null;
+    persist(p);
+    openLoaded(p);
   };
 
   const onChange = (p: ProductProject) => {
+    current.current = p;
+    dirty.current = true;
     setView({ kind: "edit", project: p });
     setSaveStatus("saving");
     window.clearTimeout(timer.current);
@@ -70,18 +103,26 @@ export function App() {
 
   // Flush a pending autosave when leaving the page.
   useEffect(() => {
-    const flush = () => {
-      if (view.kind === "edit" && saveStatus === "saving") persist(view.project);
-    };
     window.addEventListener("beforeunload", flush);
     return () => window.removeEventListener("beforeunload", flush);
-  }, [view, saveStatus, persist]);
+  }, [flush]);
+
+  // Another tab saved: an unchanged tab follows it (so it can never write an older copy later).
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      const open = current.current;
+      if (open && e.key === projectKey(open.id) && !dirty.current) {
+        const p = store.load(open.id);
+        if (p && p.updatedAt > (base.current ?? "")) openLoaded(p);
+      }
+      refresh();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
   const reload = () => {
-    if (view.kind === "edit") {
-      window.clearTimeout(timer.current);
-      persist(view.project);
-    }
+    flush();
     window.location.reload();
   };
   const banner = stale ? <UpdateBanner onReload={reload} /> : null;
@@ -90,13 +131,15 @@ export function App() {
     return (
       <>
       {banner}
+      {conflict && <div className="update-banner" role="alert"><span>This project was changed in another tab, so that newer version is open here. Your edits from this tab were kept as a separate project: “{conflict}”.</span><button type="button" className="btn" onClick={() => setConflict(null)}>OK</button></div>}
       <Editor
+        key={`${view.project.id}:${generation}`}
         project={view.project}
         onChange={onChange}
         saveStatus={saveStatus}
         onBack={() => {
-          window.clearTimeout(timer.current);
-          persist(view.project);
+          flush();
+          current.current = null;
           setView({ kind: "list" });
         }}
       />
@@ -112,7 +155,7 @@ export function App() {
       onStart={(start) => setView({ kind: "new", start })}
       onOpen={(id) => {
         const p = store.load(id);
-        if (p) setView({ kind: "edit", project: p });
+        if (p) openLoaded(p);
       }}
       onDuplicate={(id) => {
         const p = store.load(id);
