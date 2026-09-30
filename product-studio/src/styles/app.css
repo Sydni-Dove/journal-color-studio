@@ -1706,3 +1706,23 @@ button.family-card:focus-visible {
   gap: 8px;
   margin: 0 0 6px;
 }
+
+/* ── Page Composer: saved page designs ── */
+.save-design {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--ui-line);
+}
+.copies-field input {
+  width: 64px;
+  min-height: 44px;
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}

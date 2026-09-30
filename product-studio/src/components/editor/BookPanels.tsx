@@ -7,6 +7,8 @@ import { CoverDividerControls } from "./CoverDividerControls";
  * colour, surface, decoration, spacing) stays in the design panels.
  */
 import { Visual } from "../help/visuals";
+import { useState } from "react";
+import { savePageDesign } from "../../engines/recipe/pageDesigns";
 import { PromptEditor, type PromptFit } from "./PromptEditor";
 import { sectionLineCounts, sectionPages } from "../../layouts/shared/promptPages";
 import { promptSetFromList } from "../../types/prompts";
@@ -182,9 +184,42 @@ export function StepFields({ s, siblings, scope, props, parts }: { s: BookStep; 
             allowStarters
             fit={stepFit(doc, s.id)}
           />
+          <SaveDesign step={s} props={props} />
         </details>
       )}
     </>
+  );
+}
+
+/** Save this Custom Page as a reusable page design (Pages → Your page designs adds pages made from it). */
+function SaveDesign({ step, props }: { step: BookStep; props: Props }) {
+  const { project, update } = props;
+  const from = project.pageDesigns?.find((d) => d.id === step.designId);
+  const [name, setName] = useState(from?.name ?? step.title ?? "");
+  const [saved, setSaved] = useState<string | null>(null);
+  return (
+    <div className="save-design" data-testid="save-design">
+      <div className="field-label">Reuse this page</div>
+      <p className="hint">{from ? `Made from your page design “${from.name}”. Saving again updates that design; pages already in the book keep their own copy.` : "Save it as a page design, then add it anywhere in Pages — as many copies as you need."}</p>
+      <div className="row">
+        <Field label="Design name">
+          <input type="text" value={name} placeholder="e.g. Project Snapshot" onChange={(e) => setName(e.target.value)} />
+        </Field>
+      </div>
+      <button
+        type="button"
+        className="btn"
+        disabled={!step.promptSet?.blocks.length}
+        onClick={() => {
+          const clean = name.trim() || step.title || "Page design";
+          update((p) => savePageDesign(p, step, clean));
+          setSaved(clean);
+        }}
+      >
+        Save page design
+      </button>
+      {saved && <p className="hint" role="status">Saved “{saved}”. Add it from Pages → Your page designs.</p>}
+    </div>
   );
 }
 

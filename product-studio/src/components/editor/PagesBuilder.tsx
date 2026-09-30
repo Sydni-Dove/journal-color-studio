@@ -19,6 +19,7 @@ import {
   BUILDER_CATEGORIES, builderRows, primaryCategories, stepPeriod, WEEKLY_JOURNAL, type BuilderCategory, type BuilderRow, type WeeklyJournalKind,
 } from "../../engines/recipe/pageBuilder";
 import { getLayout } from "../../layouts/registry";
+import { addPageFromDesign, removePageDesign } from "../../engines/recipe/pageDesigns";
 import { neutralLuxeDividers } from "../../presets/bookRecipes";
 import { moduleTitle } from "../../presets/modules";
 import { layoutName, pageTypeName } from "../../presets/plainNames";
@@ -82,6 +83,7 @@ export function PagesBuilder({ project, update, doc, onEdit }: Props) {
       {shown.map((cat) => (
         <Category key={cat} cat={cat} rows={rows} allRows={rows} edit={edit} onEdit={onEdit} doc={doc} />
       ))}
+      <PageDesigns project={project} edit={edit} update={update} />
       {more.length > 0 && (
         <button type="button" className="btn btn--ghost builder__more" aria-expanded={showMore} onClick={() => setShowMore(!showMore)}>
           {showMore ? "Fewer kinds of pages" : `More kinds of pages (${more.map((c) => BUILDER_CATEGORIES.find((x) => x.id === c)!.label).join(", ")})`}
@@ -217,4 +219,32 @@ function WeeklyJournalChooser({ weeklyLayout, onAdd }: { weeklyLayout?: string; 
 /** Rename a step (used by rows that show a title). */
 export function renameStep(nodes: BookNode[], id: string, title: string): BookNode[] {
   return updateNode(nodes, id, (n) => ({ ...n, title }) as BookNode);
+}
+
+/** Your page designs: Custom Pages saved for reuse; each adds pages that are a copy of it. */
+function PageDesigns({ project, edit, update }: { project: ProductProject; edit: (fn: (n: BookNode[]) => BookNode[]) => void; update: Update }) {
+  const designs = project.pageDesigns ?? [];
+  const [copies, setCopies] = useState<Record<string, number>>({});
+  if (!designs.length) return null;
+  return (
+    <div className="builder-cat" data-category="designs">
+      <div className="builder-cat__head"><strong>Your page designs</strong></div>
+      {designs.map((d) => (
+        <div key={d.id} className="builder-row" data-design={d.id}>
+          <div className="builder-row__text">
+            <span className="builder-row__name">{d.name}</span>
+            <span className="builder-row__detail">{d.promptSet.blocks.length} section{d.promptSet.blocks.length === 1 ? "" : "s"}</span>
+          </div>
+          <div className="builder-row__actions">
+            <label className="copies-field">
+              <span className="visually-hidden">Copies of {d.name}</span>
+              <input type="number" min={1} max={200} value={copies[d.id] ?? 1} aria-label={`Copies of ${d.name}`} onChange={(e) => setCopies({ ...copies, [d.id]: Math.max(1, Math.min(200, Math.round(+e.target.value || 1))) })} />
+            </label>
+            <button type="button" className="btn" onClick={() => edit((n) => addPageFromDesign(n, d, copies[d.id] ?? 1))} aria-label={`Add ${d.name}`}>+ Add</button>
+            <button type="button" className="btn btn--ghost" onClick={() => update((p) => removePageDesign(p, d.id))} aria-label={`Delete design ${d.name}`}>Delete</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }

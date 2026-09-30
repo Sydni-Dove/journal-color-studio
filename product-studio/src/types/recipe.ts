@@ -112,6 +112,8 @@ export type BookStep = {
   /** Prompt overrides for guided pages (saved before prompt blocks; still read). */
   prompts?: string[];
   /** Prompt + response blocks for guided pages (wins over `prompts`). */
+  /** A page made from a saved page design (ProductProject.pageDesigns): which one. */
+  designId?: string;
   promptSet?: import("./prompts").PromptSet;
 };
 

@@ -76,3 +76,29 @@ describe("Page Composer blocks", () => {
     expect(contentOf({ id: "w", label: "Words", content: { mode: "list", key: "propheticWords" } })).toEqual({ mode: "list", key: "propheticWords" });
   });
 });
+
+describe("saved page designs", () => {
+  it("save a Custom Page as a design, add it × 8 before the end cover; pages are copies, the design is unchanged by edits", async () => {
+    const { savePageDesign, addPageFromDesign } = await import("../src/engines/recipe/pageDesigns");
+    const { addEndCover, addFrontCover } = await import("../src/engines/recipe/pageBuilder");
+    let p = composed(DASHBOARD);
+    const s = p.recipe.structure![0];
+    if (s.kind !== "step") throw new Error("step");
+    p = savePageDesign(p, s, "Project Snapshot", "2026-09-30T00:00:00Z");
+    expect(p.pageDesigns).toHaveLength(1);
+    const d = p.pageDesigns![0];
+    expect(d.promptSet.blocks.map((b) => b.id)).toEqual(DASHBOARD.map((b) => b.id));
+    // Saving again under the same name updates it (no duplicate).
+    expect(savePageDesign(p, s, "Project Snapshot").pageDesigns).toHaveLength(1);
+
+    const structure = addPageFromDesign(addEndCover(addFrontCover(p.recipe.structure!)), d, 8);
+    const doc = resolveDocument({ ...p, recipe: { ...p.recipe, structure } });
+    const made = structure.find((n) => n.kind === "step" && n.designId === d.id)!;
+    expect(doc.recipe.pages.filter((x) => x.recipeItemId === made.id && !x.filler).length).toBeGreaterThanOrEqual(8);
+    expect(doc.recipe.pages.filter((x) => !x.filler).at(-1)!.layoutId).toBe("back-cover-page");
+    // The page's sections are a copy: changing them never changes the saved design.
+    if (made.kind !== "step") throw new Error("step");
+    made.promptSet!.blocks[0].label = "Changed";
+    expect(d.promptSet.blocks[0].label).toBe("Master Dashboard");
+  });
+});

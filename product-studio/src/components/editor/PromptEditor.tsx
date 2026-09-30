@@ -10,7 +10,7 @@
  * show what was asked for, sections that share the space show the lines they
  * get at this page size. The layout engine decides whether the page fits.
  */
-import { DEFAULT_MIN_LINES, newPromptId, PROMPT_STARTERS, spaceOf, type GuidedHeader, type PromptBlock, type PromptSet, type PromptSpacing, type ResponseStyle, type SpaceMode, type TaskMarker, type TaskMarkerPosition } from "../../types/prompts";
+import { contentOf, DEFAULT_MIN_LINES, kindOf, newPromptId, PROMPT_STARTERS, spaceOf, type GuidedHeader, type PromptBlockKind, type SpacerSize, type PromptBlock, type PromptSet, type PromptSpacing, type ResponseStyle, type SpaceMode, type TaskMarker, type TaskMarkerPosition } from "../../types/prompts";
 import { Check, Field, LabeledNumeric, NumberField, Segmented, Select } from "./ui";
 
 const MAX_PROMPTS = 20;
@@ -38,6 +38,14 @@ function spaceSummary(set: PromptSet, b: PromptBlock, got: number | undefined): 
   const n = got !== undefined ? ` · ${plural(got, unit)}` : "";
   return mode === "equal" ? `Equal share${n}` : `Fills space${n}`;
 }
+
+/** A non-writing section's one-line summary in its row. */
+const KIND_SUMMARY: Record<Exclude<PromptBlockKind, "prompt">, (b: PromptBlock) => string> = {
+  heading: (b) => (b.prompt?.trim() ? "Heading + text" : "Heading"),
+  info: (b) => `Info row · ${plural((b.fields ?? []).filter((f) => f.trim()).length || 1, "blank")}`,
+  divider: () => "Line",
+  spacer: (b) => `${(b.spacer ?? "medium")[0].toUpperCase()}${(b.spacer ?? "medium").slice(1)} space`,
+};
 
 function HeaderEditor({ header, onChange }: { header: GuidedHeader | undefined; onChange: (h: GuidedHeader | undefined) => void }) {
   const h = header ?? {};
@@ -107,7 +115,13 @@ const ADD_GROUPS: { title: string; items: { label: string; block: Omit<PromptBlo
   },
   {
     title: "Organization",
-    items: [{ label: "Notes", block: { label: "Notes", space: "fill", responseStyle: "ruled" } }],
+    items: [
+      { label: "Heading / text", block: { kind: "heading", label: "Heading" } },
+      { label: "Info row", block: { kind: "info", label: "", fields: ["Date", "Project"] } },
+      { label: "Divider line", block: { kind: "divider", label: "" } },
+      { label: "Spacer / open space", block: { kind: "spacer", label: "", spacer: "medium" } },
+      { label: "Notes", block: { label: "Notes", space: "fill", responseStyle: "ruled" } },
+    ],
   },
 ];
 
@@ -184,7 +198,8 @@ export function PromptEditor({
       <ol className="prompt-list">
         {blocks.map((b, i) => {
           const mode = spaceOf(b);
-          const name = b.label.trim() || b.prompt?.trim() || `Section ${i + 1}`;
+          const k = kindOf(b);
+          const name = k === "divider" ? "Divider line" : k === "spacer" ? "Open space" : k === "info" ? (b.fields ?? []).filter((f) => f.trim()).join(" · ") || "Info row" : b.label.trim() || b.prompt?.trim() || `Section ${i + 1}`;
           const got = fit?.lines?.[b.id];
           return (
             <li key={b.id}>
@@ -192,11 +207,37 @@ export function PromptEditor({
                 <summary>
                   <span className="prompt-block__name">{name}</span>
                   <span className="prompt-block__space" data-testid="section-space">
-                    {spaceSummary(set, b, got)}
+                    {k === "prompt" ? spaceSummary(set, b, got) : KIND_SUMMARY[k](b)}
                     {fit && fit.pages > 1 && fit.pageOf?.[b.id] !== undefined ? ` · page ${fit.pageOf[b.id] + 1}` : ""}
                   </span>
                 </summary>
                 <div className="prompt-block__body">
+                  {kindOf(b) === "heading" && (
+                    <>
+                      <Field label="Heading">
+                        <input type="text" value={b.label} placeholder="e.g. Master Dashboard" onChange={(e) => putBlock(b.id, { label: e.target.value })} />
+                      </Field>
+                      <Field label="Text under it (optional)">
+                        <textarea rows={2} value={b.prompt ?? ""} placeholder="A short line of text" onChange={(e) => putBlock(b.id, { prompt: e.target.value || undefined })} />
+                      </Field>
+                    </>
+                  )}
+                  {kindOf(b) === "info" && (
+                    <Field label="Blanks on this row (comma separated)">
+                      <input
+                        type="text"
+                        value={(b.fields ?? []).join(", ")}
+                        placeholder="e.g. Date, Project, Status"
+                        onChange={(e) => putBlock(b.id, { fields: e.target.value.split(",").map((x) => x.trimStart()).slice(0, 4) })}
+                      />
+                    </Field>
+                  )}
+                  {kindOf(b) === "divider" && <p className="hint">A thin line across the page between the sections above and below it.</p>}
+                  {kindOf(b) === "spacer" && (
+                    <Segmented<SpacerSize> label="Open space" value={b.spacer ?? "medium"} options={(["small", "medium", "large"] as const).map((v) => ({ value: v, label: v[0].toUpperCase() + v.slice(1) }))} onChange={(spacer) => putBlock(b.id, { spacer })} />
+                  )}
+                  {kindOf(b) === "prompt" && (
+                    <>
                   <Field label="Heading">
                     <input type="text" value={b.label} placeholder="e.g. MY RESPONSE (optional)" onChange={(e) => putBlock(b.id, { label: e.target.value })} />
                   </Field>
@@ -306,6 +347,14 @@ export function PromptEditor({
                         onChange={(showHeader) => putBlock(b.id, { table: { ...(b.table ?? { columns: ["Task", "Due", "Done"], rows: b.lineCount ?? 6 }), showHeader } })}
                       />
                     </div>
+                  )}
+                      <Segmented<"field" | "list">
+                        label="Holds"
+                        value={contentOf(b).mode}
+                        options={[{ value: "field", label: "One answer" }, { value: "list", label: "A list of entries" }]}
+                        onChange={(mode) => putBlock(b.id, { content: { ...b.content, mode } })}
+                      />
+                    </>
                   )}
                   <div className="card-actions">
                     <button type="button" className="btn" aria-label={`Move section ${i + 1} up`} disabled={i === 0} onClick={() => move(i, -1)}>Move up</button>

@@ -145,9 +145,25 @@ export type ProductProject = {
   exportSettings: ExportSettings;
 
   variants: ProductVariant[];
+  /**
+   * Saved page designs: Custom Pages the maker built once and reuses in Pages
+   * (e.g. "Project Snapshot" × 8). A page added from a design gets its own copy
+   * of the sections, so editing that page never changes the design.
+   */
+  pageDesigns?: PageDesign[];
   activeVariantId: string | null;
   origin: ProjectOrigin;
 
   createdAt: string;
   updatedAt: string;
+};
+
+/** A reusable page definition: a Custom Page's title and structured sections. */
+export type PageDesign = {
+  id: string;
+  name: string;
+  /** The page title printed on pages made from it. */
+  title?: string;
+  promptSet: import("./prompts").PromptSet;
+  savedAt: string;
 };
