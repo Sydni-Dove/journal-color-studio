@@ -119,7 +119,7 @@ function isPaged(binding: BindingProfile, duplex: boolean): boolean {
 }
 
 /** Cover and divider pages drawn in a designed style (not "plain"): they carry that design's title type. */
-export const designedCoverPage = (p: PageInstance) => (p.layoutId === "cover-page" || p.layoutId === "back-cover-page" || p.layoutId === "divider-page") && p.module?.cover?.preset !== "plain";
+export const designedCoverPage = (p: PageInstance) => (p.layoutId === "cover-page" || p.layoutId === "back-cover-page" || p.layoutId === "divider-page") && p.module?.cover?.preset === "neutral-cheetah-luxe";
 
 /**
  * The document's typography: the project's, plus — when the book has Neutral
