@@ -189,12 +189,19 @@ export function ExportDialog({ doc, currentIndex, fontsReady, onClose, onGoTo, o
           ]}
           onChange={(paper) => onSettings({ ...settings, paper: paper === "page" ? undefined : paper })}
         />
+        {settings.paper && settings.paper !== "page" && (
+          <Check
+            label="Show trim marks"
+            checked={settings.showTrimMarks === true}
+            onChange={(showTrimMarks) => onSettings({ ...settings, showTrimMarks })}
+          />
+        )}
         <p className="hint" data-testid="export-output">
           Output: {plan.sequence.length} page(s), {plan.mediaWidthIn}" × {plan.mediaHeightIn}"
           {doc.project.production.includeBleed ? " (page size plus the area past the cut edge)" : " (page size)"}
           {settings.paper && settings.paper !== "page" ? `, centred on ${settings.paper === "letter" ? "Letter" : "A4"} paper with nothing else on the sheet` : ""}.{" "}
           {settings.paper && settings.paper !== "page"
-            ? `In the print dialog keep scale at 100% (“Default” or “Actual size”) and turn on background graphics. Cut along the corner marks for a page whose art runs to every edge${doc.project.production.includeBleed ? "" : " — turn on “Extend background past the cut edge” (Page setup) so no white shows where you cut"}.`
+            ? `In the print dialog keep scale at 100% (“Default” or “Actual size”) and turn on background graphics.${settings.showTrimMarks ? ` Cut along the corner marks for a page whose art runs to every edge${doc.project.production.includeBleed ? "" : " — turn on “Extend background past the cut edge” (Page setup) so no white shows where you cut"}.` : " Trim marks are off; turn them on above only when you plan to cut the sheet down to the finished page size."}`
             : "In the print dialog choose “Save as PDF”, margins “None”, scale 100%, and turn on background graphics. A home printer has no paper this size — choose Letter or A4 above to print at home."}
         </p>
         <div className="row">
