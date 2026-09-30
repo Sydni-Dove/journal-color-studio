@@ -27,6 +27,23 @@ export function CoverDividerControls({ step, set, applyPreset, titleFont, onTitl
     <Select label="Title alignment" value={o.alignment ?? "center"} options={[{ value: "center", label: "Centered" }, { value: "left", label: "Left" }]} onChange={(alignment) => change({ alignment })}/>
     <Select label="Title position" value={o.position ?? "middle"} options={[{ value: "upper", label: "Higher" }, { value: "middle", label: "Middle" }, { value: "lower", label: "Lower" }]} onChange={(position) => change({ position })}/>
     <details><summary>Decorative elements</summary>{(["circles", "outlines", "leopard"] as const).map((key) => <label key={key} style={{ display: "block", minHeight: 44 }}><input type="checkbox" checked={o[key] !== false} onChange={(e) => change({ [key]: e.target.checked })}/>{key === "circles" ? "Filled circles" : key === "outlines" ? "Thin gold rings" : "Cheetah circles"}</label>)}</details>
+    {step.module !== "back-cover" && <>
+      <label style={{ display: "block", minHeight: 44 }}><input type="checkbox" checked={o.autoFit !== false} onChange={(e) => change({ autoFit: e.target.checked })}/> Fit design to page size</label>
+      <p className="hint">{o.autoFit !== false ? "Title, subtitle and shapes adapt to the page size you choose; the text always wins over the shapes." : "The Letter layout scaled to this page; smaller pages may need shorter wording."}</p>
+      {o.autoFit !== false && <details><summary>Fine-tune (optional)</summary>
+        <p className="hint">Adjusts the fitted design. Nudges are % of the page, so they carry over when you change size.</p>
+        <NumberField label="Title size (%)" min={60} max={130} step={5} value={o.titleScale ?? 100} onChange={(titleScale) => change({ titleScale })}/>
+        {([["titleOffset", "Title"], ["subtitleOffset", "Subtitle"], ["decorOffset", "Shapes"]] as const).map(([key, label]) => {
+          const v = o[key] ?? { x: 0, y: 0 };
+          const pct = (n: number) => Math.round(n * 1000) / 10;
+          return <div key={key} className="row">
+            <NumberField label={`${label} ← →  (%)`} min={-20} max={20} step={0.5} value={pct(v.x)} onChange={(x) => change({ [key]: { ...v, x: x / 100 } })}/>
+            <NumberField label={`${label} ↑ ↓  (%)`} min={-20} max={20} step={0.5} value={pct(v.y)} onChange={(y) => change({ [key]: { ...v, y: y / 100 } })}/>
+          </div>;
+        })}
+        <button className="btn" onClick={() => change({ titleScale: undefined, titleOffset: undefined, subtitleOffset: undefined, decorOffset: undefined })}>Reset fine-tuning</button>
+      </details>}
+    </>}
     {step.module === "divider-page" && <>
       <label style={{ display: "block", minHeight: 44 }}><input type="checkbox" checked={t.show} onChange={(e) => tab({ show: e.target.checked })}/> Show tab</label>
       {t.show && <>

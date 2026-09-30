@@ -59,6 +59,11 @@ export function validateBook(doc: ResolvedDocument): ValidationIssue[] {
     });
   }
 
-  for (const { layout, fit } of recipeLayouts(doc)) if (!fit.ok) add("error", `${layout.label} does not fit this page size: ${fit.reason}`);
+  // Named and located: the first page that uses the layout, so the editor can tell it apart from the page in view.
+  for (const { layout, fit } of recipeLayouts(doc)) {
+    if (fit.ok) continue;
+    const first = pages.find((p) => !p.filler && p.layoutId === layout.id);
+    add("error", `${layout.label} does not fit this page size: ${fit.reason}`, first?.pageNumber ?? null, `layout:${layout.id}`);
+  }
   return out;
 }

@@ -59,10 +59,12 @@ describe("Reusable covers and printed tabs", () => {
     }
     expect(validateProject(p, heuristicMeasurer).issues.filter((x) => x.severity === "error")).toEqual([]);
   });
-  it("Neutral Cheetah Luxe: the reference cover's composition, colors and type on every size", () => {
+  it("Neutral Cheetah Luxe with \"Fit design to page\" off: the reference cover's composition, colors and type on every size", () => {
     const luxeType = (size: string) => {
       const p = luxeProject(size);
       p.typography = { ...p.typography, fonts: { ...p.typography.fonts, cover: LUXE_TITLE_FONT }, roleOverrides: { ...p.typography.roleOverrides, coverTitle: luxeTitleStyle(LUXE_TITLE_FONT), coverSubtitle: LUXE_SUBTITLE_STYLE } };
+      // The reference layout, placed by fractions of the trim (the responsive composition is tested in cover-composition.test.ts).
+      p.recipe = { ...p.recipe, structure: p.recipe.structure!.map((n) => (n.kind === "step" ? { ...n, cover: { ...n.cover, autoFit: false } } : n)) };
       return p;
     };
     // Palette: sampled from the reference.
@@ -152,7 +154,7 @@ describe("Neutral Cheetah Luxe cover composition (the design's type and artwork,
   });
 
   for (const size of SIZES) {
-    it(`${size}: cover = one composition (no band cut across it), large script title under the burgundy circle; divider smaller and centred`, () => {
+    it(`${size}: cover = one composition (no band cut across it), a large script title as its focal point; divider smaller and centred`, () => {
       const doc = resolveDocument(themed(size));
       const cover = doc.recipe.pages.findIndex((p) => p.layoutId === "cover-page");
       const divider = doc.recipe.pages.findIndex((p) => p.layoutId === "divider-page");
@@ -169,12 +171,14 @@ describe("Neutral Cheetah Luxe cover composition (the design's type and artwork,
       const ct = c.nodes.find((n) => n.id === "cover-title")!, dt = d.nodes.find((n) => n.id === "cover-title")!;
       const burgundy = c.nodes.find((n) => n.id === "luxe-burgundy")!;
       if (ct.type !== "text" || dt.type !== "text") throw new Error("titles");
-      // Cover: the focal point — most of the page's width, its lettering in the upper-middle, just under the burgundy circle.
+      // Cover: the focal point — larger than the divider's, its lettering in the upper-middle band of the page.
       expect(ct.fit!.sizePt).toBeGreaterThan(dt.fit!.sizePt);
-      expect(ct.rect.y).toBeLessThan(0.62 * H);
+      expect(ct.rect.y).toBeGreaterThan(0.3 * H);
       expect(ct.rect.y + ct.rect.h).toBeLessThanOrEqual(0.7 * H);
-      // (The box starts below the script's tall loops: the design's tight leading keeps the box to the lettering's body.)
-      expect(ct.rect.y).toBeLessThan(burgundy.rect.y + burgundy.rect.h + 0.15 * H);
+      // The text is placed first; the burgundy anchor keeps clear of the title's box.
+      const bc = { x: burgundy.rect.x + burgundy.rect.w / 2, y: burgundy.rect.y + burgundy.rect.h / 2, r: burgundy.rect.w / 2 };
+      const nx = Math.max(ct.rect.x, Math.min(bc.x, ct.rect.x + ct.rect.w)), ny = Math.max(ct.rect.y, Math.min(bc.y, ct.rect.y + ct.rect.h));
+      expect(Math.hypot(bc.x - nx, bc.y - ny)).toBeGreaterThan(bc.r);
       // Divider: its own zone — centred, narrower, a little above the middle; the subtitle on one line beneath.
       // (centred on its column, which leaves room for the printed tab at the outer edge)
       expect(Math.abs(dt.rect.x + dt.rect.w / 2 - W / 2)).toBeLessThan(0.6);

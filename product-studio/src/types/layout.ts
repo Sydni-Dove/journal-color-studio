@@ -54,7 +54,8 @@ export type BoxNode = NodeBase & {
 };
 
 /** `failed`: the heading could not fit even at the minimum — it is reported (heading-fit) and kept inside its box. */
-export type TextFit = { sizePt: number; lineHeight: number; lines: string[]; failed?: boolean };
+/** trackingEm: letter spacing the fitting settled on (overrides the role's; tightened before the type shrinks). */
+export type TextFit = { sizePt: number; lineHeight: number; lines: string[]; failed?: boolean; trackingEm?: number };
 
 export type TextNode = NodeBase & {
   type: "text";

@@ -7,6 +7,8 @@ import { text, box, rule } from "../shared/nodes";
 import { fitHeading, HEADING_MIN_PT } from "../shared/components";
 import { guidedPage } from "./guidedPage";
 import { minimumAreaFit, type LayoutContext, type LayoutDefinition } from "../shared/types";
+import { classifyComposition, fitSubtitle, fitTitle, placeDecoration, SCRIPT_ASCENT_EM, SCRIPT_DESCENT_EM, SCRIPT_DESCENT_SHORT_EM, type MeasureText, type ProtectedZone } from "./composition";
+import { COMPOSITION_PRESETS, LUXE_DECORATION } from "./luxeComposition";
 
 /**
  * The edge a tab prints on: the outer (fore) edge, away from the binding — the
@@ -33,23 +35,11 @@ export function tabGeometry(g: PageGeometry, tab: NonNullable<CoverDividerSettin
  * Drawn in order: color circles, cheetah circles, then the thin rings over them.
  */
 type LuxeCircle = { id: string; x: number; y: number; r: number; fill?: ColorToken };
-export const LUXE_CIRCLES: LuxeCircle[] = [
-  { id: "luxe-burgundy", x: 0.269, y: 0.108, r: 0.248, fill: "primary" },
-  { id: "luxe-blush", x: 0.655, y: 0.37, r: 0.184, fill: "decorHighlight" },
-  { id: "luxe-terracotta", x: 1.013, y: 0.536, r: 0.17, fill: "accent" },
-  { id: "luxe-tan", x: 0.109, y: 0.722, r: 0.132, fill: "secondary" },
-  { id: "luxe-slate", x: 0.24, y: 0.989, r: 0.222, fill: "decorativeAccent" },
-];
-export const LUXE_CHEETAH: LuxeCircle[] = [
-  { id: "luxe-cheetah-top", x: 0.88, y: 0.232, r: 0.132 },
-  { id: "luxe-cheetah-bottom", x: 0.858, y: 0.895, r: 0.116 },
-];
-export const LUXE_RINGS: LuxeCircle[] = [
-  { id: "luxe-ring-top", x: 0.384, y: 0.046, r: 0.349 },
-  { id: "luxe-ring-left", x: 0.188, y: 0.942, r: 0.308 },
-  { id: "luxe-ring-right", x: 1.13, y: 0.942, r: 0.35 },
-  { id: "luxe-ring-low", x: 0.779, y: 1.057, r: 0.236 },
-];
+// The reference positions live with the responsive design (luxeComposition.ts); these views keep their draw groups.
+const luxeGroup = (style: string): LuxeCircle[] => LUXE_DECORATION.filter((d) => d.style === style).map(({ id, x, y, r, fill }) => ({ id, x, y, r, ...(fill ? { fill } : {}) }));
+export const LUXE_CIRCLES: LuxeCircle[] = luxeGroup("fill");
+export const LUXE_CHEETAH: LuxeCircle[] = luxeGroup("leopard");
+export const LUXE_RINGS: LuxeCircle[] = luxeGroup("outline");
 /**
  * Title, subtitle and gold rule anchors (fractions of the trim). Cover and
  * divider have their own zones:
@@ -118,7 +108,12 @@ function descenderOver(title: string, rect: Rect, sizePt: number, left: boolean,
   });
 }
 
-function solve(ctx: LayoutContext, divider: boolean): SolvedPage[] {
+/**
+ * The reference layout at every size ("Fit design to page" off): the Letter
+ * composition placed by fractions of the trim, text anchored to the burgundy
+ * circle. Kept exactly as it was before responsive composition.
+ */
+function solveReference(ctx: LayoutContext, divider: boolean): SolvedPage[] {
   const g = ctx.pages[0], s = g.safeRect, opt = ctx.module?.cover ?? {};
   const nodes: LayoutNode[] = [], diagnostics: SolvedPage["diagnostics"] = [];
   const title = ctx.module?.title ?? (divider ? "Prayer" : "Plan");
@@ -200,6 +195,146 @@ function solve(ctx: LayoutContext, divider: boolean): SolvedPage[] {
   // A designed page is its own artwork: the project's background band or frame would cut across it.
   return [{ nodes, diagnostics, metrics: [], regions: { mainContent: content }, ownArtwork: opt.preset !== "plain" }];
 }
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+
+/**
+ * The design fitted to this page (default): layouts/book/composition.ts picks
+ * the size class from the live area, fits the title and subtitle into their
+ * protected zones, and moves the decoration around them.
+ */
+function solveResponsive(ctx: LayoutContext, divider: boolean): SolvedPage[] {
+  const g = ctx.pages[0], s = g.safeRect, opt = ctx.module?.cover ?? {};
+  const nodes: LayoutNode[] = [], text$: LayoutNode[] = [], diagnostics: SolvedPage["diagnostics"] = [];
+  const title = ctx.module?.title ?? (divider ? "Prayer" : "Plan");
+  const tab = opt.tab?.show ? tabGeometry(g, opt.tab) : null;
+  if (opt.tab?.show && !tab) diagnostics.push({ severity: "error", rule: "tab-fit", componentId: "tab", message: "These tabs do not fit comfortably. Use fewer tabs or a larger page." });
+  // Text keeps a label's clear space (0.1") beyond the tab's own gap.
+  const tabRoom = tab ? tab.w + 0.26 : 0;
+  const content = { ...s, x: tab && tabEdge(g) === "left" ? s.x + tabRoom : s.x, w: s.w - tabRoom };
+  const W = g.trimWidthIn, H = g.trimHeightIn;
+  const R = Math.min(W, (H * 8.5) / 11);
+  const comp = classifyComposition(content);
+  const preset = COMPOSITION_PRESETS[opt.preset === "plain" ? "plain" : "neutral-cheetah-luxe"];
+  const variant = (divider ? preset.divider : preset.cover)[comp.sizeClass];
+  const left = opt.alignment === "left";
+
+  // Measuring with the same metrics the validator uses (the canvas once fonts load).
+  const measure = getLayoutMeasurer().measure;
+  const titleStyle = styleForRole(ctx.typography, "coverTitle"), subStyle = styleForRole(ctx.typography, "coverSubtitle");
+  const mTitle: MeasureText = (t, sizePt, trackingEm) => measure(t, { ...titleStyle, sizePt, trackingEm });
+  const mSub: MeasureText = (t, sizePt, trackingEm) => measure(t, { ...subStyle, sizePt, trackingEm });
+
+  // ── Title: the preferred size for this class (× the user's size), shrunk only as far as its zone needs.
+  const scale = clamp((opt.titleScale ?? 100) / 100, 0.6, 1.3);
+  const narrow = comp.narrow ? 0.85 : 1;
+  // Aspect ratio, not only area: a relatively narrow portrait page (6 × 9, 5.5 × 8.5) gets a narrower title zone,
+  // so the script doesn't run edge to edge where a squarer page of the same class has room around it.
+  const aspectW = comp.landscape ? 1 : comp.aspect < 0.5 ? 0.85 : comp.aspect < 0.62 ? 0.92 : 1;
+  const zone = { w: Math.min(content.w, variant.title.maxW * aspectW * content.w), h: variant.title.maxH * content.h };
+  // The role's size is a ceiling (a size set in Typography still caps the design).
+  const preferredPt = Math.min(variant.title.preferredPt * scale * narrow, titleStyle.sizePt);
+  const tf = fitTitle(title, mTitle, { preferredPt, minPt: Math.min(variant.title.minPt, preferredPt) }, zone, titleStyle.trackingEm);
+  const em = tf.sizePt / 72, lineH = ctx.typography.roles.coverTitle.lineHeight;
+  const inkAbove = SCRIPT_ASCENT_EM * em, inkBelow = (/[gjpqy]/.test(title) ? SCRIPT_DESCENT_EM : SCRIPT_DESCENT_SHORT_EM) * em;
+  const tOff = opt.titleOffset ?? { x: 0, y: 0 }, sOff = opt.subtitleOffset ?? { x: 0, y: 0 };
+  const shift = opt.position === "upper" ? -0.09 : opt.position === "lower" ? 0.07 : 0;
+  const rectX = left ? content.x : clamp((variant.title.centerX + tOff.x) * W - zone.w / 2, content.x, content.x + content.w - zone.w);
+  const cx = left ? content.x + tf.widthIn / 2 : rectX + zone.w / 2;
+  let baseline = (variant.title.centerY + shift + tOff.y) * H + (inkAbove - inkBelow) / 2;
+
+  // ── Subtitle: its own fitting (spacing → size → width), centred under the title.
+  const subtitle = (opt.subtitle ?? (divider ? "" : "WITH PURPOSE")).trim();
+  const sf = subtitle ? fitSubtitle(subtitle, mSub, { ...variant.subtitle, preferredPt: Math.min(variant.subtitle.preferredPt, subStyle.sizePt) }, subStyle.trackingEm, variant.subtitle.width * content.w, variant.subtitle.maxWidth * content.w) : null;
+  const subW = sf ? Math.min(content.w, sf.widthIn) : 0;
+  const subLine = sf ? (sf.sizePt * variant.subtitle.lineHeight) / 72 : 0, subH = sf ? subLine * sf.lines.length : 0;
+  const subCx = left ? content.x + subW / 2 : cx + sOff.x * W;
+  const subX = clamp(subCx - subW / 2, content.x, content.x + content.w - subW);
+  // A script tail (g j p q y) above the subtitle's column pushes it below the tail.
+  const tail = sf && descenderOver(title, { x: rectX, y: 0, w: zone.w, h: 0 }, tf.sizePt, left, { x: subX, w: subW }, ctx);
+  const subGap = (tail ? SCRIPT_DESCENT_EM : 0.14) * em + 0.35 * subLine;
+  // The rule keeps a label's clear space (0.1") from the subtitle.
+  const ruleW = variant.rule.width * content.w, ruleGap = sf ? Math.max(0.12, (variant.rule.gapEm * sf.sizePt) / 72) : inkBelow + 0.12;
+
+  // The text block (title box → subtitle → rule) kept inside the live area: moved as a whole, never squeezed.
+  const layoutBlock = (b: number) => {
+    const titleTop = b - lineH * em, subTop = b + subGap + sOff.y * H;
+    const subBottom = sf ? subTop + subH : b;
+    const ruleY = opt.smallLine !== false ? (sf ? subBottom : b) + ruleGap : null;
+    return { titleTop, subTop, ruleY, bottom: Math.max(b, subBottom, ruleY ?? 0) };
+  };
+  let blk = layoutBlock(baseline);
+  if (blk.bottom > content.y + content.h) baseline -= blk.bottom - (content.y + content.h);
+  blk = layoutBlock(baseline);
+  if (blk.titleTop < content.y) baseline += content.y - blk.titleTop;
+  blk = layoutBlock(baseline);
+
+  const titleRect = { x: rectX, y: blk.titleTop, w: zone.w, h: lineH * em };
+  const zones: ProtectedZone[] = [{ rect: { x: cx - tf.widthIn / 2 - 0.06 * em, y: baseline - inkAbove, w: tf.widthIn + 0.12 * em, h: inkAbove + inkBelow }, soft: true }];
+  // On a small page a wide printed tab can leave too little room: say which setting gives it back.
+  const roomHint = tab && opt.tab?.style !== "staggered" ? ", switch to the narrower tall staggered tabs" : "";
+  const addText = (id: string, value: string, rect: Rect, role: "coverTitle" | "coverSubtitle" | "body", fit: TextFit & { ok: boolean }, message: string) => {
+    const node = text(id, rect, value, role, { align: left ? "left" : "center", wrap: true });
+    node.fit = { ...fit, failed: !fit.ok };
+    if (!fit.ok) diagnostics.push({ severity: "error", rule: "heading-fit", componentId: id, message });
+    text$.push(node);
+  };
+  addText("cover-title", title, titleRect, "coverTitle", { sizePt: tf.sizePt, lineHeight: lineH, lines: [title], ok: tf.ok },
+    `“${title}” is too long for this ${divider ? "divider" : "cover"} even at the smallest readable script size (${tf.sizePt} pt). Shorten it${roomHint} or choose a larger page.`);
+  if (sf) {
+    const subRect = { x: subX, y: clamp(blk.subTop, content.y, content.y + content.h - subH), w: subW, h: subH };
+    addText("cover-subtitle", subtitle, subRect, "coverSubtitle", { sizePt: sf.sizePt, lineHeight: variant.subtitle.lineHeight, lines: sf.lines, trackingEm: sf.trackingEm, ok: sf.ok },
+      `The subtitle “${subtitle}” does not fit this page even with tighter spacing, smaller type and the widest safe space. Shorten it${roomHint} or choose a larger page.`);
+    zones.push({ rect: subRect, soft: false });
+  }
+  let below = blk.bottom;
+  if (blk.ruleY !== null) {
+    const rcx = sf ? subX + subW / 2 : cx, rx = clamp(rcx - ruleW / 2, content.x, content.x + content.w - ruleW), ry = Math.min(blk.ruleY, content.y + content.h);
+    text$.push(rule("cover-line", rx, ry, rx + ruleW, ry, { color: "lineArt", strokePt: RULE_PT }));
+    zones.push({ rect: { x: rx, y: ry - 0.04, w: ruleW, h: 0.08 }, soft: false });
+    below = ry;
+  }
+  if (opt.quote) {
+    const qw = Math.min(content.w, 0.7 * content.w), qx = clamp(cx - qw / 2, content.x, content.x + content.w - qw), qy = below + 0.2;
+    const qRect = { x: qx, y: qy, w: qw, h: Math.max(0.2, content.y + content.h - qy) };
+    const qFit = fitHeading(opt.quote, "body", qRect, ctx);
+    addText("cover-quote", opt.quote, qRect, "body", qFit, "This scripture or quote is too long for the space under the title. Shorten it or choose a larger page.");
+    zones.push({ rect: qRect, soft: false });
+  }
+  if (tab) zones.push({ rect: tab, soft: false });
+
+  // ── Decoration: the design's shapes, moved clear of the text (text wins).
+  const placed = placeDecoration(preset.decoration, variant, { W, H, R }, zones, { enabled: (t) => opt[t] !== false, shift: opt.decorOffset, strokeIn: RING_PT / 72 });
+  for (const d of placed) {
+    if (d.hidden) continue;
+    const rect = { x: d.cx - d.r, y: d.cy - d.r, w: 2 * d.r, h: 2 * d.r };
+    const it = d.item;
+    nodes.push({ id: it.id, type: "circle", component: "Section", rect, functional: false,
+      ...(it.style === "outline" ? { fill: null, outline: true, stroke: "lineArt" as ColorToken, strokePt: RING_PT } : it.style === "leopard" ? { fill: null, leopard: true } : { fill: it.fill ?? null }) });
+    if (d.overlapsText) diagnostics.push({ severity: "warning", rule: "decor-collision", componentId: it.id, message: `The ${it.anchor} shape still touches the text at this size. Nudge the decoration or the title.` });
+  }
+  nodes.push(...text$);
+
+  if (tab && opt.tab) {
+    nodes.push(box("tab", tab, { stroke: "background", strokePt: 1.5, fill: opt.tab.color ?? "secondary", radiusIn: opt.tab.style === "rounded" ? 0.12 : 0 }));
+    if (opt.tab.leopard) nodes.push({ id: "tab-leopard", type: "circle", component: "Section", rect: tab, functional: false, fill: "secondary", leopard: true });
+    const dark = opt.tab.leopard || (["primary", "text", "accent", "decorativeAccent"] as (ColorToken | undefined)[]).includes(opt.tab.color);
+    const label = text("tab-label", { x: tab.x + 0.04, y: tab.y + 0.03, w: tab.w - 0.08, h: tab.h - 0.06 }, opt.tab.label ?? title, "label", { wrap: true, align: "center", color: dark ? "background" : "text" });
+    const fitted = fitHeading(label.text, "label", label.rect, ctx);
+    label.fit = { ...fitted, failed: !fitted.ok }; nodes.push(label);
+    if (!fitted.ok) diagnostics.push({ severity: "error", rule: "tab-label-fit", componentId: label.id, message: "This tab label is too long. Use a short label or fewer tabs." });
+  }
+  const basis = `${preset.label} ${divider ? "divider" : "cover"} · ${comp.sizeClass} composition`;
+  const metric = (label: string, value: number, unit: "in" | "pt" | "count") => ({ label, value, unit, provenance: { geometryClass: "user-design" as const, basis } });
+  const metrics = [
+    metric(`Composition class: ${comp.sizeClass} (usable ${content.w.toFixed(2)} × ${content.h.toFixed(2)} in)`, content.w, "in"),
+    metric(`Title size (${tf.limitedBy})`, tf.sizePt, "pt"),
+    ...(sf ? [metric(`Subtitle size (${sf.steps.join(" → ") || "preferred"})`, sf.sizePt, "pt"), metric("Subtitle letter spacing (em × 100)", Math.round(sf.trackingEm * 100), "count")] : []),
+    metric("Decorative shapes shown", placed.filter((d) => !d.hidden).length, "count"),
+  ];
+  return [{ nodes, diagnostics, metrics, regions: { mainContent: content }, ownArtwork: opt.preset !== "plain" }];
+}
+
+const solve = (ctx: LayoutContext, divider: boolean) => (ctx.module?.cover?.autoFit === false ? solveReference(ctx, divider) : solveResponsive(ctx, divider));
 const capability = { ...guidedPage.capability, supportsPatterns: [], supportsLineStyle: false, supportsPageNumbers: false, supportsFooter: false, wordingKeys: [] };
 /**
  * END COVER (back of the book): the same design turned half a turn, so the
@@ -207,7 +342,7 @@ const capability = { ...guidedPage.capability, supportsPatterns: [], supportsLin
  * the trim. No title; an optional small line of text (the step's subtitle:
  * a brand, a verse, a website) sits centred in the space the shapes leave.
  */
-function solveBack(ctx: LayoutContext): SolvedPage[] {
+function solveBackReference(ctx: LayoutContext): SolvedPage[] {
   const g = ctx.pages[0], s = g.safeRect, opt = ctx.module?.cover ?? {};
   const nodes: LayoutNode[] = [], diagnostics: SolvedPage["diagnostics"] = [];
   const W = g.trimWidthIn, H = g.trimHeightIn, R = Math.min(W, (H * 8.5) / 11);
@@ -235,6 +370,53 @@ function solveBack(ctx: LayoutContext): SolvedPage[] {
   }
   return [{ nodes, diagnostics, metrics: [], regions: { mainContent: s }, ownArtwork: opt.preset !== "plain" }];
 }
+
+/**
+ * END COVER, fitted to the page (default): the front design turned half a turn
+ * through the same composition engine — the page's size class sets the shapes'
+ * size and which pieces stay, and they step clear of the optional line of text.
+ */
+function solveBackResponsive(ctx: LayoutContext): SolvedPage[] {
+  const g = ctx.pages[0], s = g.safeRect, opt = ctx.module?.cover ?? {};
+  const nodes: LayoutNode[] = [], diagnostics: SolvedPage["diagnostics"] = [];
+  const W = g.trimWidthIn, H = g.trimHeightIn, R = Math.min(W, (H * 8.5) / 11);
+  const comp = classifyComposition(s);
+  const preset = COMPOSITION_PRESETS[opt.preset === "plain" ? "plain" : "neutral-cheetah-luxe"];
+  const variant = preset.cover[comp.sizeClass];
+  const zones: ProtectedZone[] = [], text$: LayoutNode[] = [];
+  const line = (opt.subtitle ?? "").trim();
+  if (line) {
+    const subStyle = styleForRole(ctx.typography, "coverSubtitle"), measure = getLayoutMeasurer().measure;
+    const mSub: MeasureText = (t, sizePt, trackingEm) => measure(t, { ...subStyle, sizePt, trackingEm });
+    const spec = { ...variant.subtitle, stack: false, preferredPt: Math.min(variant.subtitle.preferredPt, subStyle.sizePt) };
+    const sf = fitSubtitle(line, mSub, spec, subStyle.trackingEm, Math.min(s.w, 0.6 * W), s.w);
+    const w = Math.min(s.w, sf.widthIn), h = (sf.sizePt * spec.lineHeight * sf.lines.length) / 72;
+    const rect = { x: clamp((W - w) / 2, s.x, s.x + s.w - w), y: clamp(0.45 * H - h / 2, s.y, s.y + s.h - h), w, h };
+    const node = text("back-line", rect, line, "coverSubtitle", { align: "center", wrap: true });
+    node.fit = { sizePt: sf.sizePt, lineHeight: spec.lineHeight, lines: sf.lines, trackingEm: sf.trackingEm, failed: !sf.ok };
+    if (!sf.ok) diagnostics.push({ severity: "error", rule: "heading-fit", componentId: "back-line", message: `“${line}” does not fit the end cover even with tighter spacing, smaller type and the widest safe space. Shorten it or choose a larger page.` });
+    text$.push(node);
+    zones.push({ rect, soft: false });
+    if (opt.smallLine !== false) {
+      const rw = variant.rule.width * s.w, ry = Math.min(rect.y + rect.h + Math.max(0.12, 0.018 * H), s.y + s.h);
+      text$.push(rule("back-rule", (W - rw) / 2, ry, (W + rw) / 2, ry, { color: "lineArt", strokePt: RULE_PT }));
+      zones.push({ rect: { x: (W - rw) / 2, y: ry - 0.04, w: rw, h: 0.08 }, soft: false });
+    }
+  }
+  // Half a turn: every anchor at (1 − x, 1 − y), each piece escaping towards its own (turned) corner.
+  const turned = preset.decoration.map((d) => ({ ...d, id: `${d.id}-back`, x: 1 - d.x, y: 1 - d.y, push: [-d.push[0], -d.push[1]] as [number, number] }));
+  const adjust = Object.fromEntries(Object.entries(variant.adjust ?? {}).map(([k, v]) => [`${k}-back`, v]));
+  const placed = placeDecoration(turned, { ...variant, adjust }, { W, H, R }, zones, { enabled: (t) => opt[t] !== false, shift: opt.decorOffset, strokeIn: RING_PT / 72 });
+  for (const d of placed) {
+    if (d.hidden) continue;
+    const it = d.item;
+    nodes.push({ id: it.id, type: "circle", component: "Section", rect: { x: d.cx - d.r, y: d.cy - d.r, w: 2 * d.r, h: 2 * d.r }, functional: false,
+      ...(it.style === "outline" ? { fill: null, outline: true, stroke: "lineArt" as ColorToken, strokePt: RING_PT } : it.style === "leopard" ? { fill: null, leopard: true } : { fill: it.fill ?? null }) });
+  }
+  nodes.push(...text$);
+  return [{ nodes, diagnostics, metrics: [], regions: { mainContent: s }, ownArtwork: opt.preset !== "plain" }];
+}
+const solveBack = (ctx: LayoutContext) => (ctx.module?.cover?.autoFit === false ? solveBackReference(ctx) : solveBackResponsive(ctx));
 
 export const coverPage: LayoutDefinition = { id: "cover-page", label: "Cover page", description: "Reusable front cover, section cover or title page.", family: "shared", pages: 1, period: "none", capability, fit: minimumAreaFit(1.5, 2.5), solve: (ctx) => solve(ctx, false) };
 export const dividerPage: LayoutDefinition = { ...coverPage, id: "divider-page", label: "Divider / tab page", description: "Section opener with optional interior printed tab.", solve: (ctx) => solve(ctx, true) };

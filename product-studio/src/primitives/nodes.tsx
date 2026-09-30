@@ -88,7 +88,7 @@ export function TextBlock({ node, typography }: { node: TextNode; typography: Ty
     fontSize: `${node.fit?.sizePt ?? role.sizePt}pt`,
     fontWeight: role.weight,
     fontStyle: role.style,
-    letterSpacing: `${role.trackingEm}em`,
+    letterSpacing: `${node.fit?.trackingEm ?? role.trackingEm}em`,
     lineHeight: node.fit?.lineHeight ?? role.lineHeight,
     textTransform: role.transform === "small-caps" || role.transform === "none" ? "none" : role.transform,
     fontVariant: role.transform === "small-caps" ? "small-caps" : undefined,

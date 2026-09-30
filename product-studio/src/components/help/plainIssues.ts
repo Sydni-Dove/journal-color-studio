@@ -66,6 +66,9 @@ export function plainIssue(i: ValidationIssue): PlainIssue {
       return { title: "Two pieces of text overlap.", advice: SHORTEN };
     case "layout-incompatible":
     case "book-structure":
+      // A page style elsewhere in the book (not a design fit problem on the page in view): say which one.
+      if (i.componentId?.startsWith("layout:") && /does not fit this page size/.test(m))
+        return { title: `${m.split(" does not fit")[0]} pages don't have enough room at this size.`, advice: "Choose a larger size, or a different page style for those pages." };
       if (/does not fit this page size|engineered for|doesn't fit|not enough|needs a usable area/i.test(m))
         return { title: "This page style doesn't have enough room at this size.", advice: "Choose a larger size or a different page style." };
       return orPlain(m, "Part of the page plan doesn't work at this size or with these settings.");

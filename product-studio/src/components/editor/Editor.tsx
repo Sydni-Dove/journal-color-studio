@@ -83,8 +83,15 @@ export function Editor({ project, onChange, onBack, saveStatus }: Props) {
     const pages = visibleIndices(doc, i, false);
     const group = doc.recipe.pages[i].spreadPart !== undefined ? visibleIndices(doc, i, true) : pages;
     const issues = [...validateProductLevel(doc), ...group.flatMap((k) => validatePage(doc, k, measure))];
-    return finalizeReport(issues, group.length);
+    // Issues that belong to another page of the book (e.g. a page style that doesn't fit this size) are listed
+    // apart and never counted against the page in view.
+    // A page style that doesn't fit this size belongs to the pages using it (it may have no pages at all yet).
+    const shown = new Set(group.map((k) => doc.recipe.pages[k].pageNumber));
+    const styles = new Set(group.map((k) => `layout:${doc.recipe.pages[k].layoutId}`));
+    const isHere = (x: (typeof issues)[number]) => (x.componentId?.startsWith("layout:") ? styles.has(x.componentId) : x.page === null || shown.has(x.page));
+    return { ...finalizeReport(issues.filter(isHere), group.length), elsewhere: issues.filter((x) => !isHere(x)) };
   }, [doc, index, fontsReady, facesLoaded]);
+  const elsewhereErrors = check?.elsewhere.filter((x) => x.severity === "error").length ?? 0;
   const issueIds = useMemo(() => new Set((check?.issues ?? []).map((i) => i.componentId ?? "").filter(Boolean)), [check]);
 
   const current = doc && doc.recipe.pages.length ? Math.min(index, doc.recipe.pages.length - 1) : 0;
@@ -125,8 +132,9 @@ export function Editor({ project, onChange, onBack, saveStatus }: Props) {
         </span>
         <span className="spacer" />
         {check && (
-          <button type="button" className={`badge badge--button ${check.errorCount ? "badge--error" : check.warningCount ? "badge--warning" : "badge--ok"}`} title="Page check" onClick={() => setArea("print")}>
+          <button type="button" className={`badge badge--button ${check.errorCount ? "badge--error" : check.warningCount || elsewhereErrors ? "badge--warning" : "badge--ok"}`} title="Page check" onClick={() => setArea("print")}>
             {check.errorCount ? `${check.errorCount} to fix` : check.warningCount ? `${check.warningCount} to check` : "Page OK"}
+            {elsewhereErrors ? ` · ${elsewhereErrors} elsewhere in the book` : ""}
           </button>
         )}
         <button className="btn btn--primary" disabled={!doc} onClick={() => setExporting(true)}>
@@ -208,6 +216,13 @@ export function Editor({ project, onChange, onBack, saveStatus }: Props) {
                   <Section title={`Page check${check ? ` · ${check.errorCount} to fix · ${check.warningCount} to check` : ""}`} open>
                     <p className="hint">Checks the page you are viewing (and its facing page). The whole product is checked again when you print.</p>
                     {check ? <IssueList issues={check.issues} onGoTo={goToPage} /> : <p className="hint">—</p>}
+                    {check && check.elsewhere.length > 0 && (
+                      <>
+                        <div className="group-label">Other pages in this book</div>
+                        <p className="hint">Not a problem with this page's design: another page style in the book doesn't fit this size.</p>
+                        <IssueList issues={check.elsewhere} onGoTo={goToPage} />
+                      </>
+                    )}
                   </Section>
                 </>
               )}

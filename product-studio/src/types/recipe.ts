@@ -183,5 +183,17 @@ export type CoverDividerSettings = {
   circles?: boolean;
   outlines?: boolean;
   leopard?: boolean;
+  /**
+   * Fit the design to the page size (default on): the composition is resolved
+   * for the page's size class (layouts/book/composition.ts). Off keeps the
+   * reference layout at every size.
+   */
+  autoFit?: boolean;
+  /** Fine-tuning on top of the fitted design. Title size in % of the fitted size (60–130). */
+  titleScale?: number;
+  /** Nudges as fractions of the trim (x of the width, y of the height), so they carry across page sizes. */
+  titleOffset?: { x: number; y: number };
+  subtitleOffset?: { x: number; y: number };
+  decorOffset?: { x: number; y: number };
   tab?: { show: boolean; label?: string; style?: "staggered" | "rounded"; order?: number; count?: number; color?: import("./tokens").ColorToken; leopard?: boolean };
 };
