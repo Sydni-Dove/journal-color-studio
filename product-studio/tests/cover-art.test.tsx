@@ -9,6 +9,7 @@ import { LEOPARD_ART } from "../src/design-library/leopardArt";
 import { renderToStaticMarkup } from "react-dom/server";
 import { geometryFor, resolveDocument, solvePage } from "../src/engines/document/resolve";
 import { PrintablePage } from "../src/primitives/PrintablePage";
+import { CutMarks } from "../src/components/export/PrintDocument";
 import { step } from "../src/presets/bookRecipes";
 import { neutralLuxeDividers } from "../src/presets/bookRecipes";
 import { createProject } from "../src/presets/products/projectFactory";
@@ -51,4 +52,27 @@ describe("divider titles on small tabbed pages", () => {
       expect(t.type === "text" && !t.fit?.failed, title).toBe(true);
     });
   }
+});
+
+describe("Home printing: cut marks for an edge-to-edge page", () => {
+  const g = { mediaWidthIn: 7.25, mediaHeightIn: 9.25, trimWidthIn: 7, trimHeightIn: 9, trimOffset: { x: 0.125, y: 0.125 } } as never;
+  it("marks sit in the paper margin, in line with the trim edges", () => {
+    const svg = renderToStaticMarkup(<CutMarks g={g} sheetW={8.5} sheetH={11} />);
+    const lines = [...svg.matchAll(/x1="([\d.]+)" y1="([\d.]+)" x2="([\d.]+)" y2="([\d.]+)"/g)].map((m) => m.slice(1).map(Number));
+    expect(lines).toHaveLength(8);
+    const x0 = (8.5 - 7.25) / 2 + 0.125, y0 = (11 - 9.25) / 2 + 0.125;
+    const vertical = lines.filter(([a, , c]) => a === c).map(([a]) => a);
+    const horizontal = lines.filter(([, b, , d]) => b === d).map(([, b]) => b);
+    for (const x of vertical) expect([x0, x0 + 7].some((t) => Math.abs(t - x) < 1e-9)).toBe(true);
+    for (const y of horizontal) expect([y0, y0 + 9].some((t) => Math.abs(t - y) < 1e-9)).toBe(true);
+    // No mark reaches onto the page (media box).
+    const mx = (8.5 - 7.25) / 2, my = (11 - 9.25) / 2;
+    for (const [a, b, c, d] of lines) {
+      const inside = (x: number, y: number) => x > mx && x < mx + 7.25 && y > my && y < my + 9.25;
+      expect(inside(a, b) || inside(c, d)).toBe(false);
+    }
+  });
+  it("no marks when the sheet is the page itself", () => {
+    expect(renderToStaticMarkup(<CutMarks g={g} sheetW={7.25} sheetH={9.25} />)).toBe("");
+  });
 });

@@ -186,7 +186,7 @@ export function ExportDialog({ doc, currentIndex, fontsReady, onClose, onGoTo, o
           {doc.project.production.includeBleed ? " (page size plus the area past the cut edge)" : " (page size)"}
           {settings.paper && settings.paper !== "page" ? `, centred on ${settings.paper === "letter" ? "Letter" : "A4"} paper with nothing else on the sheet` : ""}.{" "}
           {settings.paper && settings.paper !== "page"
-            ? "In the print dialog keep scale at 100% (“Default” or “Actual size”) and turn on background graphics."
+            ? `In the print dialog keep scale at 100% (“Default” or “Actual size”) and turn on background graphics. Cut along the corner marks for a page whose art runs to every edge${doc.project.production.includeBleed ? "" : " — turn on “Extend background past the cut edge” (Page setup) so no white shows where you cut"}.`
             : "In the print dialog choose “Save as PDF”, margins “None”, scale 100%, and turn on background graphics. A home printer has no paper this size — choose Letter or A4 above to print at home."}
         </p>
         <div className="row">
