@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Print Prep — Dove Expressions</title>
+<meta name="description" content="Upload a finished journal PDF and get print-ready interior and cover files for Lulu, KDP, IngramSpark or your own printer.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Lato:wght@400;700&display=swap" rel="stylesheet">
+<script src="vendor/pdf.min.js"></script>
+<script src="vendor/jspdf.umd.min.js"></script>
+<style>
+:root {
+  --bg: #f7f3ef; --panel: #ffffff; --ink: #2a1a18; --muted: #7b6a66; --line: #e7ddd6;
+  --brand: #630000; --gold: #c9a05a; --ok: #2f6b3a; --warn: #8a5a00; --shadow: 0 10px 30px rgba(60, 20, 10, .10);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #171211; --panel: #221a19; --ink: #f3e9e4; --muted: #b3a29d; --line: #3a2e2c;
+    --brand: #e6a3a3; --ok: #8fd19e; --warn: #f0c36b; --shadow: 0 10px 30px rgba(0,0,0,.4);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #171211; --panel: #221a19; --ink: #f3e9e4; --muted: #b3a29d; --line: #3a2e2c;
+  --brand: #e6a3a3; --ok: #8fd19e; --warn: #f0c36b; --shadow: 0 10px 30px rgba(0,0,0,.4);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 Lato, system-ui, sans-serif; }
+header { display: flex; align-items: center; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--line); background: var(--panel); position: sticky; top: 0; z-index: 5; }
+.brand-mark { width: 34px; height: 34px; border-radius: 8px; background: var(--brand); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 13px; flex: none; }
+header strong { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 20px; }
+header small { display: block; color: var(--muted); font-size: 10px; letter-spacing: .14em; }
+header .spacer { flex: 1; }
+header a { color: var(--brand); font-weight: 700; text-decoration: none; font-size: 13px; }
+.layout { display: grid; grid-template-columns: 380px minmax(0, 1fr); gap: 20px; padding: 20px; max-width: 1400px; margin: 0 auto; }
+aside { display: flex; flex-direction: column; gap: 14px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; box-shadow: var(--shadow); }
+.card h2 { margin: 0 0 10px; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); display: flex; justify-content: space-between; gap: 8px; }
+.card h2 span { text-transform: none; letter-spacing: 0; font-weight: 400; }
+.field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+.field > span { font-weight: 700; font-size: 13px; }
+.field select, .field input { min-height: 40px; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; background: var(--panel); color: var(--ink); font: inherit; width: 100%; }
+.field input[readonly] { color: var(--muted); }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.check { display: flex; gap: 8px; align-items: center; margin: 6px 0; }
+.hint { color: var(--muted); font-size: 12px; margin: 4px 0 0; }
+.btn { min-height: 44px; border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; background: var(--panel); color: var(--ink); font: inherit; font-weight: 700; cursor: pointer; width: 100%; }
+.btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+.btn:disabled { opacity: .55; cursor: progress; }
+.actions { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.drop { border: 2px dashed var(--line); border-radius: 12px; padding: 18px; text-align: center; cursor: pointer; }
+.drop.over { border-color: var(--brand); }
+.drop strong { display: block; margin-bottom: 4px; }
+.report { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.report li { padding-left: 18px; position: relative; }
+.report li::before { content: '•'; position: absolute; left: 4px; color: var(--muted); }
+.report li.ok::before { content: '✓'; color: var(--ok); }
+.report li.warn::before { content: '!'; color: var(--warn); font-weight: 700; }
+.hidden { display: none !important; }
+.stage { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); display: flex; flex-direction: column; min-height: 70vh; }
+.stagebar { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.stagebar strong { flex: 1; min-width: 160px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.seg button { border: 0; background: transparent; color: var(--ink); font: inherit; padding: 8px 12px; cursor: pointer; min-height: 40px; }
+.seg button.active { background: var(--brand); color: #fff; }
+.pager { display: flex; align-items: center; gap: 6px; }
+.pager button { min-height: 40px; min-width: 44px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--ink); cursor: pointer; font: inherit; }
+.view { flex: 1; display: grid; place-items: center; padding: 20px; background: repeating-conic-gradient(var(--bg) 0 25%, transparent 0 50%) 0 0 / 22px 22px; }
+.view canvas { max-width: 100%; max-height: 74vh; box-shadow: 0 6px 24px rgba(0,0,0,.18); background: #fff; }
+.empty { color: var(--muted); text-align: center; max-width: 420px; }
+.empty h3 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 26px; color: var(--ink); margin: 0 0 8px; }
+.toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; z-index: 20; max-width: 90vw; }
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; padding: 16px; }
+  header { padding: 12px 16px; }
+  .view canvas { max-height: 60vh; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand-mark">DE</div>
+  <div><strong>Print Prep</strong><small>UPLOAD A JOURNAL · GET PRINT-READY FILES</small></div>
+  <div class="spacer"></div>
+  <a href="./">← Journal Color Studio</a>
+</header>
+<div class="layout">
+  <aside>
+    <div class="card">
+      <h2>1 · Your journal <span id="fileName"></span></h2>
+      <label class="drop" id="drop">
+        <strong>Upload a journal PDF</strong>
+        <span class="hint">The whole book, covers included, as one PDF (Canva: Download → PDF Print). Pages with or without bleed both work.</span>
+        <input type="file" id="fileInput" accept="application/pdf" hidden>
+      </label>
+      <div class="check"><input type="checkbox" id="firstIsCover"><label for="firstIsCover">First page is the front cover</label></div>
+      <div class="check"><input type="checkbox" id="lastIsBack"><label for="lastIsBack">Last page is the back cover</label></div>
+      <ul class="report" id="report"></ul>
+    </div>
+    <div class="card">
+      <h2>2 · Printer <span>inside pages</span></h2>
+      <div class="field"><span>Printer</span><select id="printer"></select></div>
+      <div class="row3 hidden" id="customMargins">
+        <div class="field"><span>Binding (in)</span><input type="number" id="marginBind" min=".25" max="1.25" step=".0625"></div>
+        <div class="field"><span>Edges (in)</span><input type="number" id="marginEdge" min=".125" max="1" step=".0625"></div>
+        <div class="field"><span>Top/bottom</span><input type="number" id="marginTB" min=".125" max="1" step=".0625"></div>
+      </div>
+      <div class="field"><span>Margins</span><select id="fit"><option value="fit">Fit my pages to the printer's margins</option><option value="keep">Keep my pages exactly as they are (add bleed only)</option></select></div>
+      <p class="hint" id="printerHint"></p>
+    </div>
+    <div class="card">
+      <h2>3 · Cover file <span>back, spine, front</span></h2>
+      <div class="row2">
+        <div class="field"><span>Binding</span><select id="binding"><option value="coil">Coil / spiral</option><option value="saddle">Saddle stitch</option><option value="paperback">Paperback</option><option value="hardcover">Hardcover</option></select></div>
+        <div class="field" id="paperField"><span>Paper</span><select id="paper"><option value="white">White</option><option value="cream">Cream</option><option value="color">Standard color</option><option value="premium">Premium color</option></select></div>
+      </div>
+      <div class="row2">
+        <div class="field" id="spineField"><span>Spine width (in)</span><input type="number" id="spineIn" min="0" max="3" step=".001"></div>
+        <div class="field"><span>Bleed / wrap (in)</span><input type="number" id="coverBleedIn" min=".125" max="1.5" step=".0625"></div>
+      </div>
+      <div class="row2" id="spineRow">
+        <div class="field"><span>Spine title</span><input type="text" id="spineText" maxlength="60" placeholder="Your journal's title"></div>
+        <div class="field"><span>Spine color</span><input type="color" id="spineColor"></div>
+      </div>
+      <div class="field" id="backField"><span>Back cover (no back page in the file)</span><select id="backFill"><option value="color">Plain, in the spine color</option><option value="mirror">The front cover's art, mirrored</option></select></div>
+      <p class="hint" id="coverHint"></p>
+    </div>
+    <div class="card">
+      <h2>4 · Download</h2>
+      <div class="seg" id="qualitySeg"><button data-q="print" class="active">Print 300 DPI</button><button data-q="proof">Proof 150 DPI</button></div>
+      <div class="actions">
+        <button class="btn primary" id="exportInterior" disabled>Print-ready interior PDF</button>
+        <button class="btn" id="exportCover" disabled>Print-ready cover PDF</button>
+      </div>
+      <p class="hint">Files are made in your browser; your journal is never uploaded anywhere. It stays saved in this browser until you upload another.</p>
+    </div>
+  </aside>
+  <section class="stage">
+    <div class="stagebar">
+      <strong id="viewTitle">No journal yet</strong>
+      <div class="seg" id="viewSeg"><button data-view="pages" class="active">Pages</button><button data-view="cover">Cover spread</button></div>
+      <div class="pager" id="pager"><button id="prev" aria-label="Previous page">‹</button><span id="pageNum"></span><button id="next" aria-label="Next page">›</button></div>
+      <label class="check"><input type="checkbox" id="guides" checked> Guides</label>
+    </div>
+    <div class="view" id="view">
+      <div class="empty" id="empty"><h3>Upload a finished journal</h3><p>Print Prep reads every page, finds where your wording sits, and fits each page to your printer's margins. It adds the bleed, alternates the binding side for fronts and backs, and builds the wraparound cover.</p></div>
+      <canvas id="canvas" class="hidden"></canvas>
+    </div>
+  </section>
+</div>
+<div class="toast hidden" id="toast"></div>
+<script>
+(() => {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const BLEED = 9;                                    // 1/8 in, in points
+  // Printer margin presets for inside pages (inches) — the same rules as the studio's Export card.
+  const PRINTERS = {
+    standard: { label: 'Standard (½″ binding, ¼″ edges)', bind: () => .5, edge: .25, tb: .25 },
+    lulu: { label: 'Lulu', bind: (n) => .5 + (n <= 60 ? 0 : n <= 150 ? .125 : n <= 400 ? .5 : .625), edge: .5, tb: .5 },
+    ingram: { label: 'IngramSpark', bind: () => .5, edge: .5, tb: .5 },
+    kdp: { label: 'Amazon KDP', bind: (n) => n <= 150 ? .375 : n <= 300 ? .5 : n <= 500 ? .625 : .75, edge: .375, tb: .375, bindBleed: false },
+    custom: { label: 'Custom margins' },
+  };
+  const KDP_PAPER = { white: .002252, cream: .0025, color: .002252, premium: .002347 };
+  const COVER_SPECS = {
+    standard: { safe: .25 }, lulu: { safe: .5, barcode: [3.622, 1.26], spine: (n) => n / 444 + .06 }, ingram: { safe: .5 },
+    kdp: { safe: .25, barcode: [2, 1.2], spine: (n, paper) => n * (KDP_PAPER[paper] || KDP_PAPER.white), spineTextMin: 80 }, custom: { safe: .25 },
+  };
+  // Common trim sizes (points); a page that is one of these plus an even margin all round has that margin as bleed.
+  const TRIMS = [[612, 792, '8.5 × 11 in'], [432, 648, '6 × 9 in'], [396, 612, '5.5 × 8.5 in'], [419.5, 595.3, 'A5'], [504, 720, '7 × 10 in'], [595.3, 841.9, 'A4'], [360, 504, '5 × 7 in']];
+
+  const DEF = { printer: 'standard', marginBind: .5, marginEdge: .25, marginTB: .25, fit: 'fit', binding: 'coil', paper: 'white', spineIn: .3,
+    coverBleedIn: .125, spineText: '', spineColor: '', backFill: 'color', firstIsCover: true, lastIsBack: false, quality: 'print', guides: true };
+  let st = { ...DEF };
+  try { st = { ...st, ...JSON.parse(localStorage.getItem('dove-print-prep') || '{}') }; } catch {}
+  const save = () => { try { localStorage.setItem('dove-print-prep', JSON.stringify(st)); } catch {} };
+
+  let doc = null, info = null, view = 'pages', page = 0, busy = false;
+  const toast = (m) => { const t = $('toast'); t.textContent = m; t.classList.remove('hidden'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.add('hidden'), 4200); };
+  const inch = (pt) => `${+(pt / 72).toFixed(3)}″`;
+
+  if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdf.worker.min.js';
+
+  // ---------- Storage: the last journal stays in this browser (IndexedDB) ----------
+  const idb = () => new Promise((res, rej) => { const r = indexedDB.open('dove-print-prep', 1); r.onupgradeneeded = () => r.result.createObjectStore('files'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+  async function storeFile(name, buf) { try { const db = await idb(); db.transaction('files', 'readwrite').objectStore('files').put({ name, buf }, 'journal'); } catch {} }
+  async function loadStored() { try { const db = await idb(); return await new Promise((res) => { const q = db.transaction('files').objectStore('files').get('journal'); q.onsuccess = () => res(q.result); q.onerror = () => res(null); }); } catch { return null; } }
+
+  // ---------- Reading the PDF ----------
+  function detectTrim(w, h) {
+    for (const [tw, th, name] of TRIMS) {
+      const ex = (w - tw) / 2, ey = (h - th) / 2;
+      if (ex > -1.5 && Math.abs(ex - ey) < 1.5 && ex < 40) return { tw, th, ex: Math.max(0, ex), ey: Math.max(0, ey), name };
+    }
+    return { tw: w, th: h, ex: 0, ey: 0, name: `${+(w / 72).toFixed(2)} × ${+(h / 72).toFixed(2)} in` };
+  }
+  // Every page: its size, its trim and where its wording sits (text boxes from the PDF, in trim points).
+  async function readJournal(buf, name) {
+    doc = await pdfjsLib.getDocument({ data: buf }).promise;
+    const pages = [];
+    for (let n = 1; n <= doc.numPages; n++) {
+      const pg = await doc.getPage(n), vp = pg.getViewport({ scale: 1 }), t = detectTrim(vp.width, vp.height);
+      const tc = await pg.getTextContent(), box = { l: Infinity, r: Infinity, t: Infinity, b: Infinity }, words = [];
+      for (const it of tc.items) {
+        if (!it.str || !it.str.trim() || !it.width) continue;
+        const [a, b, c, d, e, f] = it.transform, hgt = Math.hypot(c, d) || it.height || 10;
+        const p0 = vp.convertToViewportPoint(e, f), p1 = vp.convertToViewportPoint(e + it.width * (a / Math.hypot(a, b) || 1), f + hgt);
+        const x0 = Math.min(p0[0], p1[0]) - t.ex, x1 = Math.max(p0[0], p1[0]) - t.ex, y0 = Math.min(p0[1], p1[1]) - t.ey, y1 = Math.max(p0[1], p1[1]) - t.ey;
+        if (x1 < 0 || y1 < 0 || x0 > t.tw || y0 > t.th) continue;                // off the page (hidden or in the slug)
+        box.l = Math.min(box.l, x0); box.r = Math.min(box.r, t.tw - x1); box.t = Math.min(box.t, y0); box.b = Math.min(box.b, t.th - y1);
+        words.push([x0, y0, x1, y1]);
+      }
+      pages.push({ n, w: vp.width, h: vp.height, trim: t, box: Number.isFinite(box.l) ? box : null, words });
+    }
+    info = { name, pages };
+    $('fileName').textContent = name;
+    page = 0; view = 'pages';
+    refresh();
+  }
+
+  // ---------- Layout ----------
+  const interiorPages = () => info ? info.pages.filter((p, i) => !(st.firstIsCover && i === 0) && !(st.lastIsBack && i === info.pages.length - 1 && info.pages.length > 1)) : [];
+  function margins() {
+    const pr = PRINTERS[st.printer] || PRINTERS.standard, n = interiorPages().length;
+    const m = st.printer === 'custom' ? { bind: st.marginBind, edge: st.marginEdge, tb: st.marginTB } : { bind: pr.bind(n), edge: pr.edge, tb: pr.tb };
+    return { bind: m.bind * 72, edge: m.edge * 72, tb: m.tb * 72, bindBleed: pr.bindBleed !== false };
+  }
+  // Closest wording to each side, separately for fronts (inside pages 1, 3, 5 … binding left) and backs.
+  function insets() {
+    const out = { left: null, right: null, all: null };
+    interiorPages().forEach((p, i) => {
+      if (!p.box) return;
+      for (const k of [i % 2 ? 'right' : 'left', 'all']) {
+        const o = out[k] || (out[k] = { l: Infinity, r: Infinity, t: Infinity, b: Infinity });
+        o.l = Math.min(o.l, p.box.l); o.r = Math.min(o.r, p.box.r); o.t = Math.min(o.t, p.box.t); o.b = Math.min(o.b, p.box.b);
+      }
+    });
+    return out;
+  }
+  // One scale for the whole book (so every page matches) and, per binding side, the smallest move that brings all the
+  // wording inside the printer's margins. "Keep" leaves pages untouched.
+  function placement() {
+    const ip = interiorPages(), t = (ip[0] || info.pages[0]).trim, m = margins(), ins = insets(), W = t.tw, H = t.th;
+    const res = { f: 1, x: { left: 0, right: 0 }, y: 0, m, t, ins };
+    if (st.fit === 'keep' || !ins.all) return res;
+    let f = 1;
+    for (const k of ['left', 'right']) { const o = ins[k]; if (o) f = Math.min(f, (W - m.bind - m.edge) / Math.max(1, W - o.l - o.r)); }
+    f = Math.min(f, (H - 2 * m.tb) / Math.max(1, H - ins.all.t - ins.all.b));
+    f = Math.max(.5, f);
+    const clamp = (v, lo, hi) => (lo > hi ? (lo + hi) / 2 : Math.min(Math.max(v, lo), hi));
+    for (const side of ['left', 'right']) {
+      const o = ins[side] || ins.all, L = side === 'left' ? m.bind : m.edge, R = side === 'left' ? m.edge : m.bind;
+      res.x[side] = clamp((W - W * f) / 2, L - o.l * f, (W - R) - (W - o.r) * f);
+    }
+    res.y = clamp((H - H * f) / 2, m.tb - ins.all.t * f, (H - m.tb) - (H - ins.all.b) * f);
+    res.f = f;
+    return res;
+  }
+
+  // ---------- Rendering ----------
+  const srcCache = new Map();
+  async function renderSource(p, scale) {
+    const key = `${p.n}@${scale.toFixed(4)}`;
+    if (srcCache.has(key)) return srcCache.get(key);
+    const pg = await doc.getPage(p.n), vp = pg.getViewport({ scale });
+    const c = document.createElement('canvas'); c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+    const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height);
+    await pg.render({ canvasContext: x, viewport: vp }).promise;
+    srcCache.set(key, c);
+    while (srcCache.size > 4) srcCache.delete(srcCache.keys().next().value);
+    return c;
+  }
+  // Fills the area around img (drawn at x0, y0) by mirroring its outer strip, stretched where the gap is wider.
+  function composeBleed(ctx, img, x0, y0, stripX = Infinity, stripY = Infinity) {
+    const W = ctx.canvas.width, H = ctx.canvas.height, w = img.width, h = img.height;
+    const L = Math.min(Math.max(0, x0), w), R = Math.min(Math.max(0, W - x0 - w), w), T = Math.min(Math.max(0, y0), h), B = Math.min(Math.max(0, H - y0 - h), h);
+    const sL = Math.max(1, Math.min(L, stripX)), sR = Math.max(1, Math.min(R, stripX)), sT = Math.max(1, Math.min(T, stripY)), sB = Math.max(1, Math.min(B, stripY));
+    const row = document.createElement('canvas'); row.width = W; row.height = h;
+    const r = row.getContext('2d');
+    r.drawImage(img, x0, 0);
+    if (L > 0) { r.save(); r.translate(x0, 0); r.scale(-L / sL, 1); r.drawImage(img, 0, 0, sL, h, 0, 0, sL, h); r.restore(); }
+    if (R > 0) { r.save(); r.translate(x0 + w, 0); r.scale(-R / sR, 1); r.drawImage(img, w - sR, 0, sR, h, -sR, 0, sR, h); r.restore(); }
+    ctx.drawImage(row, 0, y0);
+    if (T > 0) { ctx.save(); ctx.translate(0, y0); ctx.scale(1, -T / sT); ctx.drawImage(row, 0, 0, W, sT, 0, 0, W, sT); ctx.restore(); }
+    if (B > 0) { ctx.save(); ctx.translate(0, y0 + h); ctx.scale(1, -B / sB); ctx.drawImage(row, 0, h - sB, W, sB, 0, -sB, W, sB); ctx.restore(); }
+  }
+  // One inside page as the printer wants it: trim + 1/8 in bleed (none at the binding edge for KDP), the page scaled and
+  // moved per placement(); the page's own bleed art is used where the file has it, otherwise its edges are continued.
+  async function renderInterior(canvas, p, side, k) {
+    const pl = placement(), t = p.trim, f = pl.f, sc = k * f;
+    const src = await renderSource(p, sc);
+    const trim = document.createElement('canvas'); trim.width = Math.round(t.tw * sc); trim.height = Math.round(t.th * sc);
+    trim.getContext('2d').drawImage(src, -t.ex * sc, -t.ey * sc);
+    const W = Math.round((t.tw + 2 * BLEED) * k), H = Math.round((t.th + 2 * BLEED) * k);
+    const out = document.createElement('canvas'); out.width = W; out.height = H;
+    const ctx = out.getContext('2d'), x0 = Math.round((BLEED + pl.x[side]) * k), y0 = Math.round((BLEED + pl.y) * k);
+    const o = pl.ins.all || { l: 27, r: 27, t: 18, b: 18 };
+    const strip = (d) => Math.round(Math.max(2, Math.min(20, d - 3)) * sc);
+    composeBleed(ctx, trim, x0, y0, strip(Math.min(o.l, o.r)), strip(Math.min(o.t, o.b)));
+    // The file's own bleed (if any) replaces the continued edges right around the page.
+    if (t.ex > 0 || t.ey > 0) { ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.rect(x0, y0, trim.width, trim.height); ctx.clip('evenodd'); ctx.drawImage(src, x0 - t.ex * sc, y0 - t.ey * sc); ctx.restore(); }
+    const cut = pl.m.bindBleed ? 0 : Math.round(BLEED * k), cutLeft = side === 'left' ? cut : 0;
+    canvas.width = W - cut; canvas.height = H;
+    canvas.getContext('2d').drawImage(out, -cutLeft, 0);
+    return { x0: x0 - cutLeft, y0, f, cut, cutLeft };
+  }
+  function guides(c, side, k, cutLeft, cutRight) {
+    const m = margins(), t = (interiorPages()[0] || info.pages[0]).trim, ctx = c.getContext('2d'), b = BLEED * k, W = c.width, H = c.height;
+    const bl = cutLeft ? 0 : b, br = cutRight ? 0 : b;
+    ctx.save();
+    ctx.fillStyle = 'rgba(230,40,90,.18)'; ctx.fillRect(0, 0, W, b); ctx.fillRect(0, H - b, W, b); ctx.fillRect(0, b, bl, H - 2 * b); ctx.fillRect(W - br, b, br, H - 2 * b);
+    ctx.lineWidth = Math.max(1, k * .75); ctx.strokeStyle = 'rgba(230,40,90,.9)'; ctx.strokeRect(bl, b, t.tw * k, t.th * k);
+    const l = (side === 'left' ? m.bind : m.edge) * k, r = (side === 'left' ? m.edge : m.bind) * k;
+    ctx.setLineDash([6, 4]); ctx.strokeStyle = 'rgba(20,110,220,.9)'; ctx.strokeRect(bl + l, b + m.tb * k, t.tw * k - l - r, t.th * k - 2 * m.tb * k);
+    ctx.setLineDash([]); ctx.fillStyle = 'rgba(20,110,220,.12)'; ctx.fillRect(side === 'left' ? bl : bl + t.tw * k - m.bind * k, b, m.bind * k, t.th * k);
+    ctx.restore();
+  }
+
+  // ---------- Cover spread ----------
+  function coverSpec() {
+    const c = COVER_SPECS[st.printer] || COVER_SPECS.standard, n = interiorPages().length, t = info.pages[0].trim;
+    const hasSpine = st.binding === 'paperback' || st.binding === 'hardcover', auto = hasSpine && st.binding === 'paperback' && !!c.spine;
+    const spine = !hasSpine ? 0 : auto ? c.spine(n, st.paper) : Math.max(0, st.spineIn);
+    const bleed = st.binding === 'hardcover' || st.printer === 'custom' ? st.coverBleedIn : .125;
+    return { spine, auto, hasSpine, bleed, safe: c.safe, barcode: c.barcode || [3.622, 1.26], textOk: spine >= .25 && n >= (c.spineTextMin || 0),
+      tw: t.tw / 72, th: t.th / 72, W: 2 * bleed + 2 * t.tw / 72 + spine, H: t.th / 72 + 2 * bleed };
+  }
+  const avgColor = (c, x, y, w, h) => {
+    const d = c.getContext('2d').getImageData(Math.round(x), Math.round(y), Math.max(1, Math.round(w)), Math.max(1, Math.round(h))).data; let r = 0, g = 0, b = 0, n = 0;
+    for (let i = 0; i < d.length; i += 4 * 13) { r += d[i]; g += d[i + 1]; b += d[i + 2]; n++; }
+    return '#' + [r, g, b].map((v) => Math.round(v / n).toString(16).padStart(2, '0')).join('');
+  };
+  const lum = (hex) => { const v = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((c) => (c <= .03928 ? c / 12.92 : ((c + .055) / 1.055) ** 2.4)); return .2126 * v[0] + .7152 * v[1] + .0722 * v[2]; };
+  async function renderSpread(canvas, ppi) {
+    const cs = coverSpec(), pages = info.pages, tw = Math.round(cs.tw * ppi), th = Math.round(cs.th * ppi), sp = Math.round(cs.spine * ppi), b = Math.round(cs.bleed * ppi);
+    const crop = async (p) => { const s = await renderSource(p, ppi / 72), c = document.createElement('canvas'); c.width = tw; c.height = th; c.getContext('2d').drawImage(s, -p.trim.ex * ppi / 72, -p.trim.ey * ppi / 72); return c; };
+    const front = await crop(pages[0]);
+    const spineColor = st.spineColor || avgColor(front, 0, 0, tw * .06, th);
+    let back;
+    if (st.lastIsBack && pages.length > 1) back = await crop(pages[pages.length - 1]);
+    else {
+      back = document.createElement('canvas'); back.width = tw; back.height = th; const x = back.getContext('2d');
+      if (st.backFill === 'mirror') { x.translate(tw, 0); x.scale(-1, 1); x.drawImage(front, 0, 0); } else { x.fillStyle = spineColor; x.fillRect(0, 0, tw, th); }
+    }
+    const flat = document.createElement('canvas'); flat.width = 2 * tw + sp; flat.height = th;
+    const f = flat.getContext('2d'); f.drawImage(back, 0, 0); f.drawImage(front, tw + sp, 0);
+    if (sp > 0) {
+      f.fillStyle = spineColor; f.fillRect(tw, 0, sp, th);
+      const title = st.spineText.trim();
+      if (title && cs.textOk) {
+        const ink = lum(spineColor) > .35 ? '#1a1a1a' : '#ffffff', room = sp - ppi / 8, len = th - 2 * cs.safe * ppi;
+        f.save(); f.translate(tw + sp / 2, th / 2); f.rotate(Math.PI / 2); f.fillStyle = ink; f.textAlign = 'center'; f.textBaseline = 'middle';
+        let size = room * .8; f.font = `${size}px "Cormorant Garamond", Georgia, serif`;
+        const w = f.measureText(title).width; if (w > len) { size *= len / w; f.font = `${size}px "Cormorant Garamond", Georgia, serif`; }
+        f.fillText(title, 0, 0); f.restore();
+      }
+    }
+    canvas.width = Math.round(cs.W * ppi); canvas.height = Math.round(cs.H * ppi);
+    composeBleed(canvas.getContext('2d'), flat, b, b, Math.round(ppi / 4), Math.round(ppi / 4));
+    // The file's own bleed around the front cover, where it has it.
+    const p0 = pages[0];
+    if (p0.trim.ex > 0) {
+      const s = await renderSource(p0, ppi / 72), ctx = canvas.getContext('2d'), fx = b + tw + sp;
+      ctx.save(); ctx.beginPath(); ctx.rect(fx + tw, 0, canvas.width - fx - tw, canvas.height); ctx.rect(fx, 0, tw, b); ctx.rect(fx, b + th, tw, canvas.height - b - th); ctx.clip();
+      ctx.drawImage(s, fx - p0.trim.ex * ppi / 72, b - p0.trim.ey * ppi / 72); ctx.restore();
+    }
+    return cs;
+  }
+  function spreadGuides(c, cs) {
+    const ppi = c.width / cs.W, ctx = c.getContext('2d'), b = cs.bleed * ppi, W = c.width, H = c.height, tw = cs.tw * ppi, th = cs.th * ppi, sp = cs.spine * ppi, m = cs.safe * ppi;
+    ctx.save();
+    ctx.fillStyle = 'rgba(230,40,90,.18)'; ctx.fillRect(0, 0, W, b); ctx.fillRect(0, H - b, W, b); ctx.fillRect(0, b, b, H - 2 * b); ctx.fillRect(W - b, b, b, H - 2 * b);
+    ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(230,40,90,.9)'; ctx.strokeRect(b, b, W - 2 * b, th);
+    ctx.strokeStyle = 'rgba(160,40,200,.95)'; ctx.beginPath(); for (const x of sp > 0 ? [b + tw, b + tw + sp] : [b + tw]) { ctx.moveTo(x, 0); ctx.lineTo(x, H); } ctx.stroke();
+    ctx.setLineDash([6, 4]); ctx.strokeStyle = 'rgba(20,110,220,.9)'; ctx.strokeRect(b + m, b + m, tw - 2 * m, th - 2 * m); ctx.strokeRect(b + tw + sp + m, b + m, tw - 2 * m, th - 2 * m);
+    ctx.setLineDash([]);
+    const [bw, bh] = cs.barcode, x = b + tw - (.25 + bw) * ppi, y = b + th - (.25 + bh) * ppi;
+    ctx.fillStyle = 'rgba(255,214,0,.35)'; ctx.fillRect(x, y, bw * ppi, bh * ppi); ctx.strokeStyle = 'rgba(200,160,0,.9)'; ctx.strokeRect(x, y, bw * ppi, bh * ppi);
+    ctx.restore();
+  }
+
+  // ---------- Report ----------
+  function report() {
+    const ul = $('report'); ul.innerHTML = '';
+    if (!info) return;
+    const add = (cls, html) => { const li = document.createElement('li'); li.className = cls; li.innerHTML = html; ul.appendChild(li); };
+    const ip = interiorPages(), t = (ip[0] || info.pages[0]).trim, pl = placement(), m = pl.m;
+    add('ok', `${info.pages.length} pages: ${st.firstIsCover ? 'front cover, ' : ''}${ip.length} inside pages${st.lastIsBack ? ', back cover' : ''}.`);
+    const bleedNote = t.ex >= 8.5 ? 'with its own ⅛″ bleed (used as is)' : t.ex > 0 ? `with ${inch(t.ex)} extra around the trim (cropped; the bleed is added)` : 'no bleed in the file (Print Prep adds it)';
+    add('ok', `Page size ${t.name}, ${bleedNote}.`);
+    const sizes = new Set(info.pages.map((p) => `${Math.round(p.w)}×${Math.round(p.h)}`));
+    if (sizes.size > 1) add('warn', 'Pages are not all the same size; each is fitted to the trim of the first inside page.');
+    if (!pl.ins.all) add('warn', 'No live text found (pages may be images). Margins are fitted assuming ⅜″ side and ¼″ top/bottom page margins; check the guides.');
+    else {
+      const o = pl.ins.all;
+      add('', `Closest wording to the edges: ${inch(o.l)} left, ${inch(o.r)} right, ${inch(o.t)} top, ${inch(o.b)} bottom.`);
+      if (st.fit === 'keep') {
+        const bad = ip.filter((p, i) => p.box && (p.box.l < (i % 2 ? m.edge : m.bind) - .5 || p.box.r < (i % 2 ? m.bind : m.edge) - .5 || p.box.t < m.tb - .5 || p.box.b < m.tb - .5)).length;
+        add(bad ? 'warn' : 'ok', bad ? `${bad} inside page${bad > 1 ? 's have' : ' has'} wording inside the printer's margins. Choose “Fit my pages” to fix it.` : 'All wording is already inside the printer\'s margins.');
+      } else add('ok', pl.f < .9995 ? `Pages drawn at ${Math.round(pl.f * 100)}% and moved away from the binding so all wording sits inside the printer's margins.` : 'All wording fits the printer\'s margins at full size; pages are only moved away from the binding where needed.');
+    }
+  }
+
+  // ---------- UI ----------
+  let drawToken = 0;
+  async function draw() {
+    if (!info) { $('empty').classList.remove('hidden'); $('canvas').classList.add('hidden'); return; }
+    $('empty').classList.add('hidden'); const c = $('canvas'); c.classList.remove('hidden');
+    const token = ++drawToken, tmp = document.createElement('canvas');
+    if (view === 'cover') {
+      const cs = await renderSpread(tmp, 1100 / coverSpec().W);
+      if (token !== drawToken) return;
+      if (st.guides) spreadGuides(tmp, cs);
+      $('viewTitle').textContent = `Cover spread · ${+cs.W.toFixed(3)} × ${+cs.H.toFixed(3)} in`;
+      $('pageNum').textContent = '';
+    } else {
+      const ip = interiorPages(), p = ip[page] || ip[0];
+      if (!p) return;
+      const side = page % 2 ? 'right' : 'left', r = await renderInterior(tmp, p, side, 760 / (p.trim.tw + 2 * BLEED));
+      if (token !== drawToken) return;
+      if (st.guides) guides(tmp, side, 760 / (p.trim.tw + 2 * BLEED), r.cutLeft, r.cut && !r.cutLeft);
+      $('viewTitle').textContent = `Inside page ${page + 1} · binds ${side} (${side === 'left' ? 'front' : 'back'} of the sheet)`;
+      $('pageNum').textContent = `${page + 1} / ${ip.length}`;
+    }
+    c.width = tmp.width; c.height = tmp.height; c.getContext('2d').drawImage(tmp, 0, 0);
+  }
+  function sync() {
+    const sel = $('printer');
+    if (!sel.options.length) for (const [v, { label }] of Object.entries(PRINTERS)) sel.add(new Option(label, v));
+    sel.value = st.printer; $('fit').value = st.fit; $('binding').value = st.binding; $('paper').value = st.paper; $('backFill').value = st.backFill;
+    $('firstIsCover').checked = st.firstIsCover; $('lastIsBack').checked = st.lastIsBack; $('guides').checked = st.guides;
+    for (const id of ['marginBind', 'marginEdge', 'marginTB']) $(id).value = st[id];
+    $('customMargins').classList.toggle('hidden', st.printer !== 'custom');
+    $('spineText').value = st.spineText;
+    document.querySelectorAll('#qualitySeg button').forEach((b) => b.classList.toggle('active', b.dataset.q === st.quality));
+    document.querySelectorAll('#viewSeg button').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
+    $('pager').classList.toggle('hidden', view !== 'pages');
+    $('exportInterior').disabled = $('exportCover').disabled = !info || busy;
+    if (!info) { $('printerHint').textContent = ''; $('coverHint').textContent = ''; report(); return; }
+    const m = margins(), n = interiorPages().length;
+    $('printerHint').textContent = `Inside pages: ${inch(m.bind)} at the binding, ${inch(m.edge)} at the outside edge, ${inch(m.tb)} top and bottom`
+      + (st.printer === 'lulu' || st.printer === 'kdp' ? ` (for ${n} inside pages)` : '') + '.' + (m.bindBleed ? '' : ' No bleed at the binding edge.');
+    const cs = coverSpec(), in3 = (v) => +v.toFixed(3);
+    $('paperField').classList.toggle('hidden', !(cs.auto && st.printer === 'kdp'));
+    $('spineField').classList.toggle('hidden', !cs.hasSpine); $('spineRow').classList.toggle('hidden', !cs.hasSpine);
+    $('spineIn').value = in3(cs.spine); $('spineIn').readOnly = cs.auto;
+    $('coverBleedIn').value = in3(cs.bleed); $('coverBleedIn').readOnly = !(st.binding === 'hardcover' || st.printer === 'custom');
+    $('backField').classList.toggle('hidden', st.lastIsBack);
+    if (!st.spineColor) { $('spineColor').value = '#111111'; } else $('spineColor').value = st.spineColor;
+    $('coverHint').textContent = `Cover file ${in3(cs.W)} × ${in3(cs.H)} in: two ${in3(cs.tw)} × ${in3(cs.th)} in covers`
+      + (cs.hasSpine ? ` and a ${in3(cs.spine)}″ spine${cs.auto ? '' : ' (from your printer\'s cover template)'}` : ', no spine') + `, ${cs.bleed}″ ${st.binding === 'hardcover' ? 'wrap' : 'bleed'}.`
+      + (cs.hasSpine && st.spineText && !cs.textOk ? ' The spine is too narrow for lettering.' : '') + (st.firstIsCover ? '' : ' Tick “First page is the front cover” so the cover file uses it.');
+    report();
+  }
+  function refresh() { save(); sync(); draw(); }
+
+  async function openFile(file) {
+    if (!file) return;
+    if (!window.pdfjsLib) { toast('The PDF reader did not load. Refresh the page and try again.'); return; }
+    if (file.type && file.type !== 'application/pdf') { toast('Please choose a PDF.'); return; }
+    busy = true; sync(); toast('Reading your journal…');
+    try {
+      const buf = await file.arrayBuffer();
+      srcCache.clear();
+      await readJournal(buf.slice(0), file.name);
+      storeFile(file.name, buf);
+      toast(`Read ${info.pages.length} pages.`);
+    } catch (e) { console.error(e); toast('That PDF could not be read. Try exporting it again (PDF Print).'); }
+    finally { busy = false; sync(); }
+  }
+  $('fileInput').onchange = (e) => { openFile(e.target.files[0]); e.target.value = ''; };
+  const drop = $('drop');
+  drop.ondragover = (e) => { e.preventDefault(); drop.classList.add('over'); };
+  drop.ondragleave = () => drop.classList.remove('over');
+  drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove('over'); openFile(e.dataTransfer.files[0]); };
+  for (const id of ['printer', 'fit', 'binding', 'paper', 'backFill']) $(id).onchange = (e) => { st[id] = e.target.value; refresh(); };
+  for (const id of ['firstIsCover', 'lastIsBack', 'guides']) $(id).onchange = (e) => { st[id] = e.target.checked; page = 0; refresh(); };
+  [['marginBind', .25, 1.25], ['marginEdge', .125, 1], ['marginTB', .125, 1], ['spineIn', 0, 3], ['coverBleedIn', .125, 1.5]].forEach(([id, lo, hi]) => {
+    $(id).onchange = (e) => { if (e.target.readOnly) return; const v = Number(e.target.value); st[id] = Math.min(hi, Math.max(lo, Number.isFinite(v) ? v : DEF[id])); refresh(); };
+  });
+  $('spineText').oninput = (e) => { st.spineText = e.target.value; save(); sync(); if (view === 'cover') draw(); };
+  $('spineColor').oninput = (e) => { st.spineColor = e.target.value; save(); if (view === 'cover') draw(); };
+  document.querySelectorAll('#qualitySeg button').forEach((b) => b.onclick = () => { st.quality = b.dataset.q; save(); sync(); });
+  document.querySelectorAll('#viewSeg button').forEach((b) => b.onclick = () => { view = b.dataset.view; sync(); draw(); });
+  $('prev').onclick = () => { if (page > 0) { page--; draw(); } };
+  $('next').onclick = () => { if (page < interiorPages().length - 1) { page++; draw(); } };
+  document.addEventListener('keydown', (e) => { if (view !== 'pages' || /input|select/i.test(e.target.tagName)) return; if (e.key === 'ArrowLeft') $('prev').click(); if (e.key === 'ArrowRight') $('next').click(); });
+
+  const slug = () => (info?.name || 'journal').replace(/\.pdf$/i, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const toBlob = (c, q) => new Promise((res, rej) => c.toBlob((b) => (b ? res(b) : rej(new Error('blob'))), 'image/jpeg', q));
+  const dpi = () => (st.quality === 'print' ? 300 : 150);
+  function setBusy(on, label) { busy = on; $('exportInterior').textContent = on && label ? label : 'Print-ready interior PDF'; sync(); }
+  $('exportInterior').onclick = async () => {
+    if (busy || !info) return;
+    if (!window.jspdf) { toast('The PDF writer did not load. Refresh the page and try again.'); return; }
+    const ip = interiorPages(); setBusy(true, 'Building 0%');
+    try {
+      let pdf = null; const c = document.createElement('canvas');
+      for (let i = 0; i < ip.length; i++) {
+        const p = ip[i], side = i % 2 ? 'right' : 'left', k = dpi() / 72;
+        await renderInterior(c, p, side, k);
+        // Exact print size in points: trim + 1/8 in bleed each side (none at the binding edge for KDP).
+        const data = new Uint8Array(await (await toBlob(c, st.quality === 'print' ? .94 : .88)).arrayBuffer()), cutPt = margins().bindBleed ? 0 : BLEED;
+        const w = p.trim.tw + 2 * BLEED - cutPt, h = p.trim.th + 2 * BLEED;
+        if (!pdf) pdf = new jspdf.jsPDF({ orientation: 'portrait', unit: 'pt', format: [w, h], compress: true }); else pdf.addPage([w, h], 'portrait');
+        pdf.addImage(data, 'JPEG', 0, 0, w, h, `p${i}`, 'FAST');
+        setBusy(true, `Building ${Math.round((i + 1) / ip.length * 100)}%`);
+        await new Promise(requestAnimationFrame);
+      }
+      pdf.save(`${slug()}-interior-${st.printer}.pdf`);
+      toast(`Interior downloaded (${ip.length} pages).`);
+    } catch (e) { console.error(e); toast('Export stopped. Please try again.'); }
+    finally { srcCache.clear(); setBusy(false); }
+  };
+  $('exportCover').onclick = async () => {
+    if (busy || !info) return;
+    if (!window.jspdf) { toast('The PDF writer did not load. Refresh the page and try again.'); return; }
+    busy = true; sync(); toast('Building the cover…');
+    try {
+      const c = document.createElement('canvas'), cs = await renderSpread(c, dpi());
+      const data = new Uint8Array(await (await toBlob(c, .95)).arrayBuffer());
+      const pdf = new jspdf.jsPDF({ orientation: 'landscape', unit: 'pt', format: [cs.W * 72, cs.H * 72], compress: true });
+      pdf.addImage(data, 'JPEG', 0, 0, cs.W * 72, cs.H * 72, 'cover', 'FAST');
+      pdf.save(`${slug()}-cover-${st.printer}-${st.binding}.pdf`);
+      toast(`Cover downloaded (${+cs.W.toFixed(3)} × ${+cs.H.toFixed(3)} in).`);
+    } catch (e) { console.error(e); toast('Cover export stopped. Please try again.'); }
+    finally { srcCache.clear(); busy = false; sync(); }
+  };
+
+  if (new URLSearchParams(location.search).has('debug')) window.__prep = { get st() { return st; }, get info() { return info; }, placement, renderInterior, renderSpread, coverSpec, refresh, openBuffer: (b, n) => readJournal(b, n).then(() => refresh()) };
+  sync();
+  loadStored().then(async (rec) => { if (rec && rec.buf && window.pdfjsLib) { try { await readJournal(rec.buf.slice(0), rec.name); } catch {} } sync(); });
+})();
+</script>
+</body>
+</html>
