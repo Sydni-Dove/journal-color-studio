@@ -153,8 +153,9 @@ aside { display: flex; flex-direction: column; gap: 14px; }
       <div class="actions">
         <button class="btn primary" id="exportInterior" disabled>Print-ready interior PDF</button>
         <button class="btn" id="exportCover" disabled>Print-ready cover PDF</button>
+        <button class="btn" id="exportBook" disabled>Whole book PDF (cover + inside pages)</button>
       </div>
-      <p class="hint">Files are made in your browser; your journal is never uploaded anywhere. It stays saved in this browser until you upload another.</p>
+      <p class="hint">Printers want the interior and the cover as two files; the whole book PDF (front cover, inside pages, back cover, each with bleed) is for proofs, sharing and printers that take one file. Files are made in your browser; your journal is never uploaded anywhere. It stays saved in this browser until you upload another.</p>
     </div>
   </aside>
   <section class="stage">
@@ -486,8 +487,9 @@ aside { display: flex; flex-direction: column; gap: 14px; }
   }
   // One inside page as the printer wants it: trim + 1/8 in bleed (none at the binding edge for KDP), the page scaled and
   // moved per placement(); the page's own bleed art is used where the file has it, otherwise its edges are continued.
-  async function renderInterior(canvas, p, side, k) {
-    const pl = placement(), t = p.trim, f = pl.f, sc = k * f;
+  async function renderInterior(canvas, p, side, k, cover = false) {
+    // Covers go in as they are: full size, centred, bleed all round.
+    const pl = cover ? { ...placement(), f: 1, x: { left: 0, right: 0 }, y: 0, m: { ...margins(), bindBleed: true } } : placement(), t = p.trim, f = pl.f, sc = k * f;
     const src = await renderSource(p, sc);
     const trim = document.createElement('canvas'); trim.width = Math.round(t.tw * sc); trim.height = Math.round(t.th * sc);
     trim.getContext('2d').drawImage(src, -t.ex * sc, -t.ey * sc);
@@ -635,7 +637,7 @@ aside { display: flex; flex-direction: column; gap: 14px; }
     document.querySelectorAll('#qualitySeg button').forEach((b) => b.classList.toggle('active', b.dataset.q === st.quality));
     document.querySelectorAll('#viewSeg button').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
     $('pager').classList.toggle('hidden', view !== 'pages');
-    $('exportInterior').disabled = $('exportCover').disabled = !info || busy;
+    $('exportInterior').disabled = $('exportCover').disabled = $('exportBook').disabled = !info || busy;
     if (!info) {
       $('printerHint').textContent = ''; $('coverHint').textContent = '';
       $('paperField').classList.toggle('hidden', st.binding !== 'paperback'); $('spineField').classList.toggle('hidden', st.binding === 'coil' || st.binding === 'saddle');
@@ -718,6 +720,43 @@ aside { display: flex; flex-direction: column; gap: 14px; }
       toast(`Interior downloaded (${ip.length} pages).`);
     } catch (e) { console.error(e); toast('Export stopped. Please try again.'); }
     finally { srcCache.clear(); setBusy(false); }
+  };
+  // Front cover, the print-ready inside pages, back cover: one PDF, each page with its bleed.
+  $('exportBook').onclick = async () => {
+    if (busy || !info) return;
+    if (!window.jspdf) { toast('The PDF writer did not load. Refresh the page and try again.'); return; }
+    const ip = interiorPages(), k = dpi() / 72, list = [];
+    if (st.firstIsCover) list.push(['front', info.pages[0]]);
+    ip.forEach((p, i) => list.push([i % 2 ? 'right' : 'left', p]));
+    list.push(['back', st.lastIsBack && info.pages.length > 1 ? info.pages[info.pages.length - 1] : null]);
+    busy = true; sync(); $('exportBook').textContent = 'Building 0%';
+    try {
+      let pdf = null; const c = document.createElement('canvas'), q = st.quality === 'print' ? .94 : .88;
+      for (let i = 0; i < list.length; i++) {
+        const [kind, p] = list[i];
+        let w, h;
+        if (kind === 'back' && !p) {
+          // No back page in the file: the plain or mirrored back the cover file uses.
+          const f0 = info.pages[0], t = f0.trim; w = t.tw + 2 * BLEED; h = t.th + 2 * BLEED;
+          const front = document.createElement('canvas'); await renderInterior(front, f0, 'left', k, true);
+          c.width = front.width; c.height = front.height; const x = c.getContext('2d');
+          if (st.backFill === 'mirror') { x.save(); x.translate(c.width, 0); x.scale(-1, 1); x.drawImage(front, 0, 0); x.restore(); }
+          else { x.fillStyle = st.spineColor || avgColor(front, front.width * .02, 0, front.width * .06, front.height); x.fillRect(0, 0, c.width, c.height); }
+        } else if (kind === 'front' || kind === 'back') {
+          await renderInterior(c, p, 'left', k, true); w = p.trim.tw + 2 * BLEED; h = p.trim.th + 2 * BLEED;
+        } else {
+          await renderInterior(c, p, kind, k); w = p.trim.tw + 2 * BLEED - (margins().bindBleed ? 0 : BLEED); h = p.trim.th + 2 * BLEED;
+        }
+        const data = new Uint8Array(await (await toBlob(c, q)).arrayBuffer());
+        if (!pdf) pdf = new jspdf.jsPDF({ orientation: 'portrait', unit: 'pt', format: [w, h], compress: true }); else pdf.addPage([w, h], 'portrait');
+        pdf.addImage(data, 'JPEG', 0, 0, w, h, `b${i}`, 'FAST');
+        $('exportBook').textContent = `Building ${Math.round((i + 1) / list.length * 100)}%`;
+        await new Promise(requestAnimationFrame);
+      }
+      pdf.save(`${slug()}-whole-book-${st.printer}.pdf`);
+      toast(`Whole book downloaded (${list.length} pages at ${dpi()} DPI).`);
+    } catch (e) { console.error(e); toast('Export stopped. Please try again.'); }
+    finally { srcCache.clear(); busy = false; $('exportBook').textContent = 'Whole book PDF (cover + inside pages)'; sync(); }
   };
   $('exportCover').onclick = async () => {
     if (busy || !info) return;
