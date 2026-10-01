@@ -164,7 +164,7 @@ aside { display: flex; flex-direction: column; gap: 14px; }
   <section class="stage">
     <div class="stagebar">
       <strong id="viewTitle">No journal yet</strong>
-      <div class="seg" id="viewSeg"><button data-view="pages" class="active">Pages</button><button data-view="cover">Cover spread</button></div>
+      <div class="seg" id="viewSeg"><button data-view="pages" class="active">Pages</button><button data-view="spreads">Spreads</button><button data-view="cover">Cover spread</button></div>
       <div class="pager" id="pager"><button id="prev" aria-label="Previous page">‹</button><span id="pageNum"></span><button id="next" aria-label="Next page">›</button></div>
       <label class="check"><input type="checkbox" id="guides" checked> Guides</label>
     </div>
@@ -203,7 +203,7 @@ aside { display: flex; flex-direction: column; gap: 14px; }
   try { st = { ...st, ...JSON.parse(localStorage.getItem('dove-print-prep') || '{}') }; } catch {}
   const save = () => { try { localStorage.setItem('dove-print-prep', JSON.stringify(st)); } catch {} };
 
-  let doc = null, info = null, view = 'pages', page = 0, busy = false;
+  let doc = null, info = null, view = 'pages', page = 0, spread = 0, busy = false;
   const toast = (m) => { const t = $('toast'); t.textContent = m; t.classList.remove('hidden'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.add('hidden'), 4200); };
   const inch = (pt) => `${+(pt / 72).toFixed(3)}″`;
 
@@ -243,7 +243,7 @@ aside { display: flex; flex-direction: column; gap: 14px; }
     info = { name, pages };
     $('fileName').textContent = name;
     await analyzeColors(); buildSwatches();
-    page = 0; view = 'pages';
+    page = 0; spread = 0; view = 'pages';
     refresh();
   }
 
@@ -618,6 +618,34 @@ aside { display: flex; flex-direction: column; gap: 14px; }
       if (st.guides) spreadGuides(tmp, cs);
       $('viewTitle').textContent = `Cover spread · ${+cs.W.toFixed(3)} × ${+cs.H.toFixed(3)} in`;
       $('pageNum').textContent = '';
+    } else if (view === 'spreads') {
+      // Facing pages as the open book shows them: page 1 alone on the right (the inside of the front cover on the
+      // left), then 2–3, 4–5 … Each page keeps its outer bleed; the two meet at the binding.
+      const ip = interiorPages(), n = ip.length, last = Math.floor(n / 2), sp = Math.min(spread, last);
+      const k = 560 / (ip[0].trim.tw + 2 * BLEED), li = 2 * sp - 1, ri = 2 * sp;
+      const half = async (i, side) => {
+        const c = document.createElement('canvas');
+        if (i < 0 || i >= n) {                       // inside of a cover: blank, same size as a page
+          const t = ip[0].trim; c.width = Math.round((t.tw + BLEED) * k); c.height = Math.round((t.th + 2 * BLEED) * k);
+          const x = c.getContext('2d'); x.fillStyle = '#e4dcd5'; x.fillRect(0, 0, c.width, c.height);
+          x.fillStyle = 'rgba(60,40,35,.45)'; x.font = `600 ${Math.round(c.width * .045)}px Lato, sans-serif`; x.textAlign = 'center'; x.fillText('Inside cover', c.width / 2, c.height / 2);
+          return c;
+        }
+        const r = await renderInterior(c, ip[i], side, k);
+        if (st.guides) guides(c, side, k, r.cutLeft, r.cut && !r.cutLeft);
+        // Drop the bleed at the binding (if it is still there) so the two trims meet.
+        const cutB = r.cut ? 0 : Math.round(BLEED * k), o = document.createElement('canvas');
+        o.width = c.width - cutB; o.height = c.height; o.getContext('2d').drawImage(c, side === 'left' ? -cutB : 0, 0);
+        return o;
+      };
+      const L = await half(li, 'right'), R = await half(ri, 'left');
+      if (token !== drawToken) return;
+      tmp.width = L.width + R.width; tmp.height = Math.max(L.height, R.height);
+      const x = tmp.getContext('2d'); x.drawImage(L, 0, 0); x.drawImage(R, L.width, 0);
+      x.fillStyle = 'rgba(0,0,0,.18)'; x.fillRect(L.width - 1, 0, 2, tmp.height);           // the binding
+      const lab = (i) => (i >= 0 && i < n ? `page ${i + 1}` : 'inside cover');
+      $('viewTitle').textContent = `Spread: ${lab(li)} (back of sheet) · ${lab(ri)} (front of sheet)`;
+      $('pageNum').textContent = `${sp + 1} / ${last + 1}`;
     } else {
       const ip = interiorPages(), p = ip[page] || ip[0];
       if (!p) return;
@@ -639,7 +667,7 @@ aside { display: flex; flex-direction: column; gap: 14px; }
     $('spineText').value = st.spineText;
     document.querySelectorAll('#qualitySeg button').forEach((b) => b.classList.toggle('active', b.dataset.q === st.quality));
     document.querySelectorAll('#viewSeg button').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
-    $('pager').classList.toggle('hidden', view !== 'pages');
+    $('pager').classList.toggle('hidden', view === 'cover');
     $('exportInterior').disabled = $('exportCover').disabled = $('exportBook').disabled = !info || busy;
     if (!info) {
       $('printerHint').textContent = ''; $('coverHint').textContent = '';
@@ -684,7 +712,7 @@ aside { display: flex; flex-direction: column; gap: 14px; }
   drop.ondragleave = () => drop.classList.remove('over');
   drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove('over'); openFile(e.dataTransfer.files[0]); };
   for (const id of ['printer', 'fit', 'binding', 'paper', 'backFill']) $(id).onchange = (e) => { st[id] = e.target.value; refresh(); };
-  for (const id of ['firstIsCover', 'lastIsBack', 'guides']) $(id).onchange = (e) => { st[id] = e.target.checked; page = 0; refresh(); };
+  for (const id of ['firstIsCover', 'lastIsBack', 'guides']) $(id).onchange = (e) => { st[id] = e.target.checked; if (id !== 'guides') { page = 0; spread = 0; } refresh(); };
   [['marginBind', .25, 1.25], ['marginEdge', .125, 1], ['marginTB', .125, 1], ['spineIn', 0, 3], ['coverBleedIn', .125, 1.5]].forEach(([id, lo, hi]) => {
     $(id).onchange = (e) => { if (e.target.readOnly) return; const v = Number(e.target.value); st[id] = Math.min(hi, Math.max(lo, Number.isFinite(v) ? v : DEF[id])); refresh(); };
   });
@@ -693,10 +721,18 @@ aside { display: flex; flex-direction: column; gap: 14px; }
   $('spineText').oninput = (e) => { st.spineText = e.target.value; save(); sync(); if (view === 'cover') draw(); };
   $('spineColor').oninput = (e) => { st.spineColor = e.target.value; save(); if (view === 'cover') draw(); };
   document.querySelectorAll('#qualitySeg button').forEach((b) => b.onclick = () => { st.quality = b.dataset.q; save(); sync(); });
-  document.querySelectorAll('#viewSeg button').forEach((b) => b.onclick = () => { view = b.dataset.view; sync(); draw(); });
-  $('prev').onclick = () => { if (page > 0) { page--; draw(); } };
-  $('next').onclick = () => { if (page < interiorPages().length - 1) { page++; draw(); } };
-  document.addEventListener('keydown', (e) => { if (view !== 'pages' || /input|select/i.test(e.target.tagName)) return; if (e.key === 'ArrowLeft') $('prev').click(); if (e.key === 'ArrowRight') $('next').click(); });
+  // Switching views keeps your place: page n ↔ the spread it is in.
+  document.querySelectorAll('#viewSeg button').forEach((b) => b.onclick = () => {
+    if (b.dataset.view === 'spreads' && view === 'pages') spread = Math.floor((page + 1) / 2);
+    if (b.dataset.view === 'pages' && view === 'spreads') page = Math.max(0, Math.min(interiorPages().length - 1, 2 * spread - 1));
+    view = b.dataset.view; sync(); draw();
+  });
+  $('prev').onclick = () => { if (view === 'spreads') { if (spread > 0) { spread--; draw(); } } else if (page > 0) { page--; draw(); } };
+  $('next').onclick = () => {
+    if (view === 'spreads') { if (spread < Math.floor(interiorPages().length / 2)) { spread++; draw(); } }
+    else if (page < interiorPages().length - 1) { page++; draw(); }
+  };
+  document.addEventListener('keydown', (e) => { if (view === 'cover' || /input|select/i.test(e.target.tagName)) return; if (e.key === 'ArrowLeft') $('prev').click(); if (e.key === 'ArrowRight') $('next').click(); });
 
   const slug = () => (info?.name || 'journal').replace(/\.pdf$/i, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   const toBlob = (c, q) => new Promise((res, rej) => c.toBlob((b) => (b ? res(b) : rej(new Error('blob'))), 'image/jpeg', q));
