@@ -7,7 +7,7 @@
 <meta name="description" content="Swap the colors and design elements of complete Dove Expressions journals and export print-ready PDFs.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Lato:wght@400;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="vendor/jspdf.umd.min.js"></script>
 <style>
 :root {
   --bg: #f7f3ef;
@@ -383,6 +383,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
   <button class="back-btn" id="undoBtn" type="button" title="Go back: undo the last change (⌘Z)" aria-label="Go back (undo the last change)" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
   <strong class="hdr-title">Journal Color Studio</strong>
   <div class="spacer"></div>
+  <a class="btn head-btn" href="print-prep.html" title="Upload a finished journal PDF and get print-ready interior and cover files" style="text-decoration:none">Print Prep</a>
   <button class="btn head-btn" id="startOver" type="button" title="Reset this journal to its original design">Start over</button>
 </header>
 
@@ -745,6 +746,11 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
             <button class="btn" id="exportBookPdf">Whole journal PDF</button>
             <button class="btn" id="exportLined">This page PNG</button>
           </div>
+        </div>
+        <div data-tab="book" class="card">
+          <h2>Print Prep <span>for journals made elsewhere</span></h2>
+          <p class="hint" style="margin:0 0 8px">Made a journal in Canva or another program? Upload the whole PDF to Print Prep: it fits every page to your printer's margins, adds the bleed and builds the cover file.</p>
+          <a class="btn" href="print-prep.html" style="display:block;text-align:center;text-decoration:none">Open Print Prep</a>
         </div>
         <div data-tab="book" class="card" id="coverFileCard">
           <h2>Print-ready cover <span>back, spine and front in one file</span></h2>
@@ -6039,7 +6045,9 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
       const [type, side] = pages[i], key = `${type}-${side}`;
       if (!cache.has(key)) {
         renderPage(c, pxWidth(), state, type, side);
-        cache.set(key, { data: new Uint8Array(await (await toBlob(c, 'image/jpeg', q)).arrayBuffer()), w: PAGE_H * c.width / c.height });
+        // Exact page width in points: the full bleed page, or 1/8 in narrower without bleed at the binding edge (KDP).
+        const narrow = Math.abs(PAGE_H * c.width / c.height - (PAGE_W - BLEED_PT)) < 2;
+        cache.set(key, { data: new Uint8Array(await (await toBlob(c, 'image/jpeg', q)).arrayBuffer()), w: narrow ? PAGE_W - BLEED_PT : PAGE_W });
       }
       const { data, w } = cache.get(key);
       if (!pdf) pdf = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'pt', format: [w, PAGE_H], compress: true });
