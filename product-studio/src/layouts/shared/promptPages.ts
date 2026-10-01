@@ -533,7 +533,7 @@ function composedHeader(id: string, h: GuidedHeader, body: Rect, ctx: LayoutCont
   if (dividers && used > 0) {
     if (leftW && (titleText || subtitle || overline)) {
       const x = body.x + leftW + gap / 2;
-      nodes.push(rule(`${id}-divider-left`, x, body.y, x, body.y + used, { component: "PageHeader", color: "goldInk", strokePt: 0.75 }));
+      nodes.push(rule(`${id}-divider-left`, x, body.y, x, body.y + used, { component: "PageHeader", color: "goldInk", strokePt: 1.5 }));
     }
     if (rightW) {
       const x = body.x + body.w - rightW - gap / 2;

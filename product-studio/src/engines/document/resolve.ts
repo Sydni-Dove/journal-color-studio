@@ -19,7 +19,7 @@ import { PRODUCT_RECOMMENDED_MARGINS, PRODUCT_TYPES } from "../../presets/produc
 import { resolveSpacing } from "../../presets/spacing/spacingPresets";
 import { resolveColors } from "../../presets/themes/palettes";
 import { resolveTypography } from "../../presets/typography/typography";
-import { withLuxeCoverType } from "../../presets/coverLuxe";
+import { isScriptFont, withLuxeCoverType } from "../../presets/coverLuxe";
 import { resolveWording } from "../../presets/wording";
 import type { BindingProfile } from "../../types/binding";
 import type { CalendarData, WeekStart } from "../../types/calendar";
@@ -128,7 +128,12 @@ export const designedCoverPage = (p: PageInstance) => (p.layoutId === "cover-pag
  * project's other fonts or colors.
  */
 function bookTypography(project: ProductProject, recipe: ExpandedRecipe): TypographySettings {
-  const t = resolveTypography(project.typography.fonts, project.typography.roleOverrides);
+  let t = resolveTypography(project.typography.fonts, project.typography.roleOverrides);
+  // A script title is lettered as written: never forced into spaced capitals (the cover title's default style).
+  if (isScriptFont(t.roles.coverTitle.family ?? t.fonts.cover)) {
+    const own = project.typography.roleOverrides?.coverTitle ?? {};
+    t = { ...t, roles: { ...t.roles, coverTitle: { ...t.roles.coverTitle, transform: own.transform ?? "none", trackingEm: own.trackingEm ?? 0 } } };
+  }
   return recipe.pages.some(designedCoverPage) ? withLuxeCoverType(t, project.typography.roleOverrides) : t;
 }
 

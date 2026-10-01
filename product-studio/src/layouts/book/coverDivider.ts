@@ -10,6 +10,7 @@ import { minimumAreaFit, type LayoutContext, type LayoutDefinition } from "../sh
 import { classifyComposition, fitSubtitle, fitTitle, placeDecoration, SCRIPT_ASCENT_EM, SCRIPT_DESCENT_EM, SCRIPT_DESCENT_SHORT_EM, type MeasureText, type ProtectedZone } from "./composition";
 import { COMPOSITION_PRESETS, LUXE_DECORATION } from "./luxeComposition";
 import { findCoverSurface } from "../../design-library/coverSurfaces";
+import { isScriptFont } from "../../presets/coverLuxe";
 
 /**
  * The edge a tab prints on: the outer (fore) edge, away from the binding — the
@@ -321,16 +322,26 @@ function solveFlat(ctx: LayoutContext, divider: boolean): SolvedPage[] {
 
   if (showText) {
     const anchor = opt.position === "upper" ? 0.26 : opt.position === "lower" ? 0.66 : 0.46;
-    const titleRect = { x: content.x, y: Math.max(content.y, anchor * g.trimHeightIn - 0.7), w: content.w, h: Math.min(1.4, content.h * 0.24) };
-    let below = titleRect.y;
+    let below = Math.max(content.y, anchor * g.trimHeightIn - 0.7);
 
     if (title) {
-      const fit = fitHeading(title, "coverTitle", titleRect, ctx);
-      const n = text("cover-title", titleRect, title, "coverTitle", { align: left ? "left" : "center", color });
+      // The title is the cover's focal point whatever the font: as large as ~86 % of the width allows, on one
+      // line or two, up to ~30 % of the page's height — not the interior's heading size.
+      const role = ctx.typography.roles.coverTitle;
+      const script = isScriptFont(role.family ?? ctx.typography.fonts.cover);
+      const lh = Math.max(role.lineHeight, script ? 0.95 : 1.05);
+      const box = { w: content.w * 0.86, h: content.h * 0.3 };
+      const tctx = { typography: { ...ctx.typography, roles: { ...ctx.typography.roles, coverTitle: { ...role, sizePt: Math.min(240, (box.h * 72) / lh), lineHeight: lh } } } };
+      const fit = fitHeading(title, "coverTitle", box, tctx);
+      const h = (fit.sizePt * fit.lineHeight * fit.lines.length) / 72;
+      const y = Math.max(content.y, Math.min(anchor * g.trimHeightIn - h / 2, content.y + content.h - h));
+      const titleRect = { x: content.x, y, w: content.w, h };
+      const n = text("cover-title", titleRect, title, "coverTitle", { align: left ? "left" : "center", color, wrap: fit.lines.length > 1 });
       n.fit = { ...fit, failed: !fit.ok };
       if (!fit.ok) diagnostics.push({ severity: "error", rule: "heading-fit", componentId: n.id, message: "This cover title is too long. Shorten it or choose a larger page." });
       words.push(n);
-      below = titleRect.y + titleRect.h;
+      // A script's tails (g, j, p, q, y) hang below its line: the subtitle starts under them.
+      below = titleRect.y + titleRect.h + (script ? (fit.sizePt / 72) * 0.28 : 0);
     }
 
     if (subtitle) {

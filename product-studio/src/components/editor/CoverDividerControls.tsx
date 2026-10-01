@@ -5,7 +5,23 @@ import { LUXE_TITLE_FONT } from "../../presets/coverLuxe";
 import type { ColorToken, ColorTokens } from "../../types/tokens";
 import { COVER_SURFACES, coverSurfaceColors, findCoverSurface, ownPaletteId } from "../../design-library/coverSurfaces";
 import { DesignThumb } from "./DesignThumb";
+import { FONT_CATALOG, FONT_CATEGORY_LABEL } from "../../presets/typography/typography";
+import type { FontCategory } from "../../types/tokens";
 import { NEUTRAL_LUXE_ID, resolveColors } from "../../presets/themes/palettes";
+
+/**
+ * Title fonts: the Luxe design's scripts first; on solid and artwork covers every
+ * font in the studio, by kind (the chosen one always listed).
+ */
+function titleFontOptions(luxe: boolean, current: string) {
+  const named = new Map(TITLE_FONTS.map((f) => [f.value, f.label]));
+  const kinds: FontCategory[] = luxe ? ["script", "handwritten"] : ["script", "handwritten", "display", "serif", "sans-serif"];
+  const out = TITLE_FONTS.map((f) => ({ value: f.value, label: `${f.label} — script` }));
+  for (const k of kinds)
+    for (const f of FONT_CATALOG.filter((x) => x.category === k && !named.has(x.family))) out.push({ value: f.family, label: `${f.family} — ${FONT_CATEGORY_LABEL[k].toLowerCase()}` });
+  if (!out.some((o) => o.value === current)) out.push({ value: current, label: `${current} (current)` });
+  return out;
+}
 
 type CoverChoice = "neutral-cheetah-luxe" | "solid" | "plain" | `surface:${string}`;
 const choiceOf = (o: CoverDividerSettings): CoverChoice => (o.preset === "surface" && findCoverSurface(o.surfaceId) ? `surface:${o.surfaceId}` : o.preset === "surface" ? "solid" : o.preset ?? "neutral-cheetah-luxe");
@@ -106,8 +122,8 @@ export function CoverDividerControls({ step, set, applyPreset, titleFont, onTitl
     {!showText && <p className="hint">Only the artwork prints. The page keeps its name{step.title ? ` (“${step.title}”)` : ""} for Pages and tabs.</p>}
     {showText && <>
       {step.module !== "back-cover" && <Field label={step.module === "cover-page" ? "Cover title" : "Divider title"}><input value={step.title ?? (step.module === "cover-page" ? "Plan" : "")} onChange={(e) => set({ title: e.target.value })}/></Field>}
-      <Select label="Title font" value={titleFont} options={[...TITLE_FONTS, ...(TITLE_FONTS.some((f) => f.value === titleFont) ? [] : [{ value: titleFont, label: `Current: ${titleFont}` }])]} onChange={onTitleFont}/>
-      <p className="hint">Applies to cover and divider titles throughout this book.</p>
+      <Select label="Title font" value={titleFont} options={titleFontOptions(luxe, titleFont)} onChange={onTitleFont}/>
+      <p className="hint">{luxe ? "The Neutral Cheetah Luxe design is lettered in script; for capitals or a serif title, choose Solid color or an artwork cover." : "Applies to cover and divider titles throughout this book. The title is sized to fill the cover whichever font you choose."}</p>
       {wording !== "title" && <Field label={step.module === "back-cover" ? "Line of text (optional)" : "Subtitle"}><input value={o.subtitle ?? (step.module === "cover-page" && luxe ? "WITH PURPOSE" : "")} onChange={(e) => change({ subtitle: e.target.value })}/></Field>}
       <Field label="Optional scripture or quote"><textarea value={o.quote ?? ""} onChange={(e) => change({ quote: e.target.value })}/></Field>
       <label><input type="checkbox" checked={o.smallLine !== false} onChange={(e) => change({ smallLine: e.target.checked })}/> Show small line</label>

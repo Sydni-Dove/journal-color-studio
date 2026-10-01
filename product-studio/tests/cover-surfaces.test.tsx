@@ -250,3 +250,33 @@ describe("panel width: hugs the words, or runs off both sides — never almost t
     expect(fit.s.nodes.find((n) => n.id === "cover-panel")!.rect.w).toBeLessThan(fit.g.trimWidthIn);
   });
 });
+
+describe("title size on solid and artwork covers: the cover's focal point whatever the font", () => {
+  // Reported: "Cinzel is too small" (it was sized like an interior heading); a script's tails ran into the subtitle.
+  const cover = (font: string, size = "8.5x11") => {
+    const p = project({ preset: "surface", surfaceId: "jcs-watercolor-abstract", subtitle: "WITH GOD" }, size);
+    p.typography = { ...p.typography, fonts: { ...p.typography.fonts, cover: font } };
+    p.recipe.structure![0] = { ...(p.recipe.structure![0] as object), title: "Meetings" } as never;
+    const doc = resolveDocument(p);
+    const i = pageOf(doc, "cover-page");
+    return { s: solvePage(doc, i), g: geometryFor(doc, doc.recipe.pages[i]) };
+  };
+  for (const font of ["Cinzel", "Playfair Display", "Great Vibes", "Montserrat"])
+    for (const size of ["8.5x11", "6x9"])
+      it(`${size} · ${font}: about ¾ of the width or more, inside the page, subtitle below it`, () => {
+        const { s, g } = cover(font, size);
+        const t = s.nodes.find((n) => n.id === "cover-title")!;
+        const sub = s.nodes.find((n) => n.id === "cover-subtitle")!;
+        if (t.type !== "text") throw new Error();
+        const widest = Math.max(...t.fit!.lines.map((l) => getLayoutMeasurerWidth(l, t.fit!.sizePt, font)));
+        expect(widest, `${font} title width`).toBeGreaterThan(0.6 * g.safeRect.w);
+        expect(t.fit!.sizePt).toBeGreaterThan(36);
+        expect(rectContains(g.safeRect, t.rect)).toBe(true);
+        expect(sub.rect.y).toBeGreaterThan(t.rect.y + t.rect.h - 1e-6);
+        expect(s.diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+      });
+});
+import { getLayoutMeasurer } from "../src/engines/typography/textMeasure";
+function getLayoutMeasurerWidth(text: string, sizePt: number, family: string) {
+  return getLayoutMeasurer().measure(text, { family, sizePt, weight: 400, italic: false, trackingEm: 0, transform: "none" } as never);
+}
