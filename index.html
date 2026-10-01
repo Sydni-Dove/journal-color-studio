@@ -717,6 +717,13 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
             <div class="field"><span>Front cover</span><select id="includeCover"><option value="yes">Include</option><option value="no">Leave out</option></select></div>
           </div>
           <div class="field"><span>Back cover</span><select id="includeBack"><option value="yes">Include</option><option value="no">Leave out</option></select></div>
+          <div class="field"><span>Printer margins</span><select id="printer"></select></div>
+          <div id="customMargins" class="hidden" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+            <div class="field"><span>Binding (in)</span><input type="number" id="marginBind" min=".25" max="1.25" step=".0625"></div>
+            <div class="field"><span>Edges (in)</span><input type="number" id="marginEdge" min=".125" max="1" step=".0625"></div>
+            <div class="field"><span>Top/bottom (in)</span><input type="number" id="marginTB" min=".125" max="1" step=".0625"></div>
+          </div>
+          <span class="hint" id="printerHint"></span>
           <div class="role" style="margin-top:8px"><label><input type="checkbox" id="showGuides"> Show trim and safe area</label></div>
           <span class="hint">Inside pages export as their own PDF: page 1 is the first inside page (odd pages bind on the left, even on the right). The covers are a separate file. "Whole journal PDF" puts the included covers and the inside pages in one file.</span>
           <div class="actions" style="margin-top:12px">
@@ -773,7 +780,35 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
   // that is 1/2 in at the binding edge and 1/4 in at the outer edge. The thin border line along the top of a page is
   // an edge element instead: 1/8 in deep, running off the page into the bleed (composeBleed mirrors it outward).
   const safeInset = (W) => W * (SAFE_BIND_PT - BIND_SHIFT_PT) / TRIM_W;
-  const topBorder = (H) => H * BLEED_PT / TRIM_H;
+  // While a page is drawn smaller for a printer that wants wider margins (see pagePlacement), the design leaves this
+  // border out and renderPage paints it at full size across the top of the page instead, so it still bleeds.
+  let topBorderOff = false, topBorderUsed = false;
+  const topBorder = (H) => { topBorderUsed = true; return topBorderOff ? 0 : H * BLEED_PT / TRIM_H; };
+  // Printer margin presets for inside pages, in inches: bind = binding side, edge = outside edge, tb = top and bottom.
+  // Some printers widen the binding margin as the page count grows. bindBleed: false for printers whose inside pages
+  // have no bleed on the binding edge (KDP: 8.625 × 11.25 in pages). Covers are separate files and never change.
+  const PRINTERS = {
+    standard: { label: 'Standard (½″ binding, ¼″ edges)', bind: () => .5, edge: .25, tb: .25 },
+    lulu: { label: 'Lulu', bind: (n) => .5 + (n <= 60 ? 0 : n <= 150 ? .125 : n <= 400 ? .5 : .625), edge: .5, tb: .5 },
+    ingram: { label: 'IngramSpark', bind: () => .5, edge: .5, tb: .5 },
+    kdp: { label: 'Amazon KDP', bind: (n) => n <= 150 ? .375 : n <= 300 ? .5 : n <= 500 ? .625 : .75, edge: .375, tb: .375, bindBleed: false },
+    custom: { label: 'Custom margins' },
+  };
+  // The chosen printer's margins in points (from the trim), for the current page count.
+  function printMargins(s) {
+    const pr = PRINTERS[s.printer] || PRINTERS.standard;
+    const m = s.printer === 'custom' ? { bind: s.marginBind, edge: s.marginEdge, tb: s.marginTB } : { bind: pr.bind(s.pageCount), edge: pr.edge, tb: pr.tb };
+    return { bind: m.bind * 72, edge: m.edge * 72, tb: m.tb * 72, bindBleed: pr.bindBleed !== false };
+  }
+  // Where an inside page's design sits on the trim (points) and how much it is scaled. Designs keep their wording and
+  // lines 3/8 in from each side and 1/4 in from the top and bottom; the design moves away from the binding and, only
+  // when the printer asks for more room than that, is drawn a little smaller. Standard: 1/8 in shift, full size.
+  function pagePlacement(s, side) {
+    const m = printMargins(s), D = SAFE_BIND_PT - BIND_SHIFT_PT, DV = SAFE_EDGE_PT;
+    const f = Math.min(1, (TRIM_W - m.bind - m.edge) / (TRIM_W - 2 * D), (TRIM_H - 2 * m.tb) / (TRIM_H - 2 * DV));
+    const xl = m.bind - D * f + (TRIM_W - m.bind - m.edge - (TRIM_W - 2 * D) * f) / 2;
+    return { f, x: side === 'right' ? TRIM_W - TRIM_W * f - xl : xl, y: (TRIM_H - TRIM_H * f) / 2, m };
+  }
   // Marble layer maps: R = stone detail (or vein shading), G = gold veins, B = cream highlights.
   // The "canva" marble comes from Sydni's Canva cover: flat stone, so the gold carries its own light-to-dark shading.
   const TEXTURES = {
@@ -1221,6 +1256,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
       divider: { asset: 'divider-none', show: true, colorMode: 'palette', color: '#C9A05A', scale: 100 },
     },
     journal: 'dream', page: 0, pageCount: 102, includeCover: 'yes', includeBack: 'yes',
+    printer: 'standard', marginBind: .5, marginEdge: .25, marginTB: .25,   // inside-page margins (see PRINTERS), inches
     // Cover, heading and body typography are independent: changing one never resizes the others.
     coverFont: 'Playfair Display', coverFontScale: 100, coverFontColorAuto: true, coverFontColor: '#FFFFFF',
     headingFont: 'Cormorant Garamond', headingFontScale: 100,
@@ -1257,6 +1293,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     if (!['mixed', 'block', 'rule', 'bar', 'band', 'soft', 'plain'].includes(state.headerStyle)) state.headerStyle = 'mixed';
     if (!['snug', 'designed'].includes(state.headerSpacing)) state.headerSpacing = 'snug';
     if (state.pageCount < 10) state.pageCount = DEFAULTS.pageCount;
+    if (!(state.printer in PRINTERS)) state.printer = 'standard';
     // Sept 24 single-corner names → the shared layout names.
     state.accentPlace = { cornerTopRight: 'tr', cornerBottomLeft: 'bl' }[state.accentPlace] || state.accentPlace;
     if (!ACCENT_LAYOUTS.some(([v]) => v === state.accentPlace)) state.accentPlace = 'corners';
@@ -3026,6 +3063,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
 
   // A dark bar or block: real marble, or the flat stone color (the Canva master uses flat black).
   function stoneBar(ctx, x, y, w, h, s) {
+    if (h <= 0 || w <= 0) return;
     if (s.headerFill === 'solid') { ctx.fillStyle = s.palette.stone; ctx.fillRect(x, y, w, h); }
     else paintMarble(ctx, x, y, w, h, s);
   }
@@ -4348,29 +4386,50 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
 
   // The finished print page: the design (on the 8.5 × 11 trim) inside the 1/8 in bleed. Inside pages sit 1/8 in away
   // from their binding edge (side: 'left' for odd inside pages, 'right' for even); covers stay centred.
+  // The chosen printer (see PRINTERS) sets the inside-page margins; for a printer with no bleed at the binding edge the
+  // page comes back 1/8 in narrower, without that strip.
   function renderPage(canvas, width, s, type, side = 'left') {
-    const W = width, H = Math.round(width * PAGE_H / PAGE_W), trim = document.createElement('canvas');
-    renderDesign(trim, Math.round(W * TRIM_W / PAGE_W), s, type);
-    canvas.width = W; canvas.height = H;
+    const W = width, H = Math.round(width * PAGE_H / PAGE_W), k = W / PAGE_W, trim = document.createElement('canvas');
     const cover = type === 'cover' || type === 'back';
-    const shift = cover ? 0 : Math.round(W * BIND_SHIFT_PT / PAGE_W) * (side === 'right' ? -1 : 1);
-    const x0 = Math.round((W - trim.width) / 2) + shift, y0 = Math.round((H - trim.height) / 2);
-    if (s._typoProbe) s._typoProbe.offset = [x0, y0];
-    composeBleed(canvas.getContext('2d'), trim, x0, y0);
+    if (cover) {
+      renderDesign(trim, Math.round(W * TRIM_W / PAGE_W), s, type);
+      canvas.width = W; canvas.height = H;
+      const x0 = Math.round((W - trim.width) / 2), y0 = Math.round((H - trim.height) / 2);
+      if (s._typoProbe) s._typoProbe.offset = [x0, y0];
+      composeBleed(canvas.getContext('2d'), trim, x0, y0);
+      return;
+    }
+    const pl = pagePlacement(s, side), scaled = pl.f < .9995;
+    topBorderOff = scaled; topBorderUsed = false;
+    try { renderDesign(trim, Math.round(W * TRIM_W / PAGE_W * (scaled ? pl.f : 1)), s, type); } finally { topBorderOff = false; }
+    const page = document.createElement('canvas'); page.width = W; page.height = H;
+    const ctx = page.getContext('2d'), x0 = Math.round(k * (BLEED_PT + pl.x)), y0 = Math.round(k * (BLEED_PT + pl.y));
+    // A smaller design leaves a wider gap than its blank edge, so mirroring would bring lines and titles into the
+    // margin: the gap takes the design's blank outer strip, mirrored and stretched to fit.
+    if (scaled) composeBleed(ctx, trim, x0, y0, Math.round(k * 20 * pl.f), Math.round(k * 16 * pl.f));
+    else composeBleed(ctx, trim, x0, y0);
+    // The top border line stays 1/8 in deep and runs off the page, whatever the margins.
+    if (scaled && topBorderUsed) stoneBar(ctx, 0, 0, W, Math.round(k * 2 * BLEED_PT), { ...s, _W: W });
+    const cut = pl.m.bindBleed ? 0 : Math.round(k * BLEED_PT), cutLeft = side === 'left' ? cut : 0;
+    canvas.width = W - cut; canvas.height = H;
+    canvas.getContext('2d').drawImage(page, -cutLeft, 0);
+    if (s._typoProbe) s._typoProbe.offset = [x0 - cutLeft, y0];
   }
   // Draws the design at (x0, y0) and fills the bleed around it by mirroring the design's own edges outward, so marble,
   // bars and background art run seamlessly past the trim (and past the binding gap left by the shift).
-  function composeBleed(ctx, img, x0, y0) {
+  // stripX / stripY cap how much of the design's edge is mirrored; a wider gap stretches that strip to fill it.
+  function composeBleed(ctx, img, x0, y0, stripX = Infinity, stripY = Infinity) {
     const W = ctx.canvas.width, H = ctx.canvas.height, w = img.width, h = img.height;
     const L = Math.min(x0, w), R = Math.min(W - x0 - w, w), T = Math.min(y0, h), B = Math.min(H - y0 - h, h);
+    const sL = Math.min(L, stripX), sR = Math.min(R, stripX), sT = Math.min(T, stripY), sB = Math.min(B, stripY);
     const row = document.createElement('canvas'); row.width = W; row.height = h;
     const r = row.getContext('2d');
     r.drawImage(img, x0, 0);
-    if (L > 0) { r.save(); r.translate(x0, 0); r.scale(-1, 1); r.drawImage(img, 0, 0, L, h, 0, 0, L, h); r.restore(); }
-    if (R > 0) { r.save(); r.translate(x0 + w, 0); r.scale(-1, 1); r.drawImage(img, w - R, 0, R, h, -R, 0, R, h); r.restore(); }
+    if (L > 0) { r.save(); r.translate(x0, 0); r.scale(-L / sL, 1); r.drawImage(img, 0, 0, sL, h, 0, 0, sL, h); r.restore(); }
+    if (R > 0) { r.save(); r.translate(x0 + w, 0); r.scale(-R / sR, 1); r.drawImage(img, w - sR, 0, sR, h, -sR, 0, sR, h); r.restore(); }
     ctx.drawImage(row, 0, y0);
-    if (T > 0) { ctx.save(); ctx.translate(0, y0); ctx.scale(1, -1); ctx.drawImage(row, 0, 0, W, T, 0, 0, W, T); ctx.restore(); }
-    if (B > 0) { ctx.save(); ctx.translate(0, y0 + h); ctx.scale(1, -1); ctx.drawImage(row, 0, h - B, W, B, 0, -B, W, B); ctx.restore(); }
+    if (T > 0) { ctx.save(); ctx.translate(0, y0); ctx.scale(1, -T / sT); ctx.drawImage(row, 0, 0, W, sT, 0, 0, W, sT); ctx.restore(); }
+    if (B > 0) { ctx.save(); ctx.translate(0, y0 + h); ctx.scale(1, -B / sB); ctx.drawImage(row, 0, h - sB, W, sB, 0, -sB, W, sB); ctx.restore(); }
   }
   // Inside-page number of pageList(s)[index] (covers are their own files and never count), and its binding side.
   function insideNumber(s, index) {
@@ -5001,6 +5060,20 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     const inside = type !== 'cover' && type !== 'back' ? insideNumber(state, state.page) : 0;
     $('pageNum').textContent = inside ? `Inside page ${inside} · binds ${bindingSide(inside)}` : `${type === 'cover' ? 'Front' : 'Back'} cover (separate file)`;
     $('showGuides').checked = !!state.showGuides;
+    syncPrinter();
+  }
+  // Printer margin picker: the preset list, the custom fields and a line saying what the inside pages will get.
+  function syncPrinter() {
+    const sel = $('printer');
+    if (!sel.options.length) for (const [v, { label }] of Object.entries(PRINTERS)) sel.add(new Option(label, v));
+    sel.value = state.printer;
+    $('customMargins').classList.toggle('hidden', state.printer !== 'custom');
+    for (const id of ['marginBind', 'marginEdge', 'marginTB']) $(id).value = state[id];
+    const m = printMargins(state), f = pagePlacement(state, 'left').f, inch = (pt) => `${+(pt / 72).toFixed(3)}″`;
+    $('printerHint').textContent = `Inside pages: ${inch(m.bind)} at the binding, ${inch(m.edge)} at the outside edge, ${inch(m.tb)} top and bottom`
+      + (state.printer === 'lulu' || state.printer === 'kdp' ? ` (binding margin for ${state.pageCount} pages)` : '')
+      + (f < .9995 ? `. Page designs are drawn at ${Math.round(f * 100)}% to fit.` : '.')
+      + (m.bindBleed ? '' : ' No bleed at the binding edge, so inside pages are 8.625 × 11.25 in.');
   }
 
   let raf = 0;
@@ -5031,19 +5104,21 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
   }
 
   // Preview-only print guides (never exported): bleed shaded, trim line, and on inside pages the safe area
-  // (1/2 in at the binding edge, 1/4 in elsewhere) with the binding edge marked.
+  // (the chosen printer's margins: binding edge, outside edge, top and bottom) with the binding margin tinted.
   function drawGuides(c, type, side) {
-    const ctx = c.getContext('2d'), k = c.width / PAGE_W, b = BLEED_PT * k, W = c.width, H = c.height;
+    const inside = type !== 'cover' && type !== 'back', m = printMargins(state);
+    const ctx = c.getContext('2d'), k = c.height / PAGE_H, b = BLEED_PT * k, W = c.width, H = c.height;
+    const bl = inside && !m.bindBleed && side === 'left' ? 0 : b, br = inside && !m.bindBleed && side === 'right' ? 0 : b;
     ctx.save();
     ctx.fillStyle = 'rgba(230,40,90,.18)';
-    ctx.fillRect(0, 0, W, b); ctx.fillRect(0, H - b, W, b); ctx.fillRect(0, b, b, H - 2 * b); ctx.fillRect(W - b, b, b, H - 2 * b);
-    ctx.lineWidth = Math.max(1, k * .75); ctx.strokeStyle = 'rgba(230,40,90,.9)'; ctx.strokeRect(b, b, W - 2 * b, H - 2 * b);
-    if (type !== 'cover' && type !== 'back') {
-      const l = (side === 'left' ? SAFE_BIND_PT : SAFE_EDGE_PT) * k, r = (side === 'left' ? SAFE_EDGE_PT : SAFE_BIND_PT) * k, e = SAFE_EDGE_PT * k;
+    ctx.fillRect(0, 0, W, b); ctx.fillRect(0, H - b, W, b); ctx.fillRect(0, b, bl, H - 2 * b); ctx.fillRect(W - br, b, br, H - 2 * b);
+    ctx.lineWidth = Math.max(1, k * .75); ctx.strokeStyle = 'rgba(230,40,90,.9)'; ctx.strokeRect(bl, b, W - bl - br, H - 2 * b);
+    if (inside) {
+      const l = (side === 'left' ? m.bind : m.edge) * k, r = (side === 'left' ? m.edge : m.bind) * k, e = m.tb * k;
       ctx.setLineDash([6 * k, 4 * k]); ctx.strokeStyle = 'rgba(20,110,220,.9)';
-      ctx.strokeRect(b + l, b + e, W - 2 * b - l - r, H - 2 * b - 2 * e);
+      ctx.strokeRect(bl + l, b + e, W - bl - br - l - r, H - 2 * b - 2 * e);
       ctx.setLineDash([]); ctx.fillStyle = 'rgba(20,110,220,.14)';
-      ctx.fillRect(side === 'left' ? b : W - b - SAFE_BIND_PT * k, b, SAFE_BIND_PT * k, H - 2 * b);
+      ctx.fillRect(side === 'left' ? bl : W - br - m.bind * k, b, m.bind * k, H - 2 * b);
     }
     ctx.restore();
   }
@@ -5727,8 +5802,9 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     catch { toast('Page export stopped. Please try again.'); } finally { setBusy(false); }
   };
   // Builds a PDF of [type, side] pages at the print page size (8.75 × 11.25 in with bleed).
+  // Pages without bleed at the binding edge (KDP) come out 1/8 in narrower; each PDF page takes its image's size.
   async function buildPdf(pages, name, progress) {
-    const pdf = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'pt', format: [PAGE_W, PAGE_H], compress: true });
+    let pdf = null;
     const q = state.quality === 'print' ? .94 : .88;
     const c = document.createElement('canvas'), cache = new Map();
     // Repeated pages (every Dream, Notes… on the same side) render once; the PDF reuses the same image by name.
@@ -5736,10 +5812,12 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
       const [type, side] = pages[i], key = `${type}-${side}`;
       if (!cache.has(key)) {
         renderPage(c, pxWidth(), state, type, side);
-        cache.set(key, new Uint8Array(await (await toBlob(c, 'image/jpeg', q)).arrayBuffer()));
+        cache.set(key, { data: new Uint8Array(await (await toBlob(c, 'image/jpeg', q)).arrayBuffer()), w: PAGE_H * c.width / c.height });
       }
-      if (i) pdf.addPage([PAGE_W, PAGE_H], 'portrait');
-      pdf.addImage(cache.get(key), 'JPEG', 0, 0, PAGE_W, PAGE_H, `page-${key}`, 'FAST');
+      const { data, w } = cache.get(key);
+      if (!pdf) pdf = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'pt', format: [w, PAGE_H], compress: true });
+      else pdf.addPage([w, PAGE_H], 'portrait');
+      pdf.addImage(data, 'JPEG', 0, 0, w, PAGE_H, `page-${key}`, 'FAST');
       if (progress && i % 6 === 0) { setBusy(true, `Building ${Math.round(i / pages.length * 100)}%`); await new Promise(requestAnimationFrame); }
     }
     pdf.save(name);
@@ -5779,6 +5857,10 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     finally { setBusy(false); }
   };
   $('showGuides').onchange = (e) => { state.showGuides = e.target.checked; commit(false, false); };
+  $('printer').onchange = (e) => { state.printer = e.target.value; commit(false); };
+  [['marginBind', .25, 1.25], ['marginEdge', .125, 1], ['marginTB', .125, 1]].forEach(([id, lo, hi]) => {
+    $(id).onchange = (e) => { const v = Number(e.target.value); state[id] = Math.min(hi, Math.max(lo, Number.isFinite(v) ? v : DEFAULTS[id])); commit(false); };
+  });
 
   // ?debug exposes the renderers for visual QA (preview vs. export comparisons); off in normal use.
   if (new URLSearchParams(location.search).has('debug')) window.__studio = { sectionStyle, TYPO_PAGES, palettesFor, paletteVariations, designType, paletteFit, recommendedPalettes, PALETTE_HOME, renderCover, renderPage, renderDesign, pageList, insideNumber, bindingSide, titleContrast, wordsOffArt, get state() { return state; }, commit, TITLE_PLATE_STYLES };
