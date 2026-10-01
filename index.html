@@ -437,6 +437,11 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
             <label class="field hidden" id="bgArtRow"><span>Background artwork colors</span>
               <select id="bgArt"><option value="original">Original watercolor colors</option><option value="palette">Recolor to palette (keeps texture)</option></select></label>
             <span class="hint hidden" id="floralNote"></span>
+            <label class="field hidden" id="uploadBgRow"><span>Your background's colors</span>
+              <select id="uploadBgColors"><option value="original">Keep its own colors</option><option value="palette">Recolor to palette (keeps texture)</option></select></label>
+            <div class="group-label">Your own background</div>
+            <p class="hint" style="margin:0 0 6px">Upload a <b>PNG or JPG</b> (best for marble, watercolor and photos) or an <b>SVG</b> (flat shapes and patterns). For a full page use <b>2625 × 3375 px</b> (8.75 × 11.25 in at 300 DPI, bleed included); smaller images are scaled up and can look soft. Leave words off it: it fills the covers and the marble areas of the inside pages (header bars, sidebars, footer).</p>
+            <label class="btn" style="display:block;text-align:center;cursor:pointer">Upload a background<input type="file" id="bgUploadInput" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden></label>
           </div>
         </div>
         <div data-tab="design" class="card" id="plateCard">
@@ -1280,6 +1285,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     printer: 'standard', marginBind: .5, marginEdge: .25, marginTB: .25,   // inside-page margins (see PRINTERS), inches
     // Print-ready cover (see COVER_SPECS): binding, paper (KDP spine), typed spine width / bleed / safety where the
     // printer gives no formula, spine lettering and background, barcode box, and the spread preview.
+    uploadBgColors: 'original',          // an uploaded background: its own colors or recolored to the palette
     coverBinding: 'coil', coverPaper: 'white', spineIn: .3, coverBleedIn: .125, coverSafeIn: .5,
     spineText: '', spineBrand: 'Dove Expressions', spineBg: 'art', barcodeBox: false, showSpread: false,
     // Cover, heading and body typography are independent: changing one never resizes the others.
@@ -1816,8 +1822,9 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     }
     if (s.marble.startsWith('upload:')) {
       // An uploaded background fills full-bleed areas (covers) in its own colors; thin bars use the stone color.
-      const img = ASSETS[s.marble];
-      if (!img) { ctx.fillStyle = s.palette.stone; ctx.fillRect(x, y, w, h); return; }
+      const raw = ASSETS[s.marble];
+      if (!raw) { ctx.fillStyle = s.palette.stone; ctx.fillRect(x, y, w, h); return; }
+      const img = s.uploadBgColors === 'palette' ? toneMapped(raw, s.palette) : raw;
       // Like the artwork backgrounds: each area shows its slice of the full-page image (covers: all of it).
       const PW = s._W && !s._thumb ? s._W : w, PH = s._W && !s._thumb ? Math.round(s._W * TRIM_H / TRIM_W) : h, part = PW !== w || PH !== h;
       ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
@@ -2774,6 +2781,33 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
   // ---------- Decorative slots (top / bottom / divider) ----------
   // The zones are fixed by the layout (above and below the title plate, never over it); the CONTENT of each
   // zone is whatever approved or uploaded asset the user picks, recolored and sized within the zone's bounds.
+  // An uploaded background in the palette's colors, keeping its texture: each pixel's lightness picks a color along
+  // dark → mid → light, taken from the palette (darkest of background / vein / title, the accent, lightest of paper /
+  // background / highlight). Cached per image and palette.
+  const uploadToneCache = new Map();
+  function toneMapped(img, p) {
+    const dark = [p.stone, p.vein, p.title].filter(Boolean).sort((a, b) => relLum(a) - relLum(b))[0];
+    const light = [p.paper, p.stone, p.highlight].filter(Boolean).sort((a, b) => relLum(b) - relLum(a))[0];
+    const mid = p.accent || p.trim || p.vein, key = `${img._key}|${dark}|${mid}|${light}`;
+    if (uploadToneCache.has(key)) return uploadToneCache.get(key);
+    const iw = img.naturalWidth || img.width || 2625, ih = img.naturalHeight || img.height || 3375, k = Math.min(1, 2625 / Math.max(iw, ih));
+    const c = document.createElement('canvas'); c.width = Math.round(iw * k); c.height = Math.round(ih * k);
+    const x = c.getContext('2d'); x.drawImage(img, 0, 0, c.width, c.height);
+    const d = x.getImageData(0, 0, c.width, c.height), a = d.data, [D, M, L] = [dark, mid, light].map(hexRgb);
+    // Stretch the image's own lightness range so its darkest and lightest areas reach the palette's ends.
+    let lo = 255, hi = 0;
+    for (let i = 0; i < a.length; i += 16) { const v = .299 * a[i] + .587 * a[i + 1] + .114 * a[i + 2]; if (a[i + 3] > 8) { lo = Math.min(lo, v); hi = Math.max(hi, v); } }
+    const span = Math.max(1, hi - lo);
+    for (let i = 0; i < a.length; i += 4) {
+      const t = Math.min(1, Math.max(0, (.299 * a[i] + .587 * a[i + 1] + .114 * a[i + 2] - lo) / span));
+      const [A, B, u] = t < .5 ? [D, M, t * 2] : [M, L, (t - .5) * 2];
+      a[i] = A[0] + (B[0] - A[0]) * u; a[i + 1] = A[1] + (B[1] - A[1]) * u; a[i + 2] = A[2] + (B[2] - A[2]) * u;
+    }
+    x.putImageData(d, 0, 0);
+    if (uploadToneCache.size > 12) uploadToneCache.delete(uploadToneCache.keys().next().value);
+    uploadToneCache.set(key, c);
+    return c;
+  }
   function drawCover(ctx, img, x, y, w, h) {          // object-fit: cover, centred (an image or a canvas)
     const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height, ir = iw / ih, r = w / h;
     let sw = iw, sh = ih, sx = 0, sy = 0;
@@ -4943,6 +4977,20 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
       box.appendChild(row);
     });
   }
+  // Background upload: stored like any upload (also offered in the decoration slots) and selected right away.
+  $('bgUploadInput').onchange = async (e) => {
+    const file = e.target.files[0]; e.target.value = '';
+    if (!file || !file.type.startsWith('image/')) return;
+    const rec = { id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, name: file.name.replace(/\.[^.]+$/, ''), blob: file };
+    try {
+      await uploadTx('readwrite', (st) => st.put(rec)); await registerUpload(rec);
+      state.marble = `upload:${rec.id}`;
+      const img = ASSETS[state.marble], w = img.naturalWidth, h = img.naturalHeight;
+      toast(w && w < 1800 ? `Background added. It is ${w} × ${h} px, so it may print soft; 2625 × 3375 px is best.` : `Background “${rec.name}” added and in use.`);
+    } catch { toast('That image could not be added. Try a PNG or JPG.'); }
+    commit(true); buildUploadList();
+  };
+  $('uploadBgColors').onchange = (e) => { state.uploadBgColors = e.target.value; commit(false); };
   $('uploadInput').onchange = async (e) => {
     for (const file of e.target.files) {
       if (!file.type.startsWith('image/')) continue;
@@ -5118,6 +5166,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     recBtn.classList.toggle('hidden', !rec || paletteMatch()?.name === rec.name);
     if (rec) recBtn.textContent = `Use recommended colors (${rec.name})`;
     $('bgArtRow').classList.toggle('hidden', state.marble !== 'abstract' && state.marble !== CLOUD); $('bgArt').value = state.bgArt;
+    $('uploadBgRow').classList.toggle('hidden', !state.marble.startsWith('upload:')); $('uploadBgColors').value = state.uploadBgColors;
     const floralNote = $('floralNote');
     floralNote.classList.toggle('hidden', !bg?.bakedTitle);
     floralNote.textContent = state.plateStyle === 'none'
