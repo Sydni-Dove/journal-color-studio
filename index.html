@@ -3679,7 +3679,9 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
       const LEGEND = [['Status', .1], ['N = Not Interpreted', .3], ['I = Interpreted', .6], ['A = Application', .8]];
       const panel = pagePanel(s, 'contents'), onPage = !panel && wordsOffArt(s);
       const legendY = onPage ? H * .05 : ly + lh / 2;                           // the legend line's centre
-      if (onPage) { stoneBar(ctx, 0, 0, W, topBorder(H), s); stoneBar(ctx, 0, H * .072, W, H * .022, s); } else stoneBar(ctx, 0, ly, W, lh, s);
+      // Every page carries the 1/8 in top border that bleeds off the edge, the legend strip included.
+      stoneBar(ctx, 0, 0, W, topBorder(H), s);
+      if (onPage) stoneBar(ctx, 0, H * .072, W, H * .022, s); else stoneBar(ctx, 0, ly, W, lh, s);
       if (panel) {
         // Edge to edge (bleeds off both sides like the strip); padding sets how much of the strip's height it covers.
         const iy = [lh * .16, lh * .08, 0][panel.lvl + 1];
@@ -3748,7 +3750,9 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     dreamLegend(ctx, W, H, s) {
       const p = s.palette;
       if (floralDesign(s)) { floralSidebarPage(ctx, W, H, s, 'dreamTitle', true); return; }
-      sidebarPage(ctx, W, H, s, 'dreamTitle', (x, w) => {
+      sidebarPage(ctx, W, H, s, 'dreamTitle', (x) => {
+        // The legend card, Brainstorm band and writing panel stop at the safe line, 1/4 in inside the outer trim.
+        const w = W - safeInset(W) - x;
         // Legend card
         const y = H * .045, h = H * .165;
         ctx.fillStyle = p.paper; ctx.fillRect(x, y, w, h);
@@ -3782,8 +3786,9 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
         return y;
       };
       // The panel runs from the top to near the bottom of the sidebar (further only if very long wording needs it).
-      // The questions column stops 1/8 in short of the sidebar's usual text edge so the page's outer safe margin holds.
-      const sx = W * .6, edge = W * BIND_SHIFT_PT / TRIM_W, contentEnd = questions(sx + W * .03, W - sx - W * .06 - edge, false);
+      // The questions column stops 1/8 in short of the sidebar's usual text edge so the page's safe margin holds, plus
+      // 1/12 in more so trim and binding variation on backs (binding on this side) can't reach the wording.
+      const sx = W * .6, edge = W * (BIND_SHIFT_PT + 6) / TRIM_W, contentEnd = questions(sx + W * .03, W - sx - W * .06 - edge, false);
       sidebarPage(ctx, W, H, s, 'brainstormTitle', (x, w) => {
         ctx.fillStyle = s._card ? panelInk(s) : bodyInk(s, p.title);
         questions(x, w - edge, true);
