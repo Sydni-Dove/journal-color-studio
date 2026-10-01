@@ -24,8 +24,10 @@ export const fontOptions = (sameLabel: string) => [
   ...(["serif", "display", "sans-serif", "script", "handwritten"] as const).flatMap((k) => FONT_CATALOG.filter((f) => f.category === k).map((f) => ({ value: f.family, label: `${f.family} — ${FONT_CATEGORY_LABEL[k].toLowerCase()}` }))),
 ];
 
-/** A section heading's look: where it sits, a line under it, its own font. */
-function HeadingLook({ b, putBlock }: { b: PromptBlock; putBlock: (id: string, patch: Partial<PromptBlock>) => void }) {
+/** A section heading's look: where it sits, a line under it, its own font and size. */
+function HeadingLook({ b, putBlock, defaultSize }: { b: PromptBlock; putBlock: (id: string, patch: Partial<PromptBlock>) => void; defaultSize?: (b: PromptBlock) => number }) {
+  // The style's size shown until one is chosen (default type: section heading 9 pt, page title 16 pt).
+  const sizeOf = defaultSize ?? ((x: PromptBlock) => (x.textStyle === "title" ? 16 : 9));
   return (
     <>
       <Segmented
@@ -36,6 +38,10 @@ function HeadingLook({ b, putBlock }: { b: PromptBlock; putBlock: (id: string, p
       />
       <Check label="Line under the heading" checked={!!b.headingRule} onChange={(on) => putBlock(b.id, { headingRule: on || undefined })} />
       <Select label="Heading font" value={b.headingFont ?? ""} options={fontOptions("Same as Style (section headings)")} onChange={(v) => putBlock(b.id, { headingFont: v || undefined })} />
+      <div className="row">
+        <NumberField label="Heading size" suffix="points" step={1} min={6} max={72} value={b.headingSizePt ?? sizeOf(b)} onChange={(v) => putBlock(b.id, { headingSizePt: Math.max(6, Math.min(72, Math.round(v * 2) / 2)) })} />
+        {b.headingSizePt !== undefined && <button type="button" className="btn btn--ghost" onClick={() => putBlock(b.id, { headingSizePt: undefined })}>Use the style's size</button>}
+      </div>
     </>
   );
 }

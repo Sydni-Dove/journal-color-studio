@@ -33,8 +33,11 @@ function titleOf(ctx: Pick<LayoutContext, "options" | "spacing" | "typography">)
   const role = o.style ?? "label";
   const base = STUDIO_JOURNAL.headingZone.valueIn - ctx.spacing.headerGap;
   // A larger title style takes the room it needs (with its gap above the content).
-  const headerH = Math.max(base, lineBoxIn(ctx.typography, role) + ctx.spacing.titleToRuleGap + (o.rule ? ctx.spacing.block : 0));
-  return { role, align: o.align ?? "left", rule: !!o.rule, font: o.font, headerH };
+  const r = ctx.typography.roles[role];
+  const sizePt = o.sizePt && o.sizePt > 0 ? o.sizePt : undefined;
+  const lineH = sizePt ? (sizePt * r.lineHeight) / 72 : lineBoxIn(ctx.typography, role);
+  const headerH = Math.max(base, lineH + ctx.spacing.titleToRuleGap + (o.rule ? ctx.spacing.block : 0));
+  return { role, align: o.align ?? "left", rule: !!o.rule, font: o.font, sizePt, headerH };
 }
 
 function writingPage(ctx: LayoutContext, heading: string | null): SolvedPage {
@@ -45,8 +48,12 @@ function writingPage(ctx: LayoutContext, heading: string | null): SolvedPage {
   const nodes: LayoutNode[] = [...frame.nodes];
   const diagnostics = [...frame.diagnostics];
   if (heading) {
-    const t = positionText(ctx, heading === ctx.wording.date ? "dateLabel" : "pageTitle", frame.zones, "journal-heading", heading, t0.role, `above-content-${t0.align}`);
+    // Its own size / font: placed and measured at that size.
+    const r = ctx.typography.roles[t0.role];
+    const tctx = t0.sizePt || t0.font ? { ...ctx, typography: { ...ctx.typography, roles: { ...ctx.typography.roles, [t0.role]: { ...r, ...(t0.sizePt ? { sizePt: t0.sizePt } : {}), ...(t0.font ? { family: t0.font } : {}) } } } } : ctx;
+    const t = positionText(tctx, heading === ctx.wording.date ? "dateLabel" : "pageTitle", frame.zones, "journal-heading", heading, t0.role, `above-content-${t0.align}`);
     if (t0.font) t.node.family = t0.font;
+    if (t0.sizePt) t.node.fit = { sizePt: t0.sizePt, lineHeight: r.lineHeight, lines: [heading] };
     nodes.push(t.node);
     diagnostics.push(...t.diagnostics);
   }

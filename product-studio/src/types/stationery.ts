@@ -107,6 +107,7 @@ export type StationeryZone = {
   headingAlign?: "left" | "center" | "right";
   headingRule?: boolean;
   headingFont?: string;
+  headingSizePt?: number;
   badge?: string;
   /** Page Composer: the section's visual treatment (semantic colors only). */
   frame?: import("./prompts").SectionFrame;

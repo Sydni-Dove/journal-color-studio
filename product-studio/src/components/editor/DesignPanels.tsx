@@ -24,6 +24,7 @@ import type { CornerSet, DecorativePlacement, DecorativeTheme, EdgeTreatment, Fu
 import type { ColorToken, ColorTokens, FontCategory, FontGroup, SpacingDensity, WordingKey } from "../../types/tokens";
 import { AppliesTo, Check, Field, NumberField, Section, Segmented, Select, type EditorNav } from "./ui";
 import { fontOptions } from "./PromptEditor";
+import { resolveTypography } from "../../presets/typography/typography";
 import { useEffect, useMemo, useState } from "react";
 import { BACKGROUND_GROUPS, ELEMENT_GROUPS, defaultRoles, designValue, groupOf, type CatalogDesign, type CatalogGroup } from "../../design-library/catalog";
 import { jcsPaletteId } from "../../design-library/palettes";
@@ -847,6 +848,7 @@ const SECTION_ANCHOR_LABEL: Partial<Record<TextAnchor, string>> = { "above-conte
  */
 export function WritingTitlePanel({ project, update }: PanelProps) {
   const o = project.layoutOptions.writingTitle ?? {};
+  const styleSize = resolveTypography(project.typography.fonts, project.typography.roleOverrides).roles[o.style ?? "label"].sizePt;
   const set = (patch: Partial<NonNullable<ProductProject["layoutOptions"]["writingTitle"]>>) =>
     update((p) => ({ ...p, layoutOptions: { ...p.layoutOptions, writingTitle: { ...(p.layoutOptions.writingTitle ?? {}), ...patch } } }));
   return (
@@ -856,6 +858,10 @@ export function WritingTitlePanel({ project, update }: PanelProps) {
       <Check label="Line under the title" checked={!!o.rule} onChange={(rule) => set({ rule })} />
       <Segmented label="Style" value={o.style ?? "label"} options={[{ value: "label", label: "Small label" }, { value: "sectionHeading", label: "Section heading" }, { value: "pageTitle", label: "Page title" }]} onChange={(style) => set({ style })} />
       <Select label="Font" value={o.font ?? ""} options={fontOptions("Same as Style")} onChange={(font) => set({ font: font || undefined })} />
+      <div className="row">
+        <NumberField label="Size" suffix="points" step={1} min={6} max={72} value={o.sizePt ?? styleSize} onChange={(v) => set({ sizePt: Math.max(6, Math.min(72, Math.round(v * 2) / 2)) })} />
+        {o.sizePt !== undefined && <button type="button" className="btn btn--ghost" onClick={() => set({ sizePt: undefined })}>Use the style's size</button>}
+      </div>
     </Section>
   );
 }

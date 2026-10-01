@@ -37,6 +37,9 @@ describe("Moving headings", () => {
     await panel.getByRole("checkbox", { name: "Line under the title" }).check();
     await expect.poll(() => heading.evaluate((e) => getComputedStyle(e).textAlign)).toBe("center");
     await expect.poll(() => page.locator('.ps-page--editor [data-node="journal-heading-rule"]').count()).toBe(1);
+    await panel.getByLabel(/^Size/).fill("24");
+    await panel.getByLabel(/^Size/).press("Tab");
+    await expect.poll(() => heading.evaluate((e) => e.style.fontSize)).toBe("24pt");
     // Writing line color.
     await openArea(page, "writing");
     const lines = await openSection(page, /^Writing lines/);

@@ -76,3 +76,36 @@ describe("Custom Page section headings", () => {
     expect(s.nodes.some((n) => n.id.endsWith("-heading-rule"))).toBe(false);
   });
 });
+
+describe("font size", () => {
+  it("journal / notes title: its own size; the header grows with it; writing starts below", () => {
+    const small = solve0(notesBook({ align: "center", rule: true }));
+    const big = solve0(notesBook({ align: "center", rule: true, sizePt: 28 }));
+    const t = big.s.nodes.find((n) => n.id === "journal-heading")!;
+    if (t.type !== "text") throw new Error();
+    expect(t.fit?.sizePt).toBe(28);
+    const firstLine = (s: typeof big.s) => Math.min(...s.nodes.filter((n) => n.id.startsWith("journal-writing")).map((n) => n.rect.y));
+    expect(firstLine(big.s)).toBeGreaterThan(firstLine(small.s));
+    expect(firstLine(big.s)).toBeGreaterThan(t.rect.y + t.rect.h);
+    for (const n of big.s.nodes.filter((n) => n.functional !== false && n.type !== "group")) expect(rectContains(big.g.safeRect, n.rect), n.id).toBe(true);
+    expect(big.s.diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+  });
+  it("section heading: its own size; the prompt and writing move down; a size too big for the width is fitted, never overflowing", () => {
+    const mk = (headingSizePt?: number) => {
+      const p = createProject("custom", { name: "C", dimensions: { sizePresetId: "6x9", orientation: "portrait" }, recipe: { items: [], ordering: "sequential", structure: [step("custom", { type: "copies", count: 1 }, { layoutId: "guided-page", title: "Custom Page", promptSet: { blocks: [{ id: "notes", label: "Notes", prompt: "Anything on your heart.", space: "fill", headingAlign: "center", ...(headingSizePt ? { headingSizePt } : {}) }] } })] } } as never);
+      return solve0(p);
+    };
+    const base = mk(), big = mk(24), huge = mk(72);
+    const title = (r: ReturnType<typeof mk>) => r.s.nodes.find((n) => n.id.endsWith("-notes-title"))!;
+    const prompt = (r: ReturnType<typeof mk>) => r.s.nodes.find((n) => n.id.endsWith("-notes-prompt"))!;
+    const t = title(big);
+    expect(t.type === "text" && t.fit?.sizePt).toBe(24);
+    expect(prompt(big).rect.y).toBeGreaterThan(prompt(base).rect.y);
+    const h = title(huge);
+    expect(h.type === "text" && (h.fit?.sizePt ?? 0) <= 72).toBe(true);
+    for (const r of [big, huge]) {
+      for (const n of r.s.nodes.filter((n) => n.functional !== false && n.type !== "group")) expect(rectContains(r.g.safeRect, n.rect), n.id).toBe(true);
+      expect(r.s.diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+    }
+  });
+});

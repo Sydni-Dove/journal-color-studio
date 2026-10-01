@@ -104,6 +104,7 @@ function blockZone(set: PromptSet, b: PromptBlock, surfaceOf: (b: PromptBlock) =
         ...(b.headingAlign && b.headingAlign !== "left" ? { headingAlign: b.headingAlign } : {}),
         ...(b.headingRule ? { headingRule: true } : {}),
         ...(b.headingFont ? { headingFont: b.headingFont } : {}),
+        ...(b.headingSizePt ? { headingSizePt: b.headingSizePt } : {}),
       };
     }
     case "info": {
@@ -127,6 +128,7 @@ function blockZone(set: PromptSet, b: PromptBlock, surfaceOf: (b: PromptBlock) =
     ...(b.headingAlign && b.headingAlign !== "left" ? { headingAlign: b.headingAlign } : {}),
     ...(b.headingRule ? { headingRule: true } : {}),
     ...(b.headingFont ? { headingFont: b.headingFont } : {}),
+    ...(b.headingSizePt ? { headingSizePt: b.headingSizePt } : {}),
     ...(lines === undefined && spaceOf(b) === "equal" ? { equal: true } : {}),
     surface: b.responseStyle ? RESPONSE_SURFACE[b.responseStyle] : own.surface,
     ...(b.responseStyle ? {} : own.treatment ? { treatment: own.treatment } : {}),
@@ -219,10 +221,12 @@ function measureOne(zone: StationeryZone, width: number, ctx: LayoutContext): Me
   const badge = zone.badge?.trim() ? badgeIn(ctx) : 0;
   const inner = Math.max(0, width - ins.l - ins.r - (badge ? badge + s.column : 0));
   const role = zone.labelRole ?? "sectionHeading", pRole = zone.promptRole ?? "prompt";
-  const headingLine = lineBoxIn(ctx.typography, role), promptLine = lineBoxIn(ctx.typography, pRole);
+  const promptLine = lineBoxIn(ctx.typography, pRole);
   // A heading in its own font is measured in that font.
-  const hctx = zone.headingFont ? { ...ctx, typography: { ...ctx.typography, roles: { ...ctx.typography.roles, [role]: { ...ctx.typography.roles[role], family: zone.headingFont } } } } : ctx;
-  const heading = zone.label ? fitHeading(zone.label, role, { w: inner, h: 2 * headingLine }, hctx) : null;
+  // A heading in its own font or size is measured in it (the size is where fitting starts; it never overflows).
+  const own = { ...(zone.headingFont ? { family: zone.headingFont } : {}), ...(zone.headingSizePt ? { sizePt: zone.headingSizePt } : {}) };
+  const hctx = Object.keys(own).length ? { ...ctx, typography: { ...ctx.typography, roles: { ...ctx.typography.roles, [role]: { ...ctx.typography.roles[role], ...own } } } } : ctx;
+  const heading = zone.label ? fitHeading(zone.label, role, { w: inner, h: 2 * lineBoxIn(hctx.typography, role) }, hctx) : null;
   const promptLines = zone.prompt ? wrapText(zone.prompt, inner, ctx, pRole) : [];
   // A line under the heading takes a block's space (half above it, half below).
   const headingH = heading ? heading.heightIn + (zone.headingRule ? s.block : 0) : 0;

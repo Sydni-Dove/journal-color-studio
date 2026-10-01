@@ -128,6 +128,8 @@ export type PromptBlock = {
   headingRule?: boolean;
   /** The heading's own font family (otherwise the section-heading font from Style). */
   headingFont?: string;
+  /** The heading's own size in points (otherwise its style's size). */
+  headingSizePt?: number;
   /** Sit beside the section above, as two columns (writing sections only). */
   beside?: boolean;
   /** Checklist / task list: a writing line on each row (default true). */

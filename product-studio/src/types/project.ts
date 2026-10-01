@@ -82,7 +82,7 @@ export type LayoutOptions = {
    * where it sits, a line under it, its text style and its own font. Absent =
    * a small label at the left, no line (as before).
    */
-  writingTitle?: { align?: "left" | "center" | "right"; rule?: boolean; style?: "label" | "sectionHeading" | "pageTitle"; font?: string };
+  writingTitle?: { align?: "left" | "center" | "right"; rule?: boolean; style?: "label" | "sectionHeading" | "pageTitle"; font?: string; /** Points; absent = the style's size. */ sizePt?: number };
 };
 
 export type ExportSettings = {
