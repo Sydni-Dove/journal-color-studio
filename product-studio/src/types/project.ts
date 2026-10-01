@@ -77,6 +77,12 @@ export type LayoutOptions = {
   promptText: string;
   /** User placement of semantic text (Week of, month title, Notes…). Absent = layout default. */
   textPositions?: Partial<Record<SemanticTextKey, ElementPosition>>;
+  /**
+   * The title of plain writing pages (journal pages, notes pages — "NOTES"):
+   * where it sits, a line under it, its text style and its own font. Absent =
+   * a small label at the left, no line (as before).
+   */
+  writingTitle?: { align?: "left" | "center" | "right"; rule?: boolean; style?: "label" | "sectionHeading" | "pageTitle"; font?: string };
 };
 
 export type ExportSettings = {

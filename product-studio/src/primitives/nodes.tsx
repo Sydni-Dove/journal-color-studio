@@ -85,7 +85,7 @@ export function TextBlock({ node, typography }: { node: TextNode; typography: Ty
     flexDirection: "column",
     justifyContent: node.vAlign === "top" ? "flex-start" : node.vAlign === "bottom" ? "flex-end" : "center",
     textAlign: align,
-    fontFamily: role.family ? fontStack(role.family) : `var(--f-${role.group})`,
+    fontFamily: node.family ? fontStack(node.family) : role.family ? fontStack(role.family) : `var(--f-${role.group})`,
     fontSize: `${node.fit?.sizePt ?? role.sizePt}pt`,
     fontWeight: role.weight,
     fontStyle: role.style,

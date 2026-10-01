@@ -103,6 +103,10 @@ export type StationeryZone = {
   /** Checklist surfaces: a writing line on each row (default true). */
   taskLines?: boolean;
   /** Page Composer: a number in a soft circle beside the heading. */
+  /** Heading alignment, a line under the heading, and its own font (Page Composer sections). */
+  headingAlign?: "left" | "center" | "right";
+  headingRule?: boolean;
+  headingFont?: string;
   badge?: string;
   /** Page Composer: the section's visual treatment (semantic colors only). */
   frame?: import("./prompts").SectionFrame;

@@ -23,6 +23,7 @@ import type { ProductProject } from "../../types/project";
 import type { CornerSet, DecorativePlacement, DecorativeTheme, EdgeTreatment, FunctionalPatternKind, TitleAccentPosition } from "../../types/theme";
 import type { ColorToken, ColorTokens, FontCategory, FontGroup, SpacingDensity, WordingKey } from "../../types/tokens";
 import { AppliesTo, Check, Field, NumberField, Section, Segmented, Select, type EditorNav } from "./ui";
+import { fontOptions } from "./PromptEditor";
 import { useEffect, useMemo, useState } from "react";
 import { BACKGROUND_GROUPS, ELEMENT_GROUPS, defaultRoles, designValue, groupOf, type CatalogDesign, type CatalogGroup } from "../../design-library/catalog";
 import { jcsPaletteId } from "../../design-library/palettes";
@@ -236,6 +237,12 @@ const PATTERN_LABELS: Record<FunctionalPatternKind, string> = {
   "split-column": "Split column",
 };
 
+/** The writing lines' color now: the product's own choice, else its palette's. */
+const lineColor = (p: ProductProject) => {
+  const c = p.colors.overrides.line ?? resolveColors(p.colors.paletteId, {}, p.colors).line;
+  return /^#[0-9a-f]{6}$/i.test(c) ? c : "#999999";
+};
+
 export function PatternPanel({ project, update, usage, nav }: PanelProps) {
   const f = project.functionalPattern;
   const set = (patch: Partial<ProductProject["functionalPattern"]>) => update((p) => ({ ...p, functionalPattern: { ...p.functionalPattern, ...patch } }));
@@ -268,6 +275,19 @@ export function PatternPanel({ project, update, usage, nav }: PanelProps) {
       {kind === "dot-grid" && <NumberField label="Dot size" suffix="points" step={0.1} min={0.2} value={f.dotSizePt} onChange={(dotSizePt) => set({ dotSizePt })} />}
       {kind === "graph-grid" && <NumberField label="Darker line every … squares (0 = none)" step={1} min={0} value={f.majorEvery} onChange={(v) => set({ majorEvery: Math.max(0, Math.round(v)) })} />}
       {kind === "margin-ruled" && <NumberField label="Margin line distance from the binding side" suffix="inches" step={0.05} value={f.marginLineIn} onChange={(marginLineIn) => set({ marginLineIn })} />}
+      {drawsLines && (
+        <div className="row">
+          <label className="field" style={{ flex: "0 0 auto" }}>
+            <span className="field-label">Line color</span>
+            <input type="color" aria-label="Writing line color" value={lineColor(project)} onChange={(e) => update((p) => ({ ...p, colors: { ...p.colors, overrides: { ...p.colors.overrides, line: e.target.value } } }))} />
+          </label>
+          {project.colors.overrides.line && (
+            <button type="button" className="btn btn--ghost" onClick={() => update((p) => { const { line: _l, ...rest } = p.colors.overrides; void _l; return { ...p, colors: { ...p.colors, overrides: rest } }; })}>
+              Use the palette's line color
+            </button>
+          )}
+        </div>
+      )}
       {drawsLines && usage.lineStyle && (
         <div className="row">
           {kind !== "dot-grid" && <NumberField label="Line thickness" suffix="points" step={0.1} min={0.1} value={f.lineWeightPt} onChange={(lineWeightPt) => set({ lineWeightPt })} />}
@@ -820,6 +840,26 @@ const ANCHOR_LABEL: Record<TextAnchor, string> = {
 const SECTION_ANCHOR_LABEL: Partial<Record<TextAnchor, string>> = { "above-content-left": "Left", "above-content-center": "Center", "above-content-right": "Right" };
 
 /** Controlled placement of semantic text: logical anchors + print-safe fine offsets. */
+/**
+ * The title of plain writing pages (journal and notes pages — "NOTES"): where it
+ * sits, a line under it, its style and its own font. Every journal and notes
+ * page in this product follows it.
+ */
+export function WritingTitlePanel({ project, update }: PanelProps) {
+  const o = project.layoutOptions.writingTitle ?? {};
+  const set = (patch: Partial<NonNullable<ProductProject["layoutOptions"]["writingTitle"]>>) =>
+    update((p) => ({ ...p, layoutOptions: { ...p.layoutOptions, writingTitle: { ...(p.layoutOptions.writingTitle ?? {}), ...patch } } }));
+  return (
+    <Section title="Page title">
+      <p className="hint">The title at the top of journal and notes pages (“NOTES”). Every journal and notes page in this product follows these.</p>
+      <Segmented label="Position" value={o.align ?? "left"} options={[{ value: "left", label: "Left" }, { value: "center", label: "Center" }, { value: "right", label: "Right" }]} onChange={(align) => set({ align })} />
+      <Check label="Line under the title" checked={!!o.rule} onChange={(rule) => set({ rule })} />
+      <Segmented label="Style" value={o.style ?? "label"} options={[{ value: "label", label: "Small label" }, { value: "sectionHeading", label: "Section heading" }, { value: "pageTitle", label: "Page title" }]} onChange={(style) => set({ style })} />
+      <Select label="Font" value={o.font ?? ""} options={fontOptions("Same as Style")} onChange={(font) => set({ font: font || undefined })} />
+    </Section>
+  );
+}
+
 export function TextPlacementPanel({ project, update, usage, nav }: PanelProps) {
   if (!usage.semanticText.length) return null;
   const positions = project.layoutOptions.textPositions ?? {};

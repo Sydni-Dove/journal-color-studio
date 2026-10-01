@@ -9,6 +9,7 @@ import { fillWritingRegion, lineSpacingIn } from "../../engines/patterns/pattern
 import { STUDIO_JOURNAL } from "../../presets/studioDefaults";
 import type { LayoutMetric, LayoutNode, SolvedPage } from "../../types/layout";
 import { pageFrame, positionText } from "../shared/components";
+import { lineBoxIn, rule } from "../shared/nodes";
 import { minimumAreaFit, type LayoutCapability, type LayoutContext, type LayoutDefinition } from "../shared/types";
 
 const WRITING_PAGE: Omit<LayoutCapability, "wordingKeys" | "supportedProductTypes"> = {
@@ -26,17 +27,33 @@ const WRITING_PAGE: Omit<LayoutCapability, "wordingKeys" | "supportedProductType
   defaultRepeat: "count",
 };
 
+/** The writing page's title choices (layoutOptions.writingTitle) and the header height they need. */
+function titleOf(ctx: Pick<LayoutContext, "options" | "spacing" | "typography">) {
+  const o = ctx.options.writingTitle ?? {};
+  const role = o.style ?? "label";
+  const base = STUDIO_JOURNAL.headingZone.valueIn - ctx.spacing.headerGap;
+  // A larger title style takes the room it needs (with its gap above the content).
+  const headerH = Math.max(base, lineBoxIn(ctx.typography, role) + ctx.spacing.titleToRuleGap + (o.rule ? ctx.spacing.block : 0));
+  return { role, align: o.align ?? "left", rule: !!o.rule, font: o.font, headerH };
+}
+
 function writingPage(ctx: LayoutContext, heading: string | null): SolvedPage {
   const g = ctx.pages[0];
   // The heading zone ends where the first writing row begins (J-B1/J-B4: 0.5" zone).
-  const headerH = STUDIO_JOURNAL.headingZone.valueIn - ctx.spacing.headerGap;
-  const frame = pageFrame(ctx, 0, { headerH, headerRule: false });
+  const t0 = titleOf(ctx);
+  const frame = pageFrame(ctx, 0, { headerH: t0.headerH, headerRule: t0.rule });
   const nodes: LayoutNode[] = [...frame.nodes];
   const diagnostics = [...frame.diagnostics];
   if (heading) {
-    const t = positionText(ctx, heading === ctx.wording.date ? "dateLabel" : "pageTitle", frame.zones, "journal-heading", heading, "label", "above-content-left");
+    const t = positionText(ctx, heading === ctx.wording.date ? "dateLabel" : "pageTitle", frame.zones, "journal-heading", heading, t0.role, `above-content-${t0.align}`);
+    if (t0.font) t.node.family = t0.font;
     nodes.push(t.node);
     diagnostics.push(...t.diagnostics);
+  }
+  if (t0.rule) {
+    // A divider under the title, across the writing area: the writing starts below it.
+    const h = frame.header, y = h.y + h.h;
+    nodes.push(rule("journal-heading-rule", frame.body.x, y, frame.body.x + frame.body.w, y, { component: "PageHeader", color: "goldInk", strokePt: 1 }));
   }
   // Margin-ruled paper: margin line measured from the page's INSIDE trim edge
   // so it mirrors with the gutter.
@@ -58,7 +75,7 @@ function writingPage(ctx: LayoutContext, heading: string | null): SolvedPage {
 }
 
 export const linedJournal: LayoutDefinition = {
-  headerIn: (ctx) => STUDIO_JOURNAL.headingZone.valueIn - ctx.spacing.headerGap,
+  headerIn: (ctx) => titleOf(ctx).headerH,
   alignsHeader: true,
   id: "journal-lined",
   label: "Lined Journal Page",
@@ -73,7 +90,7 @@ export const linedJournal: LayoutDefinition = {
 };
 
 export const notesPage: LayoutDefinition = {
-  headerIn: (ctx) => STUDIO_JOURNAL.headingZone.valueIn - ctx.spacing.headerGap,
+  headerIn: (ctx) => titleOf(ctx).headerH,
   alignsHeader: true,
   id: "notes-page",
   label: "Notes Page",

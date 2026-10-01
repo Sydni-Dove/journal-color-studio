@@ -122,6 +122,12 @@ export type PromptBlock = {
   frame?: SectionFrame;
   /** A number (or short mark) in a soft circle beside the section heading ("1", "2", …). */
   badge?: string;
+  /** Where the heading (and its prompt) sit: left (default), centered or right. */
+  headingAlign?: "left" | "center" | "right";
+  /** A line under the heading, before the prompt and writing space. */
+  headingRule?: boolean;
+  /** The heading's own font family (otherwise the section-heading font from Style). */
+  headingFont?: string;
   /** Sit beside the section above, as two columns (writing sections only). */
   beside?: boolean;
   /** Checklist / task list: a writing line on each row (default true). */

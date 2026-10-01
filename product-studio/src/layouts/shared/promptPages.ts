@@ -96,7 +96,15 @@ function blockZone(set: PromptSet, b: PromptBlock, surfaceOf: (b: PromptBlock) =
         const body = [b.label.trim(), b.prompt?.trim()].filter(Boolean).join("\n");
         return { ...base, label: "", ...(body ? { prompt: body } : {}), promptRole: "body" };
       }
-      return { ...base, label: b.label, ...(b.textStyle === "title" ? { labelRole: "pageTitle" as const } : {}), ...(b.prompt?.trim() ? { prompt: b.prompt.trim() } : {}) };
+      return {
+        ...base,
+        label: b.label,
+        ...(b.textStyle === "title" ? { labelRole: "pageTitle" as const } : {}),
+        ...(b.prompt?.trim() ? { prompt: b.prompt.trim() } : {}),
+        ...(b.headingAlign && b.headingAlign !== "left" ? { headingAlign: b.headingAlign } : {}),
+        ...(b.headingRule ? { headingRule: true } : {}),
+        ...(b.headingFont ? { headingFont: b.headingFont } : {}),
+      };
     }
     case "info": {
       // Blanks keep their style by position; empty labels are skipped.
@@ -116,6 +124,9 @@ function blockZone(set: PromptSet, b: PromptBlock, surfaceOf: (b: PromptBlock) =
     label: b.label,
     ...(b.prompt?.trim() ? { prompt: b.prompt.trim() } : {}),
     ...(b.badge?.trim() ? { badge: b.badge.trim() } : {}),
+    ...(b.headingAlign && b.headingAlign !== "left" ? { headingAlign: b.headingAlign } : {}),
+    ...(b.headingRule ? { headingRule: true } : {}),
+    ...(b.headingFont ? { headingFont: b.headingFont } : {}),
     ...(lines === undefined && spaceOf(b) === "equal" ? { equal: true } : {}),
     surface: b.responseStyle ? RESPONSE_SURFACE[b.responseStyle] : own.surface,
     ...(b.responseStyle ? {} : own.treatment ? { treatment: own.treatment } : {}),
@@ -209,9 +220,12 @@ function measureOne(zone: StationeryZone, width: number, ctx: LayoutContext): Me
   const inner = Math.max(0, width - ins.l - ins.r - (badge ? badge + s.column : 0));
   const role = zone.labelRole ?? "sectionHeading", pRole = zone.promptRole ?? "prompt";
   const headingLine = lineBoxIn(ctx.typography, role), promptLine = lineBoxIn(ctx.typography, pRole);
-  const heading = zone.label ? fitHeading(zone.label, role, { w: inner, h: 2 * headingLine }, ctx) : null;
+  // A heading in its own font is measured in that font.
+  const hctx = zone.headingFont ? { ...ctx, typography: { ...ctx.typography, roles: { ...ctx.typography.roles, [role]: { ...ctx.typography.roles[role], family: zone.headingFont } } } } : ctx;
+  const heading = zone.label ? fitHeading(zone.label, role, { w: inner, h: 2 * headingLine }, hctx) : null;
   const promptLines = zone.prompt ? wrapText(zone.prompt, inner, ctx, pRole) : [];
-  const headingH = heading ? heading.heightIn : 0;
+  // A line under the heading takes a block's space (half above it, half below).
+  const headingH = heading ? heading.heightIn + (zone.headingRule ? s.block : 0) : 0;
   const promptH = promptLines.length * promptLine;
   const textH = headingH + (promptH ? s.block + promptH : 0);
   const overhead = Math.max(textH, badge) + (headingH || promptH || badge ? s.headingToContentGap : 0);
@@ -713,14 +727,20 @@ export function solveZonePages(spec: ZonePageSpec, ctx: LayoutContext, pageIndex
       }
       if (!fixed && m.heading && m.headingH) {
         const role = z.labelRole ?? "sectionHeading";
-        const t = text(`${id}-title`, { x: tx, y: ty, w: tw, h: m.headingH }, z.label, role, { component: "SectionHeader" });
+        const ruleH = z.headingRule ? s.block : 0;
+        const t = text(`${id}-title`, { x: tx, y: ty, w: tw, h: m.headingH - ruleH }, z.label, role, { component: "SectionHeader", align: z.headingAlign ?? "left" });
+        if (z.headingFont) t.family = z.headingFont;
+        if (z.headingRule) {
+          const ry = ty + m.headingH - ruleH / 2;
+          nodes.push(rule(`${id}-heading-rule`, tx, ry, tx + tw, ry, { component: "SectionHeader", color: "goldInk", strokePt: 1 }));
+        }
         if (m.heading.lines.length > 1 || m.heading.sizePt !== ctx.typography.roles[role].sizePt || !m.heading.ok) t.fit = { sizePt: m.heading.sizePt, lineHeight: m.heading.lineHeight, lines: m.heading.lines, ...(m.heading.ok ? {} : { failed: true }) };
         nodes.push(t);
       }
       if (!fixed && m.promptLines.length) {
         const y = ty + m.headingH + (m.headingH ? s.block : 0);
         const pRole = z.promptRole ?? "prompt";
-        const pt: TextNode = text(`${id}-prompt`, { x: tx, y, w: tw, h: m.promptH }, m.promptLines.join(" "), pRole, { component: "Text", vAlign: "top", wrap: true });
+        const pt: TextNode = text(`${id}-prompt`, { x: tx, y, w: tw, h: m.promptH }, m.promptLines.join(" "), pRole, { component: "Text", vAlign: "top", wrap: true, align: z.headingAlign ?? "left" });
         pt.fit = { sizePt: ctx.typography.roles[pRole].sizePt, lineHeight: ctx.typography.roles[pRole].lineHeight, lines: m.promptLines };
         nodes.push(pt);
       }

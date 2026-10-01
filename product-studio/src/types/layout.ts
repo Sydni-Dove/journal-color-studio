@@ -73,6 +73,8 @@ export type TextNode = NodeBase & {
    */
   fit?: TextFit;
   color?: ColorToken;
+  /** Its own font family (otherwise its role's). */
+  family?: string;
   /** Semantic element this text is (user-positionable page titles, headings, footer). */
   semantic?: SemanticTextKey;
   /** Where a semantic element was placed, and the layout's default for it. */

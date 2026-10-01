@@ -149,6 +149,29 @@ export function StepFields({ s, siblings, scope, props, parts }: { s: BookStep; 
             )}
           </div>
           {LAYOUT_NAMES[s.layoutId]?.hint && <p className="hint">{LAYOUT_NAMES[s.layoutId].hint}</p>}
+          {(s.layoutId === "journal-lined" || s.layoutId === "notes-page") && (
+            <div className="customize-page">
+              <button
+                type="button"
+                className="btn btn--primary"
+                onClick={() => {
+                  // The same page, made from pieces: one writing section with this page's title, then every builder option.
+                  const wt = props.project.layoutOptions.writingTitle ?? {};
+                  const heading = s.layoutId === "notes-page" ? props.project.wording.notes ?? "Notes" : "";
+                  set({
+                    module: "custom",
+                    layoutId: "guided-page",
+                    title: s.title ?? (heading || "Custom Page"),
+                    prompts: undefined,
+                    promptSet: { blocks: [{ id: `b${Date.now().toString(36)}`, label: heading, space: "fill", ...(wt.align && wt.align !== "left" ? { headingAlign: wt.align } : {}), ...(wt.rule ? { headingRule: true } : {}), ...(wt.font ? { headingFont: wt.font } : {}) }] },
+                  });
+                }}
+              >
+                Customize this page
+              </button>
+              <p className="hint">Turns this page into a Custom page you build yourself — page header, sections, prompts, tables, checklists, headings anywhere — starting from what it has now. Only this page changes.</p>
+            </div>
+          )}
           <div className="row">
             <Select label="How often" value={cadenceValue(s.cadence)} options={cadenceOptions} onChange={(v) => set({ cadence: cadenceFrom(v, s.cadence) })} />
             {s.cadence.type === "copies" ? (

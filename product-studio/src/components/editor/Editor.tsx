@@ -13,7 +13,8 @@ import { GeometryInfo } from "../debug/GeometryInfo";
 import { ExportDialog, IssueList } from "../export/ExportDialog";
 import { PagePreview, visibleIndices } from "../preview/PagePreview";
 import { StationeryPanel } from "./StationeryPanel";
-import { BackgroundPanel, ColorPanel, DecorationPanel, LayoutPanel, PatternPanel, SpacingPanel, TextPlacementPanel, TypographyPanel, VariantsPanel, WordingPanel } from "./DesignPanels";
+import { BackgroundPanel, ColorPanel, DecorationPanel, LayoutPanel, PatternPanel, SpacingPanel, TextPlacementPanel, TypographyPanel, VariantsPanel, WordingPanel, WritingTitlePanel } from "./DesignPanels";
+import type { BookNode } from "../../types/recipe";
 import { PagesPanel, PlannerSetupPanel, ProductPanel, ProductionPanel } from "./ProductionPanels";
 import { BookOutlinePanel, BookStructurePanel, ThisPagePanel } from "./BookPanels";
 import { PagesBuilder } from "./PagesBuilder";
@@ -71,7 +72,16 @@ export function Editor({ project, onChange, onBack, saveStatus, cloudLabel }: Pr
   const [exporting, setExporting] = useState(false);
   const panel = usePanelWidth();
   // The Neutral Cheetah Luxe script is always loaded: covers and dividers in that design use it for their title.
-  const fontsReady = useFontLoader(project.typography.fonts, [LUXE_TITLE_FONT]);
+  // Fonts chosen for one heading or one kind of title load too (not only the Style fonts).
+  const ownFonts = useMemo(() => {
+    const out = new Set<string>([LUXE_TITLE_FONT]);
+    if (project.layoutOptions.writingTitle?.font) out.add(project.layoutOptions.writingTitle.font);
+    const walk = (ns: BookNode[]) => ns.forEach((n) => (n.kind === "group" ? walk(n.children) : n.promptSet?.blocks.forEach((b) => b.headingFont && out.add(b.headingFont))));
+    walk(project.recipe.structure ?? []);
+    for (const d of project.pageDesigns ?? []) d.promptSet.blocks.forEach((b) => b.headingFont && out.add(b.headingFont));
+    return [...out];
+  }, [project.layoutOptions.writingTitle?.font, project.recipe.structure, project.pageDesigns]);
+  const fontsReady = useFontLoader(project.typography.fonts, ownFonts);
   const facesLoaded = useFontFacesLoaded();
 
   // UNDO / REDO — every change the editor makes goes through `update`, so the history lives here.
@@ -264,6 +274,7 @@ export function Editor({ project, onChange, onBack, saveStatus, cloudLabel }: Pr
                   ) : (
                     currentItemId && <div className="card"><PagesPanel nav={nav} project={project} update={update} doc={doc} usage={usage} onlyItemId={currentItemId} bare /></div>
                   )}
+                  {["journal-lined", "notes-page"].includes(doc.recipe.pages[current]?.layoutId ?? "") && <WritingTitlePanel nav={nav} project={project} update={update} usage={usage} />}
                   <LayoutPanel nav={nav} project={project} update={update} usage={usage} part="layout" />
                   <SpacingPanel nav={nav} project={project} update={update} usage={usage} />
                   <WordingPanel nav={nav} project={project} update={update} usage={usage} />

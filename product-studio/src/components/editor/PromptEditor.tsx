@@ -16,6 +16,29 @@ import {
   type GuidedHeader, type HeadingTextStyle, type InfoFieldStyle, type TableRowSpace, type PromptBlockKind, type SectionFrame, type SpacerSize, type PromptBlock, type PromptSet, type PromptSpacing, type ResponseStyle, type SpaceMode, type TaskMarker, type TaskMarkerPosition, type WritingAmount,
 } from "../../types/prompts";
 import { Check, Field, LabeledNumeric, NumberField, Segmented, Select } from "./ui";
+import { FONT_CATALOG, FONT_CATEGORY_LABEL } from "../../presets/typography/typography";
+
+/** Every studio font, by kind, for a heading's own font ("" = the Style font). */
+export const fontOptions = (sameLabel: string) => [
+  { value: "", label: sameLabel },
+  ...(["serif", "display", "sans-serif", "script", "handwritten"] as const).flatMap((k) => FONT_CATALOG.filter((f) => f.category === k).map((f) => ({ value: f.family, label: `${f.family} — ${FONT_CATEGORY_LABEL[k].toLowerCase()}` }))),
+];
+
+/** A section heading's look: where it sits, a line under it, its own font. */
+function HeadingLook({ b, putBlock }: { b: PromptBlock; putBlock: (id: string, patch: Partial<PromptBlock>) => void }) {
+  return (
+    <>
+      <Segmented
+        label="Heading position"
+        value={b.headingAlign ?? "left"}
+        options={[{ value: "left", label: "Left" }, { value: "center", label: "Center" }, { value: "right", label: "Right" }]}
+        onChange={(v) => putBlock(b.id, { headingAlign: v === "left" ? undefined : v })}
+      />
+      <Check label="Line under the heading" checked={!!b.headingRule} onChange={(on) => putBlock(b.id, { headingRule: on || undefined })} />
+      <Select label="Heading font" value={b.headingFont ?? ""} options={fontOptions("Same as Style (section headings)")} onChange={(v) => putBlock(b.id, { headingFont: v || undefined })} />
+    </>
+  );
+}
 
 const MAX_PROMPTS = 20;
 const STYLE_LABEL: Record<ResponseStyle | "own", string> = {
@@ -447,6 +470,7 @@ export function PromptEditor({
                         <textarea rows={2} value={b.prompt ?? ""} placeholder="A short line of text" onChange={(e) => putBlock(b.id, { prompt: e.target.value || undefined })} />
                       </Field>
                     )}
+                    {b.textStyle !== "body" && <HeadingLook b={b} putBlock={putBlock} />}
                   </>
                 )}
                 {k === "info" && <InfoFields b={b} putBlock={putBlock} />}
@@ -465,6 +489,7 @@ export function PromptEditor({
                     <Field label="Number in a circle (optional)">
                       <input type="text" value={b.badge ?? ""} maxLength={3} placeholder="e.g. 1" onChange={(e) => putBlock(b.id, { badge: e.target.value || undefined })} />
                     </Field>
+                    {b.label.trim() && <HeadingLook b={b} putBlock={putBlock} />}
                     <Select
                       label="Writing area"
                       value={b.responseStyle ?? "own"}
