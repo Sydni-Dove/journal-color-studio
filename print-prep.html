@@ -49,7 +49,13 @@ aside { display: flex; flex-direction: column; gap: 14px; }
 .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
 .btn:disabled { opacity: .55; cursor: progress; }
 .actions { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
-.drop { border: 2px dashed var(--line); border-radius: 12px; padding: 18px; text-align: center; cursor: pointer; }
+.drop { display: block; border: 2px dashed var(--line); border-radius: 12px; padding: 18px; text-align: center; cursor: pointer; margin-bottom: 8px; }
+.drop .hint { display: block; }
+.swatches { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 10px; }
+.swatch { display: grid; grid-template-columns: 34px 1fr 20px 46px; align-items: center; gap: 8px; font-size: 12px; }
+.swatch i { width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--line); display: block; }
+.swatch input[type=color] { width: 46px; height: 34px; border: 1px solid var(--line); border-radius: 8px; padding: 2px; background: var(--panel); cursor: pointer; }
+.swatch.changed span { font-weight: 700; }
 .drop.over { border-color: var(--brand); }
 .drop strong { display: block; margin-bottom: 4px; }
 .report { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
@@ -99,7 +105,15 @@ aside { display: flex; flex-direction: column; gap: 14px; }
       <ul class="report" id="report"></ul>
     </div>
     <div class="card">
-      <h2>2 · Printer <span>inside pages</span></h2>
+      <h2>2 · Colors <span>swap your journal's colors</span></h2>
+      <p class="hint" id="colorsHint" style="margin:0 0 6px">Upload a journal to see its main colors.</p>
+      <div class="swatches" id="swatches"></div>
+      <div class="field" id="paletteField"><span>Use a Color Studio palette</span><select id="palettePick"></select></div>
+      <div class="check"><input type="checkbox" id="recolorCovers"><label for="recolorCovers">Also recolor the covers</label></div>
+      <button class="btn" id="resetColors" type="button">Back to the original colors</button>
+    </div>
+    <div class="card">
+      <h2>3 · Printer <span>inside pages</span></h2>
       <div class="field"><span>Printer</span><select id="printer"></select></div>
       <div class="row3 hidden" id="customMargins">
         <div class="field"><span>Binding (in)</span><input type="number" id="marginBind" min=".25" max="1.25" step=".0625"></div>
@@ -110,7 +124,7 @@ aside { display: flex; flex-direction: column; gap: 14px; }
       <p class="hint" id="printerHint"></p>
     </div>
     <div class="card">
-      <h2>3 · Cover file <span>back, spine, front</span></h2>
+      <h2>4 · Cover file <span>back, spine, front</span></h2>
       <div class="row2">
         <div class="field"><span>Binding</span><select id="binding"><option value="coil">Coil / spiral</option><option value="saddle">Saddle stitch</option><option value="paperback">Paperback</option><option value="hardcover">Hardcover</option></select></div>
         <div class="field" id="paperField"><span>Paper</span><select id="paper"><option value="white">White</option><option value="cream">Cream</option><option value="color">Standard color</option><option value="premium">Premium color</option></select></div>
@@ -127,7 +141,7 @@ aside { display: flex; flex-direction: column; gap: 14px; }
       <p class="hint" id="coverHint"></p>
     </div>
     <div class="card">
-      <h2>4 · Download</h2>
+      <h2>5 · Download</h2>
       <div class="seg" id="qualitySeg"><button data-q="print" class="active">Print 300 DPI</button><button data-q="proof">Proof 150 DPI</button></div>
       <div class="actions">
         <button class="btn primary" id="exportInterior" disabled>Print-ready interior PDF</button>
@@ -172,7 +186,8 @@ aside { display: flex; flex-direction: column; gap: 14px; }
   const TRIMS = [[612, 792, '8.5 × 11 in'], [432, 648, '6 × 9 in'], [396, 612, '5.5 × 8.5 in'], [419.5, 595.3, 'A5'], [504, 720, '7 × 10 in'], [595.3, 841.9, 'A4'], [360, 504, '5 × 7 in']];
 
   const DEF = { printer: 'standard', marginBind: .5, marginEdge: .25, marginTB: .25, fit: 'fit', binding: 'coil', paper: 'white', spineIn: .3,
-    coverBleedIn: .125, spineText: '', spineColor: '', backFill: 'color', firstIsCover: true, lastIsBack: false, quality: 'print', guides: true };
+    coverBleedIn: .125, spineText: '', spineColor: '', backFill: 'color', firstIsCover: true, lastIsBack: false, quality: 'print', guides: true,
+    colorMap: {}, recolorCovers: false, colorsFor: '' };
   let st = { ...DEF };
   try { st = { ...st, ...JSON.parse(localStorage.getItem('dove-print-prep') || '{}') }; } catch {}
   const save = () => { try { localStorage.setItem('dove-print-prep', JSON.stringify(st)); } catch {} };
@@ -216,6 +231,7 @@ aside { display: flex; flex-direction: column; gap: 14px; }
     }
     info = { name, pages };
     $('fileName').textContent = name;
+    await analyzeColors(); buildSwatches();
     page = 0; view = 'pages';
     refresh();
   }
@@ -259,15 +275,153 @@ aside { display: flex; flex-direction: column; gap: 14px; }
     return res;
   }
 
+  // ---------- Colors ----------
+  // An uploaded page is a flat picture, so colors are swapped by color: the journal's main colors are found (k-means in
+  // Lab), and every pixel moves with its nearest colors — target + (pixel − source), blended across the nearest few —
+  // so shading, anti-aliased edges and texture are kept. Unchanged colors map to themselves exactly.
+  const srgb = (v) => { v /= 255; return v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; };
+  const unsrgb = (v) => 255 * (v <= .0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - .055);
+  function rgb2lab(r, g, b) {
+    const R = srgb(r), G = srgb(g), B = srgb(b);
+    const f = (t) => (t > .008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
+    const x = f((.4124 * R + .3576 * G + .1805 * B) / .95047), y = f(.2126 * R + .7152 * G + .0722 * B), z = f((.0193 * R + .1192 * G + .9505 * B) / 1.08883);
+    return [116 * y - 16, 500 * (x - y), 200 * (y - z)];
+  }
+  function lab2rgb(L, a, bb) {
+    const fy = (L + 16) / 116, fx = fy + a / 500, fz = fy - bb / 200, inv = (t) => (t ** 3 > .008856 ? t ** 3 : (t - 16 / 116) / 7.787);
+    const X = inv(fx) * .95047, Y = inv(fy), Z = inv(fz) * 1.08883;
+    return [3.2406 * X - 1.5372 * Y - .4986 * Z, -.9689 * X + 1.8758 * Y + .0415 * Z, .0557 * X - .204 * Y + 1.057 * Z].map((v) => Math.max(0, Math.min(255, unsrgb(v))));
+  }
+  const hex2rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const rgb2hex = (c) => '#' + c.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('').toUpperCase();
+  let colors = [];                                     // [{ hex, lab, share }], most used first
+  async function analyzeColors() {
+    const ip = interiorPages(), pick = ip.length ? ip : info.pages, step = Math.max(1, Math.floor(pick.length / 14)), px = [];
+    for (let i = 0; i < pick.length; i += step) {
+      const pg = await doc.getPage(pick[i].n), vp = pg.getViewport({ scale: 360 / pick[i].w });
+      const c = document.createElement('canvas'); c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+      const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height);
+      await pg.render({ canvasContext: x, viewport: vp }).promise;
+      const d = x.getImageData(0, 0, c.width, c.height).data;
+      for (let j = 0; j < d.length; j += 4 * 7) px.push(rgb2lab(d[j], d[j + 1], d[j + 2]));
+    }
+    // k-means++ (k = 10), then merge near-duplicates (ΔE < 9), drop the in-between shades where two colors meet (a
+    // cluster sitting on the line between two other main colors), and drop colors under 0.08% of the pages.
+    const K = 10, dist = (p, q) => (p[0] - q[0]) ** 2 + (p[1] - q[1]) ** 2 + (p[2] - q[2]) ** 2;
+    let cent = [px[Math.floor(px.length / 2)]];
+    while (cent.length < K) {
+      const ds = px.map((p) => Math.min(...cent.map((c) => dist(p, c)))), tot = ds.reduce((a, b) => a + b, 0);
+      if (!tot) break; let r = Math.random() * tot, i = 0; while ((r -= ds[i]) > 0 && i < ds.length - 1) i++; cent.push(px[i]);
+    }
+    let lab = new Array(px.length).fill(0);
+    for (let it = 0; it < 12; it++) {
+      const sum = cent.map(() => [0, 0, 0, 0]);
+      px.forEach((p, i) => { let best = 0, bd = Infinity; cent.forEach((c, k) => { const d = dist(p, c); if (d < bd) { bd = d; best = k; } }); lab[i] = best; const s2 = sum[best]; s2[0] += p[0]; s2[1] += p[1]; s2[2] += p[2]; s2[3]++; });
+      cent = sum.map((s2, k) => (s2[3] ? [s2[0] / s2[3], s2[1] / s2[3], s2[2] / s2[3]] : cent[k]));
+    }
+    const counts = cent.map((_, k) => lab.filter((v) => v === k).length);
+    let list = cent.map((c, k) => ({ lab: c, n: counts[k] })).filter((c) => c.n).sort((a, b) => b.n - a.n);
+    const merged = [];
+    for (const c of list) { const m = merged.find((o) => Math.sqrt(dist(o.lab, c.lab)) < 9); if (m) m.n += c.n; else merged.push({ ...c }); }
+    const segDist = (p, a, b) => { const ab = [0, 1, 2].map((i) => b[i] - a[i]), ap = [0, 1, 2].map((i) => p[i] - a[i]), L2 = ab.reduce((t, v) => t + v * v, 0) || 1;
+      const t = ab.reduce((u, v, i) => u + v * ap[i], 0) / L2; return t < .08 || t > .92 ? Infinity : Math.sqrt(dist(p, a.map((v, i) => v + t * ab[i]))); };
+    const kept = [];
+    for (const c of merged) {
+      const big = kept.filter((o) => o.n > c.n * .5);
+      const blend = big.some((a, i) => big.some((b2, j) => j > i && segDist(c.lab, a.lab, b2.lab) < 7 && Math.sqrt(dist(c.lab, a.lab)) > 6 && Math.sqrt(dist(c.lab, b2.lab)) > 6));
+      if (blend) { const near = kept.reduce((m, o) => (dist(o.lab, c.lab) < dist(m.lab, c.lab) ? o : m)); near.n += c.n; } else kept.push({ ...c });
+    }
+    colors = kept.filter((c) => c.n / px.length >= .0008).map((c) => ({ lab: c.lab, hex: rgb2hex(lab2rgb(...c.lab)), share: c.n / px.length }));
+    if (st.colorsFor !== info.name) { st.colorMap = {}; st.colorsFor = info.name; save(); }
+    lutKey = '';
+  }
+  let lut = null, lutKey = '';
+  const recolorKey = () => colors.map((c) => (st.colorMap[c.hex] && st.colorMap[c.hex] !== c.hex ? `${c.hex}>${st.colorMap[c.hex]}` : '')).join('');
+  function buildLut() {
+    const key = recolorKey();
+    if (key === lutKey) return lut;
+    lutKey = key;
+    if (!key) return (lut = null);
+    const src = colors.map((c) => c.lab), dst = colors.map((c) => (st.colorMap[c.hex] ? rgb2lab(...hex2rgb(st.colorMap[c.hex])) : c.lab));
+    // 6 bits per channel; each entry stores the change (new − old), so detail finer than the grid survives.
+    const N = 64, out = new Int16Array(N * N * N * 3);
+    for (let r = 0; r < N; r++) for (let g = 0; g < N; g++) for (let b = 0; b < N; b++) {
+      const R = r * 4 + 2, G = g * 4 + 2, B = b * 4 + 2, p = rgb2lab(R, G, B);
+      let w = 0, L = 0, A = 0, Bb = 0;
+      for (let k = 0; k < src.length; k++) {
+        const d = (p[0] - src[k][0]) ** 2 + (p[1] - src[k][1]) ** 2 + (p[2] - src[k][2]) ** 2, wk = 1 / (d * d + 1e-6);
+        w += wk; L += wk * (dst[k][0] - src[k][0]); A += wk * (dst[k][1] - src[k][1]); Bb += wk * (dst[k][2] - src[k][2]);
+      }
+      const n = lab2rgb(p[0] + L / w, p[1] + A / w, p[2] + Bb / w), i = ((r * N + g) * N + b) * 3;
+      out[i] = n[0] - R; out[i + 1] = n[1] - G; out[i + 2] = n[2] - B;
+    }
+    return (lut = out);
+  }
+  function recolor(c) {
+    const L = buildLut(); if (!L) return;
+    const x = c.getContext('2d'), im = x.getImageData(0, 0, c.width, c.height), d = im.data;
+    for (let i = 0; i < d.length; i += 4) {
+      const j = (((d[i] >> 2) * 64 + (d[i + 1] >> 2)) * 64 + (d[i + 2] >> 2)) * 3;
+      d[i] += L[j]; d[i + 1] += L[j + 1]; d[i + 2] += L[j + 2];
+    }
+    x.putImageData(im, 0, 0);
+  }
+  const isCoverPage = (p) => (st.firstIsCover && p.n === 1) || (st.lastIsBack && info.pages.length > 1 && p.n === info.pages.length);
+  // Color Studio palettes (same site, so its saved state is readable): the one in use there and the ones saved by name.
+  function studioPalettes() {
+    try {
+      const s = JSON.parse(localStorage.getItem('dove-marble-studio') || 'null'); if (!s) return [];
+      return [...(s.palette ? [{ ...s.palette, name: `In use in Color Studio${s.palette.name ? ` (${s.palette.name})` : ''}` }] : []), ...(s.customPalettes || [])];
+    } catch { return []; }
+  }
+  // A palette onto the journal's colors: paper → the main light color, the darkest → lettering (only if it stays dark
+  // enough to read), gold → gold/trim, other colored ones → background/accent/highlight, pale greys → ruled lines.
+  // Every swap stays editable.
+  function applyPalette(pl) {
+    const map = {}, used = new Set(), chroma = (c) => Math.hypot(c.lab[1], c.lab[2]), Lof = (h) => rgb2lab(...hex2rgb(h))[0];
+    const take = (c, hex) => { if (c && hex && /^#[0-9a-f]{6}$/i.test(hex) && !used.has(c.hex)) { map[c.hex] = hex.toUpperCase(); used.add(c.hex); } };
+    const light = colors.filter((c) => c.lab[0] > 80).sort((a, b) => b.share - a.share)[0];
+    take(light, pl.paper);
+    const dark = [...colors].sort((a, b) => a.lab[0] - b.lab[0])[0];
+    const ink = [pl.title, pl.stone, pl.frame, pl.plate].filter(Boolean).sort((a, b) => Lof(a) - Lof(b))[0];
+    if (dark && dark.lab[0] < 35 && ink && Lof(ink) < 45) take(dark, ink);
+    // Gold-like (yellow-orange hue, mid lightness) → the palette's gold/trim; the other colored ones by how much they
+    // cover: the biggest is usually bars and backgrounds (→ background color), then accent, highlight, veins.
+    const hue = (c) => (Math.atan2(c.lab[2], c.lab[1]) * 180 / Math.PI + 360) % 360;
+    const gold = colors.filter((c) => !used.has(c.hex) && chroma(c) > 15 && hue(c) > 50 && hue(c) < 105 && c.lab[0] > 45 && c.lab[0] < 88).sort((a, b) => chroma(b) - chroma(a))[0];
+    take(gold, pl.trim);
+    const colored = colors.filter((c) => !used.has(c.hex) && chroma(c) > 12).sort((a, b) => b.share - a.share);
+    [pl.stone, pl.accent, pl.highlight, pl.vein].filter(Boolean).forEach((h, i) => take(colored[i], h));
+    colors.filter((c) => !used.has(c.hex) && chroma(c) <= 12 && c.lab[0] > 55 && c.lab[0] <= 95).forEach((c) => take(c, pl.line));
+    st.colorMap = map; save();
+  }
+  function buildSwatches() {
+    const box = $('swatches'); box.innerHTML = '';
+    $('colorsHint').textContent = colors.length ? 'Your journal\'s main colors, most used first. Pick a new color for any of them; every line, shape and word in that color changes with it, keeping its shading.' : 'Upload a journal to see its main colors.';
+    colors.forEach((c) => {
+      const to = st.colorMap[c.hex] || c.hex, row = document.createElement('label'); row.className = 'swatch' + (to !== c.hex ? ' changed' : '');
+      row.innerHTML = `<i style="background:${c.hex}"></i><span>${c.hex} · ${c.share >= .01 ? Math.round(c.share * 100) : '<1'}% of the pages</span><span>→</span><input type="color" value="${to.toLowerCase()}" aria-label="New color for ${c.hex}">`;
+      row.querySelector('input').oninput = (e) => { st.colorMap[c.hex] = e.target.value.toUpperCase(); save(); row.classList.toggle('changed', st.colorMap[c.hex] !== c.hex); schedule(); };
+      box.appendChild(row);
+    });
+    const sel = $('palettePick'), pals = studioPalettes(); sel.innerHTML = '';
+    sel.add(new Option(pals.length ? 'Choose a palette…' : 'No Color Studio palette in this browser yet', ''));
+    pals.forEach((pl, i) => sel.add(new Option(pl.name || `Palette ${i + 1}`, String(i))));
+    $('paletteField').classList.toggle('hidden', !colors.length);
+    $('resetColors').disabled = !colors.length;
+  }
+  let schedT = 0; const schedule = () => { clearTimeout(schedT); schedT = setTimeout(() => { srcCache.clear(); draw(); }, 120); };
+
   // ---------- Rendering ----------
   const srcCache = new Map();
   async function renderSource(p, scale) {
-    const key = `${p.n}@${scale.toFixed(4)}`;
+    const recol = recolorKey() && (!isCoverPage(p) || st.recolorCovers), key = `${p.n}@${scale.toFixed(4)}${recol ? recolorKey() : ''}`;
     if (srcCache.has(key)) return srcCache.get(key);
     const pg = await doc.getPage(p.n), vp = pg.getViewport({ scale });
     const c = document.createElement('canvas'); c.width = Math.round(vp.width); c.height = Math.round(vp.height);
     const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height);
     await pg.render({ canvasContext: x, viewport: vp }).promise;
+    if (recol) recolor(c);
     srcCache.set(key, c);
     while (srcCache.size > 4) srcCache.delete(srcCache.keys().next().value);
     return c;
@@ -430,7 +584,7 @@ aside { display: flex; flex-direction: column; gap: 14px; }
     const sel = $('printer');
     if (!sel.options.length) for (const [v, { label }] of Object.entries(PRINTERS)) sel.add(new Option(label, v));
     sel.value = st.printer; $('fit').value = st.fit; $('binding').value = st.binding; $('paper').value = st.paper; $('backFill').value = st.backFill;
-    $('firstIsCover').checked = st.firstIsCover; $('lastIsBack').checked = st.lastIsBack; $('guides').checked = st.guides;
+    $('firstIsCover').checked = st.firstIsCover; $('lastIsBack').checked = st.lastIsBack; $('guides').checked = st.guides; $('recolorCovers').checked = st.recolorCovers;
     for (const id of ['marginBind', 'marginEdge', 'marginTB']) $(id).value = st[id];
     $('customMargins').classList.toggle('hidden', st.printer !== 'custom');
     $('spineText').value = st.spineText;
@@ -438,7 +592,12 @@ aside { display: flex; flex-direction: column; gap: 14px; }
     document.querySelectorAll('#viewSeg button').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
     $('pager').classList.toggle('hidden', view !== 'pages');
     $('exportInterior').disabled = $('exportCover').disabled = !info || busy;
-    if (!info) { $('printerHint').textContent = ''; $('coverHint').textContent = ''; report(); return; }
+    if (!info) {
+      $('printerHint').textContent = ''; $('coverHint').textContent = '';
+      $('paperField').classList.toggle('hidden', st.binding !== 'paperback'); $('spineField').classList.toggle('hidden', st.binding === 'coil' || st.binding === 'saddle');
+      $('spineRow').classList.toggle('hidden', st.binding === 'coil' || st.binding === 'saddle'); $('spineIn').value = st.spineIn; $('coverBleedIn').value = st.binding === 'hardcover' ? st.coverBleedIn : .125;
+      report(); return;
+    }
     const m = margins(), n = interiorPages().length;
     $('printerHint').textContent = `Inside pages: ${inch(m.bind)} at the binding, ${inch(m.edge)} at the outside edge, ${inch(m.tb)} top and bottom`
       + (st.printer === 'lulu' || st.printer === 'kdp' ? ` (for ${n} inside pages)` : '') + '.' + (m.bindBleed ? '' : ' No bleed at the binding edge.');
@@ -480,6 +639,9 @@ aside { display: flex; flex-direction: column; gap: 14px; }
   [['marginBind', .25, 1.25], ['marginEdge', .125, 1], ['marginTB', .125, 1], ['spineIn', 0, 3], ['coverBleedIn', .125, 1.5]].forEach(([id, lo, hi]) => {
     $(id).onchange = (e) => { if (e.target.readOnly) return; const v = Number(e.target.value); st[id] = Math.min(hi, Math.max(lo, Number.isFinite(v) ? v : DEF[id])); refresh(); };
   });
+  $('palettePick').onchange = (e) => { const pl = studioPalettes()[Number(e.target.value)]; if (pl) { applyPalette(pl); buildSwatches(); srcCache.clear(); draw(); } };
+  $('recolorCovers').onchange = (e) => { st.recolorCovers = e.target.checked; save(); srcCache.clear(); draw(); };
+  $('resetColors').onclick = () => { st.colorMap = {}; save(); buildSwatches(); srcCache.clear(); draw(); };
   $('spineText').oninput = (e) => { st.spineText = e.target.value; save(); sync(); if (view === 'cover') draw(); };
   $('spineColor').oninput = (e) => { st.spineColor = e.target.value; save(); if (view === 'cover') draw(); };
   document.querySelectorAll('#qualitySeg button').forEach((b) => b.onclick = () => { st.quality = b.dataset.q; save(); sync(); });
@@ -529,8 +691,8 @@ aside { display: flex; flex-direction: column; gap: 14px; }
     finally { srcCache.clear(); busy = false; sync(); }
   };
 
-  if (new URLSearchParams(location.search).has('debug')) window.__prep = { get st() { return st; }, get info() { return info; }, placement, renderInterior, renderSpread, coverSpec, refresh, openBuffer: (b, n) => readJournal(b, n).then(() => refresh()) };
-  sync();
+  if (new URLSearchParams(location.search).has('debug')) window.__prep = { get colors() { return colors; }, applyPalette, buildSwatches, get st() { return st; }, get info() { return info; }, placement, renderInterior, renderSpread, coverSpec, refresh, openBuffer: (b, n) => readJournal(b, n).then(() => refresh()) };
+  sync(); buildSwatches();
   loadStored().then(async (rec) => { if (rec && rec.buf && window.pdfjsLib) { try { await readJournal(rec.buf.slice(0), rec.name); } catch {} } sync(); });
 })();
 </script>
