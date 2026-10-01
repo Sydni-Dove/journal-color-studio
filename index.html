@@ -717,7 +717,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
             <div class="field"><span>Front cover</span><select id="includeCover"><option value="yes">Include</option><option value="no">Leave out</option></select></div>
           </div>
           <div class="field"><span>Back cover</span><select id="includeBack"><option value="yes">Include</option><option value="no">Leave out</option></select></div>
-          <div class="field"><span>Printer margins</span><select id="printer"></select></div>
+          <div class="field"><span>Printer</span><select id="printer"></select></div>
           <div id="customMargins" class="hidden" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
             <div class="field"><span>Binding (in)</span><input type="number" id="marginBind" min=".25" max="1.25" step=".0625"></div>
             <div class="field"><span>Edges (in)</span><input type="number" id="marginEdge" min=".125" max="1" step=".0625"></div>
@@ -735,6 +735,27 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
             <button class="btn" id="exportBookPdf">Whole journal PDF</button>
             <button class="btn" id="exportLined">This page PNG</button>
           </div>
+        </div>
+        <div data-tab="book" class="card" id="coverFileCard">
+          <h2>Print-ready cover <span>back, spine and front in one file</span></h2>
+          <div class="row2">
+            <div class="field"><span>Binding</span><select id="coverBinding"></select></div>
+            <div class="field" id="coverPaperField"><span>Paper</span><select id="coverPaper"><option value="white">White</option><option value="cream">Cream</option><option value="color">Standard color</option><option value="premium">Premium color</option></select></div>
+          </div>
+          <div class="row2">
+            <div class="field" id="spineField"><span>Spine width (in)</span><input type="number" id="spineIn" min="0" max="3" step=".001"></div>
+            <div class="field"><span>Bleed / wrap (in)</span><input type="number" id="coverBleedIn" min=".125" max="1.5" step=".0625"></div>
+          </div>
+          <div class="field" id="coverSafeField"><span>Safety margin (in)</span><input type="number" id="coverSafeIn" min=".125" max="1" step=".0625"></div>
+          <div class="row2" id="spineTextRow">
+            <div class="field"><span>Spine title</span><input type="text" id="spineText" maxlength="60"></div>
+            <div class="field"><span>Spine background</span><select id="spineBg"><option value="art">Cover art</option><option value="stone">Background color</option><option value="title">Title color</option><option value="trim">Gold / trim</option><option value="paper">Paper</option></select></div>
+          </div>
+          <div class="field" id="spineBrandField"><span>Spine publisher name</span><input type="text" id="spineBrand" maxlength="40" placeholder="Leave empty to hide"></div>
+          <div class="role"><label><input type="checkbox" id="barcodeBox"> White box in the barcode area</label></div>
+          <div class="role"><label><input type="checkbox" id="showSpread"> Preview the cover as one spread</label></div>
+          <span class="hint" id="coverHint"></span>
+          <div class="actions" style="margin-top:12px"><button class="btn primary" id="exportSpreadPdf">Print-ready cover PDF</button></div>
         </div>
       </div>
     </section>
@@ -1257,6 +1278,10 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     },
     journal: 'dream', page: 0, pageCount: 102, includeCover: 'yes', includeBack: 'yes',
     printer: 'standard', marginBind: .5, marginEdge: .25, marginTB: .25,   // inside-page margins (see PRINTERS), inches
+    // Print-ready cover (see COVER_SPECS): binding, paper (KDP spine), typed spine width / bleed / safety where the
+    // printer gives no formula, spine lettering and background, barcode box, and the spread preview.
+    coverBinding: 'coil', coverPaper: 'white', spineIn: .3, coverBleedIn: .125, coverSafeIn: .5,
+    spineText: '', spineBrand: 'Dove Expressions', spineBg: 'art', barcodeBox: false, showSpread: false,
     // Cover, heading and body typography are independent: changing one never resizes the others.
     coverFont: 'Playfair Display', coverFontScale: 100, coverFontColorAuto: true, coverFontColor: '#FFFFFF',
     headingFont: 'Cormorant Garamond', headingFontScale: 100,
@@ -1294,6 +1319,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     if (!['snug', 'designed'].includes(state.headerSpacing)) state.headerSpacing = 'snug';
     if (state.pageCount < 10) state.pageCount = DEFAULTS.pageCount;
     if (!(state.printer in PRINTERS)) state.printer = 'standard';
+    if (!['coil', 'saddle', 'paperback', 'hardcover'].includes(state.coverBinding)) state.coverBinding = 'coil';
     // Sept 24 single-corner names → the shared layout names.
     state.accentPlace = { cornerTopRight: 'tr', cornerBottomLeft: 'bl' }[state.accentPlace] || state.accentPlace;
     if (!ACCENT_LAYOUTS.some(([v]) => v === state.accentPlace)) state.accentPlace = 'corners';
@@ -4451,6 +4477,96 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     withRole(ctx, sx, null, () => (TEMPLATES[type] || TEMPLATES.dream)(ctx, canvas.width, canvas.height, sx));
   }
 
+  // ---------- Print-ready cover: back, spine and front as one flat file ----------
+  // Printer cover rules (inches). spine(n, paper): paperback spine width from the inside page count; printers without
+  // a formula here take the width from their own cover template (typed in). barcode: [w, h] area kept clear at the
+  // lower right of the back cover. spineTextMin: fewest pages that may carry spine lettering.
+  const KDP_PAPER = { white: .002252, cream: .0025, color: .002252, premium: .002347 };
+  const COVER_SPECS = {
+    standard: { safe: .25 },
+    lulu: { safe: .5, barcode: [3.622, 1.26], spine: (n) => n / 444 + .06 },
+    ingram: { safe: .5 },
+    kdp: { safe: .25, barcode: [2, 1.2], spine: (n, paper) => n * (KDP_PAPER[paper] || KDP_PAPER.white), spineTextMin: 80 },
+    custom: {},
+  };
+  const COVER_BINDINGS = { coil: 'Coil / spiral (no spine)', saddle: 'Saddle stitch (no spine)', paperback: 'Paperback (perfect bound)', hardcover: 'Hardcover (casewrap)' };
+  function coverSpec(s) {
+    const c = COVER_SPECS[s.printer] || COVER_SPECS.standard, n = s.pageCount;
+    const hasSpine = s.coverBinding === 'paperback' || s.coverBinding === 'hardcover';
+    const auto = hasSpine && s.coverBinding === 'paperback' && !!c.spine;
+    const spine = !hasSpine ? 0 : auto ? c.spine(n, s.coverPaper) : Math.max(0, s.spineIn);
+    const bleed = s.coverBinding === 'hardcover' || s.printer === 'custom' ? s.coverBleedIn : .125;
+    const safe = s.printer === 'custom' ? s.coverSafeIn : c.safe;
+    const textOk = spine >= .25 && n >= (c.spineTextMin || 0);
+    return { spine, auto, hasSpine, bleed, safe, textOk, barcode: c.barcode || [3.622, 1.26], W: 2 * bleed + 2 * TRIM_W / 72 + spine, H: TRIM_H / 72 + 2 * bleed };
+  }
+  // The flat cover at `width` px: [bleed | back | spine | front | bleed]. Each cover is its usual 8.5 × 11 design; the
+  // spine carries the cover art (or a palette color) and, when it is wide enough, the title running top to bottom.
+  function renderCoverSpread(canvas, width, s) {
+    const cs = coverSpec(s), ppi = width / cs.W, tw = Math.round(TRIM_W / 72 * ppi), th = Math.round(TRIM_H / 72 * ppi);
+    const sp = Math.round(cs.spine * ppi), b = Math.round(cs.bleed * ppi);
+    const back = document.createElement('canvas'), front = document.createElement('canvas');
+    renderDesign(back, tw, { ...s, _typoProbe: null }, 'back');
+    renderDesign(front, tw, s, 'cover');
+    const flat = document.createElement('canvas'); flat.width = 2 * tw + sp; flat.height = th;
+    const f = flat.getContext('2d');
+    f.drawImage(back, 0, 0, tw, th); f.drawImage(front, tw + sp, 0, tw, th);
+    if (sp > 0) {
+      const p = s.palette, bg = s.spineBg === 'art' ? null : (p[s.spineBg] || p.stone);
+      if (bg) { f.fillStyle = bg; f.fillRect(tw, 0, sp, th); } else stoneBar(f, tw, 0, sp, th, { ...s, _W: tw });
+      if (cs.textOk) {
+        // Lettering reads top to bottom (US convention), 1/16 in clear of each spine edge.
+        const d = f.getImageData(tw, 0, sp, th).data; let r = 0, g = 0, bl = 0, k = 0;
+        for (let i = 0; i < d.length; i += 4 * 97) { r += d[i]; g += d[i + 1]; bl += d[i + 2]; k++; }
+        const avg = '#' + [r, g, bl].map((v) => Math.round(v / k).toString(16).padStart(2, '0')).join('');
+        const ink = [p.title, p.paper, p.plate, '#FFFFFF', '#111111'].sort((x, y) => contrast(y, avg) - contrast(x, avg))[0];
+        const room = sp - 2 * ppi / 16, len = th - 2 * cs.safe * ppi;
+        const title = (s.spineText || '').trim() || (JOURNALS[s.journal] || JOURNALS.dream).name, brand = (s.spineBrand || '').trim();
+        f.save(); f.translate(tw + sp / 2, 0); f.rotate(Math.PI / 2); f.fillStyle = ink; f.textBaseline = 'middle';
+        const fit = (txt, size, maxLen) => { f.font = headFont(size); const w = f.measureText(txt).width; return w > maxLen ? size * maxLen / w : size; };
+        let ts = fit(title, room * .85, len * (brand ? .62 : 1)); f.font = headFont(ts);
+        f.textAlign = 'center'; f.fillText(title, th / 2 - (brand ? len * .12 : 0), 0);
+        if (brand) { const bs = fit(brand, Math.min(ts * .62, room * .6), len * .3); f.font = headFont(bs); f.textAlign = 'right'; f.fillText(brand, th - cs.safe * ppi, 0); }
+        f.restore();
+      }
+    }
+    if (s.barcodeBox) { const [x, y, w, h] = barcodeRect(cs, ppi, 0); f.fillStyle = '#FFFFFF'; f.fillRect(x, y, w, h); }
+    canvas.width = Math.round(cs.W * ppi); canvas.height = Math.round(cs.H * ppi);
+    // Bleed (or a hardcover's wrap) continues each cover's own edges outward; a wide wrap stretches a 1/4 in strip.
+    composeBleed(canvas.getContext('2d'), flat, b, b, Math.round(ppi / 4), Math.round(ppi / 4));
+  }
+  // The barcode area at the lower right of the back cover, inside the safety margin, in px from the trim's corner + o.
+  function barcodeRect(cs, ppi, o) {
+    const [w, h] = cs.barcode, m = Math.max(cs.safe, .25);
+    return [o + (TRIM_W / 72 - m - w) * ppi, o + (TRIM_H / 72 - m - h) * ppi, w * ppi, h * ppi];
+  }
+  // Preview-only guides on the spread: bleed, trim, spine folds (or the center line), safety margins, barcode area.
+  function drawSpreadGuides(c, s) {
+    const cs = coverSpec(s), ppi = c.width / cs.W, ctx = c.getContext('2d'), b = cs.bleed * ppi, W = c.width, H = c.height;
+    const tw = TRIM_W / 72 * ppi, th = TRIM_H / 72 * ppi, sp = cs.spine * ppi, m = cs.safe * ppi;
+    ctx.save();
+    ctx.fillStyle = 'rgba(230,40,90,.18)'; ctx.fillRect(0, 0, W, b); ctx.fillRect(0, H - b, W, b); ctx.fillRect(0, b, b, H - 2 * b); ctx.fillRect(W - b, b, b, H - 2 * b);
+    ctx.lineWidth = Math.max(1, ppi / 72); ctx.strokeStyle = 'rgba(230,40,90,.9)'; ctx.strokeRect(b, b, W - 2 * b, th);
+    ctx.strokeStyle = 'rgba(160,40,200,.95)'; ctx.beginPath();
+    for (const x of sp > 0 ? [b + tw, b + tw + sp] : [b + tw]) { ctx.moveTo(x, 0); ctx.lineTo(x, H); }
+    ctx.stroke();
+    ctx.setLineDash([6, 4]); ctx.strokeStyle = 'rgba(20,110,220,.9)';
+    ctx.strokeRect(b + m, b + m, tw - 2 * m, th - 2 * m); ctx.strokeRect(b + tw + sp + m, b + m, tw - 2 * m, th - 2 * m);
+    if (sp > ppi / 8) ctx.strokeRect(b + tw + ppi / 16, b + m, sp - ppi / 8, th - 2 * m);
+    ctx.setLineDash([]);
+    const [x, y, w, h] = barcodeRect(cs, ppi, b); ctx.fillStyle = 'rgba(255,214,0,.35)'; ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = 'rgba(200,160,0,.9)'; ctx.strokeRect(x, y, w, h);
+    // Labels on a white tag so they read on any cover.
+    const tag = (t, cx, cy, px) => {
+      ctx.font = `600 ${Math.round(px)}px sans-serif`; const tw2 = ctx.measureText(t).width + px;
+      ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.fillRect(cx - tw2 / 2, cy - px * .8, tw2, px * 1.6);
+      ctx.fillStyle = '#222'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(t, cx, cy);
+    };
+    tag('BACK COVER', b + tw / 2, b + m + ppi * .25, ppi * .14); tag('FRONT COVER', b + tw + sp + tw / 2, b + m + ppi * .25, ppi * .14);
+    tag('BARCODE AREA', x + w / 2, y + h / 2, ppi * .1);
+    ctx.restore();
+  }
+
   // ---------- UI ----------
   const ASSETS = {};
   let ready = false, comparing = false, busy = false;
@@ -5060,7 +5176,26 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     const inside = type !== 'cover' && type !== 'back' ? insideNumber(state, state.page) : 0;
     $('pageNum').textContent = inside ? `Inside page ${inside} · binds ${bindingSide(inside)}` : `${type === 'cover' ? 'Front' : 'Back'} cover (separate file)`;
     $('showGuides').checked = !!state.showGuides;
-    syncPrinter();
+    syncPrinter(); syncCoverFile();
+  }
+  function syncCoverFile() {
+    const sel = $('coverBinding');
+    if (!sel.options.length) for (const [v, label] of Object.entries(COVER_BINDINGS)) sel.add(new Option(label, v));
+    const cs = coverSpec(state), editBleed = state.coverBinding === 'hardcover' || state.printer === 'custom', in3 = (v) => +v.toFixed(3);
+    sel.value = state.coverBinding; $('coverPaper').value = state.coverPaper; $('spineBg').value = state.spineBg;
+    $('coverPaperField').classList.toggle('hidden', !(cs.auto && state.printer === 'kdp'));
+    $('spineField').classList.toggle('hidden', !cs.hasSpine);
+    $('spineIn').value = in3(cs.spine); $('spineIn').readOnly = cs.auto;
+    $('coverBleedIn').value = in3(cs.bleed); $('coverBleedIn').readOnly = !editBleed;
+    $('coverSafeField').classList.toggle('hidden', state.printer !== 'custom'); $('coverSafeIn').value = state.coverSafeIn;
+    $('spineTextRow').classList.toggle('hidden', !cs.hasSpine); $('spineBrandField').classList.toggle('hidden', !cs.hasSpine);
+    $('spineText').value = state.spineText; $('spineText').placeholder = (JOURNALS[state.journal] || JOURNALS.dream).name; $('spineBrand').value = state.spineBrand;
+    $('barcodeBox').checked = !!state.barcodeBox; $('showSpread').checked = !!state.showSpread;
+    $('coverHint').textContent = `File size ${in3(cs.W)} × ${in3(cs.H)} in: ${cs.bleed}″ ${state.coverBinding === 'hardcover' ? 'wrap' : 'bleed'}, two 8.5 × 11 in covers`
+      + (cs.hasSpine ? ` and a ${in3(cs.spine)}″ spine${cs.auto ? ` (${state.pageCount} inside pages)` : ' (from your printer\'s cover template)'}` : ', no spine')
+      + `. Keep wording ${cs.safe}″ inside the trim.`
+      + (cs.hasSpine && !cs.textOk ? ' The spine is too narrow for lettering, so it is left plain.' : '')
+      + (state.coverBinding === 'hardcover' ? ' Hardcover: copy the spine and wrap sizes from your printer\'s cover template.' : '');
   }
   // Printer margin picker: the preset list, the custom fields and a line saying what the inside pages will get.
   function syncPrinter() {
@@ -5091,10 +5226,12 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
       const dpr = Math.min(2, window.devicePixelRatio || 1);
       const type = currentType(), side = bindingSide(insideNumber(state, state.page));
       try {
-        renderPage(canvas, Math.round(760 * dpr), s, type, side);
+        const spread = state.showSpread && (type === 'cover' || type === 'back');
+        if (spread) { s._typoProbe = null; renderCoverSpread(canvas, Math.round(1100 * dpr), s); }
+        else renderPage(canvas, Math.round(760 * dpr), s, type, side);
         hitBoxes = s._typoProbe ? { boxes: s._typoProbe.boxes, off: s._typoProbe.offset } : null;
         if (!comparing) showTypoWarnings(typoContrast(canvas, s._typoProbe));
-        if (state.showGuides) drawGuides(canvas, type, side);
+        if (state.showGuides) spread ? drawSpreadGuides(canvas, state) : drawGuides(canvas, type, side);
         if (!comparing && popRole) outlineRole(canvas, popRole);
       }
       catch (e) { console.error(e); showBlocked(e); }
@@ -5782,7 +5919,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
 
   function setBusy(on, label) {
     busy = on;
-    for (const id of ['exportPdf', 'exportCoverPdf', 'exportBookPdf', 'exportCover', 'exportLined']) $(id).disabled = on;
+    for (const id of ['exportPdf', 'exportCoverPdf', 'exportBookPdf', 'exportCover', 'exportLined', 'exportSpreadPdf']) $(id).disabled = on;
     $('exportPdf').textContent = on ? label : 'Export interior PDF';
   }
 
@@ -5858,12 +5995,34 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
   };
   $('showGuides').onchange = (e) => { state.showGuides = e.target.checked; commit(false, false); };
   $('printer').onchange = (e) => { state.printer = e.target.value; commit(false); };
+  for (const id of ['coverBinding', 'coverPaper', 'spineBg']) $(id).onchange = (e) => { state[id] = e.target.value; commit(false); };
+  for (const id of ['spineText', 'spineBrand']) $(id).oninput = (e) => { state[id] = e.target.value; commit(false); };
+  for (const id of ['barcodeBox', 'showSpread']) $(id).onchange = (e) => { state[id] = e.target.checked; if (id === 'showSpread' && state[id]) goTo('cover'); commit(false); };
+  [['spineIn', 0, 3], ['coverBleedIn', .125, 1.5], ['coverSafeIn', .125, 1]].forEach(([id, lo, hi]) => {
+    $(id).onchange = (e) => { if (e.target.readOnly) return; const v = Number(e.target.value); state[id] = Math.min(hi, Math.max(lo, Number.isFinite(v) ? v : DEFAULTS[id])); commit(false); };
+  });
+  // One flat file for the printer: [bleed | back | spine | front | bleed] at 300 DPI.
+  $('exportSpreadPdf').onclick = async () => {
+    if (busy) return;
+    if (!window.jspdf) { toast('PDF library did not load. Check your connection and refresh.'); return; }
+    setBusy(true, 'Preparing cover…');
+    try {
+      const cs = coverSpec(state), c = document.createElement('canvas');
+      renderCoverSpread(c, Math.round(cs.W * 300), state);
+      const data = new Uint8Array(await (await toBlob(c, 'image/jpeg', .95)).arrayBuffer());
+      const pdf = new window.jspdf.jsPDF({ orientation: 'landscape', unit: 'pt', format: [cs.W * 72, cs.H * 72], compress: true });
+      pdf.addImage(data, 'JPEG', 0, 0, cs.W * 72, cs.H * 72, 'cover-spread', 'FAST');
+      pdf.save(`${journalSlug()}-print-cover-${state.printer}-${state.coverBinding}-${slug()}.pdf`);
+      toast(`Print-ready cover downloaded (${+cs.W.toFixed(3)} × ${+cs.H.toFixed(3)} in)`);
+    }
+    catch (e) { console.error(e); toast('Cover export stopped. Please try again.'); } finally { setBusy(false); }
+  };
   [['marginBind', .25, 1.25], ['marginEdge', .125, 1], ['marginTB', .125, 1]].forEach(([id, lo, hi]) => {
     $(id).onchange = (e) => { const v = Number(e.target.value); state[id] = Math.min(hi, Math.max(lo, Number.isFinite(v) ? v : DEFAULTS[id])); commit(false); };
   });
 
   // ?debug exposes the renderers for visual QA (preview vs. export comparisons); off in normal use.
-  if (new URLSearchParams(location.search).has('debug')) window.__studio = { sectionStyle, TYPO_PAGES, palettesFor, paletteVariations, designType, paletteFit, recommendedPalettes, PALETTE_HOME, renderCover, renderPage, renderDesign, pageList, insideNumber, bindingSide, titleContrast, wordsOffArt, get state() { return state; }, commit, TITLE_PLATE_STYLES };
+  if (new URLSearchParams(location.search).has('debug')) window.__studio = { renderCoverSpread, coverSpec, sectionStyle, TYPO_PAGES, palettesFor, paletteVariations, designType, paletteFit, recommendedPalettes, PALETTE_HOME, renderCover, renderPage, renderDesign, pageList, insideNumber, bindingSide, titleContrast, wordsOffArt, get state() { return state; }, commit, TITLE_PLATE_STYLES };
   if (location.protocol === 'file:') { showBlocked(); return; }
   // Controls that only apply to the Dream Journal's modular cover/interior are hidden for the prayer journals.
   // Title plate, lettering, accents and decorations work on every journal; the Dream-only pieces (its preset designs,
