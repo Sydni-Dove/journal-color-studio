@@ -659,6 +659,9 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
               <select id="footer"><option value="on">Gold rule + bar</option><option value="off">None</option></select>
             </div>
           </div>
+          <div class="field"><span>Top border</span>
+            <select id="topBorder"><option value="designed">As designed (balances the footer bar)</option><option value="thin">Thin 1/8 in line (printer spec)</option></select>
+          </div>
           <div class="row2">
             <div class="field"><span>Header rule</span>
               <select id="headerRule"><option value="line">Gold line</option><option value="ornament">Gold ornament divider</option></select>
@@ -810,8 +813,14 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
   const safeInset = (W) => W * (SAFE_BIND_PT - BIND_SHIFT_PT) / TRIM_W;
   // While a page is drawn smaller for a printer that wants wider margins (see pagePlacement), the design leaves this
   // border out and renderPage paints it at full size across the top of the page instead, so it still bleeds.
-  let topBorderOff = false, topBorderUsed = false;
-  const topBorder = (H) => { topBorderUsed = true; return topBorderOff ? 0 : H * BLEED_PT / TRIM_H; };
+  // Depth: "designed" keeps each page's own top bar from the Canva layout (as heavy as the footer bar on Title and
+  // Belongs To); "thin" is the printer's 1/8 in line. design = the page's own depth as a fraction of the page height.
+  let topBorderOff = false, topBorderUsed = false, topBorderPt = 0;
+  const topBorder = (H, s, design) => {
+    const d = s.topBorder === 'thin' ? BLEED_PT / TRIM_H : design;
+    topBorderUsed = true; topBorderPt = Math.max(topBorderPt, d * TRIM_H);
+    return topBorderOff ? 0 : H * d;
+  };
   // Printer margin presets for inside pages, in inches: bind = binding side, edge = outside edge, tb = top and bottom.
   // Some printers widen the binding margin as the page count grows. bindBleed: false for printers whose inside pages
   // have no bleed on the binding edge (KDP: 8.625 × 11.25 in pages). Covers are separate files and never change.
@@ -1289,6 +1298,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     printer: 'standard', marginBind: .5, marginEdge: .25, marginTB: .25,   // inside-page margins (see PRINTERS), inches
     // Print-ready cover (see COVER_SPECS): binding, paper (KDP spine), typed spine width / bleed / safety where the
     // printer gives no formula, spine lettering and background, barcode box, and the spread preview.
+    topBorder: 'designed',               // inside pages' top bar: 'designed' (Canva depth, matches the footer) or 'thin' (1/8 in)
     subtitleStyle: 'caps',               // cover subtitle: 'caps' (small tracked capitals) or 'match' (same as the title)
     uploadBgColors: 'original',          // an uploaded background: its own colors or recolored to the palette
     coverBinding: 'coil', coverPaper: 'white', spineIn: .3, coverBleedIn: .125, coverSafeIn: .5,
@@ -3397,7 +3407,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
       bottom = H * .09;
     } else {                                       // 'rule': thin top bar, dark title, gold rule (Draw, Brainstorm, Keys, Notes)
       const isFloral = s.marble === 'floral';
-      if (s.footer === 'on' && !isFloral) stoneBar(ctx, x0, 0, w, topBorder(H), s);
+      if (s.footer === 'on' && !isFloral) stoneBar(ctx, x0, 0, w, topBorder(H, s, .022), s);
       const [ty, ry] = snugHeader(s) ? [.054, .095] : [.068, .105];   // snug still leaves a clear gap between title and rule
       ctx.fillStyle = ink; ctx.font = headFont(H * .045); fillFit(ctx, s, id, title, cx, H * ty, maxW);
       headerRule(ctx, rx0, H * ry, rx1 - rx0, H * .012, s);
@@ -3575,7 +3585,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
       const { k } = canvaFit(W, H);
       tx = cX(W, H, 212); tw = 507 * k; bodyPx = 16.44 * k; lh = bodyPx * 1.4; r = 42.7 * k; cx = cX(W, H, 137.5); y = cY(W, H, 259.3);
     } else {
-      if (s.footer === 'on') stoneBar(ctx, 0, 0, W, topBorder(H), s);
+      if (s.footer === 'on') stoneBar(ctx, 0, 0, W, topBorder(H, s, .022), s);
       ctx.fillStyle = ink; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
       withRole(ctx, s, 'pageTitle', () => { ctx.font = font(H * .042, { weight: 700 }); fillFit(ctx, s, 'howtoTitle', T(s, 'howtoTitle'), W * .09, H * .125, W * .82); });
     }
@@ -3629,7 +3639,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
         drawFloralArt(ctx, W, H, s, FLORAL_ART.belongs);
       } else {
         const bar = H * .038;
-        stoneBar(ctx, 0, 0, W, topBorder(H), s);                 // top border line: 1/8 in, bleeding off the edge
+        stoneBar(ctx, 0, 0, W, topBorder(H, s, .038), s);         // top bar, bleeding off the edge (see topBorder)
         stoneBar(ctx, 0, H - bar, W, bar, s);
         if (s.showTrim) goldRule(ctx, 0, H - bar - H * .012, W, H * .012, p.trim);
       }
@@ -3673,7 +3683,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
           ctx.font = headFont(H * .06 * sc, { weight: 600, italic: true }); fillFit(ctx, s, 'howtoTitle', title, W / 2, H * .118, W * .77);
         });
       } else {
-        if (s.footer === 'on') stoneBar(ctx, 0, 0, W, topBorder(H), s);
+        if (s.footer === 'on') stoneBar(ctx, 0, 0, W, topBorder(H, s, .022), s);
         ctx.fillStyle = ink; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
         withRole(ctx, s, 'pageTitle', () => { ctx.font = font(H * .036, { weight: 700 }); fillFit(ctx, s, 'howtoTitle', T(s, 'howtoTitle'), W * .07, H * .09, W * .86); });
       }
@@ -3742,7 +3752,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
         ctx.strokeStyle = p.line; ctx.lineWidth = Math.max(1, 1.2 * k); ctx.strokeRect(cX(W, H, 83.3), cY(W, H, 315.3), 652.3 * k, 736.7 * k);
         return;
       } else {
-        if (s.footer === 'on') stoneBar(ctx, 0, 0, W, topBorder(H), s);
+        if (s.footer === 'on') stoneBar(ctx, 0, 0, W, topBorder(H, s, .022), s);
         ctx.fillStyle = ink; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         withRole(ctx, s, 'pageTitle', () => { ctx.font = font(H * .05); fillFit(ctx, s, 'summaryTableTitle', T(s, 'summaryTableTitle'), W / 2, H * .08, W * .88); });
       }
@@ -3795,7 +3805,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
       const panel = pagePanel(s, 'contents'), onPage = !panel && wordsOffArt(s);
       const legendY = onPage ? H * .05 : ly + lh / 2;                           // the legend line's centre
       // Every page carries the 1/8 in top border that bleeds off the edge, the legend strip included.
-      stoneBar(ctx, 0, 0, W, topBorder(H), s);
+      stoneBar(ctx, 0, 0, W, topBorder(H, s, .028), s);
       if (onPage) stoneBar(ctx, 0, H * .072, W, H * .022, s); else stoneBar(ctx, 0, ly, W, lh, s);
       if (panel) {
         // Edge to edge (bleeds off both sides like the strip); padding sets how much of the strip's height it covers.
@@ -3845,7 +3855,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
         return;
       }
       const isFloral = s.marble === 'floral';
-      if (!isFloral && s.footer === 'on') stoneBar(ctx, 0, 0, W, topBorder(H), s);
+      if (!isFloral && s.footer === 'on') stoneBar(ctx, 0, 0, W, topBorder(H, s, .038), s);
       ctx.fillStyle = ink; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       withRole(ctx, s, 'pageTitle', () => { ctx.font = font(H * .06); fillFit(ctx, s, 'entryTitle', T(s, 'entryTitle'), W / 2, H * .135, W * .78); });
       headerRule(ctx, W * .1, H * .183, W * .8, H * .007, s);   // clear gap under the title, like the other section rules
@@ -4477,7 +4487,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
       return;
     }
     const pl = pagePlacement(s, side), scaled = pl.f < .9995;
-    topBorderOff = scaled; topBorderUsed = false;
+    topBorderOff = scaled; topBorderUsed = false; topBorderPt = 0;
     try { renderDesign(trim, Math.round(W * TRIM_W / PAGE_W * (scaled ? pl.f : 1)), s, type); } finally { topBorderOff = false; }
     const page = document.createElement('canvas'); page.width = W; page.height = H;
     const ctx = page.getContext('2d'), x0 = Math.round(k * (BLEED_PT + pl.x)), y0 = Math.round(k * (BLEED_PT + pl.y));
@@ -4486,7 +4496,8 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     if (scaled) composeBleed(ctx, trim, x0, y0, Math.round(k * 20 * pl.f), Math.round(k * 16 * pl.f));
     else composeBleed(ctx, trim, x0, y0);
     // The top border line stays 1/8 in deep and runs off the page, whatever the margins.
-    if (scaled && topBorderUsed) stoneBar(ctx, 0, 0, W, Math.round(k * 2 * BLEED_PT), { ...s, _W: W });
+    // As designed it grows with the page's top gap, as the footer bar does at the bottom; the thin line stays 1/8 in.
+    if (scaled && topBorderUsed) stoneBar(ctx, 0, 0, W, Math.round(k * (BLEED_PT + (s.topBorder === 'thin' ? topBorderPt : pl.y + topBorderPt * pl.f))), { ...s, _W: W });
     const cut = pl.m.bindBleed ? 0 : Math.round(k * BLEED_PT), cutLeft = side === 'left' ? cut : 0;
     canvas.width = W - cut; canvas.height = H;
     canvas.getContext('2d').drawImage(page, -cutLeft, 0);
@@ -5008,6 +5019,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     commit(true); buildUploadList();
   };
   $('uploadBgColors').onchange = (e) => { state.uploadBgColors = e.target.value; commit(false); };
+  $('topBorder').onchange = (e) => { state.topBorder = e.target.value; commit(false); };
   $('subtitleStyle').onchange = (e) => { state.subtitleStyle = e.target.value; goTo('cover'); commit(false); };
   $('uploadInput').onchange = async (e) => {
     for (const file of e.target.files) {
@@ -5186,6 +5198,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     $('bgArtRow').classList.toggle('hidden', state.marble !== 'abstract' && state.marble !== CLOUD); $('bgArt').value = state.bgArt;
     $('uploadBgRow').classList.toggle('hidden', !state.marble.startsWith('upload:')); $('uploadBgColors').value = state.uploadBgColors;
     $('subtitleStyle').value = state.subtitleStyle || 'caps';
+    $('topBorder').value = state.topBorder === 'thin' ? 'thin' : 'designed';
     const floralNote = $('floralNote');
     floralNote.classList.toggle('hidden', !bg?.bakedTitle);
     floralNote.textContent = state.plateStyle === 'none'
