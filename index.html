@@ -4535,9 +4535,10 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     // Bleed (or a hardcover's wrap) continues each cover's own edges outward; a wide wrap stretches a 1/4 in strip.
     composeBleed(canvas.getContext('2d'), flat, b, b, Math.round(ppi / 4), Math.round(ppi / 4));
   }
-  // The barcode area at the lower right of the back cover, inside the safety margin, in px from the trim's corner + o.
+  // The barcode area at the lower right of the back cover, 1/4 in from the trim at the bottom and the spine side (where
+  // Lulu's proof places its ISBN barcode), in px from the trim's corner + o.
   function barcodeRect(cs, ppi, o) {
-    const [w, h] = cs.barcode, m = Math.max(cs.safe, .25);
+    const [w, h] = cs.barcode, m = .25;
     return [o + (TRIM_W / 72 - m - w) * ppi, o + (TRIM_H / 72 - m - h) * ppi, w * ppi, h * ppi];
   }
   // Preview-only guides on the spread: bleed, trim, spine folds (or the center line), safety margins, barcode area.
