@@ -81,6 +81,23 @@ type Props = {
   onSettings: (s: ExportSettings) => void;
 };
 
+/**
+ * Resolves when every piece of artwork in the print tree is ready to paint: no
+ * raster still being recolored, and every image decoded. Never waits forever
+ * (30 s), so printing can't hang on one image.
+ */
+export async function artReady(root: HTMLElement | null, timeoutMs = 30_000): Promise<void> {
+  if (!root) return;
+  const until = Date.now() + timeoutMs;
+  const frame = () => new Promise((r) => setTimeout(r, 50));
+  while (root.querySelector('[data-decor="raster-pending"]') && Date.now() < until) await frame();
+  const hrefs = [...new Set([...root.querySelectorAll("image")].map((i) => i.getAttribute("href") ?? "").filter(Boolean))];
+  await Promise.race([
+    Promise.all(hrefs.map((h) => { const img = new Image(); img.src = h; return img.decode().catch(() => undefined); })),
+    new Promise((r) => setTimeout(r, Math.max(0, until - Date.now()))),
+  ]);
+}
+
 export function ExportDialog({ doc, currentIndex, fontsReady, onClose, onGoTo, onSettings }: Props) {
   const settings = doc.project.exportSettings;
   const [printing, setPrinting] = useState(false);
@@ -124,14 +141,17 @@ export function ExportDialog({ doc, currentIndex, fontsReady, onClose, onGoTo, o
     let cancelled = false;
     const after = () => setPrinting(false);
     window.addEventListener("afterprint", after);
-    // Wait for fonts + two frames so the print tree is laid out before printing.
-    document.fonts.ready.then(() =>
-      requestAnimationFrame(() =>
-        requestAnimationFrame(() => {
-          if (!cancelled) window.print();
-        }),
-      ),
-    );
+    // Wait for fonts, the artwork (every recolored image decoded — a large painted cover can take a moment),
+    // then two frames so the print tree is laid out and painted before printing.
+    document.fonts.ready
+      .then(() => artReady(document.getElementById("print-root")))
+      .then(() =>
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => {
+            if (!cancelled) window.print();
+          }),
+        ),
+      );
     return () => {
       cancelled = true;
       window.removeEventListener("afterprint", after);

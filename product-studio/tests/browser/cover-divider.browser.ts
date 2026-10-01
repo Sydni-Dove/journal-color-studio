@@ -127,9 +127,19 @@ describe("Cover and divider browser QA", () => {
     await go(page, 1);
     await page.getByRole("button", { name: "Export", exact: true }).click();
     expect(await page.getByRole("dialog", { name: "Export" }).locator(".issue--error").allTextContents()).toEqual([]);
-    await page.evaluate(() => { window.print = () => {}; });
+    // Reported: the painted cover was missing from the print. Printing waits until no artwork is still being
+    // prepared and every image is decoded.
+    await page.evaluate(() => {
+      window.print = () => {
+        const w = window as unknown as { __atPrint: { pending: number; images: number } };
+        w.__atPrint = { pending: document.querySelectorAll('#print-root [data-decor="raster-pending"]').length, images: document.querySelectorAll('#print-root [data-layer="surface"] image').length };
+      };
+    });
     await page.getByRole("button", { name: "Print / Save PDF", exact: true }).click();
     await page.waitForSelector("#print-root .ps-print-sheet", { state: "attached" });
+    const atPrint = await page.waitForFunction(() => (window as unknown as { __atPrint?: unknown }).__atPrint, null, { timeout: 30000 }).then((h) => h.jsonValue() as Promise<{ pending: number; images: number }>);
+    expect(atPrint.pending).toBe(0);
+    expect(atPrint.images).toBeGreaterThan(0);
     expect(await page.locator('.ps-page--print').first().locator('[data-layer="surface"] image').count()).toBeGreaterThan(0);
     expect(await page.locator('.ps-page--print').nth(2).locator('[data-layer="surface"]').count()).toBe(0);
     await page.context().close();
