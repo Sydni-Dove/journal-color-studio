@@ -422,6 +422,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
           <h2>Start from a design</h2>
           <div class="field">
             <div class="seg" id="presetSeg">
+              <button data-preset="workbook"><strong>Workbook</strong><small>Dream Journal Workbook cover</small></button>
               <button data-preset="canva"><strong>Black + gold</strong><small>Original Canva cover</small></button>
               <button data-preset="floral"><strong>Floral</strong><small>Original floral cover</small></button>
               <button data-preset="abstract"><strong>Abstract watercolor</strong><small>Your Canva page 64 art</small></button>
@@ -585,6 +586,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
               <option value="Against">Against (Dove Expressions brand)</option>
             </select>
           </div>
+          <div class="field"><span>Subtitle line</span><select id="subtitleStyle"><option value="caps">Small capitals under the title</option><option value="match">Same size as the title</option></select></div>
           <label class="slider"><span>Cover title size <b id="coverFontScaleVal"></b></span><input type="range" id="coverFontScale" min="60" max="120"></label>
           <div class="role"><label><input type="checkbox" id="coverFontColorAuto"> Cover title color follows palette</label>
             <input type="color" id="coverFontColor" aria-label="Cover title color"></div>
@@ -961,6 +963,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     // Full-bleed backgrounds from the Canva library (photos/patterns keep their own colors).
     'bg-img-marble-white': { type: 'background', renderer: 'image', textureKey: 'img:marble-white', image: 'canva:marble-white', colorRoles: ['paper'], label: 'Carrara photo', hint: 'White marble' },
     'bg-img-gold-leaf-veins': { type: 'background', renderer: 'image', textureKey: 'img:gold-leaf-veins', image: 'canva:gold-leaf-veins', colorRoles: ['paper'], label: 'Gold leaf on paper', hint: 'Gold veins, your paper color' },
+    'bg-img-marble-workbook': { type: 'background', renderer: 'image', textureKey: 'img:marble-workbook', image: 'canva:marble-workbook', colorRoles: ['paper'], label: 'Black + gold HD', hint: 'Workbook cover marble, print resolution' },
     'bg-img-marble-black-gold': { type: 'background', renderer: 'image', textureKey: 'img:marble-black-gold', image: 'canva:marble-black-gold', colorRoles: ['paper'], label: 'Black + gold photo', hint: 'Black marble, gold veins' },
     'bg-img-marble-blue-gold': { type: 'background', renderer: 'image', textureKey: 'img:marble-blue-gold', image: 'canva:marble-blue-gold', colorRoles: ['paper'], label: 'Blue watercolor marble', hint: 'Navy ink + gold' },
     'bg-img-marble-pink-gold': { type: 'background', renderer: 'image', textureKey: 'img:marble-pink-gold', image: 'canva:marble-pink-gold', colorRoles: ['paper'], label: 'Pink watercolor marble', hint: 'Blush ink + gold' },
@@ -995,6 +998,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     'plate-rounded':        { type: 'titlePlate', renderer: 'shape', shape: 'rounded', colorRoles: ['plate', 'frame', 'trim'], label: 'Rounded', hint: 'Soft rounded corners' },
     'plate-oval':           { type: 'titlePlate', renderer: 'shape', shape: 'oval',    colorRoles: ['plate', 'frame', 'trim'], label: 'Oval', hint: 'Elliptical plate' },
     'plate-circle':         { type: 'titlePlate', renderer: 'shape', shape: 'circle',  colorRoles: ['plate', 'frame', 'trim'], label: 'Circle', hint: 'Round medallion' },
+    'plate-workbook':       { type: 'titlePlate', renderer: 'shape', shape: 'workbook', colorRoles: ['plate', 'trim'], label: 'Gold frame', hint: 'Black plate, wide metallic gold border' },
     'plate-bevel':          { type: 'titlePlate', renderer: 'bevel', shape: 'bevel',   colorRoles: ['plate', 'frame', 'trim'], label: 'Gold bevel', hint: 'Metallic gradient frame' },
     'plate-none':           { type: 'titlePlate', renderer: 'none', shape: 'none',     colorRoles: [], label: 'None', hint: 'Title floats on the background' },
     // Original floral glitter ring at its exact Canva placement; drawn UNDER the decorations, as in the source file.
@@ -1036,7 +1040,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
       cover: {
         // 'bg-watercolor' (procedural blobs) is retired from the picker: it was never Sydni's artwork.
         backgroundSlot: ['bg-solid', 'bg-marble-veined', 'bg-marble-boldgold', 'bg-abstract', 'bg-marble-goldleaf', 'bg-marble-white', 'bg-marble-rose', 'bg-marble-burgundy', 'bg-marble-ember', 'bg-marble-peach', 'bg-floral', 'bg-cabana', 'bg-pinstripe', 'bg-bias', 'bg-candy', 'bg-scribble', 'bg-arches', 'bg-img-marble-white', 'bg-img-gold-leaf-veins', 'bg-img-marble-black-gold', 'bg-img-marble-blue-gold', 'bg-img-marble-pink-gold', 'bg-img-cloud-violet-peach', 'bg-img-stripes-blue-cream', 'bg-img-stripes-navy-thin', 'bg-img-stripes-diagonal', 'bg-img-notebook-paper', 'bg-img-leather-tan', 'bg-img-leather-black', 'bg-img-leather-brown', 'bg-img-leather-croc-brown', 'bg-img-leather-orange', 'bg-img-leather-croc-white', 'bg-img-leather-suede-beige', 'bg-img-abstract-white-ribbons', 'bg-img-abstract-white-chevron'],
-        titlePlateSlot: ['plate-rectangle', 'plate-rounded', 'plate-oval', 'plate-circle', 'plate-bevel', 'plate-ring', 'plate-none'],
+        titlePlateSlot: ['plate-workbook', 'plate-rectangle', 'plate-rounded', 'plate-oval', 'plate-circle', 'plate-bevel', 'plate-ring', 'plate-none'],
         // Uploaded elements are appended to every decor slot (and the background slot) at runtime.
         decorTopSlot: ['decor-none', 'decor-floral', 'decor-wash-pink', 'decor-wash-beige', 'decor-wash-orange', 'decor-wash-cream', 'decor-blob-purple', 'decor-scribble', 'decor-stripes-yellow', 'decor-boho', 'decor-cloud', 'decor-bouquet', 'decor-corner', 'decor-topo', 'decor-waves', 'decor-arcs', 'decor-ribbon', 'decor-dots', 'decor-stripes'],
         decorBottomSlot: ['decor-none', 'decor-floral', 'decor-wash-pink', 'decor-wash-beige', 'decor-wash-orange', 'decor-wash-cream', 'decor-blob-purple', 'decor-scribble', 'decor-stripes-yellow', 'decor-boho', 'decor-cloud', 'decor-bouquet', 'decor-corner', 'decor-topo', 'decor-waves', 'decor-arcs', 'decor-ribbon', 'decor-dots', 'decor-stripes'],
@@ -1285,6 +1289,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     printer: 'standard', marginBind: .5, marginEdge: .25, marginTB: .25,   // inside-page margins (see PRINTERS), inches
     // Print-ready cover (see COVER_SPECS): binding, paper (KDP spine), typed spine width / bleed / safety where the
     // printer gives no formula, spine lettering and background, barcode box, and the spread preview.
+    subtitleStyle: 'caps',               // cover subtitle: 'caps' (small tracked capitals) or 'match' (same as the title)
     uploadBgColors: 'original',          // an uploaded background: its own colors or recolored to the palette
     coverBinding: 'coil', coverPaper: 'white', spineIn: .3, coverBleedIn: .125, coverSafeIn: .5,
     spineText: '', spineBrand: 'Dove Expressions', spineBg: 'art', barcodeBox: false, showSpread: false,
@@ -1385,7 +1390,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     'marble-black-gold.jpg', 'marble-blue-gold.jpg', 'marble-pink-gold.jpg', 'stripes-blue-cream.jpg', 'divider-gold-ornament.png', 'stripes-navy-thin.jpg',
     'stripes-diagonal.jpg', 'notebook-paper.png', 'stripes-yellow.png', 'scribble-charcoal.png', 'boho-abstract.jpg', 'leather-tan.jpg', 'leather-black.jpg',
     'leather-brown.jpg', 'leather-croc-brown.jpg', 'leather-orange.jpg', 'leather-croc-white.jpg', 'leather-suede-beige.jpg', 'blob-purple.png',
-    'abstract-white-ribbons.jpg', 'abstract-white-chevron.png', 'cloud-violet-peach.png'];
+    'abstract-white-ribbons.jpg', 'abstract-white-chevron.png', 'cloud-violet-peach.png', 'marble-workbook.jpg'];
   // Page 64 abstract watercolor, as its original Canva layers (SVG export): transform m is in points on the 612×792
   // Canva page (y down); avg = the layer's mean color, used to recolor it while keeping its brush texture.
   const ABSTRACT_LAYERS = [
@@ -2248,6 +2253,9 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     circle: { shape: 'ellipse', d: .48, cy: .5, frame: .005, trimInset: .0155, trim: .0021, ring: { offset: .0125, width: .0015 }, safeW: .72, safeH: .50 },
     // No plate: the title floats in a centred safe area.
     none: { shape: 'none', w: .66, h: .30, cy: .5, safeW: 1, safeH: 1 },
+    // Sydni's Dream Journal Workbook cover (Canva "Cover Page"): black plate, a thin black rim, then a wide metallic
+    // gold border. Measured from the Canva PDF; drawn as shapes so it prints sharp at any size.
+    workbook: { shape: 'rect', w: .554, h: .2953, cy: .4797, frame: .0001, trimInset: .018, trim: .0113, metal: true, safeW: .87, safeH: .8 },
   };
 
   function bgAssetFor(marble) {
@@ -2319,7 +2327,14 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     if (s.showTrim) {
       const o = st.trimInset * W;
       platePath(ctx, L.kind, cx, cy, hw - o, hh - o, Math.max(0, r - o));
-      ctx.strokeStyle = p.trim; ctx.lineWidth = st.trim * W; ctx.stroke();
+      let stroke = p.trim;
+      if (st.metal) {
+        // Metallic gold: the trim color shaded deep → bright → deep across the plate, like foil catching light.
+        const [r0, g0, b0] = hexRgb(p.trim), lite = `rgb(${mix(r0, 255, .6)},${mix(g0, 255, .6)},${mix(b0, 255, .6)})`, deep = `rgb(${r0 * .8},${g0 * .8},${b0 * .8})`;
+        stroke = ctx.createLinearGradient(cx - hw, cy - hh, cx + hw, cy + hh);
+        [[0, lite], [.18, p.trim], [.42, deep], [.6, p.trim], [.82, lite], [1, p.trim]].forEach(([t, c]) => stroke.addColorStop(t, c));
+      }
+      ctx.strokeStyle = stroke; ctx.lineWidth = st.trim * W; ctx.stroke();
       if (st.ring) {
         const ro = (st.ring.offset + st.ring.width / 2) * W;
         platePath(ctx, L.kind, cx, cy, hw + ro, hh + ro);
@@ -2659,9 +2674,11 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
   // with "…" at the minimum size and flagged. The original wording always takes the one-line layout, as before.
   function drawCustomTitle(ctx, W, box, s) {
     const fam = `"${s.coverFont}", Georgia, serif`;
-    const TOP_W = 600, SUB_W = 500, SUB = .4, TRACK = .24, GAP = .17;   // sub-line size, tracking (em) and gap, as fractions of the top size
-    // The subtitle line is set in capitals by design (display only: the stored wording keeps its own case).
-    const top = T(s, 'coverTitle'), sub = T(s, 'coverSubtitle').toUpperCase();
+    // Subtitle "Small capitals" (default): a smaller, tracked line in capitals (display only: the stored wording keeps
+    // its own case). "Same as title": the subtitle continues the title at the same size, weight and case.
+    const match = s.subtitleStyle === 'match';
+    const TOP_W = match ? 400 : 600, SUB_W = match ? 400 : 500, SUB = match ? 1 : .4, TRACK = match ? 0 : .24, GAP = match ? .35 : .17;   // sub-line size, tracking (em) and gap, as fractions of the top size
+    const top = T(s, 'coverTitle'), sub = match ? T(s, 'coverSubtitle') : T(s, 'coverSubtitle').toUpperCase();
     ctx.textBaseline = 'alphabetic';                                    // glyph bounds are baseline-relative
     // Rows of the title block at size px: title line(s) over subtitle line(s), each measured with its own glyph bounds.
     const layout = (px, tops, subs) => {
@@ -4991,6 +5008,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     commit(true); buildUploadList();
   };
   $('uploadBgColors').onchange = (e) => { state.uploadBgColors = e.target.value; commit(false); };
+  $('subtitleStyle').onchange = (e) => { state.subtitleStyle = e.target.value; goTo('cover'); commit(false); };
   $('uploadInput').onchange = async (e) => {
     for (const file of e.target.files) {
       if (!file.type.startsWith('image/')) continue;
@@ -5167,6 +5185,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     if (rec) recBtn.textContent = `Use recommended colors (${rec.name})`;
     $('bgArtRow').classList.toggle('hidden', state.marble !== 'abstract' && state.marble !== CLOUD); $('bgArt').value = state.bgArt;
     $('uploadBgRow').classList.toggle('hidden', !state.marble.startsWith('upload:')); $('uploadBgColors').value = state.uploadBgColors;
+    $('subtitleStyle').value = state.subtitleStyle || 'caps';
     const floralNote = $('floralNote');
     floralNote.classList.toggle('hidden', !bg?.bakedTitle);
     floralNote.textContent = state.plateStyle === 'none'
@@ -5884,6 +5903,10 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     // light "title" role keeps working on the interior's dark header blocks.
     floral: { palette: 'Floral Garden', marble: 'floral', plateStyle: 'ring', titleStyle: 'script', coverFontColor: '#7A0E12', bodyFont: 'Radley', headingFont: 'Cormorant Garamond', decor: { top: 'decor-floral', bottom: 'decor-floral', divider: 'divider-none' } },
   };
+  // The Dream Journal Workbook cover: print-resolution marble, black plate with a metallic gold border, and the title
+  // in Cardo on two equal lines.
+  DESIGN_PRESETS.workbook = { palette: 'Your Canva Cover', marble: 'img:marble-workbook', plateStyle: 'workbook', titleStyle: 'custom', coverFont: 'Cardo', coverFontColor: '#FFFFFF',
+    subtitleStyle: 'match', plateOpacity: 97, plate: '#030303', text: { coverTitle: 'Dream Journal', coverSubtitle: 'Workbook' }, decor: { top: 'decor-none', bottom: 'decor-none', divider: 'divider-none' } };
   DESIGN_PRESETS.abstract = { palette: 'Abstract Watercolor', marble: 'abstract', plateStyle: 'none', titleStyle: 'custom', coverFont: 'Playfair Display', coverFontColor: '#63101A',
     decor: { top: 'decor-none', bottom: 'decor-none', divider: 'divider-canva-gold' } };
   document.querySelectorAll('#presetSeg button').forEach((b) => b.onclick = () => {
@@ -5893,6 +5916,10 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     Object.assign(state, { marble: pr.marble, plateStyle: pr.plateStyle, titleStyle: pr.titleStyle, accent: 'none', palette: { ...paletteByName(pr.palette) },
       showPlate: true, showFrame: true, showTrim: true, coverFontColorAuto: !pr.coverFontColor, coverFontColor: pr.coverFontColor || state.coverFontColor, headerStyle: 'mixed' });
     for (const f of ['bodyFont', 'headingFont']) if (pr[f]) { state[f] = pr[f]; ensureFont(pr[f]).then(() => commit(false)); }
+    state.subtitleStyle = pr.subtitleStyle || 'caps';
+    if (pr.plateOpacity) state.plateOpacity = pr.plateOpacity;
+    if (pr.plate) state.palette.plate = pr.plate;
+    if (pr.text) state.text = { ...state.text, dream: { ...(state.text.dream || {}), ...pr.text } };
     for (const [k, id] of Object.entries(pr.decor)) Object.assign(state.decor[k], { asset: id, show: true, colorMode: 'original', scale: 100 });
     commit(true);
   });
