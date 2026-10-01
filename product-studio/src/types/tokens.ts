@@ -125,9 +125,17 @@ export type ColorToken =
   /** Pattern ground between the stripes (JCS stripeBackground). */
   | "patternGround"
   /** Pattern stripes / ink (JCS stripePrimary). */
-  | "patternInk";
+  | "patternInk"
+  /**
+   * Gold for printed display type (step numbers): the line-art gold nudged
+   * toward yellow and a little less saturated, so it prints gold, not orange.
+   * Derived in resolveColors; falls back to lineArt where not resolved.
+   */
+  | "goldInk";
 
-export type ColorTokens = Record<ColorToken, string> & {
+export type ColorTokens = Record<Exclude<ColorToken, "goldInk">, string> & {
+  /** Derived (resolveColors) — see ColorToken "goldInk". */
+  goldInk?: string;
   /** Opacity applied to `line` for functional writing lines/grids (0–1). */
   lineOpacity: number;
 };

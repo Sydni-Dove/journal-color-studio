@@ -10,7 +10,7 @@ import type { BoxNode, CheckboxNode, DotsNode, LayoutNode, LinesNode, RuleNode, 
 import type { ColorToken, TypographySettings } from "../types/tokens";
 import { ptToIn } from "../engines/units/units";
 
-export const colorVar = (t: ColorToken) => `var(--c-${t})`;
+export const colorVar = (t: ColorToken) => (t === "goldInk" ? "var(--c-goldInk, var(--c-lineArt))" : `var(--c-${t})`);
 
 /** Stroke opacity: functional `line` color is scaled by the palette's lineOpacity. */
 const strokeOpacity = (color: ColorToken, opacity: number) =>

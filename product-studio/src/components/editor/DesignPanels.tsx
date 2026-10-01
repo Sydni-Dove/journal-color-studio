@@ -398,6 +398,7 @@ const TOKEN_LABEL: Record<ColorToken, string> = {
   decorBase: "Decoration main color",
   decorHighlight: "Decoration highlights",
   lineArt: "Line art",
+  goldInk: "Step-number gold (tuned for print)",
   patternGround: "Stripe background",
   patternInk: "Stripes",
 };
@@ -408,7 +409,7 @@ export function ColorPanel({ project, update, usage }: PanelProps) {
   const view = applyVariant(project);
   const effective = resolveColors(project.colors.paletteId, view.colors.overrides, project.colors);
   const active = project.variants.find((v) => v.id === project.activeVariantId);
-  const editable = usage.colorTokens.filter((t) => HEX.test(effective[t]));
+  const editable = usage.colorTokens.filter((t) => HEX.test(effective[t] ?? ""));
   const paper = project.colors.paper ?? "palette";
   const count = arrangementsOf(palette.colors, paper === "white" ? WHITE_PAPER : palette.colors.background).length;
   const at = Math.abs(project.colors.arrangement ?? 0) % count;

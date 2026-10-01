@@ -191,7 +191,10 @@ export function normalizeDecoration(t: DecorativeTheme): DecorativeTheme {
 }
 
 const HEX = /^#[0-9a-f]{6}$/i;
-const hexOf = (colors: ColorTokens, token: ColorToken, fallback: string) => (HEX.test(colors[token]) ? colors[token] : fallback);
+const hexOf = (colors: ColorTokens, token: ColorToken, fallback: string) => {
+  const v = token === "goldInk" ? colors.goldInk ?? colors.lineArt : colors[token];
+  return HEX.test(v) ? v : fallback;
+};
 
 function rasterFor(asset: DesignAsset, rect: Rect, theme: DecorativeTheme, colors: ColorTokens, fit: RasterRequest["fit"]): RasterRequest {
   let wIn = rect.w, hIn = rect.h;

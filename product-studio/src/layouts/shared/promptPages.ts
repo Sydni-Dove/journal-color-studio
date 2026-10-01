@@ -391,7 +391,7 @@ function composedHeader(id: string, h: GuidedHeader, body: Rect, ctx: LayoutCont
   }
   if (number) {
     const lh = ptIn(numberPt, roles.weekTitle.lineHeight);
-    put("number", { x: body.x, y: ly, w: leftW, h: lh }, number, "weekTitle", { sizePt: numberPt, align: "center", color: "lineArt" });
+    put("number", { x: body.x, y: ly, w: leftW, h: lh }, number, "weekTitle", { sizePt: numberPt, align: "center", color: "goldInk" });
     ly += lh;
   }
 
@@ -545,7 +545,8 @@ function composedHeader(id: string, h: GuidedHeader, body: Rect, ctx: LayoutCont
   }
   draw.forEach((f) => f());
   if (h.rule) {
-    const y = body.y + used + s.block;
+    // Clear of the details' writing lines above it (they are lines too): a section's space, not a block's.
+    const y = body.y + used + (below.meta ? s.section : s.block);
     nodes.push(rule(`${id}-rule`, body.x, y, body.x + body.w, y, { component: "PageHeader", color: "lineArt" }));
     used = y - body.y;
   }
