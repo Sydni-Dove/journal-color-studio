@@ -292,6 +292,8 @@ export const HEADER_SUBTITLE_SCALE = 0.78; // × weekTitle
  * typography roles and shrink to fit; on a narrow page the right side drops
  * below the titles. Measured once; the sections start below it.
  */
+/** Space above and below the gold rule under a header (in section spaces): it reads as a divider, not an underline. */
+const RULE_AIR = 1.6;
 function composedHeader(id: string, h: GuidedHeader, body: Rect, ctx: LayoutContext, nodes: LayoutNode[], diagnostics: LayoutDiagnostic[]): number {
   const s = ctx.spacing;
   const measure = getLayoutMeasurer().measure;
@@ -451,7 +453,7 @@ function composedHeader(id: string, h: GuidedHeader, body: Rect, ctx: LayoutCont
       // Centred in the column, the rules above and below it, as in the reference.
       const rx0 = x + (w - ruleW) / 2;
       const top = y;
-      draw.push(() => nodes.push(rule(`${id}-mark-top`, rx0, top, rx0 + ruleW, top, { component: "PageHeader", color: "lineArt", strokePt: 1 })));
+      draw.push(() => nodes.push(rule(`${id}-mark-top`, rx0, top, rx0 + ruleW, top, { component: "PageHeader", color: "goldInk", strokePt: 1 })));
       y += s.block;
       const lh = ptIn(markPt, roles.label.lineHeight);
       markLines$.forEach((l, i) => {
@@ -459,7 +461,7 @@ function composedHeader(id: string, h: GuidedHeader, body: Rect, ctx: LayoutCont
       });
       y += markLines$.length * lh + s.block;
       const yy = y;
-      draw.push(() => nodes.push(rule(`${id}-mark-bottom`, rx0, yy, rx0 + ruleW, yy, { component: "PageHeader", color: "lineArt", strokePt: 1 })));
+      draw.push(() => nodes.push(rule(`${id}-mark-bottom`, rx0, yy, rx0 + ruleW, yy, { component: "PageHeader", color: "goldInk", strokePt: 1 })));
       y += meta$.length ? s.block : 0;
     } else if (markLines$.length) {
       // Below the titles on a narrow page: the mark as one centred line between two short rules.
@@ -473,8 +475,8 @@ function composedHeader(id: string, h: GuidedHeader, body: Rect, ctx: LayoutCont
       if (room >= 0.2) {
         const len = Math.min(0.5, room);
         draw.push(() => {
-          nodes.push(rule(`${id}-mark-left`, cx - tw / 2 - s.column - len, yy, cx - tw / 2 - s.column, yy, { component: "PageHeader", color: "lineArt", strokePt: 1 }));
-          nodes.push(rule(`${id}-mark-right`, cx + tw / 2 + s.column, yy, cx + tw / 2 + s.column + len, yy, { component: "PageHeader", color: "lineArt", strokePt: 1 }));
+          nodes.push(rule(`${id}-mark-left`, cx - tw / 2 - s.column - len, yy, cx - tw / 2 - s.column, yy, { component: "PageHeader", color: "goldInk", strokePt: 1 }));
+          nodes.push(rule(`${id}-mark-right`, cx + tw / 2 + s.column, yy, cx + tw / 2 + s.column + len, yy, { component: "PageHeader", color: "goldInk", strokePt: 1 }));
         });
       }
       put("mark0", { x, y, w, h: lh }, line, "label", { sizePt: pt, trackingEm: markTrack, align: "center", color: "text" });
@@ -531,11 +533,11 @@ function composedHeader(id: string, h: GuidedHeader, body: Rect, ctx: LayoutCont
   if (dividers && used > 0) {
     if (leftW && (titleText || subtitle || overline)) {
       const x = body.x + leftW + gap / 2;
-      nodes.push(rule(`${id}-divider-left`, x, body.y, x, body.y + used, { component: "PageHeader", color: "lineArt", strokePt: 0.75 }));
+      nodes.push(rule(`${id}-divider-left`, x, body.y, x, body.y + used, { component: "PageHeader", color: "goldInk", strokePt: 0.75 }));
     }
     if (rightW) {
       const x = body.x + body.w - rightW - gap / 2;
-      nodes.push(rule(`${id}-divider-right`, x, body.y, x, body.y + used, { component: "PageHeader", color: "lineArt", strokePt: 1.5 }));
+      nodes.push(rule(`${id}-divider-right`, x, body.y, x, body.y + used, { component: "PageHeader", color: "goldInk", strokePt: 1.5 }));
     }
   }
   // Narrow page: the right side below the titles.
@@ -546,9 +548,9 @@ function composedHeader(id: string, h: GuidedHeader, body: Rect, ctx: LayoutCont
   draw.forEach((f) => f());
   if (h.rule) {
     // Clear of the details' writing lines above it (they are lines too): a section's space, not a block's.
-    const y = body.y + used + (below.meta ? s.section : s.block);
-    nodes.push(rule(`${id}-rule`, body.x, y, body.x + body.w, y, { component: "PageHeader", color: "lineArt" }));
-    used = y - body.y;
+    const y = body.y + used + (below.meta ? RULE_AIR * s.section : s.block);
+    nodes.push(rule(`${id}-rule`, body.x, y, body.x + body.w, y, { component: "PageHeader", color: "goldInk" }));
+    return y - body.y + RULE_AIR * s.section;
   }
   return used + s.section;
 }
@@ -570,10 +572,12 @@ function frameOf(spec: ZonePageSpec, ctx: LayoutContext, pageIndex: number, firs
     nodes.push(text(`${id}-period`, { x: z.x, y: z.y, w: z.w, h: z.h - ctx.spacing.titleToRuleGap }, right, "label", { component: "PageHeader", align: "right", vAlign: "bottom" }));
   }
   let body: Rect = frame.body;
-  if (first && spec.intro && isComposedHeader(spec.intro)) {
+  // The page header: on the first page, or on every page of a page that continues (header.repeat).
+  const header = first || spec.intro?.repeat === "every";
+  if (header && spec.intro && isComposedHeader(spec.intro)) {
     const used = composedHeader(`${id}-intro`, spec.intro, body, ctx, nodes, diagnostics);
     body = { ...body, y: body.y + used, h: Math.max(0, body.h - used) };
-  } else if (first && spec.intro) {
+  } else if (header && spec.intro) {
     // The designed header: each line measured in its role, stacked; the sections get what is left below it.
     const h = spec.intro;
     const items: { key: string; value: string; role: "label" | "weekTitle" | "subheading" | "prompt" }[] = [];
@@ -594,7 +598,7 @@ function frameOf(spec: ZonePageSpec, ctx: LayoutContext, pageIndex: number, firs
     if (h.rule) {
       if (items.length) y += ctx.spacing.block;
       const w = Math.min(body.w, 0.9);
-      nodes.push(rule(`${id}-intro-rule`, body.x, y, body.x + w, y, { component: "PageHeader", color: "lineArt" }));
+      nodes.push(rule(`${id}-intro-rule`, body.x, y, body.x + w, y, { component: "PageHeader", color: "goldInk" }));
     }
     const used = y - body.y + (items.length || h.rule ? ctx.spacing.section : 0);
     body = { ...body, y: body.y + used, h: Math.max(0, body.h - used) };
@@ -776,7 +780,7 @@ function frameNodes(id: string, rect: Rect, frame: SectionFrame | undefined, ctx
       return [box(id, rect, { component: "Section", stroke: "border", strokePt: Math.max(0.5, ctx.pattern.lineWeightPt), fill: "accent", fillOpacity: 0.06, radiusIn: r })];
     case "rule":
       // A line down the left side, in the palette's line-art color.
-      return [rule(id, rect.x + 0.01, rect.y, rect.x + 0.01, rect.y + rect.h, { component: "Section", color: "lineArt", strokePt: 1.25 })];
+      return [rule(id, rect.x + 0.01, rect.y, rect.x + 0.01, rect.y + rect.h, { component: "Section", color: "goldInk", strokePt: 1.25 })];
     default:
       return [];
   }

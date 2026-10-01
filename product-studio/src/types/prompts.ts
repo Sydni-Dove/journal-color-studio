@@ -181,6 +181,12 @@ export type GuidedHeader = {
   /** Composed header: thin rules between the step, the titles and the right side (default on). */
   dividers?: boolean;
   /**
+   * When a page runs onto more pages (its sections continue): show this header
+   * on the first page only (default, and every project saved before) or on
+   * every page. A repeated header takes its measured height on each page.
+   */
+  repeat?: "first" | "every";
+  /**
    * Composed header: details to fill in, each its own label and writing line,
    * stacked at the right ("Date", "Time", "Received through", "Type").
    */

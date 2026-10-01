@@ -131,6 +131,13 @@ function HeaderEditor({ header, onChange, open }: { header: GuidedHeader | undef
       {!!meta.length && <Check label="Put the details at the right of the titles instead" checked={h.metaPlace === "right"} onChange={(on) => put({ metaPlace: on ? "right" : undefined })} />}
       <Check label="Thin lines between the step, the titles and the right side" checked={h.dividers !== false} onChange={(on) => put({ dividers: on ? undefined : false })} />
       <Check label="Short decorative rule under the header" checked={!!h.rule} onChange={(rule) => put({ rule: rule || undefined })} />
+      <Segmented
+        label="Show this header"
+        value={h.repeat === "every" ? "every" : "first"}
+        options={[{ value: "first", label: "First page only" }, { value: "every", label: "Every page" }]}
+        onChange={(v) => put({ repeat: v === "every" ? "every" : undefined })}
+      />
+      <p className="hint">For a page whose sections continue onto more pages.</p>
       {!!h.fields?.length && (
         <Field label="A row of blanks above the sections (comma separated)">
           <input type="text" value={(h.fields ?? []).join(", ")} placeholder="e.g. Date, Source" onChange={(e) => put({ fields: fields(e.target.value) })} />
