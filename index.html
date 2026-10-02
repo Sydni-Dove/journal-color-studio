@@ -4085,7 +4085,8 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     const p = s.palette, role = LETTER_ROLE[name];
     const isTitle = !!LETTER_TEXT[name], customTitle = isTitle && s.coverFontColorAuto === false, customInk = role === 'ink' && s.textColorAuto === false;
     return customTitle ? s.coverFontColor : customInk ? s.textColor
-      : onPlate ? readableOn(p.plate, [p.title, p.paper, p.trim, '#FFFFFF', '#2A1A18'])
+      // Jesus Girl's plate takes its lavender lettering color, so the lettering goes light on it (as on its purple pages).
+      : onPlate ? readableOn(p.plate, s.journal === 'jg' ? [p.paper, '#FFFFFF', p.title, '#2A1A18'] : [p.title, p.paper, p.trim, '#FFFFFF', '#2A1A18'])
       : role === 'ink' ? prInk(p) : p[role];
   }
   function drawLetter(ctx, W, H, s, name, onPlate = false) {
