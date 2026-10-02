@@ -9,6 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Lato:wght@400;700&display=swap" rel="stylesheet">
 <script src="vendor/pdf.min.js"></script>
 <script src="vendor/jspdf.umd.min.js"></script>
+<script src="color-core.js"></script>
 <style>
 :root {
   --bg: #f7f3ef; --panel: #ffffff; --ink: #2a1a18; --muted: #7b6a66; --line: #e7ddd6;
@@ -290,19 +291,9 @@ aside { display: flex; flex-direction: column; gap: 14px; }
   // An uploaded page is a flat picture, so colors are swapped by color: the journal's main colors are found (k-means in
   // Lab), and every pixel moves with its nearest colors — target + (pixel − source), blended across the nearest few —
   // so shading, anti-aliased edges and texture are kept. Unchanged colors map to themselves exactly.
-  const srgb = (v) => { v /= 255; return v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; };
-  const unsrgb = (v) => 255 * (v <= .0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - .055);
-  function rgb2lab(r, g, b) {
-    const R = srgb(r), G = srgb(g), B = srgb(b);
-    const f = (t) => (t > .008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
-    const x = f((.4124 * R + .3576 * G + .1805 * B) / .95047), y = f(.2126 * R + .7152 * G + .0722 * B), z = f((.0193 * R + .1192 * G + .9505 * B) / 1.08883);
-    return [116 * y - 16, 500 * (x - y), 200 * (y - z)];
-  }
-  function lab2rgb(L, a, bb) {
-    const fy = (L + 16) / 116, fx = fy + a / 500, fz = fy - bb / 200, inv = (t) => (t ** 3 > .008856 ? t ** 3 : (t - 16 / 116) / 7.787);
-    const X = inv(fx) * .95047, Y = inv(fy), Z = inv(fz) * 1.08883;
-    return [3.2406 * X - 1.5372 * Y - .4986 * Z, -.9689 * X + 1.8758 * Y + .0415 * Z, .0557 * X - .204 * Y + 1.057 * Z].map((v) => Math.max(0, Math.min(255, unsrgb(v))));
-  }
+  // Lab conversion, color families and the recolor itself come from the shared engine (color-core.js), the same
+  // toneTransfer the studio uses for its artwork.
+  const { rgb2lab, lab2rgb, toneTransfer, findFamilies, familiesPreset } = window.ColorCore;
   const hex2rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
   const rgb2hex = (c) => '#' + c.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('').toUpperCase();
   let colors = [];                                     // [{ hex, lab, share }], most used first
@@ -316,67 +307,18 @@ aside { display: flex; flex-direction: column; gap: 14px; }
       const d = x.getImageData(0, 0, c.width, c.height).data;
       for (let j = 0; j < d.length; j += 4 * 7) px.push(rgb2lab(d[j], d[j + 1], d[j + 2]));
     }
-    // k-means++ (k = 10), then merge near-duplicates (ΔE < 9), drop the in-between shades where two colors meet (a
-    // cluster sitting on the line between two other main colors), and drop colors under 0.08% of the pages.
-    let seed = 7; const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);   // same colors every time
-    const K = 10, dist = (p, q) => (p[0] - q[0]) ** 2 + (p[1] - q[1]) ** 2 + (p[2] - q[2]) ** 2;
-    let cent = [px[Math.floor(px.length / 2)]];
-    while (cent.length < K) {
-      const ds = px.map((p) => Math.min(...cent.map((c) => dist(p, c)))), tot = ds.reduce((a, b) => a + b, 0);
-      if (!tot) break; let r = rand() * tot, i = 0; while ((r -= ds[i]) > 0 && i < ds.length - 1) i++; cent.push(px[i]);
-    }
-    let lab = new Array(px.length).fill(0);
-    for (let it = 0; it < 12; it++) {
-      const sum = cent.map(() => [0, 0, 0, 0]);
-      px.forEach((p, i) => { let best = 0, bd = Infinity; cent.forEach((c, k) => { const d = dist(p, c); if (d < bd) { bd = d; best = k; } }); lab[i] = best; const s2 = sum[best]; s2[0] += p[0]; s2[1] += p[1]; s2[2] += p[2]; s2[3]++; });
-      cent = sum.map((s2, k) => (s2[3] ? [s2[0] / s2[3], s2[1] / s2[3], s2[2] / s2[3]] : cent[k]));
-    }
-    const counts = cent.map((_, k) => lab.filter((v) => v === k).length);
-    let list = cent.map((c, k) => ({ lab: c, n: counts[k] })).filter((c) => c.n).sort((a, b) => b.n - a.n);
-    const merged = [];
-    for (const c of list) { const m = merged.find((o) => Math.sqrt(dist(o.lab, c.lab)) < 9); if (m) m.n += c.n; else merged.push({ ...c }); }
-    const segDist = (p, a, b) => { const ab = [0, 1, 2].map((i) => b[i] - a[i]), ap = [0, 1, 2].map((i) => p[i] - a[i]), L2 = ab.reduce((t, v) => t + v * v, 0) || 1;
-      const t = ab.reduce((u, v, i) => u + v * ap[i], 0) / L2; return t < .08 || t > .92 ? Infinity : Math.sqrt(dist(p, a.map((v, i) => v + t * ab[i]))); };
-    const kept = [];
-    for (const c of merged) {
-      const big = kept.filter((o) => o.n > c.n * .5);
-      const blend = big.some((a, i) => big.some((b2, j) => j > i && segDist(c.lab, a.lab, b2.lab) < 12 && Math.sqrt(dist(c.lab, a.lab)) > 6 && Math.sqrt(dist(c.lab, b2.lab)) > 6));
-      if (blend) { const near = kept.reduce((m, o) => (dist(o.lab, c.lab) < dist(m.lab, c.lab) ? o : m)); near.n += c.n; } else kept.push({ ...c });
-    }
-    colors = kept.filter((c) => c.n / px.length >= .0008).map((c) => ({ lab: c.lab, hex: rgb2hex(lab2rgb(...c.lab)), share: c.n / px.length }));
+    colors = findFamilies(px);
     if (st.colorsFor !== info.name) { st.colorMap = {}; st.colorsFor = info.name; save(); }
-    lutKey = '';
   }
-  let lut = null, lutKey = '';
   const recolorKey = () => colors.map((c) => (st.colorMap[c.hex] && st.colorMap[c.hex] !== c.hex ? `${c.hex}>${st.colorMap[c.hex]}` : '')).join('');
-  function buildLut() {
-    const key = recolorKey();
-    if (key === lutKey) return lut;
-    lutKey = key;
-    if (!key) return (lut = null);
-    const src = colors.map((c) => c.lab), dst = colors.map((c) => (st.colorMap[c.hex] ? rgb2lab(...hex2rgb(st.colorMap[c.hex])) : c.lab));
-    // 6 bits per channel; each entry stores the change (new − old), so detail finer than the grid survives.
-    const N = 64, out = new Int16Array(N * N * N * 3);
-    for (let r = 0; r < N; r++) for (let g = 0; g < N; g++) for (let b = 0; b < N; b++) {
-      const R = r * 4 + 2, G = g * 4 + 2, B = b * 4 + 2, p = rgb2lab(R, G, B);
-      let w = 0, L = 0, A = 0, Bb = 0;
-      for (let k = 0; k < src.length; k++) {
-        const d = (p[0] - src[k][0]) ** 2 + (p[1] - src[k][1]) ** 2 + (p[2] - src[k][2]) ** 2, wk = 1 / (d * d + 1e-6);
-        w += wk; L += wk * (dst[k][0] - src[k][0]); A += wk * (dst[k][1] - src[k][1]); Bb += wk * (dst[k][2] - src[k][2]);
-      }
-      const n = lab2rgb(p[0] + L / w, p[1] + A / w, p[2] + Bb / w), i = ((r * N + g) * N + b) * 3;
-      out[i] = n[0] - R; out[i + 1] = n[1] - G; out[i + 2] = n[2] - B;
-    }
-    return (lut = out);
-  }
+  // Swapped families recolored in place through toneTransfer: every pixel moves with its nearest families and keeps
+  // its own shading and texture; edge pixels blend between their two colors, so there are no halos.
   function recolor(c) {
-    const L = buildLut(); if (!L) return;
-    const x = c.getContext('2d'), im = x.getImageData(0, 0, c.width, c.height), d = im.data;
-    for (let i = 0; i < d.length; i += 4) {
-      const j = (((d[i] >> 2) * 64 + (d[i + 1] >> 2)) * 64 + (d[i + 2] >> 2)) * 3;
-      d[i] += L[j]; d[i + 1] += L[j + 1]; d[i + 2] += L[j + 2];
-    }
-    x.putImageData(im, 0, 0);
+    const targets = {};
+    colors.forEach((f, i) => { const to = st.colorMap[f.hex]; if (to && to !== f.hex) targets['f' + i] = to; });
+    if (!Object.keys(targets).length) return;
+    const out = toneTransfer(c, c.width, c.height, familiesPreset(colors), targets, false, { lut: true, noCache: true });
+    c.getContext('2d').drawImage(out, 0, 0);
   }
   const isCoverPage = (p) => (st.firstIsCover && p.n === 1) || (st.lastIsBack && info.pages.length > 1 && p.n === info.pages.length);
   // Palettes: every Color Studio palette (palettes/studio-palettes.json, exported from the studio by
