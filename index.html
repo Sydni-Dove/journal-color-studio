@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Lato:wght@400;700&display=swap" rel="stylesheet">
 <script src="vendor/jspdf.umd.min.js"></script>
+<script src="color-core.js"></script>
 <style>
 :root {
   --bg: #f7f3ef;
@@ -1553,151 +1554,9 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     ctx.restore();
   }
 
-  // ---------- Fidelity recoloring (shared by every background / artwork recolor) ----------
-  // Artwork is recolored in CIE Lab, where lightness is separate from color. Each component of an artwork keeps its
-  // OWN per-pixel lightness deviations (texture, shading, veins, highlights), its own color variation (scaled to the new
-  // color's vividness) and its alpha; only the component's average color moves to the chosen color. Nothing is flattened
-  // to a single color and no detail is regenerated: the source pixels stay the source of truth.
-  const LIN = new Float32Array(256).map((_, i) => { const c = i / 255; return c <= .04045 ? c / 12.92 : ((c + .055) / 1.055) ** 2.4; });
-  const labF = (t) => (t > .008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
-  function rgb2lab(r, g, b) {
-    const R = LIN[r | 0], G = LIN[g | 0], B = LIN[b | 0];
-    const fx = labF((R * .4124 + G * .3576 + B * .1805) / .95047), fy = labF(R * .2126 + G * .7152 + B * .0722), fz = labF((R * .0193 + G * .1192 + B * .9505) / 1.08883);
-    return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)];
-  }
-  const labInv = (t) => { const t3 = t * t * t; return t3 > .008856 ? t3 : (t - 16 / 116) / 7.787; };
-  const toSrgb = (v) => { v = Math.max(0, v); return Math.max(0, Math.min(255, 255 * (v <= .0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - .055))); };
-  function lab2rgb(L, a, b) {
-    const fy = (L + 16) / 116, x = labInv(fy + a / 500) * .95047, y = labInv(fy), z = labInv(fy - b / 200) * 1.08883;
-    return [toSrgb(x * 3.2406 - y * 1.5372 - z * .4986), toSrgb(-x * .9689 + y * 1.8758 + z * .0415), toSrgb(x * .0557 - y * .204 + z * 1.057)];
-  }
-  const hexLab = (hex) => rgb2lab(...hexRgb(hex));
-  // Target lightness + the pixel's own deviation, compressed smoothly (and monotonically) near black/white instead of
-  // clipping — so brighter stays brighter and texture never flattens into a solid block at the extremes.
-  function softL(t, d) {
-    if (d >= 0) { const room = Math.max(.5, 99.5 - t); return t + room * Math.tanh(d / room); }
-    const room = Math.max(.5, t - .5); return t - room * Math.tanh(-d / room);
-  }
-  const ramp01 = (x, a, b) => Math.min(1, Math.max(0, (x - a) / (b - a)));
-  const hueBand = (h, lo, hi, soft = 12) => { const d = h < lo ? lo - h : h > hi ? h - hi : 0; return Math.max(0, 1 - d / soft); };
-  // How an artwork splits into independently colored components (soft weights, so there are no seams between them).
-  // 'keep' = leave as painted (whites, greys, paper).
-  const TONE_PRESETS = {
-    all: { comps: ['main'], weights: () => [1] },
-    // Washes: neutral whites/greys stay as painted; gold glitter follows its own color; the colored paint is the wash.
-    // pigment: the wash is treated as paper + pigment at varying strength. Each pixel keeps its pigment strength
-    // (so pale stays pale, dense paint takes the chosen color, every gradient in between survives); glitter keeps its own tones.
-    wash: { pigment: ['main'], comps: ['keep', 'gold', 'main'], weights: (L, a, b, C, H) => {
-      // Only true whites/greys (chroma under ~3) stay as painted; pale paint is still paint and must follow the new color.
-      // Gold = gold hue + real chroma at ANY lightness (37% of the glitter's flecks are dark gold; no rose paint falls in this hue band).
-      const col = ramp01(C, 1.5, 4), g = col * hueBand(H, 66, 100, 8) * ramp01(C, 16, 26);
-      return [1 - col, g, col - g];
-    } },
-    // Marble veins from the original artwork: gold, white/cream highlights, and the stone showing between them.
-    veins: { comps: ['gold', 'light', 'stone'], weights: (L, a, b, C, H) => {
-      const col = ramp01(C, 6, 16), gold = col * hueBand(H, 50, 105, 12), light = (1 - col) * ramp01(L, 55, 75);
-      return [gold, light, Math.max(0, 1 - gold - light)];
-    } },
-    // Violet + peach watercolor cloud: the cool (violet / lilac) paint and the warm (peach / coral) paint each follow their
-    // own color, as pigment on paper (pale stays pale, dense paint takes the full color); near-whites stay as painted.
-    cloud: { pigment: ['violet', 'peach'], comps: ['keep', 'violet', 'peach'], weights: (L, a, b, C, H) => {
-      const col = ramp01(C, 2, 6), warm = ramp01(Math.cos((H - 50) * Math.PI / 180), -.15, .35);
-      return [1 - col, col * (1 - warm), col * warm];
-    } },
-    // Colored ink on paper (e.g. a flattened page): only the ink changes.
-    ink: { comps: ['keep', 'main'], weights: (L, a, b, C) => { const c = ramp01(C, 8, 20); return [1 - c, c]; } },
-    // Floral artwork: deep blooms, soft blooms, leaves, gold; page white and greys stay put.
-    floral: { comps: ['keep', 'paper', 'gold', 'leaf', 'blush', 'deep'], weights: (L, a, b, C, H) => {
-      const col = ramp01(C, 5, 12), paper = (1 - col) * ramp01(L, 90, 96), keep = 1 - col - paper;
-      const gold = col * hueBand(H, 62, 100, 10), leaf = col * hueBand(H, 110, 205, 12) * (1 - hueBand(H, 62, 100, 10));
-      const rest = Math.max(0, col - gold - leaf), light = ramp01(L, 50, 64);
-      return [keep, paper, gold, leaf, rest * light, rest * (1 - light)];
-    } },
-  };
-  const toneCache = new Map();
-  // targets: { componentName: hex }  (a component without a target is left exactly as painted).
-  function toneTransfer(img, w, h, preset, targets, cover = false) {
-    w = Math.max(1, Math.round(w)); h = Math.max(1, Math.round(h));
-    const key = `${img._key || img.src}|${w}x${h}|${preset}|${JSON.stringify(targets)}|${cover}`;
-    if (toneCache.has(key)) return toneCache.get(key);
-    const c = document.createElement('canvas'); c.width = w; c.height = h;
-    const x = c.getContext('2d', { willReadFrequently: true });
-    x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high';
-    if (cover) {
-      const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height, ir = iw / ih, r = w / h;
-      let sx = 0, sy = 0, sw = iw, sh = ih;
-      if (ir > r) { sw = sh * r; sx = (iw - sw) / 2; } else { sh = sw / r; sy = (ih - sh) / 2; }
-      x.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
-    } else x.drawImage(img, 0, 0, w, h);
-    const id = x.getImageData(0, 0, w, h), d = id.data, P = TONE_PRESETS[preset], K = P.comps.length;
-    const px = (i) => { const [L, a, b] = rgb2lab(d[i], d[i + 1], d[i + 2]); const C = Math.hypot(a, b); let H = Math.atan2(b, a) * 180 / Math.PI; if (H < 0) H += 360; return [L, a, b, C, H]; };
-    const norm = (ws) => { let t = 0; for (const v of ws) t += Math.max(0, v); return t > 0 ? ws.map((v) => Math.max(0, v) / t) : ws.map((_, i) => (i ? 0 : 1)); };
-    // Pass 1 (sampled): each component's own average color, weighted by coverage and alpha.
-    const sum = new Float64Array(K * 4), hist = new Float64Array(K * 101), histA = new Float64Array(K * 101), histB = new Float64Array(K * 101), step = Math.max(1, Math.round(Math.sqrt(w * h / 90000))) * 4;
-    for (let i = 0; i < d.length; i += step) {
-      const al = d[i + 3] / 255; if (al < .05) continue;
-      const [L, a, b, C, H] = px(i), ws = norm(P.weights(L, a, b, C, H));
-      for (let k = 0; k < K; k++) {
-        const wk = ws[k] * al; sum[k * 4] += wk; sum[k * 4 + 1] += wk * L; sum[k * 4 + 2] += wk * a; sum[k * 4 + 3] += wk * b;
-        const bin = k * 101 + Math.max(0, Math.min(100, Math.round(L)));
-        hist[bin] += wk; histA[bin] += wk * a; histB[bin] += wk * b;
-      }
-    }
-    const quantL = (k, f) => { let acc = 0; const tot = sum[k * 4]; for (let v = 0; v <= 100; v++) { acc += hist[k * 101 + v]; if (acc >= tot * f) return v; } return 50; };
-    const T = P.comps.map((name, k) => {
-      const hex = targets[name], n = sum[k * 4];
-      if (!hex || n < 1e-6) return null;
-      const m = [sum[k * 4 + 1] / n, sum[k * 4 + 2] / n, sum[k * 4 + 3] / n], t = hexLab(hex);
-      const Cm = Math.hypot(m[1], m[2]), Ct = Math.hypot(t[1], t[2]);
-      // Color variation scales with how vivid the new color is (a pastel keeps a gentle version of the painted variation).
-      const out = { m, t, sC: Math.min(1.25, Math.max(.35, (Ct + 8) / (Cm + 8))), gold: name === 'gold' };
-      if (P.pigment?.includes(name)) {
-        // Paper = the lightest paint, dense pigment = the darkest tenth; its color = the average hue scaled to that density.
-        out.Lp = Math.max(92, quantL(k, .995)); out.Ld = Math.min(out.Lp - 6, quantL(k, .1));
-        // The dense pigment's own color, measured from the densest pixels themselves.
-        let wS = 0, aS = 0, bS = 0;
-        for (let v = 0; v <= Math.min(100, out.Ld + 5); v++) { wS += hist[k * 101 + v]; aS += histA[k * 101 + v]; bS += histB[k * 101 + v]; }
-        out.pd = wS > 0 ? [aS / wS, bS / wS] : [m[1], m[2]];
-        // Color variation is judged against the dense pigment's vividness, not the (mostly pale) average.
-        out.sC = Math.min(1.25, Math.max(.35, (Ct + 8) / (Math.hypot(out.pd[0], out.pd[1]) + 8)));
-      }
-      return out;
-    });
-    // Pass 2: every pixel keeps its deviation from its component's average.
-    for (let i = 0; i < d.length; i += 4) {
-      if (!d[i + 3]) continue;
-      const [L, a, b, C, H] = px(i), ws = norm(P.weights(L, a, b, C, H));
-      let oL = 0, oa = 0, ob = 0;
-      for (let k = 0; k < K; k++) {
-        const wk = ws[k]; if (!wk) continue;
-        const t = T[k];
-        if (!t) { oL += wk * L; oa += wk * a; ob += wk * b; continue; }
-        let nL, na, nb;
-        if (t.Lp) {
-          // Pigment strength of this pixel (can exceed 1 slightly where paint pooled darker than usual).
-          // Pigment strength shows both as darkening and as color intensity; use both so the estimate follows the paint.
-          const alL = (t.Lp - L) / (t.Lp - t.Ld), alC = C / Math.max(4, Math.hypot(t.pd[0], t.pd[1]));
-          const al = Math.max(0, Math.min(1.2, .5 * alL + .5 * alC));
-          const aL = Math.max(0, Math.min(1.2, alL));                  // lightness follows the painted light/dark exactly
-          nL = Math.max(1, Math.min(99.5, t.Lp + (t.t[0] - t.Lp) * aL));
-          // Keep a gentle share of the painted hue variation (blooms, edges), not the old hue itself.
-          const ra = a - t.pd[0] * al, rb = b - t.pd[1] * al, rs = .35 * t.sC;
-          na = t.t[1] * al + ra * rs; nb = t.t[2] * al + rb * rs;
-        } else {
-          nL = softL(t.t[0], L - t.m[0]);
-          na = t.t[1] + (a - t.m[1]) * t.sC; nb = t.t[2] + (b - t.m[2]) * t.sC;
-        }
-        if (t.gold) { const f = 1 - .5 * ramp01(nL, t.t[0], 100); na *= f; nb *= f; }     // metal: bright glints go pale, shadows stay rich
-        oL += wk * nL; oa += wk * na; ob += wk * nb;
-      }
-      const [r, g, bb] = lab2rgb(oL, oa, ob);
-      d[i] = r; d[i + 1] = g; d[i + 2] = bb;
-    }
-    x.putImageData(id, 0, 0);
-    if (toneCache.size > 48) toneCache.delete(toneCache.keys().next().value);
-    toneCache.set(key, c);
-    return c;
-  }
+  // The color engine (Lab conversion, the TONE_PRESETS components and toneTransfer, the fidelity recolor every
+  // artwork recolor below goes through) lives in color-core.js, shared with Print Prep.
+  const { LIN, rgb2lab, lab2rgb, hexLab, softL, ramp01, hueBand, TONE_PRESETS, toneTransfer } = window.ColorCore;
 
   // Re-tints textured artwork to a new color while keeping its brush texture: every pixel keeps its lightness
   // relative to the artwork's own mean color, so washes stay washes (unlike a flat alpha-mask tint).
