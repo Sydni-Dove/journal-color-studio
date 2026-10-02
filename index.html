@@ -4480,6 +4480,24 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     wrapText(ctx, str, ox + l * k + ('letterSpacing' in ctx ? ls * px / 2 : 0), oy + t * k - px * lh * .22, w * k, px * lh, 'center');
     ctx.restore();
   }
+  // A picked background too busy for the cover lettering gets a soft, feathered veil of the paper color behind the title
+  // block, like frosted glass, unless a plate or title fill already backs it. Busy = the lettering color falls under 4.5:1
+  // on more than 5% of the area, or the area swings strongly between light and dark (luminance spread over .14: veined
+  // marble). Sydni's own watercolor and calm backgrounds measure about .10 with full contrast, so they never get one.
+  // The feather is a shadow cast from a shape drawn off-canvas (works in every browser, unlike ctx.filter).
+  function coverVeil(ctx, W, H, s, [l, t, w, h], ink) {
+    const { k, ox, oy } = prFit(W, H), x = ox + l * k, y = oy + t * k, rw = w * k, rh = h * k;
+    const Ls = sampleArea(ctx, x, y, rw, rh);
+    if (!Ls || titleFillColor(s)) return false;
+    const ki = relLum(ink), mean = Ls.reduce((a, b) => a + b, 0) / Ls.length, spread = Math.sqrt(Ls.reduce((a, b) => a + (b - mean) ** 2, 0) / Ls.length);
+    const reads = Ls.filter((L) => (Math.max(ki, L) + .05) / (Math.min(ki, L) + .05) >= 4.5).length / Ls.length;
+    if (reads >= .95 && spread <= .14) return false;
+    const blur = 26 * k, off = W + rw + 4 * blur;
+    ctx.save(); ctx.globalAlpha = .84; ctx.shadowColor = s.palette.paper; ctx.shadowBlur = blur; ctx.shadowOffsetX = off;
+    roundRect(ctx, x - off, y, rw, rh, 28 * k); ctx.fillStyle = s.palette.paper; ctx.fill();
+    ctx.restore();
+    return true;
+  }
   const coverInk = (s, onPlate) => {
     const p = s.palette;
     return s.coverFontColorAuto === false ? s.coverFontColor : onPlate ? readableOn(p.plate, [p.title, p.paper, '#FFFFFF', '#23201D']) : p.plate;
@@ -4552,11 +4570,18 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
   function renderCoverMwg(ctx, W, H, s) {
     paintPageBackground(ctx, W, H, s);
     drawPr(ctx, W, H, s, composeArt(s, MWG_COVER, true));
-    const onPlate = prCoverExtras(ctx, W, H, s), ink = coverInk(s, onPlate);
+    const onPlate = prCoverExtras(ctx, W, H, s), { k, ox, oy } = prFit(W, H), sx = { ...s, headerFill: null };
+    // Lettering must read on whatever background is picked: the design color while it reads on the art behind it,
+    // else the most readable candidate (same rule as the Dream cover), plus a soft halo on marble too busy for any one color.
+    const area = (l, t, w, h) => [ox + l * k, oy + t * k, w * k, h * k], titleArea = area(133.35, 320, 549.3, 186), subArea = area(118, 526, 580, 46);
+    // First the lettering color that reads best on what's there; only if the background is still too busy for it, the veil
+    // (and then the design color, which reads on the paper-colored veil).
+    let ink = onPlate || s.coverFontColorAuto === false ? coverInk(s, onPlate) : textOnArea(ctx, sx, s.palette.plate, s.palette.paper, ...area(133.35, 320, 549.3, 252));
+    if (!onPlate && coverVeil(ctx, W, H, s, [112, 300, 592, 290], ink) && s.coverFontColorAuto !== false) ink = coverInk(s, false);
     // Centred on the page (the Canva title, rule and subtitle sat 0.3 in right of centre).
-    coverType(ctx, W, H, s, T(s, 'coverTitle'), { l: 133.35, t: 326.4, w: 549.3, size: 79, lh: 1.01, ls: .105, maxLines: 2, upper: true, color: ink });
+    withHalo(ctx, sx, ink, titleArea, () => coverType(ctx, W, H, s, T(s, 'coverTitle'), { l: 133.35, t: 326.4, w: 549.3, size: 79, lh: 1.01, ls: .105, maxLines: 2, upper: true, color: ink }));
     drawPr(ctx, W, H, s, [['mwg-gold-rule', 172.9, 508.4, 470.2, 10.7, 0, -71.3, -1.2, 599.4, 15]]);
-    coverType(ctx, W, H, s, T(s, 'coverSubtitle'), { l: 118, t: 532.8, w: 580, size: 26.4, lh: 1.1, italic: true, family: 'body', color: ink });
+    withHalo(ctx, sx, ink, subArea, () => coverType(ctx, W, H, s, T(s, 'coverSubtitle'), { l: 118, t: 532.8, w: 580, size: 26.4, lh: 1.1, italic: true, family: 'body', color: ink }));
   }
   function backMwg(ctx, W, H, s) {
     paintPageBackground(ctx, W, H, s);
@@ -4576,8 +4601,16 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     drawPr(ctx, W, H, s, composeArt(s, [JG_COVER.marble, JG_COVER.washTop, JG_COVER.washBottom], true));
     const onPlate = prCoverExtras(ctx, W, H, s);
     if (s.plateStyle === 'none') drawPr(ctx, W, H, s, [JG_COVER.plate]);         // the design's own frosted plate, unless another plate is picked
+    // Lettering with nothing solid behind it (the design's plate switched off, or a frame-only plate) on a busy background:
+    // the soft veil first, then a halo for whatever still doesn't read.
+    const bare = !onPlate && (s.plateStyle !== 'none' || prOff(s, 'plate'));
+    const { k, ox, oy } = prFit(W, H), sx = { ...s, headerFill: null };
+    if (bare) coverVeil(ctx, W, H, s, [160, 222, 496, 442], letterColor(s, 'jg-title', false));
     drawPr(ctx, W, H, s, [JG_COVER.divider]);
-    drawLetter(ctx, W, H, s, 'jg-title', onPlate); drawLetter(ctx, W, H, s, 'jg-sub', onPlate);
+    for (const name of ['jg-title', 'jg-sub']) {
+      const [l, t, w, h] = LETTERING[name], draw = () => drawLetter(ctx, W, H, s, name, onPlate);
+      if (bare) withHalo(ctx, sx, letterColor(s, name, onPlate), [ox + l * k, oy + t * k, w * k, h * k], draw); else draw();
+    }
   }
   // Back: the violet + peach cloud three times (the back cover's own transparent copy; the studio's cloud background is a
   // tighter crop whose paint runs into its edges), the signature centred.
