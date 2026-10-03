@@ -130,6 +130,7 @@
     // Pass 2: every pixel keeps its deviation from its component's average.
     const mapLab = (L, a, b, C, H) => {
       const ws = norm(P.weights(L, a, b, C, H));
+      if (P.map) return lab2rgb(...P.map(L, a, b, C, H, T, ws));
       let oL = 0, oa = 0, ob = 0;
       for (let k = 0; k < K; k++) {
         const wk = ws[k]; if (!wk) continue;
@@ -146,6 +147,15 @@
           // Keep a gentle share of the painted hue variation (blooms, edges), not the old hue itself.
           const ra = a - t.pd[0] * al, rb = b - t.pd[1] * al, rs = .35 * t.sC;
           na = t.t[1] * al + ra * rs; nb = t.t[2] * al + rb * rs;
+        } else if (P.keepChroma && Math.hypot(t.m[1], t.m[2]) >= 5) {
+          // Color families of flattened artwork: the WHOLE family takes the new color. Each pixel keeps its lightness
+          // offset from its family (shading, texture) and its colorfulness relative to the family (pale stays pale), and
+          // takes the new hue with only a trace of its own hue variation, so a changed family recolors instead of tinting.
+          nL = softL(t.t[0], L - t.m[0]);
+          const Cm = Math.hypot(t.m[1], t.m[2]), Ct = Math.hypot(t.t[1], t.t[2]), Ht = Math.atan2(t.t[2], t.t[1]);
+          let dh = Math.atan2(b, a) - Math.atan2(t.m[2], t.m[1]); dh -= Math.round(dh / (2 * Math.PI)) * 2 * Math.PI;
+          const nc = Ct * Math.min(2.5, C / Cm), nh = Ct < 3 ? Ht : Ht + dh * .3;
+          na = nc * Math.cos(nh); nb = nc * Math.sin(nh);
         } else {
           nL = softL(t.t[0], L - t.m[0]);
           na = t.t[1] + (a - t.m[1]) * t.sC; nb = t.t[2] + (b - t.m[2]) * t.sC;
@@ -156,19 +166,28 @@
       return lab2rgb(oL, oa, ob);
     };
     if (opts.lut) {
-      // The mapping depends only on a pixel's color (plus this image's statistics above), so it is computed once per
-      // cell of a 64³ grid and stored as a change; each pixel adds its cell's change, keeping detail finer than the grid.
-      const N = 64, del = new Float32Array(N * N * N * 3);
+      // The mapping depends only on a pixel's color (plus this image's statistics above), so it is computed once on a
+      // 65³ grid (every 4th level, 0–255) and stored as a change; each pixel adds the change blended (trilinear) from
+      // the 8 grid points around its color, so smooth gradients stay smooth (no blocky steps between grid cells).
+      const N = 65, S = 4, del = new Float32Array(N * N * N * 3);
       for (let r = 0; r < N; r++) for (let g = 0; g < N; g++) for (let bl = 0; bl < N; bl++) {
-        const R = r * 4 + 2, G = g * 4 + 2, B = bl * 4 + 2, [L, a, b] = rgb2lab(R, G, B), C = Math.hypot(a, b);
+        const R = Math.min(255, r * S), G = Math.min(255, g * S), B = Math.min(255, bl * S), [L, a, b] = rgb2lab(R, G, B), C = Math.hypot(a, b);
         let H = Math.atan2(b, a) * 180 / Math.PI; if (H < 0) H += 360;
         const o = mapLab(L, a, b, C, H), j = ((r * N + g) * N + bl) * 3;
         del[j] = o[0] - R; del[j + 1] = o[1] - G; del[j + 2] = o[2] - B;
       }
       for (let i = 0; i < d.length; i += 4) {
         if (!d[i + 3]) continue;
-        const j = (((d[i] >> 2) * N + (d[i + 1] >> 2)) * N + (d[i + 2] >> 2)) * 3;
-        d[i] += del[j]; d[i + 1] += del[j + 1]; d[i + 2] += del[j + 2];
+        const fr = d[i] / S, fg = d[i + 1] / S, fb = d[i + 2] / S, r0 = Math.min(N - 2, fr | 0), g0 = Math.min(N - 2, fg | 0), b0 = Math.min(N - 2, fb | 0);
+        const tr = fr - r0, tg = fg - g0, tb = fb - b0;
+        let o0 = 0, o1 = 0, o2 = 0;
+        for (let q = 0; q < 8; q++) {
+          const dr = q & 1, dg = (q >> 1) & 1, db = q >> 2, w = (dr ? tr : 1 - tr) * (dg ? tg : 1 - tg) * (db ? tb : 1 - tb);
+          if (!w) continue;
+          const j = (((r0 + dr) * N + (g0 + dg)) * N + (b0 + db)) * 3;
+          o0 += w * del[j]; o1 += w * del[j + 1]; o2 += w * del[j + 2];
+        }
+        d[i] += o0; d[i + 1] += o1; d[i + 2] += o2;
       }
     } else {
       for (let i = 0; i < d.length; i += 4) {
@@ -222,12 +241,99 @@
   // between their two colors instead of snapping to one), the family's own center as its average, color variation
   // kept as is. toneTransfer(img, w, h, familiesPreset(fams), { f2: '#hex', … }) recolors families f2 …
   function familiesPreset(fams) {
-    const C = fams.map((f) => f.lab), K = C.length;
+    const C = fams.map((f) => f.lab), K = C.length, Cm = C.map((c) => Math.hypot(c[1], c[2])), Hm = C.map((c) => Math.atan2(c[2], c[1]));
+    const wrap = (x) => x - Math.round(x / (2 * Math.PI)) * 2 * Math.PI;
     return {
-      id: 'families:' + fams.map((f) => f.hex).join(''), comps: C.map((_, i) => 'f' + i), means: C, keepChroma: true,
-      weights: (L, a, b) => { const w = new Array(K); for (let i = 0; i < K; i++) { const d = (L - C[i][0]) ** 2 + (a - C[i][1]) ** 2 + (b - C[i][2]) ** 2; w[i] = 1 / (d * d + 1e-6); } return w; },
+      id: 'families2:' + fams.map((f) => f.hex).join(''), comps: C.map((_, i) => 'f' + i), means: C, keepChroma: true,
+      weights: (L, a, b) => { const w = new Array(K); for (let i = 0; i < K; i++) { const d = (L - C[i][0]) ** 2 + (a - C[i][1]) ** 2 + (b - C[i][2]) ** 2; w[i] = 1 / (d * d * d + 1e-9); } return w; },
+      // Flattened art is paint on paper: a pale tint is a little of some colored family's pigment, not "mostly paper". So
+      //  · lightness follows the families by their usual (Lab-distance) weights — pale stays pale;
+      //  · color (hue + colorfulness) comes only from the COLORED families, picked by hue and lightness, at the pixel's
+      //    own strength relative to that family: every tint of a changed family takes the new hue, the palest included;
+      //  · a changed paper / grey family adds its own color shift where the pixel is paper-like.
+      map: (L, a, b, Cp, H, T, ws) => {
+        let nL = 0, da = 0, db = 0;
+        for (let i = 0; i < K; i++) {
+          const w = ws[i], t = T[i]; if (!w) continue;
+          nL += w * (t ? softL(t.t[0], L - t.m[0]) : L);
+          if (t && Cm[i] < 5) { da += w * (t.t[1] - t.m[1]); db += w * (t.t[2] - t.m[2]); }
+        }
+        let na = a, nb = b;
+        if (Cp >= 1.5) {
+          const Hp = Math.atan2(b, a); let sw = 0, sa = 0, sb = 0;
+          for (let i = 0; i < K; i++) {
+            if (Cm[i] < 5) continue;
+            const hd = wrap(Hp - Hm[i]) * 180 / Math.PI, w = 1 / (((L - C[i][0]) ** 2 + (hd * .6) ** 2 + 4) ** 2), t = T[i];
+            let fa = a, fb = b;
+            if (t) {
+              const Ct = Math.hypot(t.t[1], t.t[2]), Ht = Math.atan2(t.t[2], t.t[1]), nc = Ct * Math.min(2.5, Cp / Cm[i]), nh = Ct < 3 ? Ht : Ht + wrap(Hp - Hm[i]) * .3;
+              fa = nc * Math.cos(nh); fb = nc * Math.sin(nh);
+            }
+            sw += w; sa += w * fa; sb += w * fb;
+          }
+          if (sw) { na = sa / sw; nb = sb / sw; }
+        }
+        return [nL, na + da, nb + db];
+      },
     };
   }
 
-  window.ColorCore = { LIN, rgb2lab, lab2rgb, hexLab, softL, ramp01, hueBand, TONE_PRESETS, toneTransfer, findFamilies, familiesPreset };
+  // ---------- Palette → color families (flattened artwork) ----------
+  // A palette onto an artwork's color families (findFamilies): paper → the main light color, the darkest → lettering (only
+  // if it stays dark enough to read), gold → gold/trim, other colored ones → the palette color nearest their lightness,
+  // pale greys → lines; in-between shades follow the two colors they sit between. turn: another click on the same palette
+  // picks the next suitable palette color for the colored areas. Returns { familyHex: newHex }. Used by Print Prep and
+  // the Recolor page.
+  const hex2rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const rgb2hex = (c) => '#' + c.map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('').toUpperCase();
+  function familyMapForPalette(colors, pl, turn = 0) {
+    // Another click on the same palette picks the next suitable palette color for the journal's colored areas.
+    const map = {}, used = new Set(), chroma = (c) => Math.hypot(c.lab[1], c.lab[2]), Lof = (h) => rgb2lab(...hex2rgb(h))[0];
+    const take = (c, hex) => { if (c && hex && /^#[0-9a-f]{6}$/i.test(hex) && !used.has(c.hex)) { map[c.hex] = hex.toUpperCase(); used.add(c.hex); } };
+    const light = colors.filter((c) => c.lab[0] > 80).sort((a, b) => b.share - a.share)[0];
+    take(light, pl.paper);
+    const dark = [...colors].sort((a, b) => a.lab[0] - b.lab[0])[0];
+    const ink = [pl.title, pl.stone, pl.frame, pl.plate].filter(Boolean).sort((a, b) => Lof(a) - Lof(b))[0];
+    if (dark && dark.lab[0] < 35 && ink && Lof(ink) < 45) take(dark, ink);
+    // Gold-like (yellow-orange hue, mid lightness) → the palette's gold/trim; the other colored ones by how much they
+    // cover: the biggest is usually bars and backgrounds (→ background color), then accent, highlight, veins.
+    const hue = (c) => (Math.atan2(c.lab[2], c.lab[1]) * 180 / Math.PI + 360) % 360;
+    const gold = colors.filter((c) => !used.has(c.hex) && chroma(c) > 15 && hue(c) > 50 && hue(c) < 105 && c.lab[0] > 45 && c.lab[0] < 88).sort((a, b) => chroma(b) - chroma(a))[0];
+    take(gold, pl.trim);
+    // Each remaining colored area takes the unused palette color closest to its own lightness, so dark bars stay dark
+    // and pale fills stay pale on any palette (another click picks the next-closest).
+    const colored = colors.filter((c) => !used.has(c.hex) && chroma(c) > 12).sort((a, b) => b.share - a.share);
+    const cands = [...new Set([pl.stone, pl.accent, pl.highlight, pl.vein, pl.frame, pl.plate, pl.title, pl.trim].filter((h) => h && /^#[0-9a-f]{6}$/i.test(h) && h.toUpperCase() !== (pl.paper || '').toUpperCase()).map((h) => h.toUpperCase()))];
+    const usedCand = new Set();
+    colored.forEach((c, i) => {
+      const ranked = cands.filter((h) => !usedCand.has(h)).sort((a, b) => Math.abs(Lof(a) - c.lab[0]) - Math.abs(Lof(b) - c.lab[0]));
+      const near = ranked.filter((h) => Math.abs(Lof(h) - c.lab[0]) < Math.abs(Lof(ranked[0]) - c.lab[0]) + 25);
+      const h = near.length ? near[(turn + i) % near.length] : ranked[0];
+      if (h) { take(c, h); usedCand.add(h); }
+    });
+    colors.filter((c) => !used.has(c.hex) && chroma(c) <= 12 && c.lab[0] > 55 && c.lab[0] <= 95).forEach((c) => take(c, pl.line));
+    // In-between shades (thin lines melting into the paper) follow the two colors they sit between, at the same mix,
+    // so lines keep their weight instead of turning solid.
+    const D = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]), tgt = (c) => rgb2lab(...hex2rgb(map[c.hex] || c.hex));
+    for (const c of colors) {
+      let best = null;
+      for (const a2 of colors) for (const b2 of colors) {
+        if (a2 === c || b2 === c || a2 === b2 || a2.share < c.share * .5 || b2.share < c.share * .5) continue;
+        const ab = [0, 1, 2].map((i) => b2.lab[i] - a2.lab[i]), L2 = ab.reduce((u, v) => u + v * v, 0) || 1, t = ab.reduce((u, v, i) => u + v * (c.lab[i] - a2.lab[i]), 0) / L2;
+        if (t < .1 || t > .9) continue;
+        const d = D(c.lab, a2.lab.map((v, i) => v + t * ab[i]));
+        if (d < 15 && (!best || d < best.d)) best = { d, a: a2, b: b2, t };
+      }
+      if (best) { const A = tgt(best.a), B = tgt(best.b); map[c.hex] = rgb2hex(lab2rgb(...A.map((v, i) => v + best.t * (B[i] - v)))); }
+    }
+        return map;
+  }
+  // { familyHex: newHex } → toneTransfer targets for familiesPreset(colors) (changed families only).
+  function familyTargets(colors, map) {
+    const targets = {};
+    colors.forEach((f, i) => { const to = map?.[f.hex]; if (to && to !== f.hex) targets['f' + i] = to; });
+    return targets;
+  }
+
+  window.ColorCore = { LIN, rgb2lab, lab2rgb, hexLab, softL, ramp01, hueBand, TONE_PRESETS, toneTransfer, findFamilies, familiesPreset, familyMapForPalette, familyTargets, hex2rgb, rgb2hex };
 })();

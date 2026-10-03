@@ -314,8 +314,7 @@ aside { display: flex; flex-direction: column; gap: 14px; }
   // Swapped families recolored in place through toneTransfer: every pixel moves with its nearest families and keeps
   // its own shading and texture; edge pixels blend between their two colors, so there are no halos.
   function recolor(c) {
-    const targets = {};
-    colors.forEach((f, i) => { const to = st.colorMap[f.hex]; if (to && to !== f.hex) targets['f' + i] = to; });
+    const targets = window.ColorCore.familyTargets(colors, st.colorMap);
     if (!Object.keys(targets).length) return;
     const out = toneTransfer(c, c.width, c.height, familiesPreset(colors), targets, false, { lut: true, noCache: true });
     c.getContext('2d').drawImage(out, 0, 0);
@@ -338,46 +337,8 @@ aside { display: flex; flex-direction: column; gap: 14px; }
   // enough to read), gold → gold/trim, other colored ones → the palette color nearest their lightness, pale greys → lines.
   // Every swap stays editable.
   function applyPalette(pl, turn = 0) {
-    // Another click on the same palette picks the next suitable palette color for the journal's colored areas.
-    const map = {}, used = new Set(), chroma = (c) => Math.hypot(c.lab[1], c.lab[2]), Lof = (h) => rgb2lab(...hex2rgb(h))[0];
-    const take = (c, hex) => { if (c && hex && /^#[0-9a-f]{6}$/i.test(hex) && !used.has(c.hex)) { map[c.hex] = hex.toUpperCase(); used.add(c.hex); } };
-    const light = colors.filter((c) => c.lab[0] > 80).sort((a, b) => b.share - a.share)[0];
-    take(light, pl.paper);
-    const dark = [...colors].sort((a, b) => a.lab[0] - b.lab[0])[0];
-    const ink = [pl.title, pl.stone, pl.frame, pl.plate].filter(Boolean).sort((a, b) => Lof(a) - Lof(b))[0];
-    if (dark && dark.lab[0] < 35 && ink && Lof(ink) < 45) take(dark, ink);
-    // Gold-like (yellow-orange hue, mid lightness) → the palette's gold/trim; the other colored ones by how much they
-    // cover: the biggest is usually bars and backgrounds (→ background color), then accent, highlight, veins.
-    const hue = (c) => (Math.atan2(c.lab[2], c.lab[1]) * 180 / Math.PI + 360) % 360;
-    const gold = colors.filter((c) => !used.has(c.hex) && chroma(c) > 15 && hue(c) > 50 && hue(c) < 105 && c.lab[0] > 45 && c.lab[0] < 88).sort((a, b) => chroma(b) - chroma(a))[0];
-    take(gold, pl.trim);
-    // Each remaining colored area takes the unused palette color closest to its own lightness, so dark bars stay dark
-    // and pale fills stay pale on any palette (another click picks the next-closest).
-    const colored = colors.filter((c) => !used.has(c.hex) && chroma(c) > 12).sort((a, b) => b.share - a.share);
-    const cands = [...new Set([pl.stone, pl.accent, pl.highlight, pl.vein, pl.frame, pl.plate, pl.title, pl.trim].filter((h) => h && /^#[0-9a-f]{6}$/i.test(h) && h.toUpperCase() !== (pl.paper || '').toUpperCase()).map((h) => h.toUpperCase()))];
-    const usedCand = new Set();
-    colored.forEach((c, i) => {
-      const ranked = cands.filter((h) => !usedCand.has(h)).sort((a, b) => Math.abs(Lof(a) - c.lab[0]) - Math.abs(Lof(b) - c.lab[0]));
-      const near = ranked.filter((h) => Math.abs(Lof(h) - c.lab[0]) < Math.abs(Lof(ranked[0]) - c.lab[0]) + 25);
-      const h = near.length ? near[(turn + i) % near.length] : ranked[0];
-      if (h) { take(c, h); usedCand.add(h); }
-    });
-    colors.filter((c) => !used.has(c.hex) && chroma(c) <= 12 && c.lab[0] > 55 && c.lab[0] <= 95).forEach((c) => take(c, pl.line));
-    // In-between shades (thin lines melting into the paper) follow the two colors they sit between, at the same mix,
-    // so lines keep their weight instead of turning solid.
-    const D = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]), tgt = (c) => rgb2lab(...hex2rgb(map[c.hex] || c.hex));
-    for (const c of colors) {
-      let best = null;
-      for (const a2 of colors) for (const b2 of colors) {
-        if (a2 === c || b2 === c || a2 === b2 || a2.share < c.share * .5 || b2.share < c.share * .5) continue;
-        const ab = [0, 1, 2].map((i) => b2.lab[i] - a2.lab[i]), L2 = ab.reduce((u, v) => u + v * v, 0) || 1, t = ab.reduce((u, v, i) => u + v * (c.lab[i] - a2.lab[i]), 0) / L2;
-        if (t < .1 || t > .9) continue;
-        const d = D(c.lab, a2.lab.map((v, i) => v + t * ab[i]));
-        if (d < 15 && (!best || d < best.d)) best = { d, a: a2, b: b2, t };
-      }
-      if (best) { const A = tgt(best.a), B = tgt(best.b); map[c.hex] = rgb2hex(lab2rgb(...A.map((v, i) => v + best.t * (B[i] - v)))); }
-    }
-    st.colorMap = map; save();
+    // The mapping rule lives in the shared engine (color-core.js), so Print Prep and the Recolor page agree exactly.
+    st.colorMap = window.ColorCore.familyMapForPalette(colors, pl, turn); save();
   }
   function buildSwatches() {
     const box = $('swatches'); box.innerHTML = '';
@@ -432,6 +393,9 @@ aside { display: flex; flex-direction: column; gap: 14px; }
   }
   // One inside page as the printer wants it: trim + 1/8 in bleed (none at the binding edge for KDP), the page scaled and
   // moved per placement(); the page's own bleed art is used where the file has it, otherwise its edges are continued.
+  // Previews render at the screen's own pixel density (up to 2×) so text looks as sharp on screen as it prints; exports
+  // use the chosen DPI and never this.
+  const PV = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
   async function renderInterior(canvas, p, side, k, cover = false) {
     // Covers go in as they are: full size, centred, bleed all round.
     const pl = cover ? { ...placement(), f: 1, x: { left: 0, right: 0 }, y: 0, m: { ...margins(), bindBleed: true } } : placement(), t = p.trim, f = pl.f, sc = k * f;
@@ -555,7 +519,7 @@ aside { display: flex; flex-direction: column; gap: 14px; }
     $('empty').classList.add('hidden'); const c = $('canvas'); c.classList.remove('hidden');
     const token = ++drawToken, tmp = document.createElement('canvas');
     if (view === 'cover') {
-      const cs = await renderSpread(tmp, 1100 / coverSpec().W);
+      const cs = await renderSpread(tmp, 1100 * PV / coverSpec().W);
       if (token !== drawToken) return;
       if (st.guides) spreadGuides(tmp, cs);
       $('viewTitle').textContent = `Cover spread · ${+cs.W.toFixed(3)} × ${+cs.H.toFixed(3)} in`;
@@ -564,7 +528,7 @@ aside { display: flex; flex-direction: column; gap: 14px; }
       // Facing pages as the open book shows them: page 1 alone on the right (the inside of the front cover on the
       // left), then 2–3, 4–5 … Each page keeps its outer bleed; the two meet at the binding.
       const ip = interiorPages(), n = ip.length, last = Math.floor(n / 2), sp = Math.min(spread, last);
-      const k = 560 / (ip[0].trim.tw + 2 * BLEED), li = 2 * sp - 1, ri = 2 * sp;
+      const k = 560 * PV / (ip[0].trim.tw + 2 * BLEED), li = 2 * sp - 1, ri = 2 * sp;
       const half = async (i, side) => {
         const c = document.createElement('canvas');
         if (i < 0 || i >= n) {                       // inside of a cover: blank, same size as a page
@@ -591,13 +555,14 @@ aside { display: flex; flex-direction: column; gap: 14px; }
     } else {
       const ip = interiorPages(), p = ip[page] || ip[0];
       if (!p) return;
-      const side = page % 2 ? 'right' : 'left', r = await renderInterior(tmp, p, side, 760 / (p.trim.tw + 2 * BLEED));
+      const side = page % 2 ? 'right' : 'left', r = await renderInterior(tmp, p, side, 760 * PV / (p.trim.tw + 2 * BLEED));
       if (token !== drawToken) return;
-      if (st.guides) guides(tmp, side, 760 / (p.trim.tw + 2 * BLEED), r.cutLeft, r.cut && !r.cutLeft);
+      if (st.guides) guides(tmp, side, 760 * PV / (p.trim.tw + 2 * BLEED), r.cutLeft, r.cut && !r.cutLeft);
       $('viewTitle').textContent = `Inside page ${page + 1} · binds ${side} (${side === 'left' ? 'front' : 'back'} of the sheet)`;
       $('pageNum').textContent = `${page + 1} / ${ip.length}`;
     }
     c.width = tmp.width; c.height = tmp.height; c.getContext('2d').drawImage(tmp, 0, 0);
+    c.style.width = `${tmp.width / PV}px`;            // same on-screen size as before, just sharper
   }
   function sync() {
     const sel = $('printer');
