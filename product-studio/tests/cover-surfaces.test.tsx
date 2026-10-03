@@ -276,6 +276,35 @@ describe("title size on solid and artwork covers: the cover's focal point whatev
         expect(s.diagnostics.filter((d) => d.severity === "error")).toEqual([]);
       });
 });
+describe("a script title sits close above its subtitle", () => {
+  // Reported: "changing the font messes up the tight spacing between words" — a script "Plan" sat ~0.7 in above
+  // "WITH PURPOSE" (a 1.2 line box plus room for tails it doesn't have); Cinzel sat 0.15 in above it.
+  const gap = (font: string, title: string) => {
+    const p = project({ preset: "surface", surfaceId: "jcs-marble-rose", subtitle: "WITH PURPOSE" }, "7x9");
+    p.typography = { ...p.typography, fonts: { ...p.typography.fonts, cover: font } };
+    p.recipe.structure![0] = { ...(p.recipe.structure![0] as object), title } as never;
+    const doc = resolveDocument(p);
+    const s = solvePage(doc, pageOf(doc, "cover-page"));
+    const t = s.nodes.find((n) => n.id === "cover-title")!, sub = s.nodes.find((n) => n.id === "cover-subtitle")!;
+    if (t.type !== "text") throw new Error();
+    return { inkGap: sub.rect.y - (t.rect.y + t.rect.h), boxIn: t.rect.h, sizePt: t.fit!.sizePt };
+  };
+  for (const font of ["Birthstone Bounce", "Great Vibes", "Allura"]) {
+    it(`${font}: one line keeps its size, in a box no taller than its letters, the subtitle right under it`, () => {
+      const g = gap(font, "Plan");
+      expect(g.sizePt).toBeGreaterThan(100);
+      expect(g.boxIn).toBeLessThan((g.sizePt / 72) * 0.9);
+      expect(g.inkGap).toBeLessThan(0.3);
+    });
+    it(`${font}: two lines are set close together`, () => {
+      const p = gap(font, "Prophetic Word Journal");
+      expect(p.boxIn).toBeLessThan(((p.sizePt / 72) * 2 * 0.96));
+    });
+  }
+  it("a title with tails (g, j, p, q, y) still leaves room for them", () => {
+    expect(gap("Great Vibes", "Agape").inkGap).toBeGreaterThan(gap("Great Vibes", "Amen").inkGap + 0.15);
+  });
+});
 import { getLayoutMeasurer } from "../src/engines/typography/textMeasure";
 function getLayoutMeasurerWidth(text: string, sizePt: number, family: string) {
   return getLayoutMeasurer().measure(text, { family, sizePt, weight: 400, italic: false, trackingEm: 0, transform: "none" } as never);

@@ -329,10 +329,14 @@ function solveFlat(ctx: LayoutContext, divider: boolean): SolvedPage[] {
       // line or two, up to ~30 % of the page's height — not the interior's heading size.
       const role = ctx.typography.roles.coverTitle;
       const script = isScriptFont(role.family ?? ctx.typography.fonts.cover);
-      const lh = Math.max(role.lineHeight, script ? 0.95 : 1.05);
+      // A script's letters sit low in a tall line box: held to its own height, the subtitle stays close beneath it.
+      // (The size is still chosen as if the line were full height, so the letters keep their size.)
+      const lh = script ? 0.85 : Math.max(role.lineHeight, 1.05);
       const box = { w: content.w * 0.86, h: content.h * 0.3 };
-      const tctx = { typography: { ...ctx.typography, roles: { ...ctx.typography.roles, coverTitle: { ...role, sizePt: Math.min(240, (box.h * 72) / lh), lineHeight: lh } } } };
-      const fit = fitHeading(title, "coverTitle", box, tctx);
+      const startPt = Math.min(240, (box.h * 72) / Math.max(role.lineHeight, script ? 0.95 : 1.05));
+      const tctx = { typography: { ...ctx.typography, roles: { ...ctx.typography.roles, coverTitle: { ...role, sizePt: startPt, lineHeight: lh } } } };
+      const fitted = fitHeading(title, "coverTitle", box, tctx);
+      const fit = script && fitted.lines.length > 1 ? { ...fitted, lineHeight: Math.min(fitted.lineHeight, 0.95) } : fitted;
       const h = (fit.sizePt * fit.lineHeight * fit.lines.length) / 72;
       const y = Math.max(content.y, Math.min(anchor * g.trimHeightIn - h / 2, content.y + content.h - h));
       const titleRect = { x: content.x, y, w: content.w, h };
@@ -341,7 +345,8 @@ function solveFlat(ctx: LayoutContext, divider: boolean): SolvedPage[] {
       if (!fit.ok) diagnostics.push({ severity: "error", rule: "heading-fit", componentId: n.id, message: "This cover title is too long. Shorten it or choose a larger page." });
       words.push(n);
       // A script's tails (g, j, p, q, y) hang below its line: the subtitle starts under them.
-      below = titleRect.y + titleRect.h + (script ? (fit.sizePt / 72) * 0.28 : 0);
+      const tails = script && /[gjpqyf]/.test(fit.lines[fit.lines.length - 1] ?? "");
+      below = titleRect.y + titleRect.h + (tails ? (fit.sizePt / 72) * 0.22 : 0);
     }
 
     if (subtitle) {
