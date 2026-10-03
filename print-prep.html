@@ -432,6 +432,9 @@ aside { display: flex; flex-direction: column; gap: 14px; }
   }
   // One inside page as the printer wants it: trim + 1/8 in bleed (none at the binding edge for KDP), the page scaled and
   // moved per placement(); the page's own bleed art is used where the file has it, otherwise its edges are continued.
+  // Previews render at the screen's own pixel density (up to 2×) so text looks as sharp on screen as it prints; exports
+  // use the chosen DPI and never this.
+  const PV = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
   async function renderInterior(canvas, p, side, k, cover = false) {
     // Covers go in as they are: full size, centred, bleed all round.
     const pl = cover ? { ...placement(), f: 1, x: { left: 0, right: 0 }, y: 0, m: { ...margins(), bindBleed: true } } : placement(), t = p.trim, f = pl.f, sc = k * f;
@@ -555,7 +558,7 @@ aside { display: flex; flex-direction: column; gap: 14px; }
     $('empty').classList.add('hidden'); const c = $('canvas'); c.classList.remove('hidden');
     const token = ++drawToken, tmp = document.createElement('canvas');
     if (view === 'cover') {
-      const cs = await renderSpread(tmp, 1100 / coverSpec().W);
+      const cs = await renderSpread(tmp, 1100 * PV / coverSpec().W);
       if (token !== drawToken) return;
       if (st.guides) spreadGuides(tmp, cs);
       $('viewTitle').textContent = `Cover spread · ${+cs.W.toFixed(3)} × ${+cs.H.toFixed(3)} in`;
@@ -564,7 +567,7 @@ aside { display: flex; flex-direction: column; gap: 14px; }
       // Facing pages as the open book shows them: page 1 alone on the right (the inside of the front cover on the
       // left), then 2–3, 4–5 … Each page keeps its outer bleed; the two meet at the binding.
       const ip = interiorPages(), n = ip.length, last = Math.floor(n / 2), sp = Math.min(spread, last);
-      const k = 560 / (ip[0].trim.tw + 2 * BLEED), li = 2 * sp - 1, ri = 2 * sp;
+      const k = 560 * PV / (ip[0].trim.tw + 2 * BLEED), li = 2 * sp - 1, ri = 2 * sp;
       const half = async (i, side) => {
         const c = document.createElement('canvas');
         if (i < 0 || i >= n) {                       // inside of a cover: blank, same size as a page
@@ -591,13 +594,14 @@ aside { display: flex; flex-direction: column; gap: 14px; }
     } else {
       const ip = interiorPages(), p = ip[page] || ip[0];
       if (!p) return;
-      const side = page % 2 ? 'right' : 'left', r = await renderInterior(tmp, p, side, 760 / (p.trim.tw + 2 * BLEED));
+      const side = page % 2 ? 'right' : 'left', r = await renderInterior(tmp, p, side, 760 * PV / (p.trim.tw + 2 * BLEED));
       if (token !== drawToken) return;
-      if (st.guides) guides(tmp, side, 760 / (p.trim.tw + 2 * BLEED), r.cutLeft, r.cut && !r.cutLeft);
+      if (st.guides) guides(tmp, side, 760 * PV / (p.trim.tw + 2 * BLEED), r.cutLeft, r.cut && !r.cutLeft);
       $('viewTitle').textContent = `Inside page ${page + 1} · binds ${side} (${side === 'left' ? 'front' : 'back'} of the sheet)`;
       $('pageNum').textContent = `${page + 1} / ${ip.length}`;
     }
     c.width = tmp.width; c.height = tmp.height; c.getContext('2d').drawImage(tmp, 0, 0);
+    c.style.width = `${tmp.width / PV}px`;            // same on-screen size as before, just sharper
   }
   function sync() {
     const sel = $('printer');

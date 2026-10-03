@@ -158,6 +158,14 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
 .text-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 10px; }
 .text-actions .btn { text-align: center; font-size: 12px; padding: 7px 8px; }
 #recommendColors { margin-top: 6px; text-align: center; font-size: 12px; }
+.pal-quick { display: grid; gap: 6px; margin-bottom: 10px; }
+.pal-quick:empty { display: none; }
+.pal-quick .btn { display: flex; align-items: center; gap: 10px; text-align: left; }
+.pal-quick .btn.active { border-color: var(--accent, #7a1f2b); box-shadow: 0 0 0 1px var(--accent, #7a1f2b) inset; }
+.pal-quick .swatch-row { display: flex; flex: 0 0 auto; }
+.pal-quick .swatch-row i { width: 14px; height: 22px; display: block; }
+.pal-quick strong { display: block; font-size: 13px; }
+.pal-quick small { display: block; font-size: 11px; opacity: .7; }
 #floralNote { display: block; margin-top: 6px; }
 .slider { display: grid; gap: 4px; margin-top: 10px; }
 .slider span { display: flex; justify-content: space-between; font-size: 12px; }
@@ -449,11 +457,30 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
             <label class="btn" style="display:block;text-align:center;cursor:pointer">Upload a background<input type="file" id="bgUploadInput" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden></label>
           </div>
         </div>
+        <div data-tab="design" class="card" id="paletteCard">
+          <h2>Palette <span id="paletteName"></span></h2>
+          <p class="hint" style="margin:0 0 8px">The colors for the background above. Pick one here; fine-tune any single color under Color.</p>
+          <div class="pal-quick" id="palQuick"></div>
+          <div class="pal-detail hidden" id="paletteDetail"><canvas id="paletteCover" aria-hidden="true"></canvas>
+            <div style="min-width:0;flex:1"><strong id="paletteDetailName"></strong><small id="paletteDetailVar"></small><div class="swatch-row" id="paletteRoles"></div></div></div>
+          <div class="palettes" id="palettes"></div>
+          <button class="btn" id="savePalette" type="button" style="margin-top:10px;width:100%;text-align:center">+ Save current colors as my palette</button>
+          <p class="hint" style="margin:6px 0 0">Change any color under Layers, then save it here. Your palettes appear in this list and are kept on this computer.</p>
+        </div>
         <div data-tab="design" class="card" id="plateCard">
           <h2>Title plate</h2>
           <div class="field">
             <div class="seg" id="plateSeg"></div>
           </div>
+          <label class="slider"><span>Plate strength <b id="plateVal"></b></span><input type="range" id="plateOpacity" min="0" max="100"></label>
+          <span class="hint">Softens the plate behind the title. The lettering stays crisp.</span>
+        </div>
+        <div data-tab="design" class="card prayer-only" id="titlePosCard">
+          <h2>Title position <span>the whole title group</span></h2>
+          <label class="slider"><span>Horizontal <b id="titleXVal"></b></span><input type="range" id="titleX" min="-300" max="300" step="1"></label>
+          <label class="slider"><span>Vertical <b id="titleYVal"></b></span><input type="range" id="titleY" min="-500" max="500" step="1"></label>
+          <button class="btn" id="titleCenter" type="button" style="width:100%;text-align:center;margin-top:6px">Reset to the design's position</button>
+          <span class="hint">Or drag the title on the cover preview. Title, subtitle, rule, plate and fill move together, and picking another plate never moves it.</span>
         </div>
         <div data-tab="design" class="card" id="titleFillField">
           <h2>Title box fill</h2>
@@ -541,20 +568,11 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     <section class="stage" data-stage="color">
       <button class="stage-toggle" type="button" aria-expanded="false" aria-controls="stage-color"><span class="stage-num">03</span><span class="stage-title"><span class="stage-name">Color</span><span class="stage-sub">Palette and layers</span></span><span class="stage-chev" aria-hidden="true"></span></button>
       <div class="stage-body" id="stage-color">
-        <div data-tab="colors" class="card" id="paletteCard">
-          <h2>Palette <span id="paletteName"></span></h2>
-          <div class="pal-detail hidden" id="paletteDetail"><canvas id="paletteCover" aria-hidden="true"></canvas>
-            <div style="min-width:0;flex:1"><strong id="paletteDetailName"></strong><small id="paletteDetailVar"></small><div class="swatch-row" id="paletteRoles"></div></div></div>
-          <div class="palettes" id="palettes"></div>
-          <button class="btn" id="savePalette" type="button" style="margin-top:10px;width:100%;text-align:center">+ Save current colors as my palette</button>
-          <p class="hint" style="margin:6px 0 0">Change any color under Layers, then save it here. Your palettes appear in this list and are kept on this computer.</p>
-        </div>
         <div data-tab="colors" class="card" id="layersCard">
           <h2>Fine-tune <span>layers: toggle + recolor</span></h2>
           <div id="roles"></div>
           <label class="slider"><span>Stone texture <b id="textureVal"></b></span><input type="range" id="texture" min="0" max="100"></label>
           <label class="slider"><span>Vein strength <b id="veinVal"></b></span><input type="range" id="veinStrength" min="0" max="100"></label>
-          <label class="slider"><span>Title plate opacity <b id="plateVal"></b></span><input type="range" id="plateOpacity" min="0" max="100"></label>
         </div>
       </div>
     </section>
@@ -1048,7 +1066,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     'decor-scribble':       { type: 'decor', image: 'canva:scribble-charcoal', art: 'wash', placement: 'center', label: 'Charcoal scribble' },
     'decor-stripes-yellow': { type: 'decor', image: 'canva:stripes-yellow', art: 'wash', placement: 'center', label: 'Stripe block' },
     'decor-boho':           { type: 'decor', image: 'canva:boho-abstract', art: 'color', placement: 'center', label: 'Boho abstract' },
-    'decor-cloud':          { type: 'decor', image: 'canva:cloud-violet-peach', art: 'color', placement: 'center', label: 'Violet + peach cloud' },
+    'decor-cloud':          { type: 'decor', image: 'canva:cloud-violet-peach', art: 'color', fit: 'cover', placement: 'center', label: 'Violet + peach cloud' },
     'divider-none':         { type: 'divider', label: 'None' },
     'divider-canva-gold':   { type: 'divider', image: 'canva:divider-gold-ornament', art: 'wash', paletteRole: 'trim', label: 'Gold ornament (Canva)' },
     'divider-ornament':     { type: 'divider', image: 'divider', art: 'mask', label: 'Gold ornament (above + below title)' },
@@ -1377,6 +1395,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     if (!['original', 'palette'].includes(state.prayerArt)) state.prayerArt = 'original';
     if (!state.looks || typeof state.looks !== 'object') state.looks = {};
     if (!['dream', 'prayer', 'warrior', 'warring', 'mwg', 'jg'].includes(state.journal)) state.journal = 'dream';
+    if (!state.titlePos || typeof state.titlePos !== 'object') state.titlePos = { x: 0, y: 0 };
     // Before cover tools worked on prayer journals, a prayer journal just carried the Dream cover's plate/decorations along.
     // Give those back to the Dream Journal's saved look and start the prayer journal from its own design.
     if (!state.lookV2) {
@@ -2216,15 +2235,15 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
 
   // Procedural plates (the user chose a simple geometric shape). Each shape uses its own spec above.
   function drawTitlePlateShape(ctx, L, W, s) {
-    const p = s.palette, st = L.style, { cx, cy, hw, hh } = L, r = (st.radius || 0) * W;
+    const p = s.palette, st = L.style, { cx, cy, hw, hh } = L, r = L.radius ?? (st.radius || 0) * W, tn = L.tone || 1;
     if (s.showPlate) { platePath(ctx, L.kind, cx, cy, hw, hh, r); ctx.fillStyle = rgba(p.plate, s.plateOpacity / 100); ctx.fill(); }
     if (s.showFrame) {
-      const fw = st.frame * W;          // stroke sits inside the plate edge so the footprint never grows
+      const fw = st.frame * W * tn;     // stroke sits inside the plate edge so the footprint never grows
       platePath(ctx, L.kind, cx, cy, hw - fw / 2, hh - fw / 2, Math.max(0, r - fw / 2));
       ctx.strokeStyle = p.frame; ctx.lineWidth = fw; ctx.stroke();
     }
     if (s.showTrim) {
-      const o = st.trimInset * W;
+      const o = st.trimInset * W * tn;
       platePath(ctx, L.kind, cx, cy, hw - o, hh - o, Math.max(0, r - o));
       let stroke = p.trim;
       if (st.metal) {
@@ -2233,11 +2252,11 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
         stroke = ctx.createLinearGradient(cx - hw, cy - hh, cx + hw, cy + hh);
         [[0, lite], [.18, p.trim], [.42, deep], [.6, p.trim], [.82, lite], [1, p.trim]].forEach(([t, c]) => stroke.addColorStop(t, c));
       }
-      ctx.strokeStyle = stroke; ctx.lineWidth = st.trim * W; ctx.stroke();
-      if (st.ring) {
-        const ro = (st.ring.offset + st.ring.width / 2) * W;
+      ctx.strokeStyle = stroke; ctx.lineWidth = st.trim * W * tn; ctx.stroke();
+      if (st.ring && !L.radius) {
+        const ro = (st.ring.offset + st.ring.width / 2) * W * tn;
         platePath(ctx, L.kind, cx, cy, hw + ro, hh + ro);
-        ctx.lineWidth = st.ring.width * W; ctx.stroke();
+        ctx.lineWidth = st.ring.width * W * tn; ctx.stroke();
       }
     }
   }
@@ -2529,10 +2548,14 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     const lvl = FILL_PAD[s.titleFill?.pad] ?? 1;
     const rr = (x, y, w, h, r) => { if (r > 0) roundRect(ctx, x, y, w, h, Math.min(r, w / 2, h / 2)); else { ctx.beginPath(); ctx.rect(x, y, w, h); } };
     if (L.kind === 'rect' || L.kind === 'ellipse') {
-      const st = L.style, r = (st.radius || 0) * W, inner = (st.trimInset + st.trim) * W;             // inside the trim line
+      const st = L.style, tn = L.tone || 1, r = L.radius ?? (st.radius || 0) * W, inner = (st.trimInset + st.trim) * W * tn;   // inside the trim line
       let hw = L.hw - inner, hh = L.hh - inner;
       if (lvl === 1) { hw -= W * .012; hh -= W * .012; }
-      if (lvl === 0) { hw = Math.min(hw, L.hw * st.safeW + W * .02); hh = Math.min(hh, L.hh * st.safeH + W * .02); }
+      if (lvl === 0) {
+        // Tight: close around the title itself (title-group covers measure it; the Dream plate uses its safe area).
+        if (L.title && L.tone) { hw = Math.min(hw, L.title.w / 2 + W * .02); hh = Math.min(hh, L.title.h / 2 + W * .02); }
+        else { hw = Math.min(hw, L.hw * st.safeW + W * .02); hh = Math.min(hh, L.hh * st.safeH + W * .02); }
+      }
       platePath(ctx, L.kind, L.cx, L.cy, hw, hh, Math.max(0, r - inner));
       return;
     }
@@ -2543,8 +2566,15 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
       rr(g.x, g.y, g.w, g.h, 0);
       return;
     }
+    if (s.journal !== 'dream' && L.kind === 'none' && (s.journal === 'mwg' || s.journal === 'jg')) {
+      // No plate: the fill is the title's own bounds plus Tight / Normal / Generous padding, centred on the title.
+      const { k } = prFit(W, H), pad = [12, 26, 42][lvl] * k, t = L.title;
+      rr(t.x - pad, t.y - pad, t.w + 2 * pad, t.h + 2 * pad, 16 * k);
+      return;
+    }
     if (s.journal !== 'dream' && L.kind === 'none' && PR_TITLE_REGION[s.journal]) {
-      const { k, ox, oy } = prFit(W, H), reg = PR_TITLE_REGION[s.journal](lvl);
+      // The design's own title region, moved with the title group.
+      const { k: k0 } = prFit(W, H), o = titleOff(s), ox = prFit(W, H).ox + o.x * k0, oy = prFit(W, H).oy + o.y * k0, k = k0, reg = PR_TITLE_REGION[s.journal](lvl);
       if (reg.ellipse) { const [cx, cy, rx, ry] = reg.ellipse; ctx.beginPath(); ctx.ellipse(ox + cx * k, oy + cy * k, rx * k, ry * k, 0, 0, Math.PI * 2); return; }
       const [l, t, w, h] = reg.rect;
       rr(ox + l * k, oy + t * k, w * k, h * k, (reg.radius || 0) * k);
@@ -2781,14 +2811,16 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
   const slotAsset = (s, key) => { const sl = s.decor?.[key]; return sl?.show ? ASSET_REGISTRY[sl.asset] : null; };
 
   // Divider height for this layout (0 when hidden), so the top/bottom zones leave room for it.
+  // The divider is a rule: it spans most of the usable width (78% of the page at 100%), whatever the plate's size, and is
+  // centred on the title group, never closer than 6% to a page edge. Aspect ratio always kept.
   function dividerBox(W, s, L) {
     const a = slotAsset(s, 'divider'), img = a?.image && ASSETS[a.image];
     if (!img) { if (a?.image && ASSET_SRC[a.image]) ensureAsset(a.image).catch(() => {}); return null; }
-    const w = Math.min(L.bounds.w * 1.05, W * .7) * (s.decor.divider.scale / 100);
+    const w = Math.min(W * .88, W * .78 * (s.decor.divider.scale / 100));
     return { w, h: w * img.naturalHeight / img.naturalWidth, gap: W * .022 };
   }
   function drawDividers(ctx, W, s, L, D) {
-    const a = slotAsset(s, 'divider'), cx = W / 2;
+    const a = slotAsset(s, 'divider'), tc = L.title ? L.title.x + L.title.w / 2 : W / 2, cx = Math.min(W * .94 - D.w / 2, Math.max(W * .06 + D.w / 2, tc));
     for (const y of [L.bounds.y - D.gap - D.h, L.bounds.y + L.bounds.h + D.gap]) {
       const im = decorImage(s.decor.divider, a, D.w, D.h, s);
       if (im) ctx.drawImage(im, cx - D.w / 2, y, D.w, D.h);
@@ -2814,27 +2846,46 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
       ctx.restore();
       return;
     }
-    const edge = H * .045, clear = W * .03 + (D ? D.gap + D.h + W * .012 : 0);
-    const top = key === 'top';
-    const zone = L.zones?.[key] || (top ? { x: W * .08, y: edge, w: W * .84, h: L.bounds.y - clear - edge }
-                     : { x: W * .08, y: L.bounds.y + L.bounds.h + clear, w: W * .84, h: H - edge - (L.bounds.y + L.bounds.h + clear) });
-    if (zone.h < H * .04) return;                        // plate so large there's no zone left: skip rather than overlap
+    // Zones are tied to the page edges and stop short of the title group (and its dividers), wherever the title sits:
+    // TOP = page top → just above the title; BOTTOM = just below the title → page bottom. Art never covers the title.
+    const clear = W * .025 + (D ? D.gap + D.h + W * .01 : 0), top = key === 'top';
+    const zone = top ? { x: 0, y: 0, w: W, h: Math.max(0, L.bounds.y - clear) }
+                     : { x: 0, y: L.bounds.y + L.bounds.h + clear, w: W, h: Math.max(0, H - (L.bounds.y + L.bounds.h + clear)) };
+    if (zone.h < H * .05) return;                        // title so near the edge there's no zone left: skip rather than overlap
     ctx.save();
     if (a.placement === 'corner') {
       // Page corner, clipped clear of the title plate. Bottom = the 180° mirror of top, like the original floral layout.
-      const w = W * .46 * k, h = w / ar, m = W * .03;
+      const w = W * .5 * k, h = w / ar, m = W * .03;
       ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.rect(L.bounds.x - m, L.bounds.y - m, L.bounds.w + 2 * m, L.bounds.h + 2 * m); ctx.clip('evenodd');
       const im = decorImage(sl, a, w, h, s);
       if (top) ctx.drawImage(im, 0, 0, w, h);
       else { ctx.translate(W, H); ctx.rotate(Math.PI); ctx.drawImage(im, 0, 0, w, h); }
     } else {
-      // Centred in its zone and hugging the plate (top art sits on the zone's bottom edge, bottom art is its mirror).
-      let w = zone.w * k, h = w / ar;
-      if (h > zone.h * k) { h = zone.h * k; w = h * ar; }
-      const x = W / 2 - w / 2, y = top ? zone.y + zone.h - h : zone.y;
+      // How the art fills its zone (never distorted):
+      //   painted art (watercolor washes, full-color pieces) — COVER: fills the zone edge to edge, bleeding off the page
+      //     edge, cropped where needed, and fading out toward the title so it reads as a deliberate band, not a sticker;
+      //   line art (topographic, waves, ribbon, stripes) — CONTAIN: spans the page width, sitting on the page edge.
+      // Top art keeps its own orientation; bottom art is its 180° mirror. The size slider scales within the zone.
+      const fill = a.fit || (a.art === 'wash' ? 'cover' : 'contain');
+      let w, h;
+      if (fill === 'cover') { w = Math.max(zone.w * 1.04, (zone.h + H * .012) * ar) * k; h = w / ar; }
+      else { w = zone.w * .96 * k; h = w / ar; if (h > zone.h * .9) { h = zone.h * .9; w = h * ar; } }
+      const x = W / 2 - w / 2, edge = fill === 'cover' ? -H * .012 : H * .02;
       const im = decorImage(sl, a, w, h, s);
-      if (top) ctx.drawImage(im, x, y, w, h);
-      else { ctx.translate(x + w / 2, y + h / 2); ctx.rotate(Math.PI); ctx.drawImage(im, -w / 2, -h / 2, w, h); }
+      // Draw into a zone-sized layer so the fade toward the title only touches this art.
+      const layer = document.createElement('canvas'); layer.width = Math.max(1, Math.round(W)); layer.height = Math.max(1, Math.round(zone.h));
+      const lx = layer.getContext('2d'); lx.imageSmoothingEnabled = true; lx.imageSmoothingQuality = 'high';
+      // Top: art hangs from the page top; bottom: mirrored, standing on the page bottom (layer coords: 0 = page edge side).
+      lx.save();
+      if (top) lx.translate(W / 2, 0); else { lx.translate(W / 2, zone.h); lx.rotate(Math.PI); }      // bottom: turned 180° onto the bottom edge
+      lx.drawImage(im, x - W / 2, edge, w, h); lx.restore();
+      if (fill === 'cover') {
+        // Soft fade over the last stretch before the title (beyond the gradient's ends it stays fully on / off).
+        const fade = Math.min(zone.h * .3, H * .07), g = lx.createLinearGradient(0, top ? zone.h - fade : fade, 0, top ? zone.h : 0);
+        g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+        lx.globalCompositeOperation = 'destination-in'; lx.fillStyle = g; lx.fillRect(0, 0, W, zone.h);
+      }
+      ctx.drawImage(layer, 0, zone.y);
     }
     ctx.restore();
   }
@@ -3990,25 +4041,32 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
   // carries the gold frame, glitter swipe and dots, split out as coverGold (tools/split_prayer_cover_wash.py).
   // Pieces a replacement never touches are simply not listed. The Dream Journal has no separate background art: its
   // original background is the "Bold gold" marble, itself a Background choice, and everything else on it is a slot.
+  const MWG_CLOUDS = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => `mwg-cover-${n}`);
   const BG_COMPOSITION = {
     dream: { art: [], pageFill: null },
-    prayer: { art: ['washA', 'washB', 'coverWash'], overlayOf: { coverWash: 'coverGold' }, pageFill: 'paper' },
+    prayer: { art: ['washA', 'washB', 'coverWash'], paint: ['washA', 'washB'], overlayOf: { coverWash: 'coverGold' }, pageFill: 'paper' },
     warrior: { art: ['pwWash'], overlayOf: {}, pageFill: 'paper' },
     warring: { art: ['pwWash'], overlayOf: {}, pageFill: 'gradient' },
-    mwg: { art: ['mwg-cover-base', 'mwg-back-art'], overlayOf: {}, pageFill: 'paper' },
-    jg: { art: ['jg-cover-marble'], overlayOf: {}, pageFill: 'paper' },
+    // paint: the journal's own watercolor pieces (transparent, no paper) that can come back on top of a picked background
+    // when "Add this journal's watercolor" is on. Full-page paintings and paper (base, marble, back art) never do.
+    mwg: { art: ['mwg-cover-base', 'mwg-back-art', ...MWG_CLOUDS], paint: MWG_CLOUDS, overlayOf: {}, pageFill: 'paper' },
+    jg: { art: ['jg-cover-marble', 'jg-cover-wash-top', 'jg-cover-wash-bottom', 'jg-back-cloud'], paint: ['jg-cover-wash-top', 'jg-cover-wash-bottom', 'jg-back-cloud'], overlayOf: {}, pageFill: 'paper' },
   };
   // True when the journal's own background is replaced by a Background pick (solid colors and White included).
   const bgReplaced = (s) => !!s.marble && s.marble !== 'journal';
   const isBgArt = (s, kind) => (BG_COMPOSITION[s.journal]?.art || []).includes(kind);
   // The art list for one page: unchanged on the original background; on a replaced one, background art is dropped from
   // full-bleed pages (its overlay layer, if any, drawn in its place) and kept as a footprint on interior pages.
+  // The picked background is the whole background: nothing of the journal's own watercolor stays unless the person
+  // turns on "Add this journal's watercolor" (state.artOverlay), which brings its paint pieces back as an overlay.
+  const hasPaint = (j) => !!BG_COMPOSITION[j]?.paint?.length;
   function composeArt(s, list, fullBleed) {
     if (!bgReplaced(s)) return list;
     const comp = BG_COMPOSITION[s.journal] || { art: [], overlayOf: {} };
     return list.flatMap((row) => {
       if (!comp.art.includes(row[0])) return [row];
       if (!fullBleed) return [row];
+      if (s.artOverlay && comp.paint?.includes(row[0])) { const r = [...row]; r.overlay = true; return [r]; }
       const over = comp.overlayOf?.[row[0]];
       return over ? [[over, ...row.slice(1)]] : [];
     });
@@ -4037,13 +4095,14 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
   };
   function drawPr(ctx, W, H, s, list) {
     const { k, ox, oy } = prFit(W, H), p = s.palette, pal = s.prayerArt === 'palette';
-    for (let [kind, l, t, w, h, rot = 0, il = 0, it = 0, iw = w, ih = h, op = 1] of list) {
-      if (prOff(s, KIND_GROUP[kind])) continue;
+    for (const row of list) {
+      let [kind, l, t, w, h, rot = 0, il = 0, it = 0, iw = w, ih = h, op = 1] = row;
+      if (!row.overlay && prOff(s, KIND_GROUP[kind])) continue;        // an opted-in overlay answers to its own switch
       const key = PR_FILE[kind] ? `el:${PR_FILE[kind]}` : `jn:${kind}`, img = ASSETS[key];
       if (!img) { ensureAsset(key).catch(() => {}); continue; }
       const dw = iw * k, dh = ih * k;
       if (kind === 'glow') op *= (s.prGlow ?? 100) / 100;
-      if (isBgArt(s, kind) && bgReplaced(s)) {
+      if (isBgArt(s, kind) && bgReplaced(s) && !row.overlay) {
         // Interior pages: background art keeps its shape, filled with the chosen background (one continuous page of it).
         const layer = scratch('prMask', W, H), lx = layer.getContext('2d');
         lx.save(); lx.clearRect(0, 0, W, H); lx.globalAlpha = op;
@@ -4089,12 +4148,13 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
       : onPlate ? readableOn(p.plate, s.journal === 'jg' ? [p.paper, '#FFFFFF', p.title, '#2A1A18'] : [p.title, p.paper, p.trim, '#FFFFFF', '#2A1A18'])
       : role === 'ink' ? prInk(p) : p[role];
   }
-  function drawLetter(ctx, W, H, s, name, onPlate = false) {
+  // ink: a lettering color chosen by the title readability help (titleAssist), else its usual color.
+  function drawLetter(ctx, W, H, s, name, onPlate = false, ink = null) {
     const { k, ox, oy } = prFit(W, H), [l, t, w, h] = LETTERING[name], p = s.palette;
     // On a title plate the lettering takes the plate's lettering color, like the Dream cover.
     const role = LETTER_ROLE[name];
-    const isTitle = !!LETTER_TEXT[name], customTitle = isTitle && s.coverFontColorAuto === false, customInk = role === 'ink' && s.textColorAuto === false;
-    const color = (TY && TY.color) || letterColor(s, name, onPlate);
+    const isTitle = !!LETTER_TEXT[name], customTitle = (isTitle && s.coverFontColorAuto === false) || !!ink, customInk = role === 'ink' && s.textColorAuto === false;
+    const color = (TY && TY.color) || ink || letterColor(s, name, onPlate);
     // Real type in the artwork's own box: cover titles in Custom font, and any lettering whose wording was edited (the
     // artwork can only say its original words). Titles use the cover font; labels and headings use the heading font.
     const slot = LETTER_SLOT[name];
@@ -4167,29 +4227,121 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
   }
 
   // ---------- Cover tools shared with the Dream Journal: title plate, decoration slots, dividers, accents ----------
-  // Each prayer cover keeps its lettering where Sydni placed it; a chosen plate is sized around that title.
+  // TITLE GROUP (every journal but the Dream Journal, which has its own cover system): the title, subtitle, title rule, the
+  // design's own title frame, a picked plate, the title box fill and the readability help are ONE group with ONE position,
+  // state.titlePos = { x, y } in Canva px from where Sydni placed the title (layout state, saved per journal; never per
+  // plate). Plate style is style state: changing it never moves the title, and a plate is sized from the title's own
+  // bounds plus padding, so it always wraps the title instead of the title being placed on a big fixed shape.
+  // PR_TITLE_BOX: each design's title content (lettering + subtitle + rule) at its original spot, Canva px. Meetings with
+  // God's title is typed, so its width is measured from the words actually set (mwgTitleBox).
   const PR_TITLE_BOX = { prayer: [145.67, 422.67, 574, 227.63], warrior: [169.67, 132, 463.33, 191.79], warring: [306.67, 375.33, 447.67, 173.33],
     mwg: [148, 326.4, 520, 239], jg: [190.9, 234.8, 434.2, 416.4] };
+  const titleOff = (s) => ({ x: +s.titlePos?.x || 0, y: +s.titlePos?.y || 0 });
+  // How far the group may move: its plate-padded box stays inside the cover's safe area (Canva px).
+  const TITLE_SAFE = [30, 30, 786, 1026], TITLE_HANDLE_PAD = 46;
+  function titleMoveRange(j, tb = PR_TITLE_BOX[j]) {
+    const [l, t, w, h] = tb, P = TITLE_HANDLE_PAD;
+    return { x: [Math.min(0, TITLE_SAFE[0] + P - l), Math.max(0, TITLE_SAFE[2] - P - (l + w))], y: [Math.min(0, TITLE_SAFE[1] + P - t), Math.max(0, TITLE_SAFE[3] - P - (t + h))] };
+  }
+  const clampTitle = (j, x, y, tb) => { const r = titleMoveRange(j, tb); return { x: Math.round(Math.min(r.x[1], Math.max(r.x[0], x))), y: Math.round(Math.min(r.y[1], Math.max(r.y[0], y))) }; };
+  // Plates are lighter on these covers than on the Dream cover: thinner frame + trim lines.
+  const PLATE_TONE = .62;
   function prPlateLayout(W, H, s, tb) {
-    const { k, ox, oy } = prFit(W, H), x = ox + tb[0] * k, y = oy + tb[1] * k, w = tb[2] * k, h = tb[3] * k, cx = x + w / 2, cy = y + h / 2;
-    const title = { x, y, w, h };
+    const { k, ox, oy } = prFit(W, H), o = titleOff(s), [l0, t0, w, h] = tb;
+    const cxp = l0 + w / 2 + o.x, cyp = t0 + h / 2 + o.y;                     // group centre on the page, Canva px
+    const c0 = { x: ox + (l0 + w / 2) * k, y: oy + (t0 + h / 2) * k };       // the title's own (unmoved) centre, canvas px
+    const X = (v) => ox + v * k, Y = (v) => oy + v * k;
+    let sg = 1;                                                              // title scale inside an oval / circle that would grow too big
+    const out = (extra) => ({ c0, sg, ...extra, title: { x: X(cxp - w * sg / 2), y: Y(cyp - h * sg / 2), w: w * sg * k, h: h * sg * k } });
+    const box = (hwp, hhp) => ({ x: X(cxp - hwp), y: Y(cyp - hhp), w: 2 * hwp * k, h: 2 * hhp * k });
     if (s.plateStyle === 'bevel') {
-      const bw = Math.min(W * .94, w * 1.3), bh = h * 1.55;
-      const b = { x: cx - bw / 2, y: cy - bh / 2, w: bw, h: bh };
-      return { kind: 'bevel', ...b, bounds: b, title };
+      const b = box(w / 2 + 50, h / 2 + 44);
+      return out({ kind: 'bevel', ...b, bounds: b, border: BEVEL_SRC_BORDER * b.w / (ASSETS.bevel ? ASSETS.bevel.naturalWidth : 921) * .72 });
     }
     if (s.plateStyle === 'ring') {
-      const img = ASSETS.floralRing, ar = img ? img.naturalHeight / img.naturalWidth : 1.03, d = Math.max(w, h) * 1.28;
-      const b = { x: cx - d / 2, y: cy - d * ar / 2, w: d, h: d * ar };
-      return { kind: 'ring', ...b, bounds: b, title };
+      const img = ASSETS.floralRing, ar = img ? img.naturalHeight / img.naturalWidth : 1.03;
+      let d = Math.max(Math.max(w, h) * 1.18, Math.hypot(w, h) * .9);         // the ring's opening circles the whole title
+      if (d > 640) { sg = 640 / d; d = 640; }
+      const b = { x: X(cxp - d / 2), y: Y(cyp - d * ar / 2), w: d * k, h: d * ar * k };
+      return out({ kind: 'ring', ...b, bounds: b });
     }
     const st = TITLE_PLATE_STYLES[s.plateStyle] || TITLE_PLATE_STYLES.none;
-    if (st.shape === 'none') return { kind: 'none', bounds: title, title };
-    let hw = w / 2 / st.safeW, hh = h / 2 / st.safeH;
-    if (st.d) hw = hh = Math.max(hw, hh);
-    hw = Math.min(hw, W * .47);
-    const ring = st.ring ? (st.ring.offset + st.ring.width) * W : 0;
-    return { kind: st.shape, style: st, cx, cy, hw, hh, bounds: { x: cx - hw - ring, y: cy - hh - ring, w: 2 * (hw + ring), h: 2 * (hh + ring) }, title };
+    if (st.shape === 'none') { const b = box(w / 2, h / 2); return out({ kind: 'none', bounds: b }); }
+    const inset = (st.trimInset + st.trim) * CANVA_W * PLATE_TONE;            // the trim line sits this far inside the plate edge
+    let kind = st.shape, hwp, hhp, radius = null, ring = st.ring ? (st.ring.offset + st.ring.width) * CANVA_W * PLATE_TONE : 0;
+    if (st.shape === 'rect') { hwp = w / 2 + inset + 30; hhp = h / 2 + inset + 22; }
+    else if (st.d && w / h > 1.4) {
+      // A circle can't hold a wide title gracefully: a rounded medallion (pill) instead, hugging the title.
+      kind = 'rect'; hwp = w / 2 + inset + 34; hhp = h / 2 + inset + 26; radius = hhp * k;
+    } else if (st.d) {
+      let r = Math.hypot(w * .46, h * .46) + inset + 12;
+      if (r > 290) { sg = 290 / r; r = 290; }
+      hwp = hhp = r;
+    } else {
+      // Oval: follows the title's proportions (never flatter than 1.6 : 1 or rounder than 1.15 : 1), wrapping it with the
+      // corners of the text box just inside, and capped so it never dominates the cover.
+      const e = Math.min(.87, Math.max(.62, h / w * .9));
+      let a = Math.hypot(w * .46, h * .46 / e) + inset + 8;
+      if (a > 300) { sg = 300 / a; a = 300; }
+      hwp = a; hhp = Math.max(a * e, h * sg / 2 + inset + 10);
+    }
+    const b = box(hwp + ring, hhp + ring);
+    return out({ kind, style: st, cx: X(cxp), cy: Y(cyp), hw: hwp * k, hh: hhp * k, radius, tone: PLATE_TONE, bounds: b });
+  }
+  // Draws fn() (lettering, rule, the design's own title frame) moved and scaled with the title group.
+  function withTitleGroup(ctx, W, H, s, L, fn) {
+    const { k } = prFit(W, H), o = titleOff(s), sg = L?.sg || 1;
+    if (!o.x && !o.y && sg === 1) return fn();
+    const c0 = L?.c0 || { x: 0, y: 0 };
+    ctx.save(); ctx.translate(c0.x + o.x * k, c0.y + o.y * k); ctx.scale(sg, sg); ctx.translate(-c0.x, -c0.y);
+    try { return fn(); } finally { ctx.restore(); }
+  }
+  // Readability help for a title with nothing solid behind it, lightest touch first:
+  //   1. lettering color: the design's own color unless another palette-friendly color reads clearly better on what is
+  //      actually behind the title (sampled pixels); a lettering color the person picked is never replaced;
+  //   2. a subtle halo where contrast is uneven;
+  //   3. only if still needed, and only with no plate and no title fill picked: a faint, tight, feathered veil.
+  // Sydni's original designs (original background, nothing hidden, title in its own place) are drawn exactly as designed.
+  const assistNeeded = (s) => bgReplaced(s) || Object.values(s.prHide || {}).some(Boolean) || !!(titleOff(s).x || titleOff(s).y);
+  function titleAssist(ctx, W, H, s, L, designInk) {
+    const res = { ink: designInk, halo: false, changed: false };
+    // On a plate softened with Plate strength, a light halo keeps the lettering crisp against what shows through.
+    if (L.onPlate) { res.halo = !L.ownPlate && L.kind !== 'bevel' && s.plateOpacity < 75; return res; }
+    if (!assistNeeded(s)) return res;
+    const r = L.title, Ls = sampleArea(ctx, r.x, r.y, r.w, r.h);
+    if (!Ls) return res;
+    const p = s.palette, stat = (c) => {
+      const kc = relLum(c); let a = 0, b = 0;
+      for (const v of Ls) { const cr = (Math.max(kc, v) + .05) / (Math.min(kc, v) + .05); if (cr >= 4.5) a++; if (cr >= 3) b++; }
+      return { r45: a / Ls.length, r3: b / Ls.length };
+    };
+    // Cover titles are large display type: 3:1 is the readable bar (WCAG large text), so a design color that meets it stays.
+    if (s.coverFontColorAuto !== false) {
+      const own = stat(designInk);
+      if (own.r3 < .9) {
+        // Same color family first (a deeper or lighter shade of the design color), then the palette's own inks.
+        const cands = [tone(designInk, 34), tone(designInk, 24), tone(designInk, 93), p.title, p.plate, p.frame, p.paper, '#FFFFFF', '#1E1B18'].filter(Boolean);
+        const best = cands.find((c) => stat(c).r3 >= .9) || cands.reduce((a, c) => (stat(c).r3 > stat(a).r3 ? c : a), designInk);
+        if (stat(best).r3 > own.r3 + .08) { res.ink = best; res.changed = true; }
+      }
+    }
+    const mean = Ls.reduce((a, b) => a + b, 0) / Ls.length, spread = Math.sqrt(Ls.reduce((a, b) => a + (b - mean) ** 2, 0) / Ls.length), now = stat(res.ink);
+    res.halo = now.r3 < .97 || spread > .12;
+    if (s.plateStyle === 'none' && !titleFillColor(s) && (now.r3 < .9 || spread > .16)) {
+      // Faint veil, tight around the title: light behind dark lettering, dark behind light lettering.
+      const light = relLum(res.ink) < .35, pad = 16 * prFit(W, H).k, blur = 22 * prFit(W, H).k, off = W + r.w + 4 * blur;
+      ctx.save(); ctx.globalAlpha = .34; ctx.shadowColor = light ? p.paper : '#1E1B18'; ctx.shadowBlur = blur; ctx.shadowOffsetX = off;
+      roundRect(ctx, r.x - pad - off, r.y - pad, r.w + 2 * pad, r.h + 2 * pad, 26 * prFit(W, H).k); ctx.fillStyle = light ? p.paper : '#1E1B18'; ctx.fill();
+      ctx.restore();
+      res.veil = true;
+    }
+    return res;
+  }
+  // The halo: a soft glow in the opposite tone around the letters (one pass, so it stays subtle).
+  function haloed(ctx, H, ink, on, fn) {
+    if (!on) return fn();
+    ctx.save(); ctx.shadowColor = relLum(ink) > .35 ? 'rgba(0,0,0,.55)' : 'rgba(255,255,255,.8)'; ctx.shadowBlur = Math.max(2, H * .006);
+    try { return fn(); } finally { ctx.restore(); }
   }
   // Draws accents, decoration slots, dividers and the plate; returns true when the title now sits on a plate.
   const PR_DECOR_ZONES = {
@@ -4200,27 +4352,28 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     mwg: { top: [70, 10, 676, 300], bottom: [70, 600, 676, 440] },
     jg: { top: [70, 10, 676, 190], bottom: [70, 710, 676, 330] },
   };
-  function prCoverExtras(ctx, W, H, s) {
-    const L = prPlateLayout(W, H, s, PR_TITLE_BOX[s.journal]), { k, ox, oy } = prFit(W, H);
+  // Returns the title-group layout L (L.onPlate: the title now sits on a plate).
+  function prCoverExtras(ctx, W, H, s, tb = PR_TITLE_BOX[s.journal]) {
+    const L = prPlateLayout(W, H, s, tb), { k, ox, oy } = prFit(W, H);
     L.zones = Object.fromEntries(Object.entries(PR_DECOR_ZONES[s.journal]).map(([key, [l, t, w, h]]) => [key, { x: ox + l * k, y: oy + t * k, w: w * k, h: h * k }]));
     if (s.accent !== 'none' && s.accentPlace !== 'behindTitleSubtle') drawAccent(ctx, W, H, s, false, L.bounds);
     const D = s.decor ? dividerBox(W, s, L) : null;
     if (s.decor) { drawDecorSlot(ctx, W, H, s, 'top', L, D); drawDecorSlot(ctx, W, H, s, 'bottom', L, D); }
     if (D) drawDividers(ctx, W, s, L, D);
     if (L.kind === 'ring') { if (s.showFrame) drawRingPlate(ctx, W, H, s, L); }
-    else if (L.kind === 'bevel') L.inner = drawBevelPlate(ctx, L.x, L.y, L.w, L.h, BEVEL_SRC_BORDER * L.w / (ASSETS.bevel ? ASSETS.bevel.naturalWidth : 921), s);
+    else if (L.kind === 'bevel') L.inner = drawBevelPlate(ctx, L.x, L.y, L.w, L.h, L.border, s);
     else if (L.kind !== 'none') drawTitlePlateShape(ctx, L, W, s);
     drawTitleFill(ctx, W, H, s, L);                  // optional title box fill, under the lettering
     if (s.accent !== 'none' && s.accentPlace === 'behindTitleSubtle') {
       ctx.save();
-      if (L.kind === 'ellipse' || L.kind === 'rect') { platePath(ctx, L.kind, L.cx, L.cy, L.hw, L.hh, (L.style.radius || 0) * W); ctx.clip(); }
+      if (L.kind === 'ellipse' || L.kind === 'rect') { platePath(ctx, L.kind, L.cx, L.cy, L.hw, L.hh, L.radius ?? (L.style.radius || 0) * W); ctx.clip(); }
       drawAccent(ctx, W, H, s, false, L.bounds);
       ctx.restore();
     }
-    const onPlate = L.kind === 'bevel' || ((L.kind === 'rect' || L.kind === 'ellipse') && s.showPlate && s.plateOpacity > 40);
+    L.onPlate = L.kind === 'bevel' || ((L.kind === 'rect' || L.kind === 'ellipse') && s.showPlate && s.plateOpacity > 40);
     const titleArt = { prayer: 'pink-prayer', warrior: 'pw-prayer', warring: 'ww-title', jg: 'jg-title' }[s.journal];
-    if (s._probe && titleArt) probeTitle(ctx, s, L.title, letterColor(s, titleArt, onPlate));
-    return onPlate;
+    if (s._probe && titleArt) probeTitle(ctx, s, L.title, letterColor(s, titleArt, L.onPlate));
+    return L;
   }
 
   // --- Pink Prayer Journal ---
@@ -4248,8 +4401,8 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
   function renderCoverPink(ctx, W, H, s) {
     paintPageBackground(ctx, W, H, s);
     drawPr(ctx, W, H, s, composeArt(s, PINK.cover, true));
-    const onPlate = prCoverExtras(ctx, W, H, s);
-    drawLetter(ctx, W, H, s, 'pink-prayer', onPlate); drawLetter(ctx, W, H, s, 'pink-journal', onPlate);
+    const L = prCoverExtras(ctx, W, H, s), A = titleAssist(ctx, W, H, s, L, letterColor(s, 'pink-prayer', L.onPlate)), ink = A.changed ? A.ink : null;
+    withTitleGroup(ctx, W, H, s, L, () => haloed(ctx, H, A.ink, A.halo, () => { drawLetter(ctx, W, H, s, 'pink-prayer', L.onPlate, ink); drawLetter(ctx, W, H, s, 'pink-journal', L.onPlate, ink); }));
   }
   function pinkSuggestions(ctx, W, H, s, tips, labels) {
     const p = s.palette;
@@ -4311,8 +4464,9 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
   }
   function renderCoverWarrior(ctx, W, H, s) {
     pwFrame(ctx, W, H, s);
-    const onPlate = prCoverExtras(ctx, W, H, s);
-    drawLetter(ctx, W, H, s, 'pw-prayer', onPlate); drawLetter(ctx, W, H, s, 'pw-journal', onPlate); if (!prOff(s, 'signature')) drawLetter(ctx, W, H, s, 'pw-dove');
+    const L = prCoverExtras(ctx, W, H, s), A = titleAssist(ctx, W, H, s, L, letterColor(s, 'pw-prayer', L.onPlate)), ink = A.changed ? A.ink : null;
+    withTitleGroup(ctx, W, H, s, L, () => haloed(ctx, H, A.ink, A.halo, () => { drawLetter(ctx, W, H, s, 'pw-prayer', L.onPlate, ink); drawLetter(ctx, W, H, s, 'pw-journal', L.onPlate, ink); }));
+    if (!prOff(s, 'signature')) drawLetter(ctx, W, H, s, 'pw-dove');
     drawPr(ctx, W, H, s, [PW.warrior]);
   }
   function pwLined(ctx, W, H, s, side) {
@@ -4347,15 +4501,21 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
   function renderCoverWarring(ctx, W, H, s) {
     const p = s.palette, { k, ox, oy } = prFit(W, H);
     paintPageBackground(ctx, W, H, s);
-    drawPr(ctx, W, H, s, [['archer', 0, 0, 816, 1056], ['ring', 244.8, 164.06, 571.2, 571.2]]);
+    drawPr(ctx, W, H, s, [['archer', 0, 0, 816, 1056]]);
+    // The gold ring and the title circle are the design's own title frame: they move with the title group.
+    const o = titleOff(s);
+    ctx.save(); ctx.translate(o.x * k, o.y * k);
+    drawPr(ctx, W, H, s, [['ring', 244.8, 164.06, 571.2, 571.2]]);
     const cx = ox + (261.71 + 554.29 / 2) * k, cy = oy + (175.88 + 547.57 / 2) * k;
     if (!prOff(s, 'circle')) {
       ctx.save(); ctx.fillStyle = gradientFill(ctx, ox + 261.71 * k, 0, 554.29 * k, 0, p.stone, p.vein);
       ctx.beginPath(); ctx.ellipse(cx, cy, 554.29 / 2 * k, 547.57 / 2 * k, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
     }
+    ctx.restore();
     drawPr(ctx, W, H, s, [['spiral', -35.64, 0, 71.28, 1056]]);
-    const onPlate = prCoverExtras(ctx, W, H, s);
-    drawLetter(ctx, W, H, s, 'ww-title', onPlate); drawLetter(ctx, W, H, s, 'ww-sub', onPlate); if (!prOff(s, 'tagline')) drawLetter(ctx, W, H, s, 'ww-tagline');
+    const L = prCoverExtras(ctx, W, H, s), A = titleAssist(ctx, W, H, s, L, letterColor(s, 'ww-title', L.onPlate)), ink = A.changed ? A.ink : null;
+    withTitleGroup(ctx, W, H, s, L, () => haloed(ctx, H, A.ink, A.halo, () => { drawLetter(ctx, W, H, s, 'ww-title', L.onPlate, ink); drawLetter(ctx, W, H, s, 'ww-sub', L.onPlate, ink); }));
+    if (!prOff(s, 'tagline')) drawLetter(ctx, W, H, s, 'ww-tagline');
   }
   function backWarring(ctx, W, H, s) {
     paintPageBackground(ctx, W, H, s);
@@ -4470,34 +4630,27 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     return out;
   }
   // Cover lettering typed in the cover font (letter-spaced capitals allowed), wrapped and shrunk to its box.
-  function coverType(ctx, W, H, s, text, { l, t, w, size, lh = 1.1, ls = 0, maxLines = 1, italic = false, family = 'cover', color, upper = false }) {
+  // measure: return the widest line's width (Canva px) instead of drawing.
+  function coverType(ctx, W, H, s, text, { l, t, w, size, lh = 1.1, ls = 0, maxLines = 1, italic = false, family = 'cover', color, upper = false, measure = false }) {
     const { k, ox, oy } = prFit(W, H), fam = family === 'cover' ? s.coverFont : s.bodyFont, scale = (family === 'cover' ? s.coverFontScale : s.bodyFontScale) / 100;
     let px = size * k * scale; const str = upper ? text.toUpperCase() : text;
     const set = () => { ctx.font = `${italic ? 'italic ' : ''}400 ${px}px "${fam}", Georgia, serif`; if ('letterSpacing' in ctx) ctx.letterSpacing = `${ls * px}px`; };
     ctx.save(); ctx.fillStyle = color; set();
     const lines = () => wrapText(ctx, str, 0, 0, w * k, px * lh, 'center', false) / (px * lh);
     while (lines() > maxLines && px > size * k * scale * TEXT_MIN_FIT) { px *= .96; set(); }
+    if (measure) {
+      let widest = 0;
+      for (const para of str.split('\n')) {
+        let line = '';
+        for (const word of para.split(' ')) { const test = line ? `${line} ${word}` : word; if (ctx.measureText(test).width > w * k && line) { widest = Math.max(widest, ctx.measureText(line).width); line = word; } else line = test; }
+        widest = Math.max(widest, ctx.measureText(line).width);
+      }
+      ctx.restore();
+      return (widest - ('letterSpacing' in ctx ? ls * px : 0)) / k;
+    }
     // Letter spacing trails the last letter too: shift right by half a space so the word stays optically centred.
     wrapText(ctx, str, ox + l * k + ('letterSpacing' in ctx ? ls * px / 2 : 0), oy + t * k - px * lh * .22, w * k, px * lh, 'center');
     ctx.restore();
-  }
-  // A picked background too busy for the cover lettering gets a soft, feathered veil of the paper color behind the title
-  // block, like frosted glass, unless a plate or title fill already backs it. Busy = the lettering color falls under 4.5:1
-  // on more than 5% of the area, or the area swings strongly between light and dark (luminance spread over .14: veined
-  // marble). Sydni's own watercolor and calm backgrounds measure about .10 with full contrast, so they never get one.
-  // The feather is a shadow cast from a shape drawn off-canvas (works in every browser, unlike ctx.filter).
-  function coverVeil(ctx, W, H, s, [l, t, w, h], ink) {
-    const { k, ox, oy } = prFit(W, H), x = ox + l * k, y = oy + t * k, rw = w * k, rh = h * k;
-    const Ls = sampleArea(ctx, x, y, rw, rh);
-    if (!Ls || titleFillColor(s)) return false;
-    const ki = relLum(ink), mean = Ls.reduce((a, b) => a + b, 0) / Ls.length, spread = Math.sqrt(Ls.reduce((a, b) => a + (b - mean) ** 2, 0) / Ls.length);
-    const reads = Ls.filter((L) => (Math.max(ki, L) + .05) / (Math.min(ki, L) + .05) >= 4.5).length / Ls.length;
-    if (reads >= .95 && spread <= .14) return false;
-    const blur = 26 * k, off = W + rw + 4 * blur;
-    ctx.save(); ctx.globalAlpha = .84; ctx.shadowColor = s.palette.paper; ctx.shadowBlur = blur; ctx.shadowOffsetX = off;
-    roundRect(ctx, x - off, y, rw, rh, 28 * k); ctx.fillStyle = s.palette.paper; ctx.fill();
-    ctx.restore();
-    return true;
   }
   const coverInk = (s, onPlate) => {
     const p = s.palette;
@@ -4568,21 +4721,23 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     ['mwg-cover-1', 4.32, -1.01, 515.75, 139.39], ['mwg-cover-2', 4.32, -1.01, 354.58, 348.48], ['mwg-cover-3', 4.32, 208.08, 242.2, 306.67],
     ['mwg-cover-4', 4.32, 472.93, 338.9, 278.79], ['mwg-cover-5', 422.5, 570.5, 386.82, 278.79], ['mwg-cover-6', 101.03, 932.92, 193.41, 97.58],
     ['mwg-cover-7', 148.94, 751.71, 403.37, 334.54], ['mwg-cover-8', 422.5, 765.65, 386.82, 320.6], ['mwg-cover-9', 502.65, 835.35, 306.67, 250.91]];
+  // Title, rule and subtitle, centred on the page (in Canva they sat 0.3 in right of centre).
+  const MWG_TITLE = { l: 133.35, t: 326.4, w: 549.3, size: 79, lh: 1.01, ls: .105, maxLines: 2, upper: true };
+  const MWG_SUB = { l: 118, t: 532.8, w: 580, size: 26.4, lh: 1.1, italic: true, family: 'body' };
+  // The title group's content box, measured from the words actually set (custom wording or font changes its width).
+  function mwgTitleBox(ctx, W, H, s) {
+    const w = Math.max(coverType(ctx, W, H, s, T(s, 'coverTitle'), { ...MWG_TITLE, measure: true }), coverType(ctx, W, H, s, T(s, 'coverSubtitle'), { ...MWG_SUB, measure: true }), 470.2) + 8;
+    return [408 - w / 2, 326.4, w, 239];
+  }
   function renderCoverMwg(ctx, W, H, s) {
     paintPageBackground(ctx, W, H, s);
     drawPr(ctx, W, H, s, composeArt(s, MWG_COVER, true));
-    const onPlate = prCoverExtras(ctx, W, H, s), { k, ox, oy } = prFit(W, H), sx = { ...s, headerFill: null };
-    // Lettering must read on whatever background is picked: the design color while it reads on the art behind it,
-    // else the most readable candidate (same rule as the Dream cover), plus a soft halo on marble too busy for any one color.
-    const area = (l, t, w, h) => [ox + l * k, oy + t * k, w * k, h * k], titleArea = area(133.35, 320, 549.3, 186), subArea = area(118, 526, 580, 46);
-    // First the lettering color that reads best on what's there; only if the background is still too busy for it, the veil
-    // (and then the design color, which reads on the paper-colored veil).
-    let ink = onPlate || s.coverFontColorAuto === false ? coverInk(s, onPlate) : textOnArea(ctx, sx, s.palette.plate, s.palette.paper, ...area(133.35, 320, 549.3, 252));
-    if (!onPlate && coverVeil(ctx, W, H, s, [112, 300, 592, 290], ink) && s.coverFontColorAuto !== false) ink = coverInk(s, false);
-    // Centred on the page (the Canva title, rule and subtitle sat 0.3 in right of centre).
-    withHalo(ctx, sx, ink, titleArea, () => coverType(ctx, W, H, s, T(s, 'coverTitle'), { l: 133.35, t: 326.4, w: 549.3, size: 79, lh: 1.01, ls: .105, maxLines: 2, upper: true, color: ink }));
-    drawPr(ctx, W, H, s, [['mwg-gold-rule', 172.9, 508.4, 470.2, 10.7, 0, -71.3, -1.2, 599.4, 15]]);
-    withHalo(ctx, sx, ink, subArea, () => coverType(ctx, W, H, s, T(s, 'coverSubtitle'), { l: 118, t: 532.8, w: 580, size: 26.4, lh: 1.1, italic: true, family: 'body', color: ink }));
+    const L = prCoverExtras(ctx, W, H, s, mwgTitleBox(ctx, W, H, s)), A = titleAssist(ctx, W, H, s, L, coverInk(s, L.onPlate));
+    withTitleGroup(ctx, W, H, s, L, () => haloed(ctx, H, A.ink, A.halo, () => {
+      coverType(ctx, W, H, s, T(s, 'coverTitle'), { ...MWG_TITLE, color: A.ink });
+      drawPr(ctx, W, H, s, [['mwg-gold-rule', 172.9, 508.4, 470.2, 10.7, 0, -71.3, -1.2, 599.4, 15]]);
+      coverType(ctx, W, H, s, T(s, 'coverSubtitle'), { ...MWG_SUB, color: A.ink });
+    }));
   }
   function backMwg(ctx, W, H, s) {
     paintPageBackground(ctx, W, H, s);
@@ -4600,24 +4755,22 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
   function renderCoverJg(ctx, W, H, s) {
     paintPageBackground(ctx, W, H, s);
     drawPr(ctx, W, H, s, composeArt(s, [JG_COVER.marble, JG_COVER.washTop, JG_COVER.washBottom], true));
-    const onPlate = prCoverExtras(ctx, W, H, s);
-    if (s.plateStyle === 'none') drawPr(ctx, W, H, s, [JG_COVER.plate]);         // the design's own frosted plate, unless another plate is picked
-    // Lettering with nothing solid behind it (the design's plate switched off, or a frame-only plate) on a busy background:
-    // the soft veil first, then a halo for whatever still doesn't read.
-    const bare = !onPlate && (s.plateStyle !== 'none' || prOff(s, 'plate'));
-    const { k, ox, oy } = prFit(W, H), sx = { ...s, headerFill: null };
-    if (bare) coverVeil(ctx, W, H, s, [160, 222, 496, 442], letterColor(s, 'jg-title', false));
-    drawPr(ctx, W, H, s, [JG_COVER.divider]);
-    for (const name of ['jg-title', 'jg-sub']) {
-      const [l, t, w, h] = LETTERING[name], draw = () => drawLetter(ctx, W, H, s, name, onPlate);
-      if (bare) withHalo(ctx, sx, letterColor(s, name, onPlate), [ox + l * k, oy + t * k, w * k, h * k], draw); else draw();
-    }
+    const L = prCoverExtras(ctx, W, H, s);
+    // The design's own frosted plate (unless another plate is picked or it's switched off) is part of the title group,
+    // and the lettering reads on it as designed.
+    const ownPlate = s.plateStyle === 'none' && !prOff(s, 'plate');
+    if (ownPlate) { withTitleGroup(ctx, W, H, s, L, () => drawPr(ctx, W, H, s, [JG_COVER.plate])); L.onPlate = L.ownPlate = true; }
+    const A = titleAssist(ctx, W, H, s, L, letterColor(s, 'jg-title', L.onPlate && !L.ownPlate)), ink = A.changed ? A.ink : null;
+    withTitleGroup(ctx, W, H, s, L, () => {
+      drawPr(ctx, W, H, s, [JG_COVER.divider]);
+      haloed(ctx, H, A.ink, A.halo, () => { drawLetter(ctx, W, H, s, 'jg-title', L.onPlate && !L.ownPlate, ink); drawLetter(ctx, W, H, s, 'jg-sub', L.onPlate && !L.ownPlate, ink); });
+    });
   }
   // Back: the violet + peach cloud three times (the back cover's own transparent copy; the studio's cloud background is a
   // tighter crop whose paint runs into its edges), the signature centred.
   function backJg(ctx, W, H, s) {
     paintPageBackground(ctx, W, H, s);
-    drawPr(ctx, W, H, s, [['jg-back-cloud', 81.6, 203.2, 653, 650], ['jg-back-cloud', -218.9, -43, 653, 650], ['jg-back-cloud', 228.9, 406.5, 653, 650]]);
+    drawPr(ctx, W, H, s, composeArt(s, [['jg-back-cloud', 81.6, 203.2, 653, 650], ['jg-back-cloud', -218.9, -43, 653, 650], ['jg-back-cloud', 228.9, 406.5, 653, 650]], true));
     drawPr(ctx, W, H, s, [['dove-expressions-logo', 300, 875.9, 216, 137.3]]);
   }
   // Purple pages: the page color, cream type, leaf sprigs in the soft blush.
@@ -4637,7 +4790,8 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
       ctx.moveTo(ox + 30 * k, oy + 1100 * k); ctx.lineTo(ox + 30 * k, oy + 408 * k); ctx.arc(ox + 408 * k, oy + 408 * k, 378 * k, Math.PI, 0); ctx.lineTo(ox + 786 * k, oy + 1100 * k);
       ctx.stroke(); ctx.restore();
     }
-    drawPr(ctx, W, H, s, [['jg-laurel', 272.3, 42.4, 271.4, 114.2]]);
+    // The laurel crowns the arch (shrunk from the Canva 271 px so it clears WELCOME); the words start below it.
+    drawPr(ctx, W, H, s, [['jg-laurel', 310, 46, 196, 82.5]]);
     flowText(ctx, W, H, s, [
       { text: 'WELCOME TO YOUR', size: 35.3, bold: true, role: 'pageTitle', lh: 1.2, w: 500 },
       { text: 'PROPHETIC JOURNAL', size: 48, head: true, bold: true, role: 'pageTitle', lh: 1.2, w: 560 },
@@ -4649,7 +4803,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
       jgBody('This journal follows a 4-step rhythm to help you process and apply what you receive from God:', { gap: 4 }),
       jgStep('Pray (Receive)'), jgBody('Sit before the Lord with expectation. Ask Him to speak—and be ready to listen. Revelation may come through dreams, scripture, impressions, visions, or quiet moments in prayer.'),
       jgStep('Brainstorm (Research)'), jgBody('Write your initial thoughts, questions, and keywords. Then begin studying with spiritual curiosity and a heart to understand.'),
-    ], { l: 64, t: 112, w: 688, b: 1012 }, ink, 'jgWelcome');
+    ], { l: 64, t: 138, w: 688, b: 1012 }, ink, 'jgWelcome');
   }
   function jgRev1(ctx, W, H, s) {
     jgPurple(ctx, W, H, s);
@@ -5198,6 +5352,19 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
       const g = document.createElement('div'); g.className = 'pal-grid'; items.forEach((pl) => g.appendChild(card(pl)));
       box.append(h, g);
     };
+    // Quick picks tied to the background: the journal's ORIGINAL palette, and the picked background's own palette.
+    const quick = $('palQuick'); quick.innerHTML = '';
+    const quickBtn = (label, pl) => {
+      if (!pl) return;
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'btn';
+      b.classList.toggle('active', !state.paletteVar && match?.name === pl.name);
+      b.innerHTML = `<span class="swatch-row">${['stone', 'vein', 'highlight', 'plate', 'trim'].map((k) => `<i style="background:${pl[k]}"></i>`).join('')}</span><span><strong>${label}</strong><small>${pl.name}</small></span>`;
+      b.onclick = () => applyPaletteClick(pl);
+      quick.appendChild(b);
+    };
+    if (state.journal !== 'dream') quickBtn('Original palette', paletteByName(JOURNALS[state.journal].palette));
+    const bgPal = state.journal === 'dream' ? paletteByName(recommendedName() || '') : bgReplaced(state) ? paletteByName(marbleOwnPalette() || '') : null;
+    if (bgPal && bgPal.name !== JOURNALS[state.journal]?.palette) quickBtn(state.journal === 'dream' ? 'This background’s palette' : 'Palette for this background', bgPal);
     const rec = recommendedPalettes(list, design), rest = list.filter((pl) => !rec.includes(pl));
     group('Recommended for this design', rec, DESIGN_NAMES[design] || '');
     group(state.journal === 'dream' ? 'More palettes' : 'More for this journal', rest.filter((pl) => !FAMILY_PALETTES.includes(pl) && !customPals().includes(pl)));
@@ -5242,6 +5409,14 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     const head = document.createElement('div'); head.className = 'group-label'; head.textContent = 'Design elements'; box.appendChild(head);
     list.forEach(([key, label]) => {
       const row = document.createElement('div'); row.className = 'role';
+      if (key === 'washes' && bgReplaced(state) && hasPaint(state.journal)) {
+        // A picked background replaces the journal's watercolor; this brings it back on top, on purpose.
+        row.innerHTML = `<label><input type="checkbox" ${state.artOverlay ? 'checked' : ''}> Add this journal's watercolor over the background</label>`;
+        row.querySelector('input').onchange = (e) => { state.artOverlay = e.target.checked; commit(false); };
+        box.appendChild(row);
+        return;
+      }
+      if (key === 'washes' && bgReplaced(state)) return;            // nothing of it shows on a picked background
       row.innerHTML = `<label><input type="checkbox" ${state.prHide[key] ? '' : 'checked'}> ${label}</label>`;
       row.querySelector('input').onchange = (e) => { state.prHide = { ...state.prHide, [key]: !e.target.checked }; commit(false); };
       box.appendChild(row);
@@ -5253,7 +5428,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
       l.querySelector('input').oninput = (e) => { state[key] = Number(e.target.value); l.querySelector('b').textContent = e.target.value + '%'; commit(false); };
       box.appendChild(l);
     };
-    if (state.journal !== 'prayer') { slider('White card opacity', 'prCardOpacity', 85, 0, 100); slider('Glow strength', 'prGlow', 100, 0, 150); }
+    if (state.journal === 'warrior' || state.journal === 'warring') { slider('White card opacity', 'prCardOpacity', 85, 0, 100); slider('Glow strength', 'prGlow', 100, 0, 150); }
     const hr = document.createElement('div'); hr.className = 'group-label'; hr.textContent = 'Add decorations'; box.appendChild(hr);
   }
   function buildCoverSlots() {
@@ -5413,7 +5588,8 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
       const byKey = Object.fromEntries(ROLES.map((r) => [r.key, r]));
       const swapped = state.marble !== 'journal', m = state.marble;
       // With another background picked, its colors replace the watercolor's (the washes now show that background).
-      const replaced = swapped ? { prayer: ['stone'], warrior: ['stone'], warring: ['stone', 'vein'], mwg: ['vein', 'accent', 'highlight'], jg: [] }[state.journal] : [];
+      // (Unless the journal's watercolor is added back over it: then its paint colors matter again.)
+      const replaced = swapped && !(state.artOverlay && hasPaint(state.journal)) ? { prayer: ['stone'], warrior: ['stone'], warring: ['stone', 'vein'], mwg: ['vein', 'accent', 'highlight'], jg: ['vein', 'accent'] }[state.journal] : [];
       const out = [];
       if (swapped) {
         if (m in PATTERNS) patternRoles(m).forEach((r) => out.push({ ...r }));
@@ -5527,6 +5703,13 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
 
   function syncControls() {
     syncTextFields();
+    if (state.journal !== 'dream') {
+      const r = titleMoveRange(state.journal), o = titleOff(state);
+      $('titleX').min = Math.floor(r.x[0]); $('titleX').max = Math.ceil(r.x[1]); $('titleX').value = o.x;
+      $('titleY').min = Math.floor(r.y[0]); $('titleY').max = Math.ceil(r.y[1]); $('titleY').value = o.y;
+      $('titleXVal').textContent = o.x ? `${o.x > 0 ? '+' : ''}${(o.x / 96).toFixed(2)} in` : 'as designed';
+      $('titleYVal').textContent = o.y ? `${o.y > 0 ? '+' : ''}${(o.y / 96).toFixed(2)} in` : 'as designed';
+    }
     document.querySelectorAll('#qualitySeg button').forEach((b) => b.classList.toggle('active', b.dataset.q === state.quality));
     document.querySelectorAll('#marbleSeg button').forEach((b) => b.classList.toggle('active', b.dataset.asset === currentBackgroundAsset()));
     document.querySelectorAll('#plateSeg button').forEach((b) => b.classList.toggle('active', b.dataset.asset === currentPlateAsset()));
@@ -5638,6 +5821,8 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
   let raf = 0;
   function draw() {
     if (!ready) return;
+    // On phones, a finger on the cover's title drags the title instead of scrolling the page.
+    canvas.style.touchAction = state.journal !== 'dream' && currentType() === 'cover' && !state.showSpread ? 'none' : '';
     cancelAnimationFrame(raf);
     raf = requestAnimationFrame(() => {
       const base = comparing ? { ...state, palette: { ...(paletteByName(recommendedName()) || DEFAULTS.palette) }, prayerArt: 'original', bgArt: 'original', typography: {} } : state;
@@ -6168,14 +6353,14 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
   // Each journal keeps its own look (colors + lettering + fonts); a journal opened for the first time starts from its Canva design.
   const LOOK_KEYS = ['marble', 'bgArt', 'palette', 'prayerArt', 'titleStyle', 'coverFont', 'coverFontColorAuto', 'coverFontColor', 'headingFont', 'bodyFont', 'plateStyle', 'showPlate',
     'showFrame', 'showTrim', 'plateOpacity', 'decor', 'accent', 'accentPlace', 'accentOpacity', 'accentScale', 'accentLined', 'titleShadow',
-    'figureColor', 'prHide', 'prCardOpacity', 'prGlow', 'titleFill', 'readingPanels'];
+    'figureColor', 'prHide', 'prCardOpacity', 'prGlow', 'titleFill', 'readingPanels', 'artOverlay', 'titlePos'];
   // The fonts each Canva design uses (Meetings with God: Playfair title, Cinzel headings, Cardo text; Jesus Girl: Playfair
   // headings, Libre Baskerville text). The others use the studio's Cinzel + Cormorant.
   const JOURNAL_FONTS = { mwg: { coverFont: 'Playfair Display', headingFont: 'Cinzel', bodyFont: 'Cardo' }, jg: { coverFont: 'Playfair Display', headingFont: 'Playfair Display', bodyFont: 'Libre Baskerville' } };
   function journalDefaultLook(j) {
     const pal = JOURNALS[j]?.palette && paletteByName(JOURNALS[j].palette);
     return pal ? { palette: { ...pal }, prayerArt: 'original', titleStyle: 'serif', coverFont: 'Cinzel', coverFontColorAuto: true, headingFont: 'Cormorant Garamond', bodyFont: 'Cormorant Garamond', ...(JOURNAL_FONTS[j] || {}),
-      plateStyle: 'none', showPlate: true, showFrame: true, showTrim: true, accent: 'none', decor: structuredClone(DEFAULTS.decor), marble: 'journal', bgArt: 'original', figureColor: null, prHide: {}, prCardOpacity: 85, prGlow: 100, titleFill: structuredClone(DEFAULTS.titleFill), readingPanels: structuredClone(DEFAULTS.readingPanels) } : null;
+      plateStyle: 'none', showPlate: true, showFrame: true, showTrim: true, accent: 'none', decor: structuredClone(DEFAULTS.decor), marble: 'journal', bgArt: 'original', figureColor: null, prHide: {}, artOverlay: false, titlePos: { x: 0, y: 0 }, prCardOpacity: 85, prGlow: 100, titleFill: structuredClone(DEFAULTS.titleFill), readingPanels: structuredClone(DEFAULTS.readingPanels) } : null;
   }
   function applyLook(look, j = state.journal) {
     if (!look) return;
@@ -6314,6 +6499,39 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
   $('accentYIn').oninput = (e) => { state.accentY = Number(e.target.value) / 100; goTo('cover'); commit(false); };
   $('accentLined').onchange = (e) => { state.accentLined = e.target.checked; toInterior(); commit(false); };
 
+  // Title position: sliders, reset, and dragging the title group itself on the cover preview (it wins over the accent drag).
+  const setTitlePos = (x, y) => { state.titlePos = clampTitle(state.journal, x, y); };
+  $('titleX').oninput = (e) => { setTitlePos(Number(e.target.value), titleOff(state).y); goTo('cover'); commit(false); };
+  $('titleY').oninput = (e) => { setTitlePos(titleOff(state).x, Number(e.target.value)); goTo('cover'); commit(false); };
+  $('titleCenter').onclick = () => { state.titlePos = { x: 0, y: 0 }; goTo('cover'); commit(false); };
+  let titleDragging = null;
+  (() => {
+    // Preview pixel → Canva px on the 816 × 1056 trim (the cover preview includes the 1/8 in bleed).
+    const toCanva = (e) => {
+      const r = canvas.getBoundingClientRect();
+      return { x: ((e.clientX - r.left) / r.width * PAGE_W - BLEED_PT) / TRIM_W * CANVA_W, y: ((e.clientY - r.top) / r.height * PAGE_H - BLEED_PT) / TRIM_H * CANVA_H };
+    };
+    const onTitle = (p) => {
+      const [l, t, w, h] = PR_TITLE_BOX[state.journal] || [], o = titleOff(state), m = TITLE_HANDLE_PAD;
+      return l != null && p.x >= l + o.x - m && p.x <= l + o.x + w + m && p.y >= t + o.y - m && p.y <= t + o.y + h + m;
+    };
+    canvas.addEventListener('pointerdown', (e) => {
+      if (state.journal === 'dream' || currentType() !== 'cover' || state.showSpread || comparing) return;
+      const p = toCanva(e);
+      if (!onTitle(p)) return;
+      const o = titleOff(state);
+      titleDragging = { x0: p.x, y0: p.y, ox: o.x, oy: o.y };
+      canvas.setPointerCapture(e.pointerId); e.preventDefault();
+    });
+    canvas.addEventListener('pointermove', (e) => {
+      if (!titleDragging) { if (e.pointerType === 'mouse' && state.journal !== 'dream' && currentType() === 'cover' && !state.showSpread && onTitle(toCanva(e))) canvas.style.cursor = 'move'; return; }
+      const p = toCanva(e), d = titleDragging;
+      setTitlePos(d.ox + p.x - d.x0, d.oy + p.y - d.y0); draw();
+    });
+    const end = () => { if (titleDragging) { titleDragging = null; save(); syncControls(); refreshThumbs(); } };
+    canvas.addEventListener('pointerup', end);
+    canvas.addEventListener('pointercancel', end);
+  })();
   // Drag the accent element directly on the cover preview when "Large + drag to place" is chosen.
   (() => {
     let dragging = false;
@@ -6322,7 +6540,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
       return { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height };
     };
     canvas.addEventListener('pointerdown', (e) => {
-      if (state.accent === 'none' || accentLayout(state) !== 'custom' || !['cover'].includes(currentType())) return;
+      if (titleDragging || state.accent === 'none' || accentLayout(state) !== 'custom' || !['cover'].includes(currentType())) return;
       dragging = true; canvas.setPointerCapture(e.pointerId);
       const { x, y } = toCanvasXY(e);
       state.accentX = x; state.accentY = y; draw();
