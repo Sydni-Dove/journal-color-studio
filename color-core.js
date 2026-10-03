@@ -146,6 +146,15 @@
           // Keep a gentle share of the painted hue variation (blooms, edges), not the old hue itself.
           const ra = a - t.pd[0] * al, rb = b - t.pd[1] * al, rs = .35 * t.sC;
           na = t.t[1] * al + ra * rs; nb = t.t[2] * al + rb * rs;
+        } else if (P.keepChroma && Math.hypot(t.m[1], t.m[2]) >= 5) {
+          // Color families of flattened artwork: the WHOLE family takes the new color. Each pixel keeps its lightness
+          // offset from its family (shading, texture) and its colorfulness relative to the family (pale stays pale), and
+          // takes the new hue with only a trace of its own hue variation, so a changed family recolors instead of tinting.
+          nL = softL(t.t[0], L - t.m[0]);
+          const Cm = Math.hypot(t.m[1], t.m[2]), Ct = Math.hypot(t.t[1], t.t[2]), Ht = Math.atan2(t.t[2], t.t[1]);
+          let dh = Math.atan2(b, a) - Math.atan2(t.m[2], t.m[1]); dh -= Math.round(dh / (2 * Math.PI)) * 2 * Math.PI;
+          const nc = Ct * Math.min(2.5, C / Cm), nh = Ct < 3 ? Ht : Ht + dh * .3;
+          na = nc * Math.cos(nh); nb = nc * Math.sin(nh);
         } else {
           nL = softL(t.t[0], L - t.m[0]);
           na = t.t[1] + (a - t.m[1]) * t.sC; nb = t.t[2] + (b - t.m[2]) * t.sC;
@@ -156,19 +165,28 @@
       return lab2rgb(oL, oa, ob);
     };
     if (opts.lut) {
-      // The mapping depends only on a pixel's color (plus this image's statistics above), so it is computed once per
-      // cell of a 64³ grid and stored as a change; each pixel adds its cell's change, keeping detail finer than the grid.
-      const N = 64, del = new Float32Array(N * N * N * 3);
+      // The mapping depends only on a pixel's color (plus this image's statistics above), so it is computed once on a
+      // 65³ grid (every 4th level, 0–255) and stored as a change; each pixel adds the change blended (trilinear) from
+      // the 8 grid points around its color, so smooth gradients stay smooth (no blocky steps between grid cells).
+      const N = 65, S = 4, del = new Float32Array(N * N * N * 3);
       for (let r = 0; r < N; r++) for (let g = 0; g < N; g++) for (let bl = 0; bl < N; bl++) {
-        const R = r * 4 + 2, G = g * 4 + 2, B = bl * 4 + 2, [L, a, b] = rgb2lab(R, G, B), C = Math.hypot(a, b);
+        const R = Math.min(255, r * S), G = Math.min(255, g * S), B = Math.min(255, bl * S), [L, a, b] = rgb2lab(R, G, B), C = Math.hypot(a, b);
         let H = Math.atan2(b, a) * 180 / Math.PI; if (H < 0) H += 360;
         const o = mapLab(L, a, b, C, H), j = ((r * N + g) * N + bl) * 3;
         del[j] = o[0] - R; del[j + 1] = o[1] - G; del[j + 2] = o[2] - B;
       }
       for (let i = 0; i < d.length; i += 4) {
         if (!d[i + 3]) continue;
-        const j = (((d[i] >> 2) * N + (d[i + 1] >> 2)) * N + (d[i + 2] >> 2)) * 3;
-        d[i] += del[j]; d[i + 1] += del[j + 1]; d[i + 2] += del[j + 2];
+        const fr = d[i] / S, fg = d[i + 1] / S, fb = d[i + 2] / S, r0 = Math.min(N - 2, fr | 0), g0 = Math.min(N - 2, fg | 0), b0 = Math.min(N - 2, fb | 0);
+        const tr = fr - r0, tg = fg - g0, tb = fb - b0;
+        let o0 = 0, o1 = 0, o2 = 0;
+        for (let q = 0; q < 8; q++) {
+          const dr = q & 1, dg = (q >> 1) & 1, db = q >> 2, w = (dr ? tr : 1 - tr) * (dg ? tg : 1 - tg) * (db ? tb : 1 - tb);
+          if (!w) continue;
+          const j = (((r0 + dr) * N + (g0 + dg)) * N + (b0 + db)) * 3;
+          o0 += w * del[j]; o1 += w * del[j + 1]; o2 += w * del[j + 2];
+        }
+        d[i] += o0; d[i + 1] += o1; d[i + 2] += o2;
       }
     } else {
       for (let i = 0; i < d.length; i += 4) {
@@ -225,7 +243,7 @@
     const C = fams.map((f) => f.lab), K = C.length;
     return {
       id: 'families:' + fams.map((f) => f.hex).join(''), comps: C.map((_, i) => 'f' + i), means: C, keepChroma: true,
-      weights: (L, a, b) => { const w = new Array(K); for (let i = 0; i < K; i++) { const d = (L - C[i][0]) ** 2 + (a - C[i][1]) ** 2 + (b - C[i][2]) ** 2; w[i] = 1 / (d * d + 1e-6); } return w; },
+      weights: (L, a, b) => { const w = new Array(K); for (let i = 0; i < K; i++) { const d = (L - C[i][0]) ** 2 + (a - C[i][1]) ** 2 + (b - C[i][2]) ** 2; w[i] = 1 / (d * d * d + 1e-9); } return w; },
     };
   }
 

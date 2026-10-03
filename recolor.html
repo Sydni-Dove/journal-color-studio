@@ -105,6 +105,17 @@ aside { display: flex; flex-direction: column; gap: 14px; }
 .slider { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; font-size: 13px; }
 .slider span { display: flex; justify-content: space-between; font-weight: 700; }
 .narrow-only { display: none; }
+@media (max-width: 900px) {
+  .layout { display: flex; flex-direction: column; }
+  .layout .stage { order: -1; position: sticky; top: 58px; z-index: 4; }
+  .layout .stagebar { padding: 8px 12px; gap: 8px; }
+  .layout .stagebar { flex-wrap: nowrap; }
+  .layout .stagebar strong { display: none; }
+  .layout .stagebar .seg button, .layout #compare { min-height: 36px; padding: 0 10px; font-size: 13px; white-space: nowrap; }
+  .layout .view { padding: 8px; }
+  .layout .view canvas { max-height: 38vh; }
+  .layout .empty h3 { font-size: 20px; }
+}
 @media (max-width: 600px) { .wide-only { display: none !important; } .narrow-only { display: inline; } header small { display: none; } }
 #compare { min-height: 40px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--ink); font: inherit; padding: 0 12px; cursor: pointer; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
 </style>
@@ -175,6 +186,8 @@ aside { display: flex; flex-direction: column; gap: 14px; }
   const save = () => { try { localStorage.setItem('dove-recolor', JSON.stringify({ k: st.k, map: st.map, for: st.for })); } catch {} };
   const toast = (msg) => { const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), 3200); };
   const PREVIEW_MAX = 1600, EXPORT_MAX = 6000, PDF_DPI = 300;
+  let flashUntil = 0, flashTimer = 0;
+  const flash = () => { flashUntil = performance.now() + 1100; clearTimeout(flashTimer); flashTimer = setTimeout(draw, 1150); };
   let src = null, full = null, name = '', pdf = null, pdfPageN = 1, pdfPageSize = null, families = [], labels = null, sel = -1, view = 'result', comparing = false, palPick = { name: '', turn: 0 };
 
   // ---------- Loading ----------
@@ -263,14 +276,14 @@ aside { display: flex; flex-direction: column; gap: 14px; }
       for (let p = 0; p < labels.length; p++) { const c = cols[labels[p]]; o[p * 4] = c[0]; o[p * 4 + 1] = c[1]; o[p * 4 + 2] = c[2]; o[p * 4 + 3] = 255; }
       x.putImageData(out, 0, 0);
     } else x.drawImage(result(), 0, 0);
-    if (sel >= 0 && !comparing) {
-      // The picked family: everything else dims, so its region shows.
+    if (sel >= 0 && !comparing && performance.now() < flashUntil) {
+      // Just picked: everything else dims for a moment so its region shows, then the page is shown as it really is.
       const m = x.createImageData(src.width, src.height), o = m.data;
       for (let p = 0; p < labels.length; p++) if (labels[p] !== sel) { o[p * 4] = o[p * 4 + 1] = o[p * 4 + 2] = 255; o[p * 4 + 3] = 150; }
       const t = document.createElement('canvas'); t.width = src.width; t.height = src.height; t.getContext('2d').putImageData(m, 0, 0);
       x.drawImage(t, 0, 0);
     }
-    $('viewTitle').textContent = comparing ? 'Original' : view === 'regions' ? `Color regions · ${families.length} families` : sel >= 0 ? `Recolored · family ${sel + 1} selected` : 'Recolored';
+    $('viewTitle').textContent = comparing ? 'Original' : view === 'regions' ? `Color regions · ${families.length} families` : sel >= 0 ? `Recolored · ${families[sel].hex} selected` : 'Recolored';
   }
 
   // ---------- Families list ----------
@@ -282,7 +295,7 @@ aside { display: flex; flex-direction: column; gap: 14px; }
       row.className = `fam${i === sel ? ' sel' : ''}${to && to !== f.hex ? ' changed' : ''}`;
       const pct = f.share * 100;
       row.innerHTML = `<i style="background:${f.hex}"></i><span>${f.hex} · ${pct < 1 ? '<1' : Math.round(pct)}% of the page</span><span>→</span><input type="color" value="${(to || f.hex).toLowerCase()}" aria-label="New color for ${f.hex}"><button class="undo" type="button" title="Back to ${f.hex}">↺</button>`;
-      row.onclick = (e) => { if (e.target.tagName === 'INPUT' || e.target.classList.contains('undo')) return; sel = sel === i ? -1 : i; buildFamilies(); draw(); };
+      row.onclick = (e) => { if (e.target.tagName === 'INPUT' || e.target.classList.contains('undo')) return; sel = sel === i ? -1 : i; if (sel >= 0) flash(); buildFamilies(); draw(); };
       row.querySelector('input').oninput = (e) => { st.map = { ...st.map, [f.hex]: e.target.value.toUpperCase() }; sel = i; save(); draw(); row.classList.add('changed', 'sel'); };
       row.querySelector('input').onchange = () => buildFamilies();
       row.querySelector('.undo').onclick = () => { const m = { ...st.map }; delete m[f.hex]; st.map = m; save(); buildFamilies(); draw(); };
@@ -360,7 +373,7 @@ aside { display: flex; flex-direction: column; gap: 14px; }
     if (!labels) return;
     const r = e.currentTarget.getBoundingClientRect(), px = Math.floor((e.clientX - r.left) / r.width * src.width), py = Math.floor((e.clientY - r.top) / r.height * src.height);
     const f = labels[py * src.width + px]; if (f == null) return;
-    sel = sel === f ? -1 : f; buildFamilies(); draw();
+    sel = sel === f ? -1 : f; if (sel >= 0) flash(); buildFamilies(); draw();
     $('fams').children[f]?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   });
   // Debug hook for automated checks.

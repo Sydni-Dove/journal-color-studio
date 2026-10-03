@@ -610,7 +610,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
               <option value="Against">Against (Dove Expressions brand)</option>
             </select>
           </div>
-          <div class="field"><span>Subtitle line</span><select id="subtitleStyle"><option value="caps">Small capitals under the title</option><option value="match">Same size as the title</option></select></div>
+          <div class="field dream-only"><span>Subtitle line</span><select id="subtitleStyle"><option value="caps">Small capitals under the title</option><option value="match">Same size as the title</option></select></div>
           <label class="slider"><span>Cover title size <b id="coverFontScaleVal"></b></span><input type="range" id="coverFontScale" min="60" max="120"></label>
           <div class="role"><label><input type="checkbox" id="coverFontColorAuto"> Cover title color follows palette</label>
             <input type="color" id="coverFontColor" aria-label="Cover title color"></div>
@@ -656,6 +656,11 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     <section class="stage" data-stage="interior">
       <button class="stage-toggle" type="button" aria-expanded="false" aria-controls="stage-interior"><span class="stage-num">05</span><span class="stage-title"><span class="stage-name">Interior</span><span class="stage-sub">Headers, lines, reading panel</span></span><span class="stage-chev" aria-hidden="true"></span></button>
       <div class="stage-body" id="stage-interior">
+        <div data-tab="book" class="card prayer-only" id="prInteriorCard">
+          <h2>Interior pages <span>this journal's own layouts</span></h2>
+          <p class="hint" style="margin:0 0 6px">The header, footer and line-style settings here belong to the Dream Journal's page template. This journal's inside pages are its own Canva layouts, already aligned to your printer's margins and binding (sidebars sit on the outer edge).</p>
+          <p class="hint" style="margin:0">To change them: <b>Design → Palette</b> recolors every page, <b>Color</b> fine-tunes single colors (lines, sidebars, text), <b>Text</b> changes wording, fonts and sizes, and <b>Design → Decorations</b> switches page elements (sidebars, bands, sprigs) on or off. The page count is under Export.</p>
+        </div>
         <div data-tab="book" class="card" id="linedCard">
           <h2>Interior pages <span>headers, footer, lines</span></h2>
           <div class="field"><span>Header style</span>
@@ -4267,8 +4272,10 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     }
     if (s.plateStyle === 'ring') {
       const img = ASSETS.floralRing, ar = img ? img.naturalHeight / img.naturalWidth : 1.03;
-      let d = Math.max(Math.max(w, h) * 1.18, Math.hypot(w, h) * .9);         // the ring's opening circles the whole title
-      if (d > 640) { sg = 640 / d; d = 640; }
+      // The glitter ring's opening is ~86% of its width: it must hold the whole title, corners included.
+      const need = Math.hypot(w, h) / .86;
+      let d = need;
+      if (d > 660) { sg = 660 / need; d = 660; }
       const b = { x: X(cxp - d / 2), y: Y(cyp - d * ar / 2), w: d * k, h: d * ar * k };
       return out({ kind: 'ring', ...b, bounds: b });
     }
@@ -4281,16 +4288,15 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
       // A circle can't hold a wide title gracefully: a rounded medallion (pill) instead, hugging the title.
       kind = 'rect'; hwp = w / 2 + inset + 34; hhp = h / 2 + inset + 26; radius = hhp * k;
     } else if (st.d) {
-      let r = Math.hypot(w * .46, h * .46) + inset + 12;
-      if (r > 290) { sg = 290 / r; r = 290; }
-      hwp = hhp = r;
+      // Circle: the whole title box (corners included) sits inside the trim line. Capped; past the cap the title group
+      // scales down to fit rather than spilling over the edge.
+      const pad = inset + 10, R = Math.hypot(w / 2, h / 2), Rf = Math.min(R, 300 - pad);
+      sg = Rf / R; hwp = hhp = Rf + pad;
     } else {
-      // Oval: follows the title's proportions (never flatter than 1.6 : 1 or rounder than 1.15 : 1), wrapping it with the
-      // corners of the text box just inside, and capped so it never dominates the cover.
-      const e = Math.min(.87, Math.max(.62, h / w * .9));
-      let a = Math.hypot(w * .46, h * .46 / e) + inset + 8;
-      if (a > 300) { sg = 300 / a; a = 300; }
-      hwp = a; hhp = Math.max(a * e, h * sg / 2 + inset + 10);
+      // Oval: follows the title's proportions (never flatter than 1.6 : 1 or rounder than 1.15 : 1) and holds the whole
+      // title box inside its trim line: (w/2)²/A² + (h/2)²/(eA)² = 1. Capped; past the cap the title scales down to fit.
+      const e = Math.min(.87, Math.max(.62, h / w * .9)), pad = inset + 8, A = Math.hypot(w / 2, h / 2 / e), Af = Math.min(A, 320 - pad);
+      sg = Af / A; hwp = Af + pad; hhp = Af * e + pad;
     }
     const b = box(hwp + ring, hhp + ring);
     return out({ kind, style: st, cx: X(cxp), cy: Y(cyp), hw: hwp * k, hh: hhp * k, radius, tone: PLATE_TONE, bounds: b });
