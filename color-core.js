@@ -229,5 +229,62 @@
     };
   }
 
-  window.ColorCore = { LIN, rgb2lab, lab2rgb, hexLab, softL, ramp01, hueBand, TONE_PRESETS, toneTransfer, findFamilies, familiesPreset };
+  // ---------- Palette → color families (flattened artwork) ----------
+  // A palette onto an artwork's color families (findFamilies): paper → the main light color, the darkest → lettering (only
+  // if it stays dark enough to read), gold → gold/trim, other colored ones → the palette color nearest their lightness,
+  // pale greys → lines; in-between shades follow the two colors they sit between. turn: another click on the same palette
+  // picks the next suitable palette color for the colored areas. Returns { familyHex: newHex }. Used by Print Prep and
+  // the Recolor page.
+  const hex2rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const rgb2hex = (c) => '#' + c.map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('').toUpperCase();
+  function familyMapForPalette(colors, pl, turn = 0) {
+    // Another click on the same palette picks the next suitable palette color for the journal's colored areas.
+    const map = {}, used = new Set(), chroma = (c) => Math.hypot(c.lab[1], c.lab[2]), Lof = (h) => rgb2lab(...hex2rgb(h))[0];
+    const take = (c, hex) => { if (c && hex && /^#[0-9a-f]{6}$/i.test(hex) && !used.has(c.hex)) { map[c.hex] = hex.toUpperCase(); used.add(c.hex); } };
+    const light = colors.filter((c) => c.lab[0] > 80).sort((a, b) => b.share - a.share)[0];
+    take(light, pl.paper);
+    const dark = [...colors].sort((a, b) => a.lab[0] - b.lab[0])[0];
+    const ink = [pl.title, pl.stone, pl.frame, pl.plate].filter(Boolean).sort((a, b) => Lof(a) - Lof(b))[0];
+    if (dark && dark.lab[0] < 35 && ink && Lof(ink) < 45) take(dark, ink);
+    // Gold-like (yellow-orange hue, mid lightness) → the palette's gold/trim; the other colored ones by how much they
+    // cover: the biggest is usually bars and backgrounds (→ background color), then accent, highlight, veins.
+    const hue = (c) => (Math.atan2(c.lab[2], c.lab[1]) * 180 / Math.PI + 360) % 360;
+    const gold = colors.filter((c) => !used.has(c.hex) && chroma(c) > 15 && hue(c) > 50 && hue(c) < 105 && c.lab[0] > 45 && c.lab[0] < 88).sort((a, b) => chroma(b) - chroma(a))[0];
+    take(gold, pl.trim);
+    // Each remaining colored area takes the unused palette color closest to its own lightness, so dark bars stay dark
+    // and pale fills stay pale on any palette (another click picks the next-closest).
+    const colored = colors.filter((c) => !used.has(c.hex) && chroma(c) > 12).sort((a, b) => b.share - a.share);
+    const cands = [...new Set([pl.stone, pl.accent, pl.highlight, pl.vein, pl.frame, pl.plate, pl.title, pl.trim].filter((h) => h && /^#[0-9a-f]{6}$/i.test(h) && h.toUpperCase() !== (pl.paper || '').toUpperCase()).map((h) => h.toUpperCase()))];
+    const usedCand = new Set();
+    colored.forEach((c, i) => {
+      const ranked = cands.filter((h) => !usedCand.has(h)).sort((a, b) => Math.abs(Lof(a) - c.lab[0]) - Math.abs(Lof(b) - c.lab[0]));
+      const near = ranked.filter((h) => Math.abs(Lof(h) - c.lab[0]) < Math.abs(Lof(ranked[0]) - c.lab[0]) + 25);
+      const h = near.length ? near[(turn + i) % near.length] : ranked[0];
+      if (h) { take(c, h); usedCand.add(h); }
+    });
+    colors.filter((c) => !used.has(c.hex) && chroma(c) <= 12 && c.lab[0] > 55 && c.lab[0] <= 95).forEach((c) => take(c, pl.line));
+    // In-between shades (thin lines melting into the paper) follow the two colors they sit between, at the same mix,
+    // so lines keep their weight instead of turning solid.
+    const D = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]), tgt = (c) => rgb2lab(...hex2rgb(map[c.hex] || c.hex));
+    for (const c of colors) {
+      let best = null;
+      for (const a2 of colors) for (const b2 of colors) {
+        if (a2 === c || b2 === c || a2 === b2 || a2.share < c.share * .5 || b2.share < c.share * .5) continue;
+        const ab = [0, 1, 2].map((i) => b2.lab[i] - a2.lab[i]), L2 = ab.reduce((u, v) => u + v * v, 0) || 1, t = ab.reduce((u, v, i) => u + v * (c.lab[i] - a2.lab[i]), 0) / L2;
+        if (t < .1 || t > .9) continue;
+        const d = D(c.lab, a2.lab.map((v, i) => v + t * ab[i]));
+        if (d < 15 && (!best || d < best.d)) best = { d, a: a2, b: b2, t };
+      }
+      if (best) { const A = tgt(best.a), B = tgt(best.b); map[c.hex] = rgb2hex(lab2rgb(...A.map((v, i) => v + best.t * (B[i] - v)))); }
+    }
+        return map;
+  }
+  // { familyHex: newHex } → toneTransfer targets for familiesPreset(colors) (changed families only).
+  function familyTargets(colors, map) {
+    const targets = {};
+    colors.forEach((f, i) => { const to = map?.[f.hex]; if (to && to !== f.hex) targets['f' + i] = to; });
+    return targets;
+  }
+
+  window.ColorCore = { LIN, rgb2lab, lab2rgb, hexLab, softL, ramp01, hueBand, TONE_PRESETS, toneTransfer, findFamilies, familiesPreset, familyMapForPalette, familyTargets, hex2rgb, rgb2hex };
 })();

@@ -49,7 +49,7 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; line-he
 .btn.primary { background: var(--brand); color: #fff; border-color: var(--brand); text-align: center; font-weight: 700; }
 .btn:disabled { opacity: .5; cursor: wait; }
 .pal-var { font-size: 10px; color: var(--muted); font-weight: 600; margin-left: 2px; }
-.head-btn { padding: 6px 12px; font-size: 13px; margin-left: 8px; text-align: center; }
+.head-btn { padding: 6px 12px; font-size: 13px; margin-left: 8px; text-align: center; display: inline-flex; align-items: center; justify-content: center; }
 .head-btn:disabled { cursor: default; }
 body.prayer-mode .dream-only { display: none !important; }
 body:not(.prayer-mode) .prayer-only { display: none !important; }
@@ -210,7 +210,8 @@ body:not(.prayer-mode) .prayer-only { display: none !important; }
   header strong { font-size: 17px; white-space: nowrap; }
   header small, .saved, .intro, .m-long { display: none; }
   .brand-mark { width: 30px; height: 30px; }
-  .head-btn { margin-left: 0; padding: 0 10px; min-height: 44px; white-space: nowrap; }
+  .head-btn { margin-left: 0; padding: 0 10px; min-height: 44px; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; }
+  .head-btn.wide-only { display: none; }                  /* Recolor is in the Export panel on phones */
   .layout { display: block; padding: 0; }
   /* The page: everything between the header and the rail (and the sheet, when one is open). */
   .workspace { position: fixed; top: var(--hdr); left: 0; right: 0; bottom: calc(var(--rail) + var(--sheet)); max-height: none; min-height: 0; border: 0; border-radius: 0; box-shadow: none; z-index: 1; transition: bottom .22s ease; }
@@ -392,6 +393,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
   <button class="back-btn" id="undoBtn" type="button" title="Go back: undo the last change (⌘Z)" aria-label="Go back (undo the last change)" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
   <strong class="hdr-title">Journal Color Studio</strong>
   <div class="spacer"></div>
+  <a class="btn head-btn wide-only" href="recolor.html" title="Upload a flattened page or artwork and recolor it by color family" style="text-decoration:none">Recolor</a>
   <a class="btn head-btn" href="print-prep.html" title="Upload a finished journal PDF and get print-ready interior and cover files" style="text-decoration:none">Print Prep</a>
   <button class="btn head-btn" id="startOver" type="button" title="Reset this journal to its original design">Start over</button>
 </header>
@@ -772,6 +774,11 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
           <h2>Print Prep <span>for journals made elsewhere</span></h2>
           <p class="hint" style="margin:0 0 8px">Made a journal in Canva or another program? Upload the whole PDF to Print Prep: it fits every page to your printer's margins, adds the bleed and builds the cover file.</p>
           <a class="btn" href="print-prep.html" style="display:block;text-align:center;text-decoration:none">Open Print Prep</a>
+        </div>
+        <div data-tab="book" class="card">
+          <h2>Recolor <span>a flattened page or artwork</span></h2>
+          <p class="hint" style="margin:0 0 8px">Upload a PNG, JPG or PDF page. Its colors are found as families you can recolor one by one or with a palette, keeping every texture and shade.</p>
+          <a class="btn" href="recolor.html" style="display:block;text-align:center;text-decoration:none">Open Recolor</a>
         </div>
         <div data-tab="book" class="card" id="coverFileCard">
           <h2>Print-ready cover <span>back, spine and front in one file</span></h2>
