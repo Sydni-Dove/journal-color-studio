@@ -130,6 +130,7 @@
     // Pass 2: every pixel keeps its deviation from its component's average.
     const mapLab = (L, a, b, C, H) => {
       const ws = norm(P.weights(L, a, b, C, H));
+      if (P.map) return lab2rgb(...P.map(L, a, b, C, H, T, ws));
       let oL = 0, oa = 0, ob = 0;
       for (let k = 0; k < K; k++) {
         const wk = ws[k]; if (!wk) continue;
@@ -240,10 +241,40 @@
   // between their two colors instead of snapping to one), the family's own center as its average, color variation
   // kept as is. toneTransfer(img, w, h, familiesPreset(fams), { f2: '#hex', … }) recolors families f2 …
   function familiesPreset(fams) {
-    const C = fams.map((f) => f.lab), K = C.length;
+    const C = fams.map((f) => f.lab), K = C.length, Cm = C.map((c) => Math.hypot(c[1], c[2])), Hm = C.map((c) => Math.atan2(c[2], c[1]));
+    const wrap = (x) => x - Math.round(x / (2 * Math.PI)) * 2 * Math.PI;
     return {
-      id: 'families:' + fams.map((f) => f.hex).join(''), comps: C.map((_, i) => 'f' + i), means: C, keepChroma: true,
+      id: 'families2:' + fams.map((f) => f.hex).join(''), comps: C.map((_, i) => 'f' + i), means: C, keepChroma: true,
       weights: (L, a, b) => { const w = new Array(K); for (let i = 0; i < K; i++) { const d = (L - C[i][0]) ** 2 + (a - C[i][1]) ** 2 + (b - C[i][2]) ** 2; w[i] = 1 / (d * d * d + 1e-9); } return w; },
+      // Flattened art is paint on paper: a pale tint is a little of some colored family's pigment, not "mostly paper". So
+      //  · lightness follows the families by their usual (Lab-distance) weights — pale stays pale;
+      //  · color (hue + colorfulness) comes only from the COLORED families, picked by hue and lightness, at the pixel's
+      //    own strength relative to that family: every tint of a changed family takes the new hue, the palest included;
+      //  · a changed paper / grey family adds its own color shift where the pixel is paper-like.
+      map: (L, a, b, Cp, H, T, ws) => {
+        let nL = 0, da = 0, db = 0;
+        for (let i = 0; i < K; i++) {
+          const w = ws[i], t = T[i]; if (!w) continue;
+          nL += w * (t ? softL(t.t[0], L - t.m[0]) : L);
+          if (t && Cm[i] < 5) { da += w * (t.t[1] - t.m[1]); db += w * (t.t[2] - t.m[2]); }
+        }
+        let na = a, nb = b;
+        if (Cp >= 1.5) {
+          const Hp = Math.atan2(b, a); let sw = 0, sa = 0, sb = 0;
+          for (let i = 0; i < K; i++) {
+            if (Cm[i] < 5) continue;
+            const hd = wrap(Hp - Hm[i]) * 180 / Math.PI, w = 1 / (((L - C[i][0]) ** 2 + (hd * .6) ** 2 + 4) ** 2), t = T[i];
+            let fa = a, fb = b;
+            if (t) {
+              const Ct = Math.hypot(t.t[1], t.t[2]), Ht = Math.atan2(t.t[2], t.t[1]), nc = Ct * Math.min(2.5, Cp / Cm[i]), nh = Ct < 3 ? Ht : Ht + wrap(Hp - Hm[i]) * .3;
+              fa = nc * Math.cos(nh); fb = nc * Math.sin(nh);
+            }
+            sw += w; sa += w * fa; sb += w * fb;
+          }
+          if (sw) { na = sa / sw; nb = sb / sw; }
+        }
+        return [nL, na + da, nb + db];
+      },
     };
   }
 

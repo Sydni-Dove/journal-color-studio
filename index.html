@@ -610,7 +610,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
               <option value="Against">Against (Dove Expressions brand)</option>
             </select>
           </div>
-          <div class="field dream-only"><span>Subtitle line</span><select id="subtitleStyle"><option value="caps">Small capitals under the title</option><option value="match">Same size as the title</option></select></div>
+          <div class="field"><span>Subtitle line</span><select id="subtitleStyle"><option value="caps">Small capitals under the title</option><option value="match">Same size as the title</option></select></div>
           <label class="slider"><span>Cover title size <b id="coverFontScaleVal"></b></span><input type="range" id="coverFontScale" min="60" max="120"></label>
           <div class="role"><label><input type="checkbox" id="coverFontColorAuto"> Cover title color follows palette</label>
             <input type="color" id="coverFontColor" aria-label="Cover title color"></div>
@@ -1049,6 +1049,8 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     'plate-workbook':       { type: 'titlePlate', renderer: 'shape', shape: 'workbook', colorRoles: ['plate', 'trim'], label: 'Gold frame', hint: 'Black plate, wide metallic gold border' },
     'plate-bevel':          { type: 'titlePlate', renderer: 'bevel', shape: 'bevel',   colorRoles: ['plate', 'frame', 'trim'], label: 'Gold bevel', hint: 'Metallic gradient frame' },
     'plate-none':           { type: 'titlePlate', renderer: 'none', shape: 'none',     colorRoles: [], label: 'None', hint: 'Title floats on the background' },
+    // Jesus Girl's own frosted plate from the Canva cover (only offered on that journal).
+    'plate-design':         { type: 'titlePlate', renderer: 'design', shape: 'design', colorRoles: [], label: 'As designed', hint: 'The cover’s own frosted plate' },
     // Original floral glitter ring at its exact Canva placement; drawn UNDER the decorations, as in the source file.
     // Recolors through the Inner trim color; hide it with the Outer frame toggle.
     'plate-ring':           { type: 'titlePlate', renderer: 'image', shape: 'ring', image: 'floralRing', canva: [0.161033, 0, 0, 0.160758, 114.498731, 221.312889], colorRoles: ['trim'], label: 'Gold ring', hint: 'Original floral glitter ring' },
@@ -1408,6 +1410,13 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     if (!state.looks || typeof state.looks !== 'object') state.looks = {};
     if (!['dream', 'prayer', 'warrior', 'warring', 'mwg', 'jg'].includes(state.journal)) state.journal = 'dream';
     if (!state.titlePos || typeof state.titlePos !== 'object') state.titlePos = { x: 0, y: 0 };
+    // Jesus Girl's own plate used to be "None" + a Design-elements switch; it is now the plate choice "As designed".
+    if (!state.jgPlateV) {
+      const fix = (L) => { if (L && L.plateStyle === 'none' && !L.prHide?.plate) L.plateStyle = 'design'; };
+      fix(state.looks?.jg); if (state.journal === 'jg') fix(state);
+      state.jgPlateV = true;
+    }
+    if (state.plateStyle === 'design' && state.journal !== 'jg') state.plateStyle = 'none';
     // Before cover tools worked on prayer journals, a prayer journal just carried the Dream cover's plate/decorations along.
     // Give those back to the Dream Journal's saved look and start the prayer journal from its own design.
     if (!state.lookV2) {
@@ -2465,24 +2474,27 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     ctx.font = `${weight} 100px "${fam}", Georgia, serif`;
     const capOf = (t) => (ctx.measureText(t).actualBoundingBoxAscent || 70) / 100;          // cap height per px
     const fitPx = (t, bw) => Math.min(h / capOf(t), 100 * bw / Math.max(1, ctx.measureText(t).width));
-    const px0 = fitPx(orig, w), mw = ctx.measureText(text).width / 100, done = (lines, px, fit, right = false, bw = w) => {
+    const px0 = fitPx(orig, w), mw = ctx.measureText(text).width / 100, done = (lines, px, fit, right = false, bw = w, middle = false) => {
       if (!fit) s._warn?.add(id);
       ctx.font = `${weight} 100px "${fam}", Georgia, serif`;                       // capOf() measures at 100px
       const cap = capOf(lines.join(' ')) * px * scale, pitch = cap * (1 + GAP);
       ctx.font = `${weight} ${px * scale}px "${fam}", Georgia, serif`;
       ctx.textAlign = right ? 'right' : 'center';
-      lines.forEach((l, i) => ctx.fillText(l, right ? x + w : x + w / 2, y + h - (lines.length - 1 - i) * pitch));
+      // middle: a multi-line title is centred in its box (like the lettering it replaces); labels sit on the box bottom.
+      const last = middle ? y + (h + cap + (lines.length - 1) * pitch) / 2 : y + h;
+      lines.forEach((l, i) => ctx.fillText(l, right ? x + w : x + w / 2, last - (lines.length - 1 - i) * pitch));
       ctx.restore();
     };
-    if (designLines > 1 && text !== orig) {
-      // A two-line design: the original words' two-line size is the designed size; typed wording takes the same lines
-      // (balanced), shrinking to the minimum; one line when it's short enough to sit on one at that size.
+    if (designLines > 1) {
+      // A two-line design (the original words too, in any font): the original words' two-line size is the designed size;
+      // the wording takes the same lines (balanced), shrinking to the minimum; one line when it's short enough to sit on
+      // one at that size. Centred in the lettering's box, so a font change never moves or shrinks the title.
       const n = designLines, capO = capOf(orig), oL = splitBalanced(ctx, orig) || [orig];
       const pD = Math.min((h + growUp) / (capO * (n + GAP * (n - 1))), 100 * w / Math.max(1, ...oL.map((l) => ctx.measureText(l).width)));
       for (let p = pD; p >= pD * rule.min - 1e-6; p -= pD * .02) {
         const one = ctx.measureText(text).width * p / 100 <= w;
         const L = one ? [text] : (splitBalanced(ctx, text) || [text]);
-        if (L.every((l) => ctx.measureText(l).width * p / 100 <= w)) { done(L, p, true); return; }
+        if (L.every((l) => ctx.measureText(l).width * p / 100 <= w)) { done(L, p, true, false, w, true); return; }
       }
       // Too long even at the minimum: the design's lines filled in reading order, "…" where the wording is cut.
       const p = pD * rule.min;
@@ -2490,7 +2502,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
       const W2 = wrapWords(ctx, text, w), L = W2.slice(0, n);
       L[L.length - 1] = ellipsize(ctx, L[L.length - 1], w, undefined, W2.length > n);
       ctx.font = `${weight} 100px "${fam}", Georgia, serif`;
-      done(L.map((l) => { ctx.font = `${weight} ${p}px "${fam}", Georgia, serif`; const e = ellipsize(ctx, l, w); ctx.font = `${weight} 100px "${fam}", Georgia, serif`; return e; }), p, false); return;
+      done(L.map((l) => { ctx.font = `${weight} ${p}px "${fam}", Georgia, serif`; const e = ellipsize(ctx, l, w); ctx.font = `${weight} 100px "${fam}", Georgia, serif`; return e; }), p, false, false, w, true); return;
     }
     // 1–3: one line at the designed size, shrinking (widening into growLeft first) down to the minimum.
     let px = Math.min(px0, fitPx(text, w));
@@ -3979,6 +3991,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
   const LETTER_ROLE = { 'pink-prayer': 'plate', 'pink-journal': 'highlight', 'pink-journaling': 'plate', 'pink-suggestions': 'ink', 'pink-dear': 'ink', 'pink-date': 'ink',
     'pw-prayer': 'plate', 'pw-journal': 'plate', 'pw-dove': 'ink', 'pw-date': 'ink', 'ww-title': 'plate', 'ww-sub': 'plate', 'ww-tagline': 'frame',
     'jg-title': 'plate', 'jg-sub': 'trim' };
+  const TITLE_ART = { prayer: 'pink-prayer', warrior: 'pw-prayer', warring: 'ww-title', jg: 'jg-title' };
   // Cover titles typed in the cover font when Cover lettering = Custom font.
   const LETTER_TEXT = { 'pink-prayer': 'PRAYER', 'pink-journal': 'JOURNAL', 'pw-prayer': 'PRAYER', 'pw-journal': 'JOURNAL', 'ww-title': 'WARRING WOMAN', 'ww-sub': 'PRAYER JOURNAL', 'jg-title': 'JESUS GIRL', 'jg-sub': 'PROPHETIC JOURNAL' };
   // Date labels end at their writing line with open header space to their left: typed wording may widen into it (Canva px).
@@ -4103,7 +4116,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     warrior: [['washes', 'Watercolor wash + edge strips'], ['card', 'White card + border'], ['glow', 'Center glow'], ['figure', 'Girl with the sword'], ['signature', 'Dove Expressions signature']],
     warring: [['washes', 'Edge strips (inside pages)'], ['archer', 'Archer'], ['ring', 'Gold ring'], ['circle', 'Title circle'], ['spiral', 'Spiral binding'], ['tagline', 'Tagline'], ['card', 'White card (inside pages)'], ['glow', 'Glow (inside pages)']],
     mwg: [['washes', 'Watercolor (cover + back)'], ['rules', 'Gold rules'], ['sidebar', 'Prompt sidebars'], ['bands', 'Belongs To bands']],
-    jg: [['washes', 'Watercolor clouds'], ['plate', 'Title plate'], ['divider', 'Title divider'], ['sprigs', 'Leaf sprigs + laurels'], ['arch', 'Welcome arch'], ['sidebar', 'Prompt sidebar']],
+    jg: [['washes', 'Watercolor clouds'], ['divider', 'Title divider'], ['sprigs', 'Leaf sprigs + laurels'], ['arch', 'Welcome arch'], ['sidebar', 'Prompt sidebar']],
   };
   function drawPr(ctx, W, H, s, list) {
     const { k, ox, oy } = prFit(W, H), p = s.palette, pal = s.prayerArt === 'palette';
@@ -4170,6 +4183,19 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     // Real type in the artwork's own box: cover titles in Custom font, and any lettering whose wording was edited (the
     // artwork can only say its original words). Titles use the cover font; labels and headings use the heading font.
     const slot = LETTER_SLOT[name];
+    // Subtitle line = "Same size as the title": the subtitle typed in the cover font at the title's line size (narrowed only
+    // as much as the title's width needs), centred where the subtitle sits.
+    if (slot === 'coverSubtitle' && s.subtitleStyle === 'match' && TITLE_ART[s.journal]) {
+      const tn = TITLE_ART[s.journal], [, , tw, th] = LETTERING[tn], text = T(s, slot);
+      if (!text) return;
+      let px = th / (LETTER_GROW[tn]?.lines || 1) * .78 * k * (s.coverFontScale || 100) / 100 * tyScale();
+      const fam = tyFam(s.coverFont), set = () => { ctx.font = `${tyWeight(500)} ${px}px "${fam}", Georgia, serif`; };
+      ctx.save(); ctx.fillStyle = color; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; set();
+      const maxW = Math.max(tw, w) * k, mw = ctx.measureText(text).width;
+      if (mw > maxW) { px *= maxW / mw; set(); }
+      ctx.fillText(text, ox + (l + w / 2) * k, oy + (t + h / 2) * k); ctx.restore();
+      return;
+    }
     const typed = TY && (TY.font || TY.size !== 100 || TY.bold != null);           // a page/section font or size: set this lettering as type
     if ((s.titleStyle === 'custom' && isTitle) || (slot && textEdited(s, slot)) || typed) {
       const text = slot ? T(s, slot) : LETTER_TEXT[name], orig = slot ? textSlot(s.journal, slot)?.text ?? text : text;
@@ -4340,7 +4366,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     }
     const mean = Ls.reduce((a, b) => a + b, 0) / Ls.length, spread = Math.sqrt(Ls.reduce((a, b) => a + (b - mean) ** 2, 0) / Ls.length), now = stat(res.ink);
     res.halo = now.r3 < .97 || spread > .12;
-    if (s.plateStyle === 'none' && !titleFillColor(s) && (now.r3 < .9 || spread > .16)) {
+    if ((s.plateStyle === 'none' || s.plateStyle === 'design') && !titleFillColor(s) && (now.r3 < .9 || spread > .16)) {
       // Faint veil, tight around the title: light behind dark lettering, dark behind light lettering.
       const light = relLum(res.ink) < .35, pad = 16 * prFit(W, H).k, blur = 22 * prFit(W, H).k, off = W + r.w + 4 * blur;
       ctx.save(); ctx.globalAlpha = .34; ctx.shadowColor = light ? p.paper : '#1E1B18'; ctx.shadowBlur = blur; ctx.shadowOffsetX = off;
@@ -4644,13 +4670,13 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
   }
   // Cover lettering typed in the cover font (letter-spaced capitals allowed), wrapped and shrunk to its box.
   // measure: return the widest line's width (Canva px) instead of drawing.
-  function coverType(ctx, W, H, s, text, { l, t, w, size, lh = 1.1, ls = 0, maxLines = 1, italic = false, family = 'cover', color, upper = false, measure = false }) {
+  function coverType(ctx, W, H, s, text, { l, t, w, size, lh = 1.1, ls = 0, maxLines = 1, italic = false, family = 'cover', color, upper = false, measure = false, minFit = TEXT_MIN_FIT }) {
     const { k, ox, oy } = prFit(W, H), fam = family === 'cover' ? s.coverFont : s.bodyFont, scale = (family === 'cover' ? s.coverFontScale : s.bodyFontScale) / 100;
     let px = size * k * scale; const str = upper ? text.toUpperCase() : text;
     const set = () => { ctx.font = `${italic ? 'italic ' : ''}400 ${px}px "${fam}", Georgia, serif`; if ('letterSpacing' in ctx) ctx.letterSpacing = `${ls * px}px`; };
     ctx.save(); ctx.fillStyle = color; set();
     const lines = () => wrapText(ctx, str, 0, 0, w * k, px * lh, 'center', false) / (px * lh);
-    while (lines() > maxLines && px > size * k * scale * TEXT_MIN_FIT) { px *= .96; set(); }
+    while (lines() > maxLines && px > size * k * scale * minFit) { px *= .96; set(); }
     if (measure) {
       let widest = 0;
       for (const para of str.split('\n')) {
@@ -4736,10 +4762,13 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     ['mwg-cover-7', 148.94, 751.71, 403.37, 334.54], ['mwg-cover-8', 422.5, 765.65, 386.82, 320.6], ['mwg-cover-9', 502.65, 835.35, 306.67, 250.91]];
   // Title, rule and subtitle, centred on the page (in Canva they sat 0.3 in right of centre).
   const MWG_TITLE = { l: 133.35, t: 326.4, w: 549.3, size: 79, lh: 1.01, ls: .105, maxLines: 2, upper: true };
-  const MWG_SUB = { l: 118, t: 532.8, w: 580, size: 26.4, lh: 1.1, italic: true, family: 'body' };
+  const MWG_SUB0 = { l: 118, t: 532.8, w: 580, size: 26.4, lh: 1.1, italic: true, family: 'body' };
+  // Subtitle line = "Same size as the title": the title's own treatment (cover font, capitals, spacing) at its size, on
+  // one line, narrowed only as much as the title group's width needs.
+  const mwgSub = (s) => (s.subtitleStyle === 'match' ? { ...MWG_TITLE, t: 530, maxLines: 1, minFit: .2 } : MWG_SUB0);
   // The title group's content box, measured from the words actually set (custom wording or font changes its width).
   function mwgTitleBox(ctx, W, H, s) {
-    const w = Math.max(coverType(ctx, W, H, s, T(s, 'coverTitle'), { ...MWG_TITLE, measure: true }), coverType(ctx, W, H, s, T(s, 'coverSubtitle'), { ...MWG_SUB, measure: true }), 470.2) + 8;
+    const w = Math.max(coverType(ctx, W, H, s, T(s, 'coverTitle'), { ...MWG_TITLE, measure: true }), coverType(ctx, W, H, s, T(s, 'coverSubtitle'), { ...mwgSub(s), measure: true }), 470.2) + 8;
     return [408 - w / 2, 326.4, w, 239];
   }
   function renderCoverMwg(ctx, W, H, s) {
@@ -4749,7 +4778,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     withTitleGroup(ctx, W, H, s, L, () => haloed(ctx, H, A.ink, A.halo, () => {
       coverType(ctx, W, H, s, T(s, 'coverTitle'), { ...MWG_TITLE, color: A.ink });
       drawPr(ctx, W, H, s, [['mwg-gold-rule', 172.9, 508.4, 470.2, 10.7, 0, -71.3, -1.2, 599.4, 15]]);
-      coverType(ctx, W, H, s, T(s, 'coverSubtitle'), { ...MWG_SUB, color: A.ink });
+      coverType(ctx, W, H, s, T(s, 'coverSubtitle'), { ...mwgSub(s), color: A.ink });
     }));
   }
   function backMwg(ctx, W, H, s) {
@@ -4771,7 +4800,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     const L = prCoverExtras(ctx, W, H, s);
     // The design's own frosted plate (unless another plate is picked or it's switched off) is part of the title group,
     // and the lettering reads on it as designed.
-    const ownPlate = s.plateStyle === 'none' && !prOff(s, 'plate');
+    const ownPlate = s.plateStyle === 'design';
     if (ownPlate) { withTitleGroup(ctx, W, H, s, L, () => drawPr(ctx, W, H, s, [JG_COVER.plate])); L.onPlate = L.ownPlate = true; }
     const A = titleAssist(ctx, W, H, s, L, letterColor(s, 'jg-title', L.onPlate && !L.ownPlate)), ink = A.changed ? A.ink : null;
     withTitleGroup(ctx, W, H, s, L, () => {
@@ -5451,7 +5480,8 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     const bgIds = state.journal === 'dream' ? slots.backgroundSlot : ['bg-journal', ...slots.backgroundSlot];
     buildSlotSeg('marbleSeg', [...bgIds, ...uploadIds()], currentBackgroundAsset(), (id, asset) => { state.marble = asset.textureKey || asset.renderer; commit(true); });   // stays on the page you're on
     buildDecorSlots(slots);
-    buildSlotSeg('plateSeg', slots.titlePlateSlot, currentPlateAsset(), (id, asset) => { state.plateStyle = asset.shape; commit(true); });
+    const plates = state.journal === 'jg' ? ['plate-design', ...slots.titlePlateSlot] : slots.titlePlateSlot;
+    buildSlotSeg('plateSeg', plates, currentPlateAsset(), (id, asset) => { state.plateStyle = asset.shape; commit(true); });
   }
 
   // ---------- Decorative slot controls ----------
@@ -5615,7 +5645,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
       if (state.journal === 'warrior' || state.journal === 'warring') out.push({ key: 'figure', figure: true, group: 'Design', label: state.journal === 'warrior' ? 'The girl with the sword' : 'The archer',
         hint: state.figureColor ? 'Your color (↺ to follow the palette again)' : 'Follows the watercolor until you pick a color', toggle: null });
       // Plate + accent colors appear only once a plate / accent is actually on the cover.
-      if (state.plateStyle !== 'none') out.push(...['plate', 'frame', 'trim', 'title'].filter((k) => k !== 'plate' || state.plateStyle !== 'ring').map((key) => ({ ...byKey[key], group: 'Title plate' })));
+      if (state.plateStyle !== 'none' && state.plateStyle !== 'design') out.push(...['plate', 'frame', 'trim', 'title'].filter((k) => k !== 'plate' || state.plateStyle !== 'ring').map((key) => ({ ...byKey[key], group: 'Title plate' })));
       if (state.accent !== 'none' || Object.values(state.decor).some((d) => d.show && ASSET_REGISTRY[d.asset]?.art === 'mask')) out.push({ ...byKey.accent, group: 'Accent' });
       return [...out, { ...byKey.paper, group: 'Page', toggle: null }, { ...byKey.line, group: 'Page', toggle: null }];
     }
@@ -5646,7 +5676,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
       const own = TEXTURES[m]?.roles || {};
       add('stone', 'Marble', ...(own.stone || [])); add('vein', 'Marble', ...(own.vein || [])); add('highlight', 'Marble', ...(own.highlight || []));
     }
-    const plated = !['none', 'ring'].includes(state.plateStyle);
+    const plated = !['none', 'ring', 'design'].includes(state.plateStyle);
     if (plated) { add('plate', 'Title plate'); add('frame', 'Title plate'); }
     add('trim', 'Title plate'); add('title', 'Title plate');
     if (state.accent !== 'none' || Object.values(state.decor).some((d) => d.show && ASSET_REGISTRY[d.asset]?.art === 'mask')) add('accent', 'Accent');
@@ -5779,7 +5809,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     for (const id of ['texture', 'veinStrength', 'plateOpacity', 'titleShadow', 'accentOpacity']) $(id).value = state[id];
     const marbleBg = !['abstract', 'floral', 'blush', 'journal', 'solid'].includes(state.marble) && !state.marble.startsWith('img:');
     for (const id of ['texture', 'veinStrength']) $(id).closest('.slider').classList.toggle('hidden', !marbleBg);
-    $('plateOpacity').closest('.slider').classList.toggle('hidden', ['none', 'ring'].includes(state.plateStyle));
+    $('plateOpacity').closest('.slider').classList.toggle('hidden', ['none', 'ring', 'design'].includes(state.plateStyle));
     $('textureVal').textContent = state.texture + '%';
     $('veinVal').textContent = state.veinStrength + '%';
     $('plateVal').textContent = state.plateOpacity + '%';
@@ -6030,10 +6060,11 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
         <label class="field"><span>Color</span><select data-k="color">${TYPO_COLORS.map(([v, n]) => `<option value="${v}">${n}</option>`).join('')}</select></label></div>
         <label class="field custom-row"><span>Custom color</span><input type="color" data-k="hex"></label>
         <label class="slider"><span>Size <b></b></span><input type="range" min="60" max="160" step="5" data-k="size"></label>
-        <div class="role"><label><input type="checkbox" data-k="bold"> Bold</label></div>
+        <label class="field"><span>Weight</span><select data-k="bold"><option value="">As designed</option><option value="1">Bold</option><option value="0">Not bold</option></select></label>
         <span class="hint warn hidden"></span>`;
       sec.querySelector('.reset').onclick = () => { setTypo(role, { font: '', color: null, size: 100, bold: null }); };
-      sec.querySelector('[data-k=bold]').onchange = (e) => setTypo(role, { bold: e.target.checked ? true : null });
+      // Three states, so design-bold text can be made regular too (a checkbox could only add bold).
+      sec.querySelector('[data-k=bold]').onchange = (e) => setTypo(role, { bold: e.target.value === '' ? null : e.target.value === '1' });
       sec.querySelector('[data-k=font]').onchange = (e) => setTypo(role, { font: e.target.value });
       sec.querySelector('[data-k=color]').onchange = (e) => {
         const v = e.target.value;
@@ -6053,11 +6084,11 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
       sec.querySelector('[data-k=color]').value = !c ? '' : c.mode === 'custom' ? 'custom' : `palette:${c.role}`;
       sec.querySelector('[data-k=hex]').value = c?.mode === 'custom' ? c.hex : (c ? state.palette[c.role] : '#2A1A18') || '#2A1A18';
       sec.querySelector('.custom-row').classList.toggle('hidden', c?.mode !== 'custom');
-      sec.querySelector('[data-k=bold]').checked = !!o.bold;
+      sec.querySelector('[data-k=bold]').value = o.bold == null ? '' : o.bold ? '1' : '0';
       const sz = o.size ?? 100; sec.querySelector('[data-k=size]').value = sz; sec.querySelector('.slider b').textContent = `${sz}%`;
       sec.querySelector('.reset').disabled = !Object.keys(o).length;
       const cn = !c ? '' : c.mode === 'custom' ? 'custom color' : (TYPO_COLORS.find(([v]) => v === `palette:${c.role}`)?.[1] || '').replace('Palette · ', '');
-      sec.querySelector('.sum').textContent = [o.font, cn, sz !== 100 ? `${sz}%` : '', o.bold ? 'bold' : ''].filter(Boolean).join(' · ') || 'Journal default';
+      sec.querySelector('.sum').textContent = [o.font, cn, sz !== 100 ? `${sz}%` : '', o.bold === true ? 'bold' : o.bold === false ? 'not bold' : ''].filter(Boolean).join(' · ') || 'Journal default';
     });
     if (popRole && !pop.contains(document.activeElement)) renderPop();   // changes made elsewhere (Page settings, undo)
   }
@@ -6369,11 +6400,11 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     'figureColor', 'prHide', 'prCardOpacity', 'prGlow', 'titleFill', 'readingPanels', 'artOverlay', 'titlePos'];
   // The fonts each Canva design uses (Meetings with God: Playfair title, Cinzel headings, Cardo text; Jesus Girl: Playfair
   // headings, Libre Baskerville text). The others use the studio's Cinzel + Cormorant.
-  const JOURNAL_FONTS = { mwg: { coverFont: 'Playfair Display', headingFont: 'Cinzel', bodyFont: 'Cardo' }, jg: { coverFont: 'Playfair Display', headingFont: 'Playfair Display', bodyFont: 'Libre Baskerville' } };
+  const JOURNAL_FONTS = { mwg: { coverFont: 'Playfair Display', headingFont: 'Cinzel', bodyFont: 'Cardo' }, jg: { coverFont: 'Playfair Display', headingFont: 'Playfair Display', bodyFont: 'Libre Baskerville', plateStyle: 'design' } };
   function journalDefaultLook(j) {
     const pal = JOURNALS[j]?.palette && paletteByName(JOURNALS[j].palette);
-    return pal ? { palette: { ...pal }, prayerArt: 'original', titleStyle: 'serif', coverFont: 'Cinzel', coverFontColorAuto: true, headingFont: 'Cormorant Garamond', bodyFont: 'Cormorant Garamond', ...(JOURNAL_FONTS[j] || {}),
-      plateStyle: 'none', showPlate: true, showFrame: true, showTrim: true, accent: 'none', decor: structuredClone(DEFAULTS.decor), marble: 'journal', bgArt: 'original', figureColor: null, prHide: {}, artOverlay: false, titlePos: { x: 0, y: 0 }, prCardOpacity: 85, prGlow: 100, titleFill: structuredClone(DEFAULTS.titleFill), readingPanels: structuredClone(DEFAULTS.readingPanels) } : null;
+    return pal ? { palette: { ...pal }, prayerArt: 'original', titleStyle: 'serif', coverFont: 'Cinzel', coverFontColorAuto: true, headingFont: 'Cormorant Garamond', bodyFont: 'Cormorant Garamond',
+      plateStyle: 'none', showPlate: true, showFrame: true, showTrim: true, accent: 'none', decor: structuredClone(DEFAULTS.decor), marble: 'journal', bgArt: 'original', figureColor: null, prHide: {}, artOverlay: false, titlePos: { x: 0, y: 0 }, prCardOpacity: 85, prGlow: 100, titleFill: structuredClone(DEFAULTS.titleFill), readingPanels: structuredClone(DEFAULTS.readingPanels), ...(JOURNAL_FONTS[j] || {}) } : null;
   }
   function applyLook(look, j = state.journal) {
     if (!look) return;
