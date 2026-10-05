@@ -6,6 +6,7 @@
  * never by branching on raw option fields. The UI writes the raw fields.
  */
 import type { LayoutOptions } from "../../types/project";
+import type { Orientation } from "../../types/geometry";
 
 export type SpreadMode = "preserve" | "continuous";
 export type FillerKind = "notes" | "blank";
@@ -42,4 +43,48 @@ export function weeklyPlanNotesOf(o: Pick<LayoutOptions, "weeklyPlanNotes">): bo
 
 export function weeklyPlanPrioritiesOf(o: Pick<LayoutOptions, "weeklyPlanPriorities">): boolean {
   return o.weeklyPlanPriorities ?? true;
+}
+
+/** The planner sections that can each carry their own page orientation. */
+export type PlannerSection = "monthly" | "weekly" | "daily";
+
+/** Which layouts belong to each planner section. */
+const SECTION_LAYOUTS: Record<PlannerSection, readonly string[]> = {
+  monthly: ["planner-monthly"],
+  weekly: ["planner-weekly-spread", "weekly-plan-spread", "weekly-plan-mwg-spread"],
+  daily: ["planner-daily", "daily-luxury-execution", "notepad-daily"],
+};
+
+const LAYOUT_SECTION = new Map<string, PlannerSection>();
+for (const [section, ids] of Object.entries(SECTION_LAYOUTS) as [PlannerSection, readonly string[]][]) {
+  for (const id of ids) LAYOUT_SECTION.set(id, section);
+}
+
+/** The planner section a layout belongs to, or null for non-planner layouts. */
+export function plannerSectionOf(layoutId: string): PlannerSection | null {
+  return LAYOUT_SECTION.get(layoutId) ?? null;
+}
+
+/**
+ * Page orientation for a planner layout: the section's override, or the
+ * project's orientation when the section has none.
+ */
+export function sectionPageOrientationOf(
+  o: Pick<LayoutOptions, "plannerPageOrientation">,
+  projectOrientation: Orientation,
+  layoutId: string,
+): Orientation {
+  const section = plannerSectionOf(layoutId);
+  if (!section) return projectOrientation;
+  return o.plannerPageOrientation?.[section] ?? projectOrientation;
+}
+
+/** The planner sections actually present in a list of layout ids. */
+export function plannerSectionsIn(layoutIds: readonly string[]): PlannerSection[] {
+  const seen = new Set<PlannerSection>();
+  for (const id of layoutIds) {
+    const s = plannerSectionOf(id);
+    if (s) seen.add(s);
+  }
+  return (["monthly", "weekly", "daily"] as PlannerSection[]).filter((s) => seen.has(s));
 }

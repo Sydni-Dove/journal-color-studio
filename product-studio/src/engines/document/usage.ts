@@ -6,7 +6,7 @@
  * solved output (which text roles and color tokens really appear).
  */
 import { dailySectionsOf } from "../../layouts/planner/dailyConfigurable";
-import { monthlySidebarOf, weeklySidebarOf } from "../../layouts/planner/plannerOptions";
+import { monthlySidebarOf, plannerSectionsIn, weeklySidebarOf, type PlannerSection } from "../../layouts/planner/plannerOptions";
 import { recipeSteps } from "../recipe/recipe";
 import type { FitResult, LayoutDefinition } from "../../layouts/shared/types";
 import type { FunctionalPatternKind } from "../../types/theme";
@@ -14,7 +14,7 @@ import type { ColorToken, FontGroup, TypographyRole, WordingKey } from "../../ty
 import { anchorsFor } from "../../layouts/shared/components";
 import type { CompositionAnchor } from "../../types/composition";
 import type { SemanticTextKey, TextAnchor } from "../../types/layout";
-import { compositionFor, recipeLayouts, representativeGeometry, solvePage, type ResolvedDocument } from "./resolve";
+import { compositionFor, recipeLayouts, representativeGeometry, solvePage, trimForPage, type ResolvedDocument } from "./resolve";
 
 export type ProjectUsage = {
   layouts: { layout: LayoutDefinition; fit: FitResult }[];
@@ -31,6 +31,10 @@ export type ProjectUsage = {
   weeklyPlanSections: { supported: boolean };
   /** Planner-level facing-page behavior (preserve spreads vs continuous flow). */
   spreadBehavior: { supported: boolean };
+  /** Planner sections present in the product (for per-section page orientation). */
+  plannerSections: PlannerSection[];
+  /** The product mixes page orientations (e.g. landscape monthlies, portrait dailies). */
+  mixedPageOrientation: boolean;
   datePlacement: boolean;
   sectionsPerDay: boolean;
   /** A Classic Weekly spread is in the product: its days can be columns or rows. */
@@ -171,6 +175,10 @@ export function computeUsage(doc: ResolvedDocument): ProjectUsage {
     weeklyPlanSections: { supported: layouts.some((l) => l.layout.id === "weekly-plan-spread" || l.layout.id === "weekly-plan-mwg-spread") },
     // Facing-page behavior matters for paged products with two-page spreads.
     spreadBehavior: { supported: doc.recipe.pages.some((p) => p.side !== "single") && layouts.some((l) => l.layout.pages === 2) },
+    // Per-section page orientation matters when a planner section is present;
+    // the export dialog offers per-orientation scopes when orientations mix.
+    plannerSections: plannerSectionsIn(layouts.map((l) => l.layout.id)),
+    mixedPageOrientation: new Set(doc.recipe.pages.map((p, i) => trimForPage(doc, p, i).orientation)).size > 1,
     datePlacement: any((c) => c.supportsDatePlacement),
     dailySections: daily,
     scheduleTimes: any((c) => !!c.supportsScheduleTimes),

@@ -4,7 +4,7 @@
  */
 import { ROLE_LABEL, rolesFor } from "../../design-library/placement";
 import { DAILY_SECTIONS, dailySectionsOf, type DailySection } from "../../layouts/planner/dailyConfigurable";
-import { fillerKindOf, monthlySidebarOf, spreadModeOf, weeklyNotesOf, weeklyPlanNotesOf, weeklyPlanPrioritiesOf, weeklySidebarOf } from "../../layouts/planner/plannerOptions";
+import { fillerKindOf, monthlySidebarOf, spreadModeOf, weeklyNotesOf, weeklyPlanNotesOf, weeklyPlanPrioritiesOf, weeklySidebarOf, type PlannerSection } from "../../layouts/planner/plannerOptions";
 import { findAsset } from "../../design-library/library";
 import { applyVariant, resolveDocument, type ResolvedDocument } from "../../engines/document/resolve";
 import { PageThumb } from "../preview/PageThumb";
@@ -44,6 +44,9 @@ const SIDEBAR_HEADINGS: WordingKey[] = ["notes", "priorities", "topPriorities", 
 export type LayoutPart = "layout" | "writing" | "add";
 const PART_TITLE: Record<LayoutPart, string> = { layout: "Page options", writing: "Writing space", add: "Extra sections" };
 
+/** Labels for the planner sections that can each carry their own page orientation. */
+const SECTION_LABEL: Record<PlannerSection, string> = { monthly: "Monthly", weekly: "Weekly", daily: "Daily" };
+
 /**
  * Page-level options, in the part of the editor they belong to:
  *   layout  — how the page is arranged (date position, schedule times, page numbers, footer)
@@ -55,7 +58,7 @@ export function LayoutPanel({ project, update, usage, nav, part = "layout" }: Pa
   const set = (patch: Partial<ProductProject["layoutOptions"]>) => update((p) => ({ ...p, layoutOptions: { ...p.layoutOptions, ...patch } }));
   const is = { layout: part === "layout", writing: part === "writing", add: part === "add" };
   const any = is.layout
-    ? usage.weeklyOrientation.supported || usage.datePlacement || (usage.scheduleTimes && !usage.dailySections) || usage.pageNumbers || usage.footer || usage.spreadBehavior.supported
+    ? usage.weeklyOrientation.supported || usage.datePlacement || (usage.scheduleTimes && !usage.dailySections) || usage.pageNumbers || usage.footer || usage.spreadBehavior.supported || usage.plannerSections.length > 0
     : is.writing
       ? usage.sectionsPerDay || usage.writingRows
       : usage.sidebar.supported || usage.weeklyNotes.supported || usage.weeklyPlanSections.supported || usage.dailySections;
@@ -185,6 +188,35 @@ export function LayoutPanel({ project, update, usage, nav, part = "layout" }: Pa
               onChange={(fillerKind) => set({ fillerKind })}
             />
           )}
+        </>
+      )}
+      {is.layout && usage.plannerSections.length > 0 && (
+        <>
+          <h4 className="subhead">Page orientation</h4>
+          {usage.plannerSections.map((section) => {
+            const current = o.plannerPageOrientation?.[section] ?? project.dimensions.orientation;
+            return (
+              <Segmented
+                key={section}
+                label={`${SECTION_LABEL[section]} pages`}
+                value={current}
+                options={[
+                  { value: "portrait", label: "Portrait" },
+                  { value: "landscape", label: "Landscape" },
+                ]}
+                onChange={(orientation) => {
+                  const next = { ...o.plannerPageOrientation };
+                  if (orientation === project.dimensions.orientation) delete next[section];
+                  else next[section] = orientation as "portrait" | "landscape";
+                  set({ plannerPageOrientation: next });
+                }}
+              />
+            );
+          })}
+          <p className="hint">
+            Each planner section can use its own page orientation — for example, landscape monthlies with portrait dailies.
+            {usage.mixedPageOrientation ? " This product mixes orientations: export each one separately under Print / Save PDF." : ""}
+          </p>
         </>
       )}
     </Section>

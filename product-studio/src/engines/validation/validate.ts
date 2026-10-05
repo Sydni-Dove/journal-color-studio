@@ -160,7 +160,7 @@ function checkText(node: Extract<LayoutNode, { type: "text" }>, doc: ResolvedDoc
 
 export function validatePage(doc: ResolvedDocument, index: number, measure: TextMeasurer, solved?: SolvedPage): ValidationIssue[] {
   const page = doc.recipe.pages[index];
-  const g = geometryFor(doc, page);
+  const g = geometryFor(doc, page, index);
   const s = solved ?? solvePage(doc, index);
   const issues: ValidationIssue[] = [];
   const counts = new Map<string, number>();

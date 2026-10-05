@@ -77,6 +77,12 @@ export type LayoutOptions = {
    * What a required filler page carries in preserve mode. Absent = "notes".
    */
   fillerKind?: "notes" | "blank";
+  /**
+   * Page orientation per planner section. Each section absent here follows the
+   * project's orientation. Lets one planner carry e.g. landscape monthly pages
+   * with portrait daily/weekly pages.
+   */
+  plannerPageOrientation?: { monthly?: Orientation; weekly?: Orientation; daily?: Orientation };
   sidebarContent: WordingKey;
   sidebarWidthIn: number;
   sectionsPerDay: number;
@@ -117,7 +123,7 @@ export type LayoutOptions = {
 };
 
 export type ExportSettings = {
-  scope: "full" | "current-page" | "page-range";
+  scope: "full" | "current-page" | "page-range" | "landscape-pages" | "portrait-pages";
   pageRange?: { from: number; to: number };
   /** Pads: emit the master sheet once (false) or once per physical sheet (true). */
   repeatSheets: boolean;
