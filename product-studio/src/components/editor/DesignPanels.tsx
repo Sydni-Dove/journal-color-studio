@@ -4,7 +4,7 @@
  */
 import { ROLE_LABEL, rolesFor } from "../../design-library/placement";
 import { DAILY_SECTIONS, dailySectionsOf, type DailySection } from "../../layouts/planner/dailyConfigurable";
-import { fillerKindOf, monthlySidebarOf, spreadModeOf, weeklyNotesOf, weeklyPlanNotesOf, weeklyPlanPrioritiesOf, weeklySidebarOf, type PlannerSection } from "../../layouts/planner/plannerOptions";
+import { fillerKindOf, monthlyArrangementOf, monthlySidebarOf, spreadModeOf, weeklyNotesOf, weeklyPlanNotesOf, weeklyPlanPrioritiesOf, weeklySidebarOf, type PlannerSection } from "../../layouts/planner/plannerOptions";
 import { findAsset } from "../../design-library/library";
 import { applyVariant, resolveDocument, type ResolvedDocument } from "../../engines/document/resolve";
 import { PageThumb } from "../preview/PageThumb";
@@ -188,6 +188,24 @@ export function LayoutPanel({ project, update, usage, nav, part = "layout" }: Pa
               onChange={(fillerKind) => set({ fillerKind })}
             />
           )}
+        </>
+      )}
+      {is.layout && usage.monthlySidebar.supported && (
+        <>
+          <Segmented
+            label="Monthly calendar style"
+            value={monthlyArrangementOf(o)}
+            options={[
+              { value: "classic", label: "Classic" },
+              { value: "sideways", label: "Sideways" },
+            ]}
+            onChange={(monthlyArrangement) => set({ monthlyArrangement })}
+          />
+          <p className="hint">
+            {monthlyArrangementOf(o) === "sideways"
+              ? "Weekdays run down the side and weeks go across — wide day cells that fill the page. The monthly sidebar stays off in sideways months."
+              : "The classic 7-column month grid."}
+          </p>
         </>
       )}
       {is.layout && usage.plannerSections.length > 0 && (
