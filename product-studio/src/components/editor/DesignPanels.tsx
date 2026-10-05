@@ -4,6 +4,7 @@
  */
 import { ROLE_LABEL, rolesFor } from "../../design-library/placement";
 import { DAILY_SECTIONS, dailySectionsOf, type DailySection } from "../../layouts/planner/dailyConfigurable";
+import { fillerKindOf, monthlySidebarOf, spreadModeOf, weeklyNotesOf, weeklyPlanNotesOf, weeklyPlanPrioritiesOf, weeklySidebarOf } from "../../layouts/planner/plannerOptions";
 import { findAsset } from "../../design-library/library";
 import { applyVariant, resolveDocument, type ResolvedDocument } from "../../engines/document/resolve";
 import { PageThumb } from "../preview/PageThumb";
@@ -53,7 +54,11 @@ export function LayoutPanel({ project, update, usage, nav, part = "layout" }: Pa
   const o = project.layoutOptions;
   const set = (patch: Partial<ProductProject["layoutOptions"]>) => update((p) => ({ ...p, layoutOptions: { ...p.layoutOptions, ...patch } }));
   const is = { layout: part === "layout", writing: part === "writing", add: part === "add" };
-  const any = is.layout ? usage.weeklyOrientation.supported || usage.datePlacement || (usage.scheduleTimes && !usage.dailySections) || usage.pageNumbers || usage.footer : is.writing ? usage.sectionsPerDay || usage.writingRows : usage.sidebar.supported || usage.dailySections;
+  const any = is.layout
+    ? usage.weeklyOrientation.supported || usage.datePlacement || (usage.scheduleTimes && !usage.dailySections) || usage.pageNumbers || usage.footer || usage.spreadBehavior.supported
+    : is.writing
+      ? usage.sectionsPerDay || usage.writingRows
+      : usage.sidebar.supported || usage.weeklyNotes.supported || usage.weeklyPlanSections.supported || usage.dailySections;
   if (!any) return null;
   return (
     <Section title={PART_TITLE[part]} open={part !== "layout" || usage.weeklyOrientation.supported}>
@@ -72,7 +77,7 @@ export function LayoutPanel({ project, update, usage, nav, part = "layout" }: Pa
           onChange={(datePlacement) => set({ datePlacement })}
         />
       )}
-      {is.add && usage.sidebar.supported && (
+      {is.add && usage.sidebar.supported && !usage.monthlySidebar.supported && !usage.weeklySidebar.supported && (
         <>
           {usage.sidebar.available && <AppliesTo ids={usage.consumers.sidebar} nav={nav} />}
           <label className="check">
@@ -88,11 +93,61 @@ export function LayoutPanel({ project, update, usage, nav, part = "layout" }: Pa
           {o.showSidebar && usage.sidebar.available && (
             <>
               <Select label="Sidebar heading" value={o.sidebarContent} options={SIDEBAR_HEADINGS.map((k) => ({ value: k, label: DEFAULT_WORDING[k] }))} onChange={(sidebarContent) => set({ sidebarContent })} />
-              {usage.layouts.some((l) => l.layout.id !== "planner-weekly-spread" && l.layout.capability.supportsSidebar) && (
+              <NumberField label="Sidebar width" suffix="inches" step={0.05} min={0.5} value={o.sidebarWidthIn} onChange={(sidebarWidthIn) => set({ sidebarWidthIn })} />
+            </>
+          )}
+        </>
+      )}
+      {is.add && (usage.monthlySidebar.supported || usage.weeklySidebar.supported) && (
+        <>
+          {usage.monthlySidebar.supported && (
+            <SidebarToggle
+              label="Monthly sidebar"
+              checked={monthlySidebarOf(o) && usage.monthlySidebar.available}
+              disabled={!usage.monthlySidebar.available}
+              reason={usage.monthlySidebar.reason}
+              appliesTo={usage.consumers.monthlySidebar}
+              nav={nav}
+              onChange={(monthlySidebar) => set({ monthlySidebar })}
+            />
+          )}
+          {usage.weeklySidebar.supported && (
+            <SidebarToggle
+              label="Weekly sidebar"
+              checked={weeklySidebarOf(o) && usage.weeklySidebar.available}
+              disabled={!usage.weeklySidebar.available}
+              reason={usage.weeklySidebar.reason}
+              appliesTo={usage.consumers.weeklySidebar}
+              nav={nav}
+              onChange={(weeklySidebar) => set({ weeklySidebar })}
+            />
+          )}
+          {(monthlySidebarOf(o) && usage.monthlySidebar.available || weeklySidebarOf(o) && usage.weeklySidebar.available) && (
+            <>
+              <Select label="Sidebar heading" value={o.sidebarContent} options={SIDEBAR_HEADINGS.map((k) => ({ value: k, label: DEFAULT_WORDING[k] }))} onChange={(sidebarContent) => set({ sidebarContent })} />
+              {usage.monthlySidebar.supported && (
                 <NumberField label="Sidebar width" suffix="inches" step={0.05} min={0.5} value={o.sidebarWidthIn} onChange={(sidebarWidthIn) => set({ sidebarWidthIn })} />
               )}
             </>
           )}
+        </>
+      )}
+      {is.add && usage.weeklyNotes.supported && !weeklySidebarOf(o) && (
+        <label className="check">
+          <input type="checkbox" checked={weeklyNotesOf(o)} onChange={(e) => set({ weeklyNotes: e.target.checked })} />
+          <span>Weekly notes slot <span className="hint">— the extra slot beside the days; off gives the days its space</span></span>
+        </label>
+      )}
+      {is.add && usage.weeklyPlanSections.supported && (
+        <>
+          <label className="check">
+            <input type="checkbox" checked={weeklyPlanNotesOf(o)} onChange={(e) => set({ weeklyPlanNotes: e.target.checked })} />
+            <span>Weekly plan notes <span className="hint">— the notes foot under the week's days</span></span>
+          </label>
+          <label className="check">
+            <input type="checkbox" checked={weeklyPlanPrioritiesOf(o)} onChange={(e) => set({ weeklyPlanPriorities: e.target.checked })} />
+            <span>Weekly priorities <span className="hint">— the priorities checklist closing the week</span></span>
+          </label>
         </>
       )}
       {is.writing && usage.sectionsPerDay && <AppliesTo ids={usage.consumers.sectionsPerDay} nav={nav} />}
@@ -109,7 +164,60 @@ export function LayoutPanel({ project, update, usage, nav, part = "layout" }: Pa
       )}
       {is.layout && usage.pageNumbers && <Check label="Page numbers" checked={o.showPageNumbers} onChange={(showPageNumbers) => set({ showPageNumbers })} />}
       {is.layout && usage.footer && <Check label="Footer with the product name" checked={o.showFooter} onChange={(showFooter) => set({ showFooter })} />}
+      {is.layout && usage.spreadBehavior.supported && (
+        <>
+          <Segmented
+            label="Facing pages"
+            value={spreadModeOf(o)}
+            options={[{ value: "preserve", label: "Preserve spreads" }, { value: "continuous", label: "Continuous pages" }]}
+            onChange={(spreadMode) => set({ spreadMode })}
+          />
+          <p className="hint">
+            {spreadModeOf(o) === "preserve"
+              ? "A filler page keeps every two-page spread opening on a left-hand page."
+              : "Pages flow with no filler pages; spreads may open on either side."}
+          </p>
+          {spreadModeOf(o) === "preserve" && (
+            <Select
+              label="Filler pages hold"
+              value={fillerKindOf(o)}
+              options={[{ value: "notes", label: "Notes" }, { value: "blank", label: "Blank" }]}
+              onChange={(fillerKind) => set({ fillerKind })}
+            />
+          )}
+        </>
+      )}
     </Section>
+  );
+}
+
+/**
+ * One planner family's sidebar switch. Monthly and weekly sidebars are
+ * independent: each planner type keeps its own toggle.
+ */
+function SidebarToggle({ label, checked, disabled, reason, appliesTo, nav, onChange }: {
+  label: string;
+  checked: boolean;
+  disabled: boolean;
+  reason?: string;
+  appliesTo: string[];
+  nav: EditorNav;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <>
+      {!disabled && <AppliesTo ids={appliesTo} nav={nav} />}
+      <label className="check">
+        <input type="checkbox" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} />
+        <span>{label}{disabled ? " (not available at this size)" : ""}</span>
+      </label>
+      {disabled && reason && (
+        <>
+          <p className="hint">There isn't room for a sidebar at this page size.</p>
+          <TechnicalDetails label="Show details">{reason}</TechnicalDetails>
+        </>
+      )}
+    </>
   );
 }
 

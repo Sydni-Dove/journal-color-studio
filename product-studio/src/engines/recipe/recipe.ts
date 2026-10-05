@@ -19,6 +19,12 @@ export type RecipeContext = {
   pagesPerInstance: (layoutId: string) => 1 | 2;
   /** True for book-like products where pages alternate recto/verso. */
   paged: boolean;
+  /**
+   * Facing-page behavior: "preserve" (default) inserts a filler page so a
+   * two-page spread never opens on a right-hand page; "continuous" flows
+   * pages with no fillers.
+   */
+  spreadMode?: "preserve" | "continuous";
   /** Layout used for inserted filler pages. */
   fillerLayoutId: string;
   /** Composite books: the period a layout needs, and its label (for diagnostics). */
@@ -169,7 +175,8 @@ export function expandRecipe(recipe: ProductRecipe, ctx: RecipeContext): Expande
 
   for (const u of units) {
     const pk = periodKey(u.period);
-    if (u.pages === 2 && ctx.paged && pageNumber % 2 === 1) {
+    const preserveSpreads = (ctx.spreadMode ?? "preserve") === "preserve";
+    if (u.pages === 2 && ctx.paged && preserveSpreads && pageNumber % 2 === 1) {
       // A spread must open on a verso (left page).
       pages.push({
         key: `filler:${fillerCount++}`,

@@ -6,6 +6,7 @@
  * solved output (which text roles and color tokens really appear).
  */
 import { dailySectionsOf } from "../../layouts/planner/dailyConfigurable";
+import { monthlySidebarOf, weeklySidebarOf } from "../../layouts/planner/plannerOptions";
 import { recipeSteps } from "../recipe/recipe";
 import type { FitResult, LayoutDefinition } from "../../layouts/shared/types";
 import type { FunctionalPatternKind } from "../../types/theme";
@@ -20,6 +21,16 @@ export type ProjectUsage = {
   patterns: FunctionalPatternKind[];
   lineStyle: boolean;
   sidebar: { supported: boolean; available: boolean; reason?: string };
+  /** Monthly calendar's sidebar, independent of the weekly one. */
+  monthlySidebar: { supported: boolean; available: boolean; reason?: string };
+  /** Weekly spread's sidebar, independent of the monthly one. */
+  weeklySidebar: { supported: boolean; available: boolean; reason?: string };
+  /** The weekly spread's extra Notes slot (only exists when its sidebar is off). */
+  weeklyNotes: { supported: boolean };
+  /** Weekly plan spread's Notes / Priorities foot sections. */
+  weeklyPlanSections: { supported: boolean };
+  /** Planner-level facing-page behavior (preserve spreads vs continuous flow). */
+  spreadBehavior: { supported: boolean };
   datePlacement: boolean;
   sectionsPerDay: boolean;
   /** A Classic Weekly spread is in the product: its days can be columns or rows. */
@@ -44,7 +55,7 @@ export type ProjectUsage = {
   /** Composition anchors present on the product's pages (decoration placement). */
   compositionAnchors: CompositionAnchor[];
   /** Layouts that visibly consume each page-scoped control (for "applies to … pages" hints). */
-  consumers: { pattern: string[]; sidebar: string[]; datePlacement: string[]; sectionsPerDay: string[]; writingRows: string[] };
+  consumers: { pattern: string[]; sidebar: string[]; monthlySidebar: string[]; weeklySidebar: string[]; datePlacement: string[]; sectionsPerDay: string[]; writingRows: string[] };
 };
 
 export function computeUsage(doc: ResolvedDocument): ProjectUsage {
@@ -55,9 +66,24 @@ export function computeUsage(doc: ResolvedDocument): ProjectUsage {
   const sidebarLayouts = layouts.filter((l) => l.layout.capability.supportsSidebar);
   const sidebarAvailable = sidebarLayouts.some((l) => l.fit.ok && l.fit.sidebarAvailable);
   const sidebarReason = sidebarLayouts.map((l) => (l.fit.ok ? l.fit.sidebarReason : l.fit.reason)).find(Boolean);
+  // Monthly and weekly sidebars are independent switches: availability is per layout family.
+  const sidebarUsage = (ids: string[]) => {
+    const ls = sidebarLayouts.filter((l) => ids.includes(l.layout.id));
+    const available = ls.some((l) => l.fit.ok && l.fit.sidebarAvailable);
+    return {
+      supported: ls.length > 0,
+      available,
+      reason: available ? undefined : ls.map((l) => (l.fit.ok ? l.fit.sidebarReason : l.fit.reason)).find(Boolean),
+    };
+  };
+  const monthlySidebar = sidebarUsage(["planner-monthly"]);
+  const weeklySidebar = sidebarUsage(["planner-weekly-spread"]);
 
   const patterns = [...new Set(caps.flatMap((c) => c.supportsPatterns))];
-  const showSidebar = doc.project.layoutOptions.showSidebar && sidebarAvailable;
+  // Either sidebar showing pulls its heading's wording into the product.
+  const monthlyOn = monthlySidebarOf(doc.project.layoutOptions) && monthlySidebar.available;
+  const weeklyOn = weeklySidebarOf(doc.project.layoutOptions) && weeklySidebar.available;
+  const showSidebar = monthlyOn || weeklyOn;
   const wording = new Set<WordingKey>(caps.flatMap((c) => c.wordingKeys));
   if (showSidebar) wording.add(doc.project.layoutOptions.sidebarContent);
   // Daily pages render the chosen sections' headings.
@@ -122,8 +148,10 @@ export function computeUsage(doc: ResolvedDocument): ProjectUsage {
   const okIds = (f: (l: (typeof layouts)[number]) => boolean) => layouts.filter((l) => l.fit.ok && f(l)).map((l) => l.layout.id);
   const consumers = {
     // Monthly pages only draw a writing surface inside the notes sidebar.
-    pattern: okIds((l) => l.layout.capability.supportsPatterns.length > 0 && (l.layout.id !== "planner-monthly" || (showSidebar && l.fit.ok && l.fit.sidebarAvailable))),
+    pattern: okIds((l) => l.layout.capability.supportsPatterns.length > 0 && (l.layout.id !== "planner-monthly" || (monthlyOn && l.fit.ok && l.fit.sidebarAvailable))),
     sidebar: okIds((l) => l.layout.capability.supportsSidebar && l.fit.ok && l.fit.sidebarAvailable),
+    monthlySidebar: okIds((l) => l.layout.id === "planner-monthly" && l.fit.ok && l.fit.sidebarAvailable),
+    weeklySidebar: okIds((l) => l.layout.id === "planner-weekly-spread" && l.fit.ok && l.fit.sidebarAvailable),
     datePlacement: okIds((l) => l.layout.capability.supportsDatePlacement),
     sectionsPerDay: okIds((l) => l.layout.capability.supportsSectionsPerDay && l.fit.ok && l.fit.variant === "vertical"),
     writingRows: okIds((l) => l.layout.capability.supportsWritingRows),
@@ -137,6 +165,12 @@ export function computeUsage(doc: ResolvedDocument): ProjectUsage {
     patterns,
     lineStyle: any((c) => c.supportsLineStyle),
     sidebar: { supported: sidebarLayouts.length > 0, available: sidebarAvailable, reason: sidebarAvailable ? undefined : sidebarReason },
+    monthlySidebar,
+    weeklySidebar,
+    weeklyNotes: { supported: layouts.some((l) => l.layout.id === "planner-weekly-spread") },
+    weeklyPlanSections: { supported: layouts.some((l) => l.layout.id === "weekly-plan-spread" || l.layout.id === "weekly-plan-mwg-spread") },
+    // Facing-page behavior matters for paged products with two-page spreads.
+    spreadBehavior: { supported: doc.recipe.pages.some((p) => p.side !== "single") && layouts.some((l) => l.layout.pages === 2) },
     datePlacement: any((c) => c.supportsDatePlacement),
     dailySections: daily,
     scheduleTimes: any((c) => !!c.supportsScheduleTimes),

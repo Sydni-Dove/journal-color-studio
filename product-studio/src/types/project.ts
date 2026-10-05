@@ -46,6 +46,37 @@ export type LayoutPlacement = "top-left" | "top-right" | "top-center";
 export type LayoutOptions = {
   datePlacement: LayoutPlacement;
   showSidebar: boolean;
+  /**
+   * Monthly calendar's notes sidebar, independent of the weekly sidebar.
+   * Absent = showSidebar (the legacy master switch).
+   */
+  monthlySidebar?: boolean;
+  /**
+   * Weekly spread's sidebar, independent of the monthly sidebar.
+   * Absent = showSidebar (the legacy master switch).
+   */
+  weeklySidebar?: boolean;
+  /**
+   * Weekly spread's extra Notes slot (shown when its sidebar is off).
+   * Absent = true. When false the seven days reclaim the slot's space.
+   */
+  weeklyNotes?: boolean;
+  /**
+   * Weekly plan spread's foot sections. Absent = true. When false the day
+   * rows reclaim the foot's space.
+   */
+  weeklyPlanNotes?: boolean;
+  weeklyPlanPriorities?: boolean;
+  /**
+   * Facing-page behavior for paged (book-like) products. "preserve" inserts
+   * a filler page so every two-page spread opens on a left-hand page;
+   * "continuous" flows pages with no fillers. Absent = "preserve".
+   */
+  spreadMode?: "preserve" | "continuous";
+  /**
+   * What a required filler page carries in preserve mode. Absent = "notes".
+   */
+  fillerKind?: "notes" | "blank";
   sidebarContent: WordingKey;
   sidebarWidthIn: number;
   sectionsPerDay: number;

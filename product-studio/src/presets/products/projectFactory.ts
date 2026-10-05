@@ -13,6 +13,8 @@ export const DEFAULT_LAYOUT_OPTIONS: LayoutOptions = {
   showSidebar: false,
   sidebarContent: "notes",
   sidebarWidthIn: STUDIO_PLANNER.monthlySidebar.valueIn,
+  spreadMode: "preserve",
+  fillerKind: "notes",
   sectionsPerDay: STUDIO_PLANNER.sectionsPerDay,
   hourStart: STUDIO_PLANNER.hourStart,
   hourEnd: STUDIO_PLANNER.hourEnd,

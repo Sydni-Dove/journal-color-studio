@@ -23,6 +23,7 @@ import { lineBoxIn, stackDiagnostic } from "../shared/nodes";
 import type { FitContext, FitResult, LayoutDefinition } from "../shared/types";
 import { FILL_IN, isUndated, MONTH_NAMES } from "../../engines/calendar/calendar";
 import { heuristicMeasurer, styleForRole } from "../../engines/typography/textMeasure";
+import { monthlySidebarOf } from "./plannerOptions";
 
 /** Widest month title any month can produce ("September 2027"), measured in the title role. */
 function widestTitleIn(ctx: FitContext): number {
@@ -83,7 +84,7 @@ export function fitMonthly(ctx: FitContext): FitResult {
       ? `A ${ctx.options.sidebarWidthIn}" sidebar would take more than ${Math.round(STUDIO_MONTHLY_VARIANTS.maxSidebarShare * 100)}% of this page's width.`
       : "The page is too narrow for a sidebar beside a full 7-column grid.";
   for (const v of VARIANTS) {
-    if (titleFits(ctx) && fits(measure(ctx, v, v.allowsSidebar && ctx.options.showSidebar && sidebarFits), v)) {
+    if (titleFits(ctx) && fits(measure(ctx, v, v.allowsSidebar && monthlySidebarOf(ctx.options) && sidebarFits), v)) {
       return { ok: true, variant: v.id, variantLabel: v.label, sidebarAvailable: v.allowsSidebar && sidebarFits, sidebarReason: v.allowsSidebar ? sidebarReason : `${v.label} has no sidebar.` };
     }
   }
@@ -138,13 +139,15 @@ export const monthlyCalendar: LayoutDefinition = {
       return [{ nodes: [], metrics: [], diagnostics: [{ severity: "error", rule: "layout-incompatible", componentId: "planner-monthly", message: fit.reason }] }];
     }
     const v = VARIANTS.find((x) => x.id === fit.variant)!;
-    const showSidebar = ctx.options.showSidebar && fit.sidebarAvailable;
+    // The monthly sidebar is its own switch (it no longer follows the weekly sidebar).
+    const wantSidebar = monthlySidebarOf(ctx.options);
+    const showSidebar = wantSidebar && fit.sidebarAvailable;
 
     const frame = pageFrame(ctx, 0, { headerH: v.zones.titleH.valueIn });
     const title = headerTitle("month-header", ctx, frame.zones, "monthYear", isUndated(ctx.calendar) ? `Month ${FILL_IN}` : `${month.name} ${month.year}`, "monthTitle", "header-left");
     const nodes: LayoutNode[] = [...frame.nodes, ...title.nodes];
     const diagnostics = [...frame.diagnostics, ...title.diagnostics];
-    if (ctx.options.showSidebar && !showSidebar) {
+    if (wantSidebar && !showSidebar) {
       diagnostics.push({ severity: "info", rule: "sidebar-unavailable", componentId: "month-sidebar", message: `Sidebar hidden: ${fit.sidebarReason}` });
     }
 

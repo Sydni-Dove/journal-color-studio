@@ -11,7 +11,8 @@
  * Colors and decorative themes are applied at render time only, so changing
  * them never re-solves geometry or dates.
  */
-import { getLayout, FILLER_LAYOUT_ID, LAYOUTS } from "../../layouts/registry";
+import { getLayout, FILLER_LAYOUT_ID, BLANK_FILLER_LAYOUT_ID, LAYOUTS } from "../../layouts/registry";
+import { fillerKindOf, spreadModeOf } from "../../layouts/planner/plannerOptions";
 import type { FitResult, LayoutContext, LayoutDefinition } from "../../layouts/shared/types";
 import { getBindingProfile } from "../../presets/bindingProfiles/bindingProfiles";
 import { getPrintProfile } from "../../presets/printProfiles/printProfiles";
@@ -150,12 +151,15 @@ export function resolveDocument(input: ProductProject): ResolvedDocument {
   const base = {
     calendar,
     paged,
-    fillerLayoutId: FILLER_LAYOUT_ID,
+    spreadMode: spreadModeOf(project.layoutOptions),
+    fillerLayoutId: fillerKindOf(project.layoutOptions) === "blank" ? BLANK_FILLER_LAYOUT_ID : FILLER_LAYOUT_ID,
     pagesPerInstance: (id: string) => getLayout(id).pages,
     layoutPeriod: (id: string) => getLayout(id).period,
     layoutLabel: (id: string) => getLayout(id).label,
   };
-  const recipeKey = JSON.stringify([project.recipe, project.calendar, paged]);
+  // The recipe key covers everything expansion reads: recipe, calendar,
+  // paging, and the facing-page behavior (spread mode + filler kind).
+  const recipeKey = JSON.stringify([project.recipe, project.calendar, paged, base.spreadMode, base.fillerLayoutId]);
   let recipe = recipeCache.get(recipeKey, () => expandRecipe(project.recipe, base));
   // Content that continues on more pages (prompt + response pages): measure against this product's page, then
   // expand again with the continuation pages. (Geometry depends on the page count only through the spine, so
