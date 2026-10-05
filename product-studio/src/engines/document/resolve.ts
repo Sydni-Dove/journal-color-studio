@@ -12,7 +12,7 @@
  * them never re-solves geometry or dates.
  */
 import { getLayout, FILLER_LAYOUT_ID, BLANK_FILLER_LAYOUT_ID, LAYOUTS } from "../../layouts/registry";
-import { fillerKindOf, spreadModeOf } from "../../layouts/planner/plannerOptions";
+import { fillerKindOf, monthlyArrangementOf, spreadModeOf } from "../../layouts/planner/plannerOptions";
 import type { FitResult, LayoutContext, LayoutDefinition } from "../../layouts/shared/types";
 import { getBindingProfile } from "../../presets/bindingProfiles/bindingProfiles";
 import { getPrintProfile } from "../../presets/printProfiles/printProfiles";
@@ -25,6 +25,7 @@ import { resolveWording } from "../../presets/wording";
 import type { BindingProfile } from "../../types/binding";
 import type { CalendarData, WeekStart } from "../../types/calendar";
 import type { PageGeometry } from "../../types/geometry";
+import { turnGeometry90CW } from "../geometry/turn";
 import type { SolvedPage } from "../../types/layout";
 import type { PrintProfile } from "../../types/print";
 import type { ProductTypeDefinition } from "../../types/product";
@@ -298,11 +299,30 @@ function facingHeader(doc: ResolvedDocument, index: number): number | undefined 
   return h > 0 ? h : undefined;
 }
 
+/**
+ * True when the page's content is designed in landscape and rotated 90° onto
+ * the portrait sheet (the rotated monthly calendar).
+ */
+export function isRotatedMonthly(doc: ResolvedDocument, page: PageInstance): boolean {
+  return page.layoutId === "planner-monthly" && monthlyArrangementOf(doc.project.layoutOptions) === "rotated";
+}
+
+/**
+ * The geometry a page's CONTENT is solved in. Rotated monthly pages solve in
+ * landscape (the turned geometry); everything else solves in the paper
+ * geometry. Renderers pair this with the solved nodes; the paper geometry
+ * stays portrait for the sheet, preview frame, and print sizing.
+ */
+export function contentGeometryFor(doc: ResolvedDocument, page: PageInstance | Pick<PageInstance, "side">, index?: number): PageGeometry {
+  const g = geometryFor(doc, page, index);
+  return "layoutId" in page && isRotatedMonthly(doc, page as PageInstance) ? turnGeometry90CW(g) : g;
+}
+
 /** Solve the page at `index` (solving its whole spread when needed). */
 export function solvePage(doc: ResolvedDocument, index: number): SolvedPage {
   const group = instancePages(doc, index);
   const layout = getLayout(group[0].layoutId);
-  const geometries = group.map((p, k) => geometryFor(doc, p, index + k));
+  const geometries = group.map((p, k) => contentGeometryFor(doc, p, index + k));
   const typeSizes = Object.fromEntries(Object.entries(doc.typography.roles).map(([k, r]) => [k, [r.sizePt, r.lineHeight, r.group, r.weight, r.style, r.trackingEm, r.transform]]));
   const facingHeaderIn = layout.alignsHeader && group.length === 1 ? facingHeader(doc, index) : undefined;
   // The layout id is part of the key: two recipe steps (or one step whose
@@ -388,5 +408,5 @@ export function recipeLayouts(doc: ResolvedDocument): { layout: LayoutDefinition
 
 /** Composition (regions + protected content) of a page — what the renderer and validation both use. */
 export function compositionFor(doc: ResolvedDocument, index: number): Composition {
-  return resolveComposition(geometryFor(doc, doc.recipe.pages[index], index), solvePage(doc, index), doc.typography, doc.spacing);
+  return resolveComposition(contentGeometryFor(doc, doc.recipe.pages[index], index), solvePage(doc, index), doc.typography, doc.spacing);
 }

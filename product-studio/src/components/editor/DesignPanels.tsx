@@ -197,13 +197,13 @@ export function LayoutPanel({ project, update, usage, nav, part = "layout" }: Pa
             value={monthlyArrangementOf(o)}
             options={[
               { value: "classic", label: "Classic" },
-              { value: "sideways", label: "Sideways" },
+              { value: "rotated", label: "Rotated" },
             ]}
             onChange={(monthlyArrangement) => set({ monthlyArrangement })}
           />
           <p className="hint">
-            {monthlyArrangementOf(o) === "sideways"
-              ? "Weekdays run down the side and weeks go across — wide day cells that fill the page. The monthly sidebar stays off in sideways months."
+            {monthlyArrangementOf(o) === "rotated"
+              ? "The whole monthly design is laid out in landscape and turned 90° onto the portrait page — turn the planner to read it. Wide day cells, everything rotates together."
               : "The classic 7-column month grid."}
           </p>
         </>

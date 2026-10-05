@@ -18,6 +18,7 @@ import { fontStack } from "../presets/typography/typography";
 import { DecorativeLayer } from "../themes/DecorativeLayer";
 import { coverSurfaceColors, coverSurfaceTheme } from "../design-library/coverSurfaces";
 import { PatternLayer, StructureLayer, TextLayer } from "./nodes";
+import { turnGeometry90CW } from "../engines/geometry/turn";
 
 export function themeVars(colors: ColorTokens, typography: TypographySettings): CSSProperties {
   const vars: Record<string, string | number> = {};
@@ -57,8 +58,13 @@ export const SafeArea = ({ geometry: g, children }: { geometry: PageGeometry; ch
 const DEFAULT_SPACING = resolveSpacing("balanced");
 
 export const PrintablePage = memo(function PrintablePage({ geometry: g, solved, colors, typography, decorative, background, spacing = DEFAULT_SPACING, mode, overlay }: Props) {
+  // A rotated page (the rotated monthly calendar) is solved in landscape; its
+  // content geometry is the turned one, and the painted content is rotated 90°
+  // back onto the portrait sheet below.
+  const rotated = solved.contentRotation === 90;
+  const cg = rotated ? turnGeometry90CW(g) : g;
   // Composition regions + protected content come from the SAME solved nodes drawn below.
-  const composition = useMemo(() => resolveComposition(g, solved, typography, spacing), [g, solved, typography, spacing]);
+  const composition = useMemo(() => resolveComposition(cg, solved, typography, spacing), [cg, solved, typography, spacing]);
   // A cover's own surface (design library): drawn by the same renderer as a background, on this page only.
   const surface = useMemo(() => {
     if (!solved.surface) return null;
@@ -69,28 +75,56 @@ export const PrintablePage = memo(function PrintablePage({ geometry: g, solved, 
     width: `${g.mediaWidthIn}in`,
     height: `${g.mediaHeightIn}in`,
   };
-  return (
-    <div className={`ps-page ps-page--${mode}`} style={style}>
+  const content = (
+    <>
       {/* 1 background */}
       <div className="ps-layer ps-bg" />
       {/* 2 decorative */}
-      {surface && <DecorativeLayer geometry={g} theme={surface.theme} colors={surface.colors} composition={surface.composition} layer="surface" />}
-      {background && <DecorativeLayer geometry={g} theme={background} colors={colors} composition={composition} layer="background" />}
-      <DecorativeLayer geometry={g} theme={decorative} colors={colors} composition={composition} layer="elements" />
+      {surface && <DecorativeLayer geometry={cg} theme={surface.theme} colors={surface.colors} composition={surface.composition} layer="surface" />}
+      {background && <DecorativeLayer geometry={cg} theme={background} colors={colors} composition={composition} layer="background" />}
+      <DecorativeLayer geometry={cg} theme={decorative} colors={colors} composition={composition} layer="elements" />
       {/* 3 functional pattern */}
-      <SafeArea geometry={g}>
+      <SafeArea geometry={cg}>
         <PatternLayer nodes={solved.nodes} />
       </SafeArea>
       {/* 4 structure */}
-      <SafeArea geometry={g}>
+      <SafeArea geometry={cg}>
         <StructureLayer nodes={solved.nodes} />
       </SafeArea>
       {/* 5 text */}
-      <div className="ps-layer" style={{ left: `${g.trimOffset.x}in`, top: `${g.trimOffset.y}in`, width: `${g.trimWidthIn}in`, height: `${g.trimHeightIn}in` }}>
+      <div className="ps-layer" style={{ left: `${cg.trimOffset.x}in`, top: `${cg.trimOffset.y}in`, width: `${cg.trimWidthIn}in`, height: `${cg.trimHeightIn}in` }}>
         <TextLayer nodes={solved.nodes} typography={typography} />
       </div>
       {/* 6 user content — reserved */}
       {mode === "editor" ? overlay : null}
+    </>
+  );
+  if (!rotated) {
+    return (
+      <div className={`ps-page ps-page--${mode}`} style={style}>
+        {content}
+      </div>
+    );
+  }
+  // Rotated content: the landscape box is centered in the portrait frame and
+  // turned 90° clockwise, so it fills the sheet edge to edge.
+  const leftIn = (g.mediaWidthIn - cg.mediaWidthIn) / 2;
+  const topIn = (g.mediaHeightIn - cg.mediaHeightIn) / 2;
+  return (
+    <div className={`ps-page ps-page--${mode}`} style={{ ...style, position: "relative", overflow: "hidden" }}>
+      <div
+        style={{
+          position: "absolute",
+          left: `${leftIn}in`,
+          top: `${topIn}in`,
+          width: `${cg.mediaWidthIn}in`,
+          height: `${cg.mediaHeightIn}in`,
+          transform: "rotate(90deg)",
+          transformOrigin: "center center",
+        }}
+      >
+        {content}
+      </div>
     </div>
   );
 });

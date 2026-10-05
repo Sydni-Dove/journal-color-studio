@@ -14,17 +14,17 @@
  * reported incompatible — cells are never compressed below their minimum.
  */
 import { distributeEqual, solveStack } from "../../engines/layout/math";
-import { STUDIO_MONTHLY_VARIANTS, STUDIO_STROKES } from "../../presets/studioDefaults";
+import { STUDIO_MONTHLY_VARIANTS } from "../../presets/studioDefaults";
 import type { Rect } from "../../types/geometry";
-import type { CalendarData, CalendarMonth } from "../../types/calendar";
 import type { LayoutRegions } from "../../types/composition";
 import type { LayoutMetric, LayoutNode, SolvedPage } from "../../types/layout";
-import { CALENDAR_GRID_GAP_IN, calendarGrid, headerTitle, pageFrame, PLACEMENT_ALIGN, section, weekdayHeader } from "../shared/components";
-import { box, group, lineBoxIn, rule, stackDiagnostic, text } from "../shared/nodes";
-import type { FitContext, FitResult, LayoutContext, LayoutDefinition } from "../shared/types";
+import { CALENDAR_GRID_GAP_IN, calendarGrid, headerTitle, pageFrame, section, weekdayHeader } from "../shared/components";
+import { lineBoxIn, stackDiagnostic } from "../shared/nodes";
+import type { FitContext, FitResult, LayoutDefinition } from "../shared/types";
 import { FILL_IN, isUndated, MONTH_NAMES } from "../../engines/calendar/calendar";
 import { heuristicMeasurer, styleForRole } from "../../engines/typography/textMeasure";
 import { monthlyArrangementOf, monthlySidebarOf } from "./plannerOptions";
+import { turnGeometry90CW } from "../../engines/geometry/turn";
 
 /** Widest month title any month can produce ("September 2027"), measured in the title role. */
 function widestTitleIn(ctx: FitContext): number {
@@ -34,9 +34,6 @@ function widestTitleIn(ctx: FitContext): number {
 
 /** Month grids are sized for the universal 6-row case so every month fits the same structure. */
 const WORST_CASE_ROWS = 6;
-
-/** Sideways months give the weekday label column this fixed width; week columns share the rest. */
-const SIDEWAYS_LABEL_W_IN = 0.9;
 
 type VariantId = "full" | "compact" | "micro";
 type Variant = {
@@ -73,21 +70,6 @@ function measure(ctx: FitContext, v: Variant, withSidebar: boolean): Measure {
 
 const fits = (m: Measure, v: Variant) => m.colW + 1e-6 >= v.zones.minCellW.valueIn && m.rowH + 1e-6 >= v.zones.minCellH.valueIn;
 
-/** Cell size the sideways (weekday-rows) grid would get — same arithmetic the solver uses. */
-function measureSideways(ctx: FitContext, v: Variant): Measure {
-  const s = ctx.spacing;
-  const g = ctx.page;
-  const footer = ctx.options.showFooter || ctx.options.showPageNumbers ? lineBoxIn(ctx.typography, "footer") + s.footerGap : 0;
-  // No sidebar in sideways mode: the grid takes the full body width.
-  const gridW = g.usableWidthIn - 2 * s.page;
-  const gridH = g.usableHeightIn - 2 * s.page - v.zones.titleH.valueIn - s.headerGap - footer;
-  return {
-    gridW,
-    colW: (gridW - SIDEWAYS_LABEL_W_IN - WORST_CASE_ROWS * CALENDAR_GRID_GAP_IN) / WORST_CASE_ROWS,
-    rowH: (gridH - 6 * CALENDAR_GRID_GAP_IN) / 7,
-  };
-}
-/** The month title must fit the page width — a variant is never offered if its title would overflow. */
 const titleFits = (ctx: FitContext) => widestTitleIn(ctx) <= ctx.page.usableWidthIn - 2 * ctx.spacing.page + 1e-6;
 
 function sidebarBalanced(ctx: FitContext): boolean {
@@ -95,119 +77,37 @@ function sidebarBalanced(ctx: FitContext): boolean {
 }
 
 export function fitMonthly(ctx: FitContext): FitResult {
-  const sideways = monthlyArrangementOf(ctx.options) === "sideways";
+  // A rotated monthly is fitted against the landscape geometry its content is
+  // solved in (the reader turns the planner to read it).
+  const rotated = monthlyArrangementOf(ctx.options) === "rotated";
+  const rctx = rotated ? { ...ctx, page: turnGeometry90CW(ctx.page) } : ctx;
   const full = VARIANTS[0];
-  const sidebarFits = !sideways && sidebarBalanced(ctx) && fits(measure(ctx, full, true), full);
-  const sidebarReason = sideways
-    ? "Sideways months use the full page width — no sidebar."
-    : sidebarFits
-      ? undefined
-      : !sidebarBalanced(ctx)
-        ? `A ${ctx.options.sidebarWidthIn}" sidebar would take more than ${Math.round(STUDIO_MONTHLY_VARIANTS.maxSidebarShare * 100)}% of this page's width.`
-        : "The page is too narrow for a sidebar beside a full 7-column grid.";
+  const sidebarFits = sidebarBalanced(rctx) && fits(measure(rctx, full, true), full);
+  const sidebarReason = sidebarFits
+    ? undefined
+    : !sidebarBalanced(rctx)
+      ? `A ${rctx.options.sidebarWidthIn}" sidebar would take more than ${Math.round(STUDIO_MONTHLY_VARIANTS.maxSidebarShare * 100)}% of this page's width.`
+      : "The page is too narrow for a sidebar beside a full 7-column grid.";
   for (const v of VARIANTS) {
-    const m = sideways ? measureSideways(ctx, v) : measure(ctx, v, v.allowsSidebar && monthlySidebarOf(ctx.options) && sidebarFits);
-    if (titleFits(ctx) && fits(m, v)) {
+    const m = measure(rctx, v, v.allowsSidebar && monthlySidebarOf(rctx.options) && sidebarFits);
+    if (titleFits(rctx) && fits(m, v)) {
       return {
         ok: true,
         variant: v.id,
-        variantLabel: sideways ? `${v.label} (sideways)` : v.label,
-        sidebarAvailable: !sideways && v.allowsSidebar && sidebarFits,
+        variantLabel: rotated ? `${v.label} (rotated)` : v.label,
+        sidebarAvailable: v.allowsSidebar && sidebarFits,
         sidebarReason: v.allowsSidebar ? sidebarReason : `${v.label} has no sidebar.`,
       };
     }
   }
-  const m = sideways ? measureSideways(ctx, VARIANTS[VARIANTS.length - 1]) : measure(ctx, VARIANTS[VARIANTS.length - 1], false);
-  if (!titleFits(ctx)) {
-    return { ok: false, reason: `Too narrow for a monthly calendar: the month title needs ${widestTitleIn(ctx).toFixed(2)}" but the page has ${ctx.page.usableWidthIn.toFixed(2)}" of usable width.` };
+  const m = measure(rctx, VARIANTS[VARIANTS.length - 1], false);
+  if (!titleFits(rctx)) {
+    return { ok: false, reason: `Too narrow for a monthly calendar: the month title needs ${widestTitleIn(rctx).toFixed(2)}" but the page has ${rctx.page.usableWidthIn.toFixed(2)}" of usable width.` };
   }
   return {
     ok: false,
-    reason: `Too small for a monthly calendar: cells would be ${m.colW.toFixed(2)}" × ${m.rowH.toFixed(2)}" (minimum ${STUDIO_MONTHLY_VARIANTS.micro.minCellW.valueIn}" × ${STUDIO_MONTHLY_VARIANTS.micro.minCellH.valueIn}").`,
+    reason: `Too small for a monthly calendar: cells would be ${m.colW.toFixed(2)}" × ${m.rowH.toFixed(2)}" (minimum ${STUDIO_MONTHLY_VARIANTS.micro.minCellW.valueIn}" x ${STUDIO_MONTHLY_VARIANTS.micro.minCellH.valueIn}").`,
   };
-}
-
-/**
- * Sideways monthly calendar: 7 weekday rows × week columns (the bullet-journal
- * sideways calendar). The grid takes the full body width — no sidebar — so day
- * cells go wide instead of narrow and the month fills the page.
- */
-function solveSideways(
-  ctx: LayoutContext,
-  month: CalendarMonth,
-  v: Variant,
-  frame: ReturnType<typeof pageFrame>,
-  title: ReturnType<typeof headerTitle>,
-  calendar: CalendarData,
-): SolvedPage {
-  const s = ctx.spacing;
-  const nodes: LayoutNode[] = [...frame.nodes, ...title.nodes];
-  const diagnostics = [...frame.diagnostics, ...title.diagnostics];
-  const gridArea: Rect = frame.body;
-  const W = month.rows; // week columns
-
-  const weekX = gridArea.x + SIDEWAYS_LABEL_W_IN + CALENDAR_GRID_GAP_IN;
-  const weekW = gridArea.w - SIDEWAYS_LABEL_W_IN - CALENDAR_GRID_GAP_IN;
-  const cols = distributeEqual(weekX, weekW, W, CALENDAR_GRID_GAP_IN);
-  const rows = distributeEqual(gridArea.y, gridArea.h, 7, CALENDAR_GRID_GAP_IN);
-  const strokePt = STUDIO_STROKES.gridRulePt;
-  const dateH = lineBoxIn(ctx.typography, v.dateRole);
-  const align = PLACEMENT_ALIGN[ctx.options.datePlacement];
-  const labels = calendar.weekdayShortNames;
-
-  nodes.push(group("month-grid", "Grid", { ...gridArea },
-    { columnEdges: [gridArea.x, weekX, ...cols.edges.slice(1)], rowEdges: rows.edges }));
-  nodes.push(box("month-grid-border", { ...gridArea }, { component: "Grid", strokePt }));
-  // Shared interior rules: one line per boundary between adjacent tracks.
-  nodes.push(rule("month-grid-v0", weekX, gridArea.y, weekX, gridArea.y + gridArea.h, { strokePt, component: "Grid" }));
-  for (let c = 1; c < W; c++) {
-    const x = cols.starts[c];
-    nodes.push(rule(`month-grid-v${c}`, x, gridArea.y, x, gridArea.y + gridArea.h, { strokePt, component: "Grid" }));
-  }
-  for (let r = 1; r < 7; r++) {
-    const y = rows.starts[r];
-    nodes.push(rule(`month-grid-h${r}`, gridArea.x, y, gridArea.x + gridArea.w, y, { strokePt, component: "Grid" }));
-  }
-  // Weekday labels in the fixed leading column.
-  labels.forEach((l, d) => {
-    nodes.push(text(`month-dow-${d}`,
-      { x: gridArea.x, y: rows.starts[d], w: SIDEWAYS_LABEL_W_IN, h: rows.size },
-      l, v.weekdayRole, { align: "center", vAlign: "middle", component: "SectionHeader" }));
-  });
-  // Dates: month.grid[w][d] is week w, weekday d. Undated planners leave every box blank.
-  const undated = calendar.settings.undated;
-  month.grid.forEach((week, w) =>
-    week.forEach((cell, d) => {
-      if (!cell.inMonth || undated) return;
-      const cid = `month-grid-w${w}d${d}`;
-      nodes.push(group(cid, "CalendarCell", { x: cols.starts[w], y: rows.starts[d], w: cols.size, h: rows.size }));
-      nodes.push(text(`${cid}-date`,
-        { x: cols.starts[w] + s.dateToCellInset, y: rows.starts[d] + s.dateToCellInset, w: cols.size - 2 * s.dateToCellInset, h: dateH },
-        String(cell.day.day), v.dateRole, { component: "CalendarCell", align, vAlign: "top" }));
-    }),
-  );
-
-  // Solved cells must honor the variant minimum (guards against solver drift).
-  const colW = cols.size, rowH = rows.size;
-  if (colW + 1e-6 < v.zones.minCellW.valueIn || rowH + 1e-6 < v.zones.minCellH.valueIn) {
-    diagnostics.push({
-      severity: "error",
-      rule: "min-cell",
-      componentId: "month-grid",
-      message: `Sideways calendar cells are ${colW.toFixed(3)}" × ${rowH.toFixed(3)}", below the ${v.label} minimum ${v.zones.minCellW.valueIn}" × ${v.zones.minCellH.valueIn}".`,
-      measurement: { actualIn: Math.min(colW, rowH), limitIn: Math.min(v.zones.minCellW.valueIn, v.zones.minCellH.valueIn) },
-    });
-  }
-
-  const metrics: LayoutMetric[] = [
-    { label: "Variant", value: VARIANTS.indexOf(v), unit: "count", provenance: { geometryClass: "studio-recommended", basis: `${v.label} (sideways) — chosen from usable width` } },
-    { label: "Title zone", value: v.zones.titleH.valueIn, unit: "in", provenance: v.zones.titleH.provenance },
-    { label: "Weekday label column", value: SIDEWAYS_LABEL_W_IN, unit: "in", provenance: { geometryClass: "studio-recommended", basis: "sideways arrangement" } },
-    { label: "Week columns", value: W, unit: "count", provenance: { geometryClass: "user-design", basis: `natural weeks for ${month.name}` } },
-    { label: "Date cell width", value: colW, unit: "in", provenance: { geometryClass: "user-design", basis: `${weekW.toFixed(3)}" / ${W} week columns` } },
-  ];
-  const regions: LayoutRegions = { mainContent: frame.body, calendar: { ...gridArea } };
-  return { nodes, diagnostics, metrics, regions };
 }
 
 export const monthlyCalendar: LayoutDefinition = {
@@ -219,7 +119,7 @@ export const monthlyCalendar: LayoutDefinition = {
   id: "planner-monthly",
   label: "Monthly Calendar",
   family: "planner",
-  description: "Month title, weekday row, 7-column grid; full / compact / micro variants chosen by page size. Sideways arrangement: 7 weekday rows × week columns.",
+  description: "Month title, weekday row, 7-column grid; full / compact / micro variants chosen by page size. Rotated arrangement: the whole design is laid out in landscape and turned 90° onto the portrait sheet.",
   pages: 1,
   period: "month",
   capability: {
@@ -244,6 +144,10 @@ export const monthlyCalendar: LayoutDefinition = {
     const monthKey = ctx.period.key;
     const month = ctx.calendar.months.find((m) => m.key === monthKey);
     if (!month) throw new Error(`Month ${monthKey} not in calendar.`);
+    // When rotated, solvePage hands us the turned landscape geometry; we solve the
+    // classic monthly design in it and flag the page so the renderer turns the
+    // painted content 90° back onto the portrait sheet.
+    const rotated = monthlyArrangementOf(ctx.options) === "rotated";
     const g = ctx.pages[0];
     const s = ctx.spacing;
     const fit = fitMonthly({ page: g, spacing: s, typography: ctx.typography, options: ctx.options });
@@ -257,10 +161,6 @@ export const monthlyCalendar: LayoutDefinition = {
 
     const frame = pageFrame(ctx, 0, { headerH: v.zones.titleH.valueIn });
     const title = headerTitle("month-header", ctx, frame.zones, "monthYear", isUndated(ctx.calendar) ? `Month ${FILL_IN}` : `${month.name} ${month.year}`, "monthTitle", "header-left");
-    // Sideways months solve the transposed grid (weekday rows × week columns) instead.
-    if (monthlyArrangementOf(ctx.options) === "sideways") {
-      return [solveSideways(ctx, month, v, frame, title, ctx.calendar)];
-    }
     const nodes: LayoutNode[] = [...frame.nodes, ...title.nodes];
     const diagnostics = [...frame.diagnostics, ...title.diagnostics];
     if (wantSidebar && !showSidebar) {
@@ -330,6 +230,6 @@ export const monthlyCalendar: LayoutDefinition = {
       regions.sidebar = sidebarRect;
       if (ctx.options.sidebarContent === "notes") regions.notes = sidebarRect;
     }
-    return [{ nodes, diagnostics, metrics, regions }];
+    return [{ nodes, diagnostics, metrics, regions, ...(rotated ? { contentRotation: 90 as const } : {}) }];
   },
 };

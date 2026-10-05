@@ -90,7 +90,7 @@ export function plannerSectionsIn(layoutIds: readonly string[]): PlannerSection[
 }
 
 /** Monthly calendar arrangement: the classic grid, or the sideways (bullet-journal) one. */
-export type MonthlyArrangement = "classic" | "sideways";
+export type MonthlyArrangement = "classic" | "rotated";
 
 /** How the monthly calendar is arranged. Absent = "classic". */
 export function monthlyArrangementOf(o: Pick<LayoutOptions, "monthlyArrangement">): MonthlyArrangement {

@@ -78,11 +78,12 @@ export type LayoutOptions = {
    */
   fillerKind?: "notes" | "blank";
   /**
-   * Monthly calendar arrangement. "classic" = 7 day-columns × week rows;
-   * "sideways" = 7 weekday rows × week columns (the bullet-journal sideways
-   * calendar) — day cells go wide and the grid fills the page. Absent = "classic".
+   * Monthly calendar arrangement. "classic" = 7 day-columns × week rows, read
+   * upright; "rotated" = the whole monthly design (title, weekday labels,
+   * grid, notes) is laid out in landscape and rotated 90° onto the portrait
+   * sheet, so the reader turns the planner to read it. Absent = "classic".
    */
-  monthlyArrangement?: "classic" | "sideways";
+  monthlyArrangement?: "classic" | "rotated";
   /**
    * Page orientation per planner section. Each section absent here follows the
    * project's orientation. Lets one planner carry e.g. landscape monthly pages
