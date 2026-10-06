@@ -5,8 +5,8 @@
  *   notes sidebar) is solved in LANDSCAPE against the turned page geometry,
  *   flagged with contentRotation: 90, and the renderer turns the painted
  *   content 90° clockwise onto the portrait sheet. The reader turns the
- *   physical planner to read it. Opt-in per product via
- *   layoutOptions.monthlyArrangement ("classic" | "rotated").
+ *   physical planner to read it. Rotated is the planner default; classic
+ *   remains available as an explicit layoutOptions.monthlyArrangement override.
  */
 import { describe, expect, it } from "vitest";
 import { contentGeometryFor, layoutAvailability, resolveDocument, solvePage } from "../src/engines/document/resolve";
@@ -46,8 +46,6 @@ describe("monthlyArrangementOf", () => {
 
 describe("turnGeometry90CW", () => {
   it("swaps width/height dimensions", () => {
-    const d = doc();
-    const i = d.recipe.pages.findIndex((p) => p.layoutId === "planner-monthly" && !p.filler);
     const classic = doc({ monthlyArrangement: "classic" });
     const ci = classic.recipe.pages.findIndex((p) => p.layoutId === "planner-monthly" && !p.filler);
     const g = contentGeometryFor(classic, classic.recipe.pages[ci], ci); // explicit classic: paper geometry
@@ -135,7 +133,7 @@ describe("rotated monthly solve", () => {
 
   it("the rotated grid is substantially wider than the classic portrait grid", () => {
     const dRot = doc({ monthlyArrangement: "rotated" });
-    const dClassic = doc();
+    const dClassic = doc({ monthlyArrangement: "classic" });
     const gridOf = (dd: ReturnType<typeof resolveDocument>) => {
       const i = dd.recipe.pages.findIndex((p) => p.layoutId === "planner-monthly" && !p.filler);
       return solvePage(dd, i).nodes.find((n) => n.id === "month-grid")!;
