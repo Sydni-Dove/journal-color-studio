@@ -9,7 +9,7 @@
  *   remains available as an explicit layoutOptions.monthlyArrangement override.
  */
 import { describe, expect, it } from "vitest";
-import { contentGeometryFor, layoutAvailability, resolveDocument, solvePage } from "../src/engines/document/resolve";
+import { contentGeometryFor, geometryFor, layoutAvailability, resolveDocument, solvePage } from "../src/engines/document/resolve";
 import { turnGeometry90CW } from "../src/engines/geometry/turn";
 import { monthlyArrangementOf } from "../src/layouts/planner/plannerOptions";
 import { addMonthly } from "../src/engines/recipe/pageBuilder";
@@ -135,7 +135,7 @@ describe("rotated monthly solve", () => {
     });
     const d = resolveDocument(p);
     const i = d.recipe.pages.findIndex((page) => page.layoutId === "planner-monthly" && !page.filler);
-    const physical = contentGeometryFor(d, { ...d.recipe.pages[i], layoutId: "not-monthly" } as never, i);
+    const physical = geometryFor(d, d.recipe.pages[i], i);
     const content = contentGeometryFor(d, d.recipe.pages[i], i);
     const solved = solvePage(d, i);
     expect([physical.trimWidthIn, physical.trimHeightIn, physical.orientation]).toEqual([8, 10, "portrait"]);
