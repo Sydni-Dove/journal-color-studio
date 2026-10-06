@@ -76,38 +76,47 @@ function sidebarBalanced(ctx: FitContext): boolean {
   return ctx.options.sidebarWidthIn <= ctx.page.usableWidthIn * STUDIO_MONTHLY_VARIANTS.maxSidebarShare + 1e-6;
 }
 
-export function fitMonthly(ctx: FitContext): FitResult {
-  // A rotated monthly is fitted against the landscape geometry its content is
-  // solved in (the reader turns the planner to read it).
-  const rotated = monthlyArrangementOf(ctx.options) === "rotated";
-  const rctx = rotated ? { ...ctx, page: turnGeometry90CW(ctx.page) } : ctx;
+/**
+ * Fit against CONTENT geometry. The caller must pass the geometry the layout
+ * will actually solve in. This avoids rotating an already-rotated monthly a
+ * second time inside solve().
+ */
+function fitMonthlyContent(ctx: FitContext, rotatedLabel: boolean): FitResult {
   const full = VARIANTS[0];
-  const sidebarFits = sidebarBalanced(rctx) && fits(measure(rctx, full, true), full);
+  const sidebarFits = sidebarBalanced(ctx) && fits(measure(ctx, full, true), full);
   const sidebarReason = sidebarFits
     ? undefined
-    : !sidebarBalanced(rctx)
-      ? `A ${rctx.options.sidebarWidthIn}" sidebar would take more than ${Math.round(STUDIO_MONTHLY_VARIANTS.maxSidebarShare * 100)}% of this page's width.`
+    : !sidebarBalanced(ctx)
+      ? `A ${ctx.options.sidebarWidthIn}" sidebar would take more than ${Math.round(STUDIO_MONTHLY_VARIANTS.maxSidebarShare * 100)}% of this page's width.`
       : "The page is too narrow for a sidebar beside a full 7-column grid.";
   for (const v of VARIANTS) {
-    const m = measure(rctx, v, v.allowsSidebar && monthlySidebarOf(rctx.options) && sidebarFits);
-    if (titleFits(rctx) && fits(m, v)) {
+    const m = measure(ctx, v, v.allowsSidebar && monthlySidebarOf(ctx.options) && sidebarFits);
+    if (titleFits(ctx) && fits(m, v)) {
       return {
         ok: true,
         variant: v.id,
-        variantLabel: rotated ? `${v.label} (rotated)` : v.label,
+        variantLabel: rotatedLabel ? `${v.label} (rotated)` : v.label,
         sidebarAvailable: v.allowsSidebar && sidebarFits,
         sidebarReason: v.allowsSidebar ? sidebarReason : `${v.label} has no sidebar.`,
       };
     }
   }
-  const m = measure(rctx, VARIANTS[VARIANTS.length - 1], false);
-  if (!titleFits(rctx)) {
-    return { ok: false, reason: `Too narrow for a monthly calendar: the month title needs ${widestTitleIn(rctx).toFixed(2)}" but the page has ${rctx.page.usableWidthIn.toFixed(2)}" of usable width.` };
+  const m = measure(ctx, VARIANTS[VARIANTS.length - 1], false);
+  if (!titleFits(ctx)) {
+    return { ok: false, reason: `Too narrow for a monthly calendar: the month title needs ${widestTitleIn(ctx).toFixed(2)}" but the page has ${ctx.page.usableWidthIn.toFixed(2)}" of usable width.` };
   }
   return {
     ok: false,
     reason: `Too small for a monthly calendar: cells would be ${m.colW.toFixed(2)}" × ${m.rowH.toFixed(2)}" (minimum ${STUDIO_MONTHLY_VARIANTS.micro.minCellW.valueIn}" x ${STUDIO_MONTHLY_VARIANTS.micro.minCellH.valueIn}").`,
   };
+}
+
+export function fitMonthly(ctx: FitContext): FitResult {
+  // Availability/header checks receive the physical page geometry. Rotate it
+  // once for a sideways month so fitting matches the landscape content space.
+  const rotated = monthlyArrangementOf(ctx.options) === "rotated";
+  const contentCtx = rotated ? { ...ctx, page: turnGeometry90CW(ctx.page) } : ctx;
+  return fitMonthlyContent(contentCtx, rotated);
 }
 
 export const monthlyCalendar: LayoutDefinition = {
@@ -150,7 +159,9 @@ export const monthlyCalendar: LayoutDefinition = {
     const rotated = monthlyArrangementOf(ctx.options) === "rotated";
     const g = ctx.pages[0];
     const s = ctx.spacing;
-    const fit = fitMonthly({ page: g, spacing: s, typography: ctx.typography, options: ctx.options });
+    // g is already the content geometry here. For rotated months solvePage() has
+    // already turned it to landscape, so do NOT rotate it again during fit.
+    const fit = fitMonthlyContent({ page: g, spacing: s, typography: ctx.typography, options: ctx.options }, rotated);
     if (!fit.ok) {
       return [{ nodes: [], metrics: [], diagnostics: [{ severity: "error", rule: "layout-incompatible", componentId: "planner-monthly", message: fit.reason }] }];
     }
