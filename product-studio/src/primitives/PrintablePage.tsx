@@ -106,31 +106,28 @@ export const PrintablePage = memo(function PrintablePage({ geometry: g, solved, 
       </div>
     );
   }
-  // Rotated content: the landscape box is centered in the portrait frame and
-  // turned 90° clockwise, so it fills the sheet edge to edge. Flex centering
-  // (not negative offsets) keeps it robust across browsers.
+  // Rotated content: use an explicit top-left transform instead of flex
+  // centering. Mobile Safari has repeatedly dropped/clipped absolutely-sized
+  // transformed children inside the scaled preview when their unrotated box
+  // is wider than the portrait page. This transform maps landscape content
+  // coordinates directly onto the portrait sheet:
+  //   x' = contentHeight - y, y' = x
+  // which is exactly the 90° clockwise geometry used by turnGeometry90CW().
   return (
     <div className={`ps-page ps-page--${mode}`} style={{ ...style, position: "relative", overflow: "hidden" }}>
       <div
+        data-rotated-content="90"
         style={{
           position: "absolute",
-          inset: 0,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
+          left: 0,
+          top: 0,
+          width: `${cg.mediaWidthIn}in`,
+          height: `${cg.mediaHeightIn}in`,
+          transformOrigin: "0 0",
+          transform: `translateX(${cg.mediaHeightIn}in) rotate(90deg)`,
         }}
       >
-        <div
-          style={{
-            position: "relative",
-            width: `${cg.mediaWidthIn}in`,
-            height: `${cg.mediaHeightIn}in`,
-            flex: "none",
-            transform: "rotate(90deg)",
-          }}
-        >
-          {content}
-        </div>
+        {content}
       </div>
     </div>
   );
