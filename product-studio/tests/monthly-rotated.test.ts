@@ -121,6 +121,30 @@ describe("rotated monthly solve", () => {
   });
 
 
+
+  it("ignores a saved monthly-landscape sheet override when the month is rotated", () => {
+    const p = createProject("planner", {
+      dimensions: { sizePresetId: "8x10", orientation: "portrait" },
+      production: paged,
+      calendar: { startDate: "2026-01-01", endDate: "2026-01-31", weekStart: 0, sixRowMonths: true },
+      recipe: { items: [], ordering: "chronological", structure: addMonthly([]) },
+      layoutOptions: {
+        monthlyArrangement: "rotated",
+        plannerPageOrientation: { monthly: "landscape" },
+      },
+    });
+    const d = resolveDocument(p);
+    const i = d.recipe.pages.findIndex((page) => page.layoutId === "planner-monthly" && !page.filler);
+    const physical = contentGeometryFor(d, { ...d.recipe.pages[i], layoutId: "not-monthly" } as never, i);
+    const content = contentGeometryFor(d, d.recipe.pages[i], i);
+    const solved = solvePage(d, i);
+    expect([physical.trimWidthIn, physical.trimHeightIn, physical.orientation]).toEqual([8, 10, "portrait"]);
+    expect([content.trimWidthIn, content.trimHeightIn, content.orientation]).toEqual([10, 8, "landscape"]);
+    expect(solved.contentRotation).toBe(90);
+    expect(solved.nodes.some((n) => n.id === "month-grid")).toBe(true);
+    expect(solved.diagnostics.some((x) => x.rule === "layout-incompatible" || x.rule === "layout-solver")).toBe(false);
+  });
+
   it("does not disappear on an 8x10 portrait planner when rotated", () => {
     const p = createProject("planner", {
       dimensions: { sizePresetId: "custom", custom: { width: 8, height: 10, unit: "in" }, orientation: "portrait" },
