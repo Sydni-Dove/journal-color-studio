@@ -37,9 +37,10 @@ const monthlySolved = (d: ReturnType<typeof resolveDocument>) => {
 const texts = (nodes: LayoutNode[]) => nodes.filter((n): n is TextNode => n.type === "text");
 
 describe("monthlyArrangementOf", () => {
-  it("defaults to classic", () => {
-    expect(monthlyArrangementOf({})).toBe("classic");
+  it("defaults to rotated while preserving an explicit classic choice", () => {
+    expect(monthlyArrangementOf({})).toBe("rotated");
     expect(monthlyArrangementOf({ monthlyArrangement: "rotated" })).toBe("rotated");
+    expect(monthlyArrangementOf({ monthlyArrangement: "classic" })).toBe("classic");
   });
 });
 
@@ -47,7 +48,9 @@ describe("turnGeometry90CW", () => {
   it("swaps width/height dimensions", () => {
     const d = doc();
     const i = d.recipe.pages.findIndex((p) => p.layoutId === "planner-monthly" && !p.filler);
-    const g = contentGeometryFor(d, d.recipe.pages[i], i); // classic: paper geometry
+    const classic = doc({ monthlyArrangement: "classic" });
+    const ci = classic.recipe.pages.findIndex((p) => p.layoutId === "planner-monthly" && !p.filler);
+    const g = contentGeometryFor(classic, classic.recipe.pages[ci], ci); // explicit classic: paper geometry
     const t = turnGeometry90CW(g);
     expect(t.trimWidthIn).toBeCloseTo(g.trimHeightIn, 6);
     expect(t.trimHeightIn).toBeCloseTo(g.trimWidthIn, 6);
@@ -73,7 +76,7 @@ describe("rotated monthly fit", () => {
   });
 
   it("fitMonthly measures wider cells in landscape than the portrait classic", () => {
-    const dClassic = doc();
+    const dClassic = doc({ monthlyArrangement: "classic" });
     const dRotated = doc({ monthlyArrangement: "rotated" });
     const pageOf = (dd: ReturnType<typeof resolveDocument>) => {
       const i = dd.recipe.pages.findIndex((p) => p.layoutId === "planner-monthly" && !p.filler);
@@ -95,7 +98,7 @@ describe("rotated monthly solve", () => {
   });
 
   it("does not flag classic months", () => {
-    const d = doc();
+    const d = doc({ monthlyArrangement: "classic" });
     const { solved } = monthlySolved(d);
     expect(solved.contentRotation).toBeUndefined();
   });
@@ -113,7 +116,7 @@ describe("rotated monthly solve", () => {
     expect(grid!.rect.w).toBeGreaterThan(0);
     expect(paperW).not.toBeNull();
     // Landscape content width exceeds the portrait usable width.
-    const classic = doc();
+    const classic = doc({ monthlyArrangement: "classic" });
     const ci = classic.recipe.pages.findIndex((p) => p.layoutId === "planner-monthly" && !p.filler);
     const classicGrid = solvePage(classic, ci).nodes.find((n) => n.id === "month-grid");
     expect(grid!.rect.w).toBeGreaterThan(classicGrid!.rect.w);
