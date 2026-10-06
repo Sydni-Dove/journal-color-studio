@@ -70,12 +70,17 @@ export function plannerSectionOf(layoutId: string): PlannerSection | null {
  * project's orientation when the section has none.
  */
 export function sectionPageOrientationOf(
-  o: Pick<LayoutOptions, "plannerPageOrientation">,
+  o: Pick<LayoutOptions, "plannerPageOrientation" | "monthlyArrangement">,
   projectOrientation: Orientation,
   layoutId: string,
 ): Orientation {
   const section = plannerSectionOf(layoutId);
   if (!section) return projectOrientation;
+  // Rotated monthly means the PAPER stays in the planner's orientation while
+  // only the calendar content turns 90°. A saved monthly landscape override
+  // would otherwise rotate the sheet first and then rotate the content again,
+  // which can make the monthly solve incompatible/blank.
+  if (section === "monthly" && monthlyArrangementOf(o) === "rotated") return projectOrientation;
   return o.plannerPageOrientation?.[section] ?? projectOrientation;
 }
 
