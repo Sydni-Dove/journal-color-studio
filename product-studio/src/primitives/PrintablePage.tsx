@@ -107,23 +107,30 @@ export const PrintablePage = memo(function PrintablePage({ geometry: g, solved, 
     );
   }
   // Rotated content: the landscape box is centered in the portrait frame and
-  // turned 90° clockwise, so it fills the sheet edge to edge.
-  const leftIn = (g.mediaWidthIn - cg.mediaWidthIn) / 2;
-  const topIn = (g.mediaHeightIn - cg.mediaHeightIn) / 2;
+  // turned 90° clockwise, so it fills the sheet edge to edge. Flex centering
+  // (not negative offsets) keeps it robust across browsers.
   return (
     <div className={`ps-page ps-page--${mode}`} style={{ ...style, position: "relative", overflow: "hidden" }}>
       <div
         style={{
           position: "absolute",
-          left: `${leftIn}in`,
-          top: `${topIn}in`,
-          width: `${cg.mediaWidthIn}in`,
-          height: `${cg.mediaHeightIn}in`,
-          transform: "rotate(90deg)",
-          transformOrigin: "center center",
+          inset: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
         }}
       >
-        {content}
+        <div
+          style={{
+            position: "relative",
+            width: `${cg.mediaWidthIn}in`,
+            height: `${cg.mediaHeightIn}in`,
+            flex: "none",
+            transform: "rotate(90deg)",
+          }}
+        >
+          {content}
+        </div>
       </div>
     </div>
   );
