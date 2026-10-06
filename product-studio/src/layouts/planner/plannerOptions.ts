@@ -94,5 +94,7 @@ export type MonthlyArrangement = "classic" | "rotated";
 
 /** How the monthly calendar is arranged. Absent = "classic". */
 export function monthlyArrangementOf(o: Pick<LayoutOptions, "monthlyArrangement">): MonthlyArrangement {
-  return o.monthlyArrangement ?? "classic";
+  // Unknown values (e.g. "sideways" saved before it was replaced by "rotated")
+  // fall back to classic rather than silently misbehaving.
+  return o.monthlyArrangement === "rotated" ? "rotated" : "classic";
 }
