@@ -120,6 +120,24 @@ describe("rotated monthly solve", () => {
     expect(grid!.rect.w).toBeGreaterThan(classicGrid!.rect.w);
   });
 
+
+  it("does not disappear on an 8x10 portrait planner when rotated", () => {
+    const p = createProject("planner", {
+      dimensions: { sizePresetId: "custom", custom: { width: 8, height: 10, unit: "in" }, orientation: "portrait" },
+      production: paged,
+      calendar: { startDate: "2026-01-01", endDate: "2026-01-31", weekStart: 0, sixRowMonths: true },
+      recipe: { items: [], ordering: "chronological", structure: addMonthly([]) },
+      layoutOptions: { monthlyArrangement: "rotated" },
+    });
+    const d = resolveDocument(p);
+    const i = d.recipe.pages.findIndex((page) => page.layoutId === "planner-monthly" && !page.filler);
+    const solved = solvePage(d, i);
+    expect(solved.contentRotation).toBe(90);
+    expect(solved.nodes.length).toBeGreaterThan(0);
+    expect(solved.nodes.some((n) => n.id === "month-grid")).toBe(true);
+    expect(solved.diagnostics.some((x) => x.rule === "layout-incompatible" || x.rule === "layout-solver")).toBe(false);
+  });
+
   it("keeps the classic 7-column structure (title, weekday labels, grid, dates)", () => {
     const d = doc({ monthlyArrangement: "rotated" });
     const { solved } = monthlySolved(d);
