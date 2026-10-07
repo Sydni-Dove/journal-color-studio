@@ -203,11 +203,11 @@ export function printGold(hex: string): string {
 
 /**
  * The same gold as sent to the printer. A home inkjet adds warmth (gold → peach / orange), so the gold sent is
- * yellower (48°), calmer and deeper, and lands on gold on paper. Chosen from a printed gold-match sheet: the Dove
- * gold #E6A742 → #AB9230. Not a gold → unchanged.
+ * yellower (44°), calmer and deeper, and lands on gold on paper. Chosen from a printed gold-match sheet: the Dove
+ * gold #E6A742 → #AB8A30 (the sheet's C3, #AB9230 at 48°, printed a little green, so the hue moved to 44°, the hue of D2/D3). Not a gold → unchanged.
  */
 export function paperGold(hex: string): string {
   const c = toHsl(hex);
   if (!isGold(c)) return hex;
-  return fromHsl({ h: 48, s: Math.min(c.s, 0.56), l: Math.min(c.l * 0.74, 0.45) });
+  return fromHsl({ h: 44, s: Math.min(c.s, 0.56), l: Math.min(c.l * 0.74, 0.45) });
 }

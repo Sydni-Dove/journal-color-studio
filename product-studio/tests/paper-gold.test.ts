@@ -8,8 +8,8 @@ import { readFileSync } from "fs";
 import { paperGold, printGold, resolveColors } from "../src/presets/themes/palettes";
 
 describe("paper gold", () => {
-  it("the Dove gold prints as the gold picked on the printed sheet (C3)", () => {
-    expect(paperGold("#E6A742").toLowerCase()).toBe("#ab9230");
+  it("the Dove gold prints as the paper gold (C3 #AB9230 printed a little green, so hue 44: #AB8A30)", () => {
+    expect(paperGold("#E6A742").toLowerCase()).toBe("#ab8a30");
   });
   it("other golds move the same way: yellower and deeper, never lighter", () => {
     for (const g of ["#c8974d", "#DBB044", "#D4A73A"]) {

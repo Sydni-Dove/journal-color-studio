@@ -336,7 +336,8 @@
   }
 
   // Gold as sent to a home inkjet. On an Epson EcoTank the screen gold prints peach / orange; a printed gold-match
-  // sheet picked #AB9230 for the Dove gold #E6A742. Golds (hue 15-55 deg, saturation >= .2) move to hue 48, calmer and
+  // sheet picked #AB9230 (hue 48) for the Dove gold #E6A742, but it printed a little green, so the hue is now 44 (#AB8A30, the
+  // hue of the approved deeper golds D2/D3). Golds (hue 15-55 deg, saturation >= .2) move to hue 44, calmer and
   // deeper; any other color is returned unchanged. Same formula as Product Studio's paperGold (palettes.ts).
   function paperGold(hex) {
     if (!/^#[0-9a-f]{6}$/i.test(hex || '')) return hex;
@@ -345,7 +346,7 @@
     const s = d / (1 - Math.abs(2 * l - 1));
     const h6 = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4, h = (h6 * 60 + 360) % 360;
     if (h < 15 || h > 55 || s < .2) return hex;
-    const S = Math.min(s, .56), L = Math.min(l * .74, .45), c = (1 - Math.abs(2 * L - 1)) * S, x = c * (1 - Math.abs(((48 / 60) % 2) - 1)), m0 = L - c / 2;
+    const S = Math.min(s, .56), L = Math.min(l * .74, .45), c = (1 - Math.abs(2 * L - 1)) * S, x = c * (1 - Math.abs(((44 / 60) % 2) - 1)), m0 = L - c / 2;
     return rgb2hex([c, x, 0].map((v) => (v + m0) * 255));
   }
 
