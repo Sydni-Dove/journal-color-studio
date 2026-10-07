@@ -2018,7 +2018,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
       const l = d[i] / 255, g = d[i + 1] / 255, a = d[i + 3];
       if (!a) continue;
       for (let k = 0; k < 3; k++) {
-        const gold = l < .55 ? mix(trim[k] * .3, trim[k], l / .55) : mix(trim[k], mix(trim[k], 255, .7), (l - .55) / .45);
+        const gold = l < .55 ? mix(trim[k] * .3, trim[k], l / .55) : paperMode ? trim[k] : mix(trim[k], mix(trim[k], 255, .7), (l - .55) / .45);
         const ring = Math.min(255, frame[k] * (.6 + 1.2 * l) + 40 * l);
         d[i + k] = mix(ring, gold, g);
       }
@@ -2269,7 +2269,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
       let stroke = p.trim;
       if (st.metal) {
         // Metallic gold: the trim color shaded deep → bright → deep across the plate, like foil catching light.
-        const [r0, g0, b0] = hexRgb(p.trim), lite = `rgb(${mix(r0, 255, .6)},${mix(g0, 255, .6)},${mix(b0, 255, .6)})`, deep = `rgb(${r0 * .8},${g0 * .8},${b0 * .8})`;
+        const [r0, g0, b0] = hexRgb(p.trim), lite = paperMode ? p.trim : `rgb(${mix(r0, 255, .6)},${mix(g0, 255, .6)},${mix(b0, 255, .6)})`, deep = `rgb(${r0 * .8},${g0 * .8},${b0 * .8})`;
         stroke = ctx.createLinearGradient(cx - hw, cy - hh, cx + hw, cy + hh);
         [[0, lite], [.18, p.trim], [.42, deep], [.6, p.trim], [.82, lite], [1, p.trim]].forEach(([t, c]) => stroke.addColorStop(t, c));
       }
@@ -3035,9 +3035,27 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     return textOn([p.plate, p.frame, p.title, p.stone].reduce((a, b) => (lum(b) < lum(a) ? b : a)), p.paper, 4.5);
   }
 
+  // Paper gold (PDF exports only, set by renderPage / renderCoverSpread from s._paperGold). A home inkjet prints every gold
+  // lighter than the approved paper gold as peach / orange, so on paper nothing derived from trim is mixed toward white
+  // or faded: highlights become the paper gold itself, and formerly pale outlines are drawn ~30% thinner instead.
+  let paperMode = false;
+  const paperLine = (w, min = 1) => (paperMode ? Math.max(min, w * .7) : w);
+  // A copy of recolored gold art with no pixel lighter than the paper gold (hue kept, brightness capped).
+  function paperCap(src, hex) {
+    if (!paperMode) return src;
+    const c = document.createElement('canvas'); c.width = src.width; c.height = src.height;
+    const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(src, 0, 0);
+    const id = x.getImageData(0, 0, c.width, c.height), d = id.data, [r, g, b] = hexRgb(hex), cap = .299 * r + .587 * g + .114 * b;
+    for (let i = 0; i < d.length; i += 4) {
+      const l = .299 * d[i] + .587 * d[i + 1] + .114 * d[i + 2];
+      if (d[i + 3] && l > cap) { const f = cap / l; d[i] *= f; d[i + 1] *= f; d[i + 2] *= f; }
+    }
+    x.putImageData(id, 0, 0);
+    return c;
+  }
   // A thin metallic rule: the trim color swept light to dark, like the gold lines in the Canva pages.
   function goldRule(ctx, x, y, w, h, trim) {
-    const [r, g, b] = hexRgb(trim), lite = `rgb(${mix(r, 255, .6)},${mix(g, 255, .6)},${mix(b, 255, .6)})`, deep = `rgb(${r * .55},${g * .55},${b * .55})`;
+    const [r, g, b] = hexRgb(trim), lite = paperMode ? trim : `rgb(${mix(r, 255, .6)},${mix(g, 255, .6)},${mix(b, 255, .6)})`, dk = paperMode ? .82 : .55, deep = `rgb(${r * dk},${g * dk},${b * dk})`;
     const gr = ctx.createLinearGradient(x, 0, x + w, 0);
     gr.addColorStop(0, deep); gr.addColorStop(.3, trim); gr.addColorStop(.5, lite); gr.addColorStop(.7, trim); gr.addColorStop(1, deep);
     ctx.fillStyle = gr; ctx.fillRect(x, y, w, h);
@@ -3730,7 +3748,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
           const bx = x + bw * .22;
           ctx.save(); roundRect(ctx, x, y, bw, h, W * .035); ctx.clip();
           const gr = ctx.createLinearGradient(0, y, 0, y + h), [r, g, b] = hexRgb(p.trim);
-          gr.addColorStop(0, `rgb(${r * .6},${g * .6},${b * .6})`); gr.addColorStop(.5, `rgb(${mix(r, 255, .5)},${mix(g, 255, .5)},${mix(b, 255, .5)})`); gr.addColorStop(1, p.trim);
+          gr.addColorStop(0, `rgb(${r * (paperMode ? .82 : .6)},${g * (paperMode ? .82 : .6)},${b * (paperMode ? .82 : .6)})`); gr.addColorStop(.5, paperMode ? p.trim : `rgb(${mix(r, 255, .5)},${mix(g, 255, .5)},${mix(b, 255, .5)})`); gr.addColorStop(1, p.trim);
           ctx.fillStyle = gr; ctx.fillRect(bx, y, bw * .11, h); ctx.restore();
           ctx.fillStyle = boxInk;
           withRole(ctx, s, 'bodyText', () => { ctx.font = font(H * .023); ['Pray', 'Brainstorm', 'Interpret', 'Apply'].forEach((word, k) => {
@@ -3939,13 +3957,13 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
         });
         return;
       }
-      const [r, g, b] = hexRgb(p.trim), soft = `rgb(${mix(r, 255, .72)},${mix(g, 255, .72)},${mix(b, 255, .72)})`, label = `rgb(${r * .7},${g * .7},${b * .7})`;
+      const [r, g, b] = hexRgb(p.trim), soft = paperMode ? p.trim : `rgb(${mix(r, 255, .72)},${mix(g, 255, .72)},${mix(b, 255, .72)})`, label = `rgb(${r * .7},${g * .7},${b * .7})`;
       // Snug: the boxes start just under the header and share the height it gives back (same bottom edge, same row gap).
       const y1 = snugHeader(s) ? hdr + H * .022 : H * .148, bh = snugHeader(s) ? (H * .92 - y1 - H * .032) / 2 : H * .37, y2 = snugHeader(s) ? y1 + bh + H * .032 : H * .55;
       [['keyActions', .14, y1], ['keySymbols', .525, y1], ['keyEmotions', .14, y2], ['keyScriptures', .525, y2]].forEach(([id, fx, y]) => {
         const x = W * fx, w = W * .335, h = bh;
         if (isFloral) { ctx.fillStyle = readingSurface(p); roundRect(ctx, x, y, w, h, W * .012); ctx.fill(); ctx.strokeStyle = p.plate; ctx.lineWidth = Math.max(1.5, W * .0028); ctx.stroke(); }
-        else { ctx.strokeStyle = soft; ctx.lineWidth = Math.max(1.5, W * .003); ctx.strokeRect(x, y, w, h); }
+        else { ctx.strokeStyle = soft; ctx.lineWidth = paperLine(Math.max(1.5, W * .003)); ctx.strokeRect(x, y, w, h); }
         ctx.fillStyle = isFloral ? p.plate : label; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; withRole(ctx, s, 'boxHeadings', () => { ctx.font = font(H * .024); fillFit(ctx, s, id, T(s, id), x + w / 2, y + H * .042, w * .9, { lines: 2 }); });
         // A single small sprig peeking from each box's right edge, sized to stay clear of the neighbouring box.
         if (isFloral && ASSETS.floralHeader) {
@@ -4148,14 +4166,14 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
       else if ((pal || s.journal === 'warring') && kind === 'pwWash') { const c = s.journal === 'warring' && l > 0 ? p.vein : p.stone; src = prRecolor(img, dw, dh, (i, a, b) => toneTransfer(i, a, b, 'wash', { main: c, gold: c })); }
       else if (pal && (/^mwg-cover-\d$/.test(kind) || kind === 'mwg-back-art')) src = prRecolor(img, dw, dh, (i, a, b) => toneTransfer(i, a, b, MWG_WASH, { deep: p.vein, warm: p.accent, blush: p.highlight }));
       else if (pal && (kind === 'jg-cover-wash-top' || kind === 'jg-cover-wash-bottom' || kind === 'jg-back-cloud')) src = prRecolor(img, dw, dh, (i, a, b) => toneTransfer(i, a, b, 'cloud', { violet: p.vein, peach: p.accent }));
-      else if (pal && (kind === 'mwg-gold-rule' || kind === 'mwg-belongs-rule' || kind === 'jg-cover-divider')) src = prRecolor(img, dw, dh, (i, a, b) => toneTransfer(i, a, b, 'all', { main: p.trim }));
+      else if (pal && (kind === 'mwg-gold-rule' || kind === 'mwg-belongs-rule' || kind === 'jg-cover-divider')) src = prRecolor(img, dw, dh, (i, a, b) => paperCap(toneTransfer(i, a, b, 'all', { main: p.trim }), p.trim));
       else if (KIND_GROUP[kind] === 'sprigs') src = prRecolor(img, dw, dh, (i, a, b) => tintedMask(i, a, b, p.highlight));     // white line art: always the soft color
       // The figures shift with the palette too: every hue in them turns by the same amount as the main color,
       // so the dress keeps its fade and the blade keeps its contrast against it.
       // Her own color when one is picked under Layers; otherwise she follows the watercolor. Saturation never drops
       // below 70% of the original, so a dark or grey palette tints her instead of turning her grey.
       else if ((pal || s.figureColor) && (kind === 'warrior' || kind === 'archer')) src = prRecolor(img, dw, dh, (i, a, b) => toneTransfer(i, a, b, 'all', { main: s.figureColor || p.stone }));
-      else if (pal && kind === 'ring') src = prRecolor(img, dw, dh, (i, a, b) => toneTransfer(i, a, b, 'all', { main: p.trim }));
+      else if (pal && kind === 'ring') src = prRecolor(img, dw, dh, (i, a, b) => paperCap(toneTransfer(i, a, b, 'all', { main: p.trim }), p.trim));
       ctx.save(); ctx.globalAlpha = op;
       ctx.translate(ox + (l + w / 2) * k, oy + (t + h / 2) * k); if (rot) ctx.rotate(rot * Math.PI / 180);
       ctx.beginPath(); ctx.rect(-w / 2 * k, -h / 2 * k, w * k, h * k); ctx.clip();       // Canva crops each image to its frame
@@ -5006,6 +5024,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
   // The chosen printer (see PRINTERS) sets the inside-page margins; for a printer with no bleed at the binding edge the
   // page comes back 1/8 in narrower, without that strip.
   function renderPage(canvas, width, s, type, side = 'left') {
+    paperMode = !!s._paperGold;
     const W = width, H = Math.round(width * PAGE_H / PAGE_W), k = W / PAGE_W, trim = document.createElement('canvas');
     const cover = type === 'cover' || type === 'back';
     if (cover) {
@@ -5060,6 +5079,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
 
   // One design on the 8.5 × 11 trim (no bleed): the journal's cover, back or an interior template.
   function renderDesign(canvas, width, s, type) {
+    paperMode = !!s._paperGold;
     if (type === 'cover') return (COVERS[s.journal] || renderCover)(canvas, width, s);
     canvas.width = width; canvas.height = Math.round(width * TRIM_H / TRIM_W);
     const ctx = canvas.getContext('2d');
@@ -5096,6 +5116,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
   // The flat cover at `width` px: [bleed | back | spine | front | bleed]. Each cover is its usual 8.5 × 11 design; the
   // spine carries the cover art (or a palette color) and, when it is wide enough, the title running top to bottom.
   function renderCoverSpread(canvas, width, s) {
+    paperMode = !!s._paperGold;
     const cs = coverSpec(s), ppi = width / cs.W, tw = Math.round(TRIM_W / 72 * ppi), th = Math.round(TRIM_H / 72 * ppi);
     const sp = Math.round(cs.spine * ppi), b = Math.round(cs.bleed * ppi);
     const back = document.createElement('canvas'), front = document.createElement('canvas');
@@ -6639,7 +6660,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
   // Pages without bleed at the binding edge (KDP) come out 1/8 in narrower; each PDF page takes its image's size.
   // PDF exports are made for a home inkjet, where screen gold prints peach / orange: the gold accents (palette.trim)
   // are rendered in the matched paper gold. A copy of the state, so the live state, the preview and PNGs keep the screen gold.
-  const paperState = (s) => ({ ...s, palette: { ...s.palette, trim: paperGold(s.palette.trim) } });
+  const paperState = (s) => ({ ...s, _paperGold: true, palette: { ...s.palette, trim: paperGold(s.palette.trim) } });
   async function buildPdf(pages, name, progress) {
     let pdf = null;
     const ps = paperState(state);
