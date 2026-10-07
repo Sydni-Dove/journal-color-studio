@@ -751,6 +751,12 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
             <button data-q="proof" class="active"><strong>Quick proof</strong><small>150 DPI</small></button>
             <button data-q="print"><strong>Print quality</strong><small>300 DPI</small></button>
           </div>
+          <div class="field"><span>Gold in PDFs</span></div>
+          <div class="seg" id="goldSeg">
+            <button data-g="home" class="active"><strong>Home printer gold</strong><small>deeper gold PDFs</small></button>
+            <button data-g="shop"><strong>Print shop gold</strong><small>true screen colors</small></button>
+          </div>
+          <span class="hint" id="goldHint"></span>
           <div class="row2">
             <div class="field"><span>Interior pages</span><input type="number" id="pageCount" min="10" max="300" value="102"></div>
             <div class="field"><span>Front cover</span><select id="includeCover"><option value="yes">Include</option><option value="no">Leave out</option></select></div>
@@ -1331,7 +1337,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
   const paletteColors = (pl) => Object.fromEntries(ROLES.map((r) => [r.key, pl[r.key]]));
 
   const DEFAULTS = {
-    view: 'cover', quality: 'proof',
+    view: 'cover', quality: 'proof', exportGold: 'home',
     // Fresh start = the original Canva cover: bold-gold marble, gold bevel plate, serif lettering, black + gold.
     palette: { ...PALETTES[0] },
     marble: 'canva', plateStyle: 'bevel', titleStyle: 'serif', titleShadow: 30,
@@ -5777,6 +5783,10 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
       $('titleYVal').textContent = o.y ? `${o.y > 0 ? '+' : ''}${(o.y / 96).toFixed(2)} in` : 'as designed';
     }
     document.querySelectorAll('#qualitySeg button').forEach((b) => b.classList.toggle('active', b.dataset.q === state.quality));
+    document.querySelectorAll('#goldSeg button').forEach((b) => b.classList.toggle('active', b.dataset.g === (state.exportGold === 'shop' ? 'shop' : 'home')));
+    $('goldHint').textContent = state.exportGold === 'shop'
+      ? 'PDFs keep the gold exactly as on screen, for a print shop (Lulu, KDP…) that prints it as shown. PNG downloads always keep the screen gold.'
+      : 'PDFs use a deeper "paper gold" so gold prints as gold, not peach / orange, on a home inkjet (matched on an Epson EcoTank). The screen and PNG downloads keep the screen gold.';
     document.querySelectorAll('#marbleSeg button').forEach((b) => b.classList.toggle('active', b.dataset.asset === currentBackgroundAsset()));
     document.querySelectorAll('#plateSeg button').forEach((b) => b.classList.toggle('active', b.dataset.asset === currentPlateAsset()));
     document.querySelectorAll('#titleSeg button').forEach((b) => b.classList.toggle('active', b.dataset.title === state.titleStyle));
@@ -6494,6 +6504,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     toast('Started over from the original design');
   };
   document.querySelectorAll('#qualitySeg button').forEach((b) => b.onclick = () => { state.quality = b.dataset.q; commit(false); });
+  document.querySelectorAll('#goldSeg button').forEach((b) => b.onclick = () => { state.exportGold = b.dataset.g; commit(false); });
   // Each font picker waits for its own face before redrawing, so metrics-based fitting uses the real glyphs.
   $('coverFont').onchange = (e) => {
     state.coverFont = e.target.value; goTo('cover');
@@ -6660,9 +6671,9 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
   };
   // Builds a PDF of [type, side] pages at the print page size (8.75 × 11.25 in with bleed).
   // Pages without bleed at the binding edge (KDP) come out 1/8 in narrower; each PDF page takes its image's size.
-  // PDF exports are made for a home inkjet, where screen gold prints peach / orange: the gold accents (palette.trim)
-  // are rendered in the matched paper gold. A copy of the state, so the live state, the preview and PNGs keep the screen gold.
-  const paperState = (s) => ({ ...s, _paperGold: true, palette: { ...s.palette, trim: paperGold(s.palette.trim) } });
+  // PDF exports for a home inkjet (Export > Gold in PDFs = Home printer gold, the default), where screen gold prints peach / orange:
+  // the gold accents (palette.trim) are rendered in the matched paper gold. Print shop gold leaves the state as it is. A copy of the state, so the live state, the preview and PNGs keep the screen gold.
+  const paperState = (s) => s.exportGold === 'shop' ? s : ({ ...s, _paperGold: true, palette: { ...s.palette, trim: paperGold(s.palette.trim) } });
   async function buildPdf(pages, name, progress) {
     let pdf = null;
     const ps = paperState(state);
