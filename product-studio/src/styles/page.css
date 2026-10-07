@@ -63,4 +63,8 @@
   .ps-debug {
     display: none !important;
   }
+  /* Gold lines and step numbers print in the paper gold (palettes.ts paperGold): screen gold reads orange on paper. */
+  .ps-page {
+    --c-goldInk: var(--c-goldPaper) !important;
+  }
 }

@@ -136,6 +136,12 @@ export type ColorToken =
 export type ColorTokens = Record<Exclude<ColorToken, "goldInk">, string> & {
   /** Derived (resolveColors) — see ColorToken "goldInk". */
   goldInk?: string;
+  /**
+   * Derived (resolveColors): the gold that goldInk is printed in. Home inkjets push gold toward orange, so the
+   * paper gold is yellower, deeper and calmer than the screen gold — matched by a printed test (an Epson EcoTank
+   * picked #AB9230 for the Dove gold #E6A742). Used only under @media print (styles/page.css).
+   */
+  goldPaper?: string;
   /** Opacity applied to `line` for functional writing lines/grids (0–1). */
   lineOpacity: number;
 };

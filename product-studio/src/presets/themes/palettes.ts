@@ -166,7 +166,7 @@ export function resolveColors(paletteId: string, overrides: Partial<ColorTokens>
   const options = arrangementsOf(base, paper);
   const arranged = options[Math.abs(Math.round(look.arrangement ?? 0)) % options.length];
   const out = { ...arranged, background: paper, ...overrides };
-  return { ...out, goldInk: overrides.goldInk ?? printGold(out.lineArt) };
+  return { ...out, goldInk: overrides.goldInk ?? printGold(out.lineArt), goldPaper: overrides.goldPaper ?? paperGold(out.lineArt) };
 }
 
 /**
@@ -175,18 +175,39 @@ export function resolveColors(paletteId: string, overrides: Partial<ColorTokens>
  * turned toward yellow (at least 42°) and made slightly less saturated.
  * Any other color is returned unchanged.
  */
-export function printGold(hex: string): string {
+type Hsl = { h: number; s: number; l: number };
+function toHsl(hex: string): Hsl | null {
   const m = /^#([0-9a-f]{6})$/i.exec(hex);
-  if (!m) return hex;
+  if (!m) return null;
   const n = parseInt(m[1], 16), r = (n >> 16) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
   const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2, d = max - min;
-  if (d === 0) return hex;
+  if (d === 0) return { h: 0, s: 0, l };
   const s = d / (1 - Math.abs(2 * l - 1));
-  let h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
-  h = (h * 60 + 360) % 360;
-  if (h < 15 || h > 50 || s < 0.2) return hex;
-  const H = Math.min(48, Math.max(42, h + 6)), S = s * 0.88, L = l * 0.97;
-  const c = (1 - Math.abs(2 * L - 1)) * S, x = c * (1 - Math.abs(((H / 60) % 2) - 1)), m0 = L - c / 2;
-  const [R, G, B] = H < 60 ? [c, x, 0] : [x, c, 0];
+  const h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return { h: (h * 60 + 360) % 360, s, l };
+}
+function fromHsl({ h, s, l }: Hsl): string {
+  const c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs(((h / 60) % 2) - 1)), m0 = l - c / 2;
+  const [R, G, B] = h < 60 ? [c, x, 0] : [x, c, 0];
   return `#${[R, G, B].map((v) => Math.round((v + m0) * 255).toString(16).padStart(2, "0")).join("")}`;
+}
+/** A gold (warm yellow-orange), as opposed to a red, brown-grey or green line color. */
+const isGold = (c: Hsl | null): c is Hsl => !!c && c.h >= 15 && c.h <= 55 && c.s >= 0.2;
+
+/** Gold lines and step numbers on screen: a touch yellower than the palette's line art, so they read gold, not orange. */
+export function printGold(hex: string): string {
+  const c = toHsl(hex);
+  if (!isGold(c) || c.h > 50) return hex;
+  return fromHsl({ h: Math.min(48, Math.max(42, c.h + 6)), s: c.s * 0.88, l: c.l * 0.97 });
+}
+
+/**
+ * The same gold as sent to the printer. A home inkjet adds warmth (gold → peach / orange), so the gold sent is
+ * yellower (48°), calmer and deeper, and lands on gold on paper. Chosen from a printed gold-match sheet: the Dove
+ * gold #E6A742 → #AB9230. Not a gold → unchanged.
+ */
+export function paperGold(hex: string): string {
+  const c = toHsl(hex);
+  if (!isGold(c)) return hex;
+  return fromHsl({ h: 48, s: Math.min(c.s, 0.56), l: Math.min(c.l * 0.74, 0.45) });
 }
