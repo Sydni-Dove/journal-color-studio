@@ -18,7 +18,7 @@ import { fontStack } from "../presets/typography/typography";
 import { DecorativeLayer } from "../themes/DecorativeLayer";
 import { coverSurfaceColors, coverSurfaceTheme } from "../design-library/coverSurfaces";
 import { PatternLayer, StructureLayer, TextLayer } from "./nodes";
-import { turnGeometry90CW } from "../engines/geometry/turn";
+import { contentToPageTransform, sidewaysGeometry } from "../engines/geometry/turn";
 
 export function themeVars(colors: ColorTokens, typography: TypographySettings): CSSProperties {
   const vars: Record<string, string | number> = {};
@@ -62,7 +62,7 @@ export const PrintablePage = memo(function PrintablePage({ geometry: g, solved, 
   // content geometry is the turned one, and the painted content is rotated 90°
   // back onto the portrait sheet below.
   const rotated = solved.contentRotation === 90;
-  const cg = rotated ? turnGeometry90CW(g) : g;
+  const cg = rotated ? sidewaysGeometry(g) : g;
   // Composition regions + protected content come from the SAME solved nodes drawn below.
   const composition = useMemo(() => resolveComposition(cg, solved, typography, spacing), [cg, solved, typography, spacing]);
   // A cover's own surface (design library): drawn by the same renderer as a background, on this page only.
@@ -106,13 +106,9 @@ export const PrintablePage = memo(function PrintablePage({ geometry: g, solved, 
       </div>
     );
   }
-  // Rotated content: use an explicit top-left transform instead of flex
-  // centering. Mobile Safari has repeatedly dropped/clipped absolutely-sized
-  // transformed children inside the scaled preview when their unrotated box
-  // is wider than the portrait page. This transform maps landscape content
-  // coordinates directly onto the portrait sheet:
-  //   x' = contentHeight - y, y' = x
-  // which is exactly the 90° clockwise geometry used by turnGeometry90CW().
+  // Sideways content: laid out in the turned (landscape) geometry, drawn back onto the sheet with the
+  // exact inverse of that turn (engines/geometry/turn.ts) — an explicit top-left transform, which
+  // Mobile Safari also draws reliably inside the scaled preview.
   return (
     <div className={`ps-page ps-page--${mode}`} style={{ ...style, position: "relative", overflow: "hidden" }}>
       <div
@@ -124,7 +120,7 @@ export const PrintablePage = memo(function PrintablePage({ geometry: g, solved, 
           width: `${cg.mediaWidthIn}in`,
           height: `${cg.mediaHeightIn}in`,
           transformOrigin: "0 0",
-          transform: `translateX(${cg.mediaHeightIn}in) rotate(90deg)`,
+          transform: contentToPageTransform(g),
         }}
       >
         {content}

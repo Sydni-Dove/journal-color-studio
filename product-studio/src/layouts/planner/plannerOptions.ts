@@ -97,9 +97,7 @@ export function plannerSectionsIn(layoutIds: readonly string[]): PlannerSection[
 /** Monthly calendar arrangement: the classic grid, or the sideways (bullet-journal) one. */
 export type MonthlyArrangement = "classic" | "rotated";
 
-/** How the monthly calendar is arranged. Absent = "rotated" so portrait planners use the wider sideways month by default. */
+/** How the monthly calendar is arranged. Absent = "classic": turning the month sideways is a choice, never a surprise. */
 export function monthlyArrangementOf(o: Pick<LayoutOptions, "monthlyArrangement">): MonthlyArrangement {
-  // Explicit classic remains available, but saved projects that predate this
-  // option should adopt the intended sideways monthly layout automatically.
-  return o.monthlyArrangement === "classic" ? "classic" : "rotated";
+  return o.monthlyArrangement === "rotated" ? "rotated" : "classic";
 }

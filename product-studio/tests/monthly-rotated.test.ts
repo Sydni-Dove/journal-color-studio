@@ -5,12 +5,12 @@
  *   notes sidebar) is solved in LANDSCAPE against the turned page geometry,
  *   flagged with contentRotation: 90, and the renderer turns the painted
  *   content 90° clockwise onto the portrait sheet. The reader turns the
- *   physical planner to read it. Rotated is the planner default; classic
- *   remains available as an explicit layoutOptions.monthlyArrangement override.
+ *   physical planner to read it. Classic is the default; rotated is chosen
+ *   with layoutOptions.monthlyArrangement.
  */
 import { describe, expect, it } from "vitest";
 import { contentGeometryFor, geometryFor, layoutAvailability, resolveDocument, solvePage } from "../src/engines/document/resolve";
-import { turnGeometry90CW } from "../src/engines/geometry/turn";
+import { sidewaysGeometry } from "../src/engines/geometry/turn";
 import { monthlyArrangementOf } from "../src/layouts/planner/plannerOptions";
 import { addMonthly } from "../src/engines/recipe/pageBuilder";
 import { createProject } from "../src/presets/products/projectFactory";
@@ -37,19 +37,19 @@ const monthlySolved = (d: ReturnType<typeof resolveDocument>) => {
 const texts = (nodes: LayoutNode[]) => nodes.filter((n): n is TextNode => n.type === "text");
 
 describe("monthlyArrangementOf", () => {
-  it("defaults to rotated while preserving an explicit classic choice", () => {
-    expect(monthlyArrangementOf({})).toBe("rotated");
+  it("defaults to classic; sideways only when chosen", () => {
+    expect(monthlyArrangementOf({})).toBe("classic");
     expect(monthlyArrangementOf({ monthlyArrangement: "rotated" })).toBe("rotated");
     expect(monthlyArrangementOf({ monthlyArrangement: "classic" })).toBe("classic");
   });
 });
 
-describe("turnGeometry90CW", () => {
+describe("sidewaysGeometry", () => {
   it("swaps width/height dimensions", () => {
     const classic = doc({ monthlyArrangement: "classic" });
     const ci = classic.recipe.pages.findIndex((p) => p.layoutId === "planner-monthly" && !p.filler);
     const g = contentGeometryFor(classic, classic.recipe.pages[ci], ci); // explicit classic: paper geometry
-    const t = turnGeometry90CW(g);
+    const t = sidewaysGeometry(g);
     expect(t.trimWidthIn).toBeCloseTo(g.trimHeightIn, 6);
     expect(t.trimHeightIn).toBeCloseTo(g.trimWidthIn, 6);
     expect(t.usableWidthIn).toBeCloseTo(g.usableHeightIn, 6);
@@ -58,9 +58,37 @@ describe("turnGeometry90CW", () => {
     expect(t.mediaHeightIn).toBeCloseTo(g.mediaWidthIn, 6);
     expect(t.orientation).toBe("landscape");
     // Double turn returns to the original dims.
-    const back = turnGeometry90CW(t);
+    const back = sidewaysGeometry(t);
     expect(back.trimWidthIn).toBeCloseTo(g.trimWidthIn, 6);
     expect(back.usableWidthIn).toBeCloseTo(g.usableWidthIn, 6);
+  });
+});
+
+describe("sidewaysGeometry: one turn, used everywhere", () => {
+  // The calendar disappeared when the drawing turned one way and the trim / margins / binding the other.
+  const page = () => {
+    const d = doc({ monthlyArrangement: "classic" });
+    const i = d.recipe.pages.findIndex((p) => p.layoutId === "planner-monthly" && !p.filler);
+    return geometryFor(d, d.recipe.pages[i], i);
+  };
+  it("the page's left edge (and its binding) becomes the top of the sideways content", () => {
+    const g = page();
+    const t = sidewaysGeometry(g);
+    expect(t.safe.top).toBeCloseTo(g.safe.left, 6);
+    expect(t.safe.left).toBeCloseTo(g.safe.bottom, 6);
+    expect(t.safe.bottom).toBeCloseTo(g.safe.right, 6);
+    expect(t.safe.right).toBeCloseTo(g.safe.top, 6);
+    for (const k of t.keepOuts) expect(k.edge).toBe(({ left: "top", top: "right", right: "bottom", bottom: "left" } as const)[g.keepOuts.find((z) => z.id === k.id)!.edge]);
+  });
+  it("the trim sits inside the media where the bleed puts it", () => {
+    const g = { ...page(), bleed: { top: 0.1, right: 0.2, bottom: 0.3, left: 0.4 }, trimOffset: { x: 0.4, y: 0.1 } };
+    g.mediaWidthIn = g.trimWidthIn + 0.6;
+    g.mediaHeightIn = g.trimHeightIn + 0.4;
+    const t = sidewaysGeometry(g);
+    expect(t.trimOffset.x).toBeCloseTo(t.bleed.left, 6);
+    expect(t.trimOffset.y).toBeCloseTo(t.bleed.top, 6);
+    expect(t.trimOffset.x + t.trimWidthIn + t.bleed.right).toBeCloseTo(t.mediaWidthIn, 6);
+    expect(t.trimOffset.y + t.trimHeightIn + t.bleed.bottom).toBeCloseTo(t.mediaHeightIn, 6);
   });
 });
 

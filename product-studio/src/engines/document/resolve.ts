@@ -25,7 +25,7 @@ import { resolveWording } from "../../presets/wording";
 import type { BindingProfile } from "../../types/binding";
 import type { CalendarData, WeekStart } from "../../types/calendar";
 import type { PageGeometry } from "../../types/geometry";
-import { turnGeometry90CW } from "../geometry/turn";
+import { sidewaysGeometry } from "../geometry/turn";
 import type { SolvedPage } from "../../types/layout";
 import type { PrintProfile } from "../../types/print";
 import type { ProductTypeDefinition } from "../../types/product";
@@ -315,7 +315,7 @@ export function isRotatedMonthly(doc: ResolvedDocument, page: PageInstance): boo
  */
 export function contentGeometryFor(doc: ResolvedDocument, page: PageInstance | Pick<PageInstance, "side">, index?: number): PageGeometry {
   const g = geometryFor(doc, page, index);
-  return "layoutId" in page && isRotatedMonthly(doc, page as PageInstance) ? turnGeometry90CW(g) : g;
+  return "layoutId" in page && isRotatedMonthly(doc, page as PageInstance) ? sidewaysGeometry(g) : g;
 }
 
 /** Solve the page at `index` (solving its whole spread when needed). */

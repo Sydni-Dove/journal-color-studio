@@ -24,7 +24,7 @@ import type { FitContext, FitResult, LayoutDefinition } from "../shared/types";
 import { FILL_IN, isUndated, MONTH_NAMES } from "../../engines/calendar/calendar";
 import { heuristicMeasurer, styleForRole } from "../../engines/typography/textMeasure";
 import { monthlyArrangementOf, monthlySidebarOf } from "./plannerOptions";
-import { turnGeometry90CW } from "../../engines/geometry/turn";
+import { sidewaysGeometry } from "../../engines/geometry/turn";
 
 /** Widest month title any month can produce ("September 2027"), measured in the title role. */
 function widestTitleIn(ctx: FitContext): number {
@@ -115,7 +115,7 @@ export function fitMonthly(ctx: FitContext): FitResult {
   // Availability/header checks receive the physical page geometry. Rotate it
   // once for a sideways month so fitting matches the landscape content space.
   const rotated = monthlyArrangementOf(ctx.options) === "rotated";
-  const contentCtx = rotated ? { ...ctx, page: turnGeometry90CW(ctx.page) } : ctx;
+  const contentCtx = rotated ? { ...ctx, page: sidewaysGeometry(ctx.page) } : ctx;
   return fitMonthlyContent(contentCtx, rotated);
 }
 

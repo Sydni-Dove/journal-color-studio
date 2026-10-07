@@ -193,25 +193,26 @@ export function LayoutPanel({ project, update, usage, nav, part = "layout" }: Pa
       {is.layout && usage.monthlySidebar.supported && (
         <>
           <Segmented
-            label="Monthly calendar style"
+            label="Monthly calendar"
             value={monthlyArrangementOf(o)}
             options={[
-              { value: "classic", label: "Classic" },
-              { value: "rotated", label: "Rotated" },
+              { value: "classic", label: "Upright" },
+              { value: "rotated", label: "Turned sideways" },
             ]}
             onChange={(monthlyArrangement) => set({ monthlyArrangement })}
           />
           <p className="hint">
             {monthlyArrangementOf(o) === "rotated"
-              ? "The whole monthly design is laid out in landscape and turned 90° onto the portrait page — turn the planner to read it. Wide day cells, everything rotates together."
-              : "The classic 7-column month grid."}
+              ? "Same page size — the whole month is turned a quarter turn on the page, so the reader turns the planner to read it and the day boxes are wide."
+              : "The month reads upright, like every other page."}
           </p>
         </>
       )}
       {is.layout && usage.plannerSections.length > 0 && (
         <>
           <h4 className="subhead">Page orientation</h4>
-          {usage.plannerSections.map((section) => {
+          {/* A sideways month keeps the planner's page, so its orientation switch would do nothing. */}
+          {usage.plannerSections.filter((section) => !(section === "monthly" && monthlyArrangementOf(o) === "rotated")).map((section) => {
             const current = o.plannerPageOrientation?.[section] ?? project.dimensions.orientation;
             return (
               <Segmented
@@ -232,7 +233,7 @@ export function LayoutPanel({ project, update, usage, nav, part = "layout" }: Pa
             );
           })}
           <p className="hint">
-            Each planner section can use its own page orientation — for example, landscape monthlies with portrait dailies.
+            Changes the paper itself (a landscape page is a different page size). To keep the page and just turn the monthly calendar, choose “Turned sideways” above.
             {usage.mixedPageOrientation ? " This product mixes orientations: export each one separately under Print / Save PDF." : ""}
           </p>
         </>
