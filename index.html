@@ -751,9 +751,9 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
             <button data-q="proof" class="active"><strong>Quick proof</strong><small>150 DPI</small></button>
             <button data-q="print"><strong>Print quality</strong><small>300 DPI</small></button>
           </div>
-          <div class="field"><span>Gold in PDFs</span></div>
+          <div class="field"><span>Gold in exports</span></div>
           <div class="seg" id="goldSeg">
-            <button data-g="home" class="active"><strong>Home printer gold</strong><small>deeper gold PDFs</small></button>
+            <button data-g="home" class="active"><strong>Home printer gold</strong><small>deeper gold, PDF + PNG</small></button>
             <button data-g="shop"><strong>Print shop gold</strong><small>true screen colors</small></button>
           </div>
           <span class="hint" id="goldHint"></span>
@@ -5785,8 +5785,8 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     document.querySelectorAll('#qualitySeg button').forEach((b) => b.classList.toggle('active', b.dataset.q === state.quality));
     document.querySelectorAll('#goldSeg button').forEach((b) => b.classList.toggle('active', b.dataset.g === (state.exportGold === 'shop' ? 'shop' : 'home')));
     $('goldHint').textContent = state.exportGold === 'shop'
-      ? 'PDFs keep the gold exactly as on screen, for a print shop (Lulu, KDP…) that prints it as shown. PNG downloads always keep the screen gold.'
-      : 'PDFs use a deeper "paper gold" so gold prints as gold, not peach / orange, on a home inkjet (matched on an Epson EcoTank). The screen and PNG downloads keep the screen gold.';
+      ? 'PDF and PNG downloads keep the gold exactly as on screen, for a print shop (Lulu, KDP…) that prints it as shown.'
+      : 'PDF and PNG downloads use a deeper "paper gold" so gold prints as gold, not peach / orange, on a home inkjet (matched on an Epson EcoTank). The on-screen preview keeps the screen gold.';
     document.querySelectorAll('#marbleSeg button').forEach((b) => b.classList.toggle('active', b.dataset.asset === currentBackgroundAsset()));
     document.querySelectorAll('#plateSeg button').forEach((b) => b.classList.toggle('active', b.dataset.asset === currentPlateAsset()));
     document.querySelectorAll('#titleSeg button').forEach((b) => b.classList.toggle('active', b.dataset.title === state.titleStyle));
@@ -6657,21 +6657,21 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
   $('exportCover').onclick = async () => {
     if (busy) return; setBusy(true, 'Preparing cover…');
     // Through renderPage, like the preview and the PDF: it picks the selected journal's own cover renderer.
-    try { const c = document.createElement('canvas'); renderPage(c, Math.round(PAGE_W / 72 * 300), state, 'cover'); download(await toBlob(c, 'image/png'), `marble-journal-cover-${slug()}.png`); toast('Production-size cover downloaded'); }
+    try { const c = document.createElement('canvas'); renderPage(c, Math.round(PAGE_W / 72 * 300), paperState(state), 'cover'); download(await toBlob(c, 'image/png'), `marble-journal-cover-${slug()}.png`); toast('Production-size cover downloaded'); }
     catch { toast('Cover export stopped. Please try again.'); } finally { setBusy(false); }
   };
   $('exportLined').onclick = async () => {
     if (busy) return; setBusy(true, 'Preparing page…');
     try {
       const c = document.createElement('canvas'), type = currentType();
-      renderPage(c, pxWidth(), state, type, bindingSide(insideNumber(state, state.page)));
+      renderPage(c, pxWidth(), paperState(state), type, bindingSide(insideNumber(state, state.page)));
       download(await toBlob(c, 'image/png'), `journal-page-${state.page + 1}-${type}-${slug()}.png`); toast('Page downloaded');
     }
     catch { toast('Page export stopped. Please try again.'); } finally { setBusy(false); }
   };
   // Builds a PDF of [type, side] pages at the print page size (8.75 × 11.25 in with bleed).
   // Pages without bleed at the binding edge (KDP) come out 1/8 in narrower; each PDF page takes its image's size.
-  // PDF exports for a home inkjet (Export > Gold in PDFs = Home printer gold, the default), where screen gold prints peach / orange:
+  // PDF and PNG exports for a home inkjet (Export > Gold in PDFs = Home printer gold, the default), where screen gold prints peach / orange:
   // the gold accents (palette.trim) are rendered in the matched paper gold. Print shop gold leaves the state as it is. A copy of the state, so the live state, the preview and PNGs keep the screen gold.
   const paperState = (s) => s.exportGold === 'shop' ? s : ({ ...s, _paperGold: true, palette: { ...s.palette, trim: paperGold(s.palette.trim) } });
   async function buildPdf(pages, name, progress) {
