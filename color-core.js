@@ -350,5 +350,16 @@
     return rgb2hex([c, x, 0].map((v) => (v + m0) * 255));
   }
 
-  window.ColorCore = { LIN, rgb2lab, lab2rgb, hexLab, softL, ramp01, hueBand, TONE_PRESETS, toneTransfer, findFamilies, familiesPreset, familyMapForPalette, familyTargets, hex2rgb, rgb2hex, paperGold };
+  // An already-paper gold re-toned: hue set to `hue` and lightness scaled by `lMul`, saturation kept. Used for a paper
+  // gold's dark gradient ends (a darker gold with the same hue reads olive / green on paper, so they run warmer) and for
+  // thin outlines (anti-aliasing against the paper lightens them toward orange, so they run a touch yellower).
+  function paperTone(hex, hue, lMul = 1) {
+    if (!/^#[0-9a-f]{6}$/i.test(hex || '')) return hex;
+    const [r, g, b] = hex2rgb(hex).map((v) => v / 255), mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, d = mx - mn;
+    if (d === 0) return hex;
+    const s = d / (1 - Math.abs(2 * l - 1)), L = Math.min(1, l * lMul), c = (1 - Math.abs(2 * L - 1)) * s, x = c * (1 - Math.abs(((hue / 60) % 2) - 1)), m0 = L - c / 2;
+    return rgb2hex([c, x, 0].map((v) => (v + m0) * 255));
+  }
+
+  window.ColorCore = { LIN, rgb2lab, lab2rgb, hexLab, softL, ramp01, hueBand, TONE_PRESETS, toneTransfer, findFamilies, familiesPreset, familyMapForPalette, familyTargets, hex2rgb, rgb2hex, paperGold, paperTone };
 })();
