@@ -1620,7 +1620,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
 
   // The color engine (Lab conversion, the TONE_PRESETS components and toneTransfer, the fidelity recolor every
   // artwork recolor below goes through) lives in color-core.js, shared with Print Prep.
-  const { LIN, rgb2lab, lab2rgb, hexLab, softL, ramp01, hueBand, TONE_PRESETS, toneTransfer } = window.ColorCore;
+  const { LIN, rgb2lab, lab2rgb, hexLab, softL, ramp01, hueBand, TONE_PRESETS, toneTransfer, paperGold } = window.ColorCore;
 
   // Re-tints textured artwork to a new color while keeping its brush texture: every pixel keeps its lightness
   // relative to the artwork's own mean color, so washes stay washes (unlike a flat alpha-mask tint).
@@ -6637,15 +6637,19 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
   };
   // Builds a PDF of [type, side] pages at the print page size (8.75 × 11.25 in with bleed).
   // Pages without bleed at the binding edge (KDP) come out 1/8 in narrower; each PDF page takes its image's size.
+  // PDF exports are made for a home inkjet, where screen gold prints peach / orange: the gold accents (palette.trim)
+  // are rendered in the matched paper gold. A copy of the state, so the live state, the preview and PNGs keep the screen gold.
+  const paperState = (s) => ({ ...s, palette: { ...s.palette, trim: paperGold(s.palette.trim) } });
   async function buildPdf(pages, name, progress) {
     let pdf = null;
+    const ps = paperState(state);
     const q = state.quality === 'print' ? .94 : .88;
     const c = document.createElement('canvas'), cache = new Map();
     // Repeated pages (every Dream, Notes… on the same side) render once; the PDF reuses the same image by name.
     for (let i = 0; i < pages.length; i++) {
       const [type, side] = pages[i], key = `${type}-${side}`;
       if (!cache.has(key)) {
-        renderPage(c, pxWidth(), state, type, side);
+        renderPage(c, pxWidth(), ps, type, side);
         // Exact page width in points: the full bleed page, or 1/8 in narrower without bleed at the binding edge (KDP).
         const narrow = Math.abs(PAGE_H * c.width / c.height - (PAGE_W - BLEED_PT)) < 2;
         cache.set(key, { data: new Uint8Array(await (await toBlob(c, 'image/jpeg', q)).arrayBuffer()), w: narrow ? PAGE_W - BLEED_PT : PAGE_W });
@@ -6707,7 +6711,7 @@ aside .accent-tiles button.active { border-color: var(--brand); background: var(
     setBusy(true, 'Preparing cover…');
     try {
       const cs = coverSpec(state), c = document.createElement('canvas');
-      renderCoverSpread(c, Math.round(cs.W * 300), state);
+      renderCoverSpread(c, Math.round(cs.W * 300), paperState(state));
       const data = new Uint8Array(await (await toBlob(c, 'image/jpeg', .95)).arrayBuffer());
       const pdf = new window.jspdf.jsPDF({ orientation: 'landscape', unit: 'pt', format: [cs.W * 72, cs.H * 72], compress: true });
       pdf.addImage(data, 'JPEG', 0, 0, cs.W * 72, cs.H * 72, 'cover-spread', 'FAST');
