@@ -217,7 +217,7 @@ describe("families + regression", () => {
     const ids = LAYOUTS.map((l) => l.id);
     // Cover and divider pages (merged from codex/reusable-covers-dividers) register ahead of the originals.
     expect(ids.slice(0, 2)).toEqual(["cover-page", "divider-page"]);
-    expect(ids.slice(2, 14)).toEqual(["notepad-todo", "notepad-grocery", "journal-lined", "notes-page", "planner-monthly", "planner-weekly-spread", "deskpad-weekly", "guided-page", "weekly-plan-mwg-spread", "planner-daily", "daily-luxury-execution", "notepad-daily"]);
+    expect(ids.slice(2, 15)).toEqual(["notepad-todo", "notepad-grocery", "journal-lined", "notes-page", "blank-page", "planner-monthly", "planner-weekly-spread", "deskpad-weekly", "guided-page", "weekly-plan-mwg-spread", "planner-daily", "daily-luxury-execution", "notepad-daily"]);
     expect(recipePresetsFor("journal").map((r) => r.id)).not.toContain(expect.stringMatching(/^stationery:/));
     expect(recipePresetsFor("planner").map((r) => r.id)).not.toContain(expect.stringMatching(/^stationery:/));
     expect(recipePresetsFor("notepad").map((r) => r.id)).not.toContain(expect.stringMatching(/^stationery:/));

@@ -23,6 +23,8 @@ import { lineBoxIn, stackDiagnostic } from "../shared/nodes";
 import type { FitContext, FitResult, LayoutDefinition } from "../shared/types";
 import { FILL_IN, isUndated, MONTH_NAMES } from "../../engines/calendar/calendar";
 import { heuristicMeasurer, styleForRole } from "../../engines/typography/textMeasure";
+import { monthlyArrangementOf, monthlySidebarOf } from "./plannerOptions";
+import { sidewaysGeometry } from "../../engines/geometry/turn";
 
 /** Widest month title any month can produce ("September 2027"), measured in the title role. */
 function widestTitleIn(ctx: FitContext): number {
@@ -67,14 +69,19 @@ function measure(ctx: FitContext, v: Variant, withSidebar: boolean): Measure {
 }
 
 const fits = (m: Measure, v: Variant) => m.colW + 1e-6 >= v.zones.minCellW.valueIn && m.rowH + 1e-6 >= v.zones.minCellH.valueIn;
-/** The month title must fit the page width — a variant is never offered if its title would overflow. */
+
 const titleFits = (ctx: FitContext) => widestTitleIn(ctx) <= ctx.page.usableWidthIn - 2 * ctx.spacing.page + 1e-6;
 
 function sidebarBalanced(ctx: FitContext): boolean {
   return ctx.options.sidebarWidthIn <= ctx.page.usableWidthIn * STUDIO_MONTHLY_VARIANTS.maxSidebarShare + 1e-6;
 }
 
-export function fitMonthly(ctx: FitContext): FitResult {
+/**
+ * Fit against CONTENT geometry. The caller must pass the geometry the layout
+ * will actually solve in. This avoids rotating an already-rotated monthly a
+ * second time inside solve().
+ */
+function fitMonthlyContent(ctx: FitContext, rotatedLabel: boolean): FitResult {
   const full = VARIANTS[0];
   const sidebarFits = sidebarBalanced(ctx) && fits(measure(ctx, full, true), full);
   const sidebarReason = sidebarFits
@@ -83,8 +90,15 @@ export function fitMonthly(ctx: FitContext): FitResult {
       ? `A ${ctx.options.sidebarWidthIn}" sidebar would take more than ${Math.round(STUDIO_MONTHLY_VARIANTS.maxSidebarShare * 100)}% of this page's width.`
       : "The page is too narrow for a sidebar beside a full 7-column grid.";
   for (const v of VARIANTS) {
-    if (titleFits(ctx) && fits(measure(ctx, v, v.allowsSidebar && ctx.options.showSidebar && sidebarFits), v)) {
-      return { ok: true, variant: v.id, variantLabel: v.label, sidebarAvailable: v.allowsSidebar && sidebarFits, sidebarReason: v.allowsSidebar ? sidebarReason : `${v.label} has no sidebar.` };
+    const m = measure(ctx, v, v.allowsSidebar && monthlySidebarOf(ctx.options) && sidebarFits);
+    if (titleFits(ctx) && fits(m, v)) {
+      return {
+        ok: true,
+        variant: v.id,
+        variantLabel: rotatedLabel ? `${v.label} (rotated)` : v.label,
+        sidebarAvailable: v.allowsSidebar && sidebarFits,
+        sidebarReason: v.allowsSidebar ? sidebarReason : `${v.label} has no sidebar.`,
+      };
     }
   }
   const m = measure(ctx, VARIANTS[VARIANTS.length - 1], false);
@@ -93,8 +107,16 @@ export function fitMonthly(ctx: FitContext): FitResult {
   }
   return {
     ok: false,
-    reason: `Too small for a monthly calendar: cells would be ${m.colW.toFixed(2)}" × ${m.rowH.toFixed(2)}" (minimum ${STUDIO_MONTHLY_VARIANTS.micro.minCellW.valueIn}" × ${STUDIO_MONTHLY_VARIANTS.micro.minCellH.valueIn}").`,
+    reason: `Too small for a monthly calendar: cells would be ${m.colW.toFixed(2)}" × ${m.rowH.toFixed(2)}" (minimum ${STUDIO_MONTHLY_VARIANTS.micro.minCellW.valueIn}" x ${STUDIO_MONTHLY_VARIANTS.micro.minCellH.valueIn}").`,
   };
+}
+
+export function fitMonthly(ctx: FitContext): FitResult {
+  // Availability/header checks receive the physical page geometry. Rotate it
+  // once for a sideways month so fitting matches the landscape content space.
+  const rotated = monthlyArrangementOf(ctx.options) === "rotated";
+  const contentCtx = rotated ? { ...ctx, page: sidewaysGeometry(ctx.page) } : ctx;
+  return fitMonthlyContent(contentCtx, rotated);
 }
 
 export const monthlyCalendar: LayoutDefinition = {
@@ -106,7 +128,7 @@ export const monthlyCalendar: LayoutDefinition = {
   id: "planner-monthly",
   label: "Monthly Calendar",
   family: "planner",
-  description: "Month title, weekday row, 7-column grid; full / compact / micro variants chosen by page size.",
+  description: "Month title, weekday row, 7-column grid; full / compact / micro variants chosen by page size. Rotated arrangement: the whole design is laid out in landscape and turned 90° onto the portrait sheet.",
   pages: 1,
   period: "month",
   capability: {
@@ -131,20 +153,28 @@ export const monthlyCalendar: LayoutDefinition = {
     const monthKey = ctx.period.key;
     const month = ctx.calendar.months.find((m) => m.key === monthKey);
     if (!month) throw new Error(`Month ${monthKey} not in calendar.`);
+    // When rotated, solvePage hands us the turned landscape geometry; we solve the
+    // classic monthly design in it and flag the page so the renderer turns the
+    // painted content 90° back onto the portrait sheet.
+    const rotated = monthlyArrangementOf(ctx.options) === "rotated";
     const g = ctx.pages[0];
     const s = ctx.spacing;
-    const fit = fitMonthly({ page: g, spacing: s, typography: ctx.typography, options: ctx.options });
+    // g is already the content geometry here. For rotated months solvePage() has
+    // already turned it to landscape, so do NOT rotate it again during fit.
+    const fit = fitMonthlyContent({ page: g, spacing: s, typography: ctx.typography, options: ctx.options }, rotated);
     if (!fit.ok) {
       return [{ nodes: [], metrics: [], diagnostics: [{ severity: "error", rule: "layout-incompatible", componentId: "planner-monthly", message: fit.reason }] }];
     }
     const v = VARIANTS.find((x) => x.id === fit.variant)!;
-    const showSidebar = ctx.options.showSidebar && fit.sidebarAvailable;
+    // The monthly sidebar is its own switch (it no longer follows the weekly sidebar).
+    const wantSidebar = monthlySidebarOf(ctx.options);
+    const showSidebar = wantSidebar && fit.sidebarAvailable;
 
     const frame = pageFrame(ctx, 0, { headerH: v.zones.titleH.valueIn });
     const title = headerTitle("month-header", ctx, frame.zones, "monthYear", isUndated(ctx.calendar) ? `Month ${FILL_IN}` : `${month.name} ${month.year}`, "monthTitle", "header-left");
     const nodes: LayoutNode[] = [...frame.nodes, ...title.nodes];
     const diagnostics = [...frame.diagnostics, ...title.diagnostics];
-    if (ctx.options.showSidebar && !showSidebar) {
+    if (wantSidebar && !showSidebar) {
       diagnostics.push({ severity: "info", rule: "sidebar-unavailable", componentId: "month-sidebar", message: `Sidebar hidden: ${fit.sidebarReason}` });
     }
 
@@ -211,6 +241,6 @@ export const monthlyCalendar: LayoutDefinition = {
       regions.sidebar = sidebarRect;
       if (ctx.options.sidebarContent === "notes") regions.notes = sidebarRect;
     }
-    return [{ nodes, diagnostics, metrics, regions }];
+    return [{ nodes, diagnostics, metrics, regions, ...(rotated ? { contentRotation: 90 as const } : {}) }];
   },
 };

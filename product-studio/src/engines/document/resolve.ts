@@ -11,7 +11,8 @@
  * Colors and decorative themes are applied at render time only, so changing
  * them never re-solves geometry or dates.
  */
-import { getLayout, FILLER_LAYOUT_ID, LAYOUTS } from "../../layouts/registry";
+import { getLayout, FILLER_LAYOUT_ID, BLANK_FILLER_LAYOUT_ID, LAYOUTS } from "../../layouts/registry";
+import { fillerKindOf, monthlyArrangementOf, spreadModeOf } from "../../layouts/planner/plannerOptions";
 import type { FitResult, LayoutContext, LayoutDefinition } from "../../layouts/shared/types";
 import { getBindingProfile } from "../../presets/bindingProfiles/bindingProfiles";
 import { getPrintProfile } from "../../presets/printProfiles/printProfiles";
@@ -24,6 +25,7 @@ import { resolveWording } from "../../presets/wording";
 import type { BindingProfile } from "../../types/binding";
 import type { CalendarData, WeekStart } from "../../types/calendar";
 import type { PageGeometry } from "../../types/geometry";
+import { sidewaysGeometry } from "../geometry/turn";
 import type { SolvedPage } from "../../types/layout";
 import type { PrintProfile } from "../../types/print";
 import type { ProductTypeDefinition } from "../../types/product";
@@ -36,6 +38,7 @@ import { getLayoutMeasurer } from "../typography/textMeasure";
 import { resolveTrim, type ResolvedTrim } from "../geometry/dimensions";
 import { computePageGeometry } from "../geometry/pageGeometry";
 import { expandRecipe, recipeSteps, type ExpandedRecipe } from "../recipe/recipe";
+import { sectionPageOrientationOf } from "../../layouts/planner/plannerOptions";
 import { normalizeDecoration } from "../../themes/decorationPlan";
 import { resolveComposition } from "../composition/composition";
 import type { Composition } from "../../types/composition";
@@ -150,12 +153,15 @@ export function resolveDocument(input: ProductProject): ResolvedDocument {
   const base = {
     calendar,
     paged,
-    fillerLayoutId: FILLER_LAYOUT_ID,
+    spreadMode: spreadModeOf(project.layoutOptions),
+    fillerLayoutId: fillerKindOf(project.layoutOptions) === "blank" ? BLANK_FILLER_LAYOUT_ID : FILLER_LAYOUT_ID,
     pagesPerInstance: (id: string) => getLayout(id).pages,
     layoutPeriod: (id: string) => getLayout(id).period,
     layoutLabel: (id: string) => getLayout(id).label,
   };
-  const recipeKey = JSON.stringify([project.recipe, project.calendar, paged]);
+  // The recipe key covers everything expansion reads: recipe, calendar,
+  // paging, and the facing-page behavior (spread mode + filler kind).
+  const recipeKey = JSON.stringify([project.recipe, project.calendar, paged, base.spreadMode, base.fillerLayoutId]);
   let recipe = recipeCache.get(recipeKey, () => expandRecipe(project.recipe, base));
   // Content that continues on more pages (prompt + response pages): measure against this product's page, then
   // expand again with the continuation pages. (Geometry depends on the page count only through the spine, so
@@ -205,12 +211,13 @@ export function resolveDocument(input: ProductProject): ResolvedDocument {
   };
 }
 
-export function geometryFor(doc: ResolvedDocument, page: Pick<PageInstance, "side">): PageGeometry {
+export function geometryFor(doc: ResolvedDocument, page: PageInstance | Pick<PageInstance, "side">, index?: number): PageGeometry {
   const p = doc.project.production;
-  const key = JSON.stringify([doc.trim.widthIn, doc.trim.heightIn, doc.trim.orientation, p, doc.project.productType, doc.recipe.pageCount, page.side, doc.duplex]);
+  const trim = "layoutId" in page ? trimForPage(doc, page, index) : doc.trim;
+  const key = JSON.stringify([trim.widthIn, trim.heightIn, trim.orientation, p, doc.project.productType, doc.recipe.pageCount, page.side, doc.duplex]);
   return geometryCache.get(key, () =>
     computePageGeometry({
-      trim: doc.trim,
+      trim,
       binding: doc.binding,
       boundEdge: p.boundEdge,
       printProfile: doc.printProfile,
@@ -222,6 +229,36 @@ export function geometryFor(doc: ResolvedDocument, page: Pick<PageInstance, "sid
       userMargins: p.userMargins,
     }),
   );
+}
+
+/**
+ * The trim for one page. Planner sections can override the project's page
+ * orientation (e.g. landscape monthlies in a portrait planner); the trim is
+ * the project trim turned to that orientation. A filler page keeps a spread
+ * open, so it takes the orientation of the spread it faces (the nearest
+ * non-filler page, preferring the one after it).
+ */
+export function trimForPageLike(
+  project: ProductProject,
+  base: ResolvedTrim,
+  page: PageInstance,
+  pages: readonly PageInstance[],
+  index?: number,
+): ResolvedTrim {
+  let layoutId = page.layoutId;
+  if (page.filler) {
+    const i = index ?? pages.indexOf(page);
+    const next = pages.slice(i + 1).find((q) => !q.filler) ?? pages.slice(0, i).reverse().find((q) => !q.filler);
+    if (next) layoutId = next.layoutId;
+  }
+  const want = sectionPageOrientationOf(project.layoutOptions, base.orientation, layoutId);
+  if (want === base.orientation) return base;
+  return { ...base, widthIn: base.heightIn, heightIn: base.widthIn, orientation: want, label: `${base.label} (${want})` };
+}
+
+/** The trim for one page of a resolved document. */
+export function trimForPage(doc: ResolvedDocument, page: PageInstance, index?: number): ResolvedTrim {
+  return trimForPageLike(doc.project, doc.trim, page, doc.recipe.pages, index);
 }
 
 /** Pages that belong to the same layout instance (1, 2 for a spread, or a page and its continuation pages). */
@@ -258,15 +295,34 @@ function facingHeader(doc: ResolvedDocument, index: number): number | undefined 
   const q = doc.recipe.pages[j];
   const other = getLayout(q.layoutId);
   if (!other.headerIn || other.pages !== 1) return undefined;
-  const h = other.headerIn({ page: geometryFor(doc, q), spacing: doc.spacing, typography: doc.typography, options: doc.project.layoutOptions, pattern: doc.project.functionalPattern, module: q.module });
+  const h = other.headerIn({ page: geometryFor(doc, q, j), spacing: doc.spacing, typography: doc.typography, options: doc.project.layoutOptions, pattern: doc.project.functionalPattern, module: q.module });
   return h > 0 ? h : undefined;
+}
+
+/**
+ * True when the page's content is designed in landscape and rotated 90° onto
+ * the portrait sheet (the rotated monthly calendar).
+ */
+export function isRotatedMonthly(doc: ResolvedDocument, page: PageInstance): boolean {
+  return page.layoutId === "planner-monthly" && monthlyArrangementOf(doc.project.layoutOptions) === "rotated";
+}
+
+/**
+ * The geometry a page's CONTENT is solved in. Rotated monthly pages solve in
+ * landscape (the turned geometry); everything else solves in the paper
+ * geometry. Renderers pair this with the solved nodes; the paper geometry
+ * stays portrait for the sheet, preview frame, and print sizing.
+ */
+export function contentGeometryFor(doc: ResolvedDocument, page: PageInstance | Pick<PageInstance, "side">, index?: number): PageGeometry {
+  const g = geometryFor(doc, page, index);
+  return "layoutId" in page && isRotatedMonthly(doc, page as PageInstance) ? sidewaysGeometry(g) : g;
 }
 
 /** Solve the page at `index` (solving its whole spread when needed). */
 export function solvePage(doc: ResolvedDocument, index: number): SolvedPage {
   const group = instancePages(doc, index);
   const layout = getLayout(group[0].layoutId);
-  const geometries = group.map((p) => geometryFor(doc, p));
+  const geometries = group.map((p, k) => contentGeometryFor(doc, p, index + k));
   const typeSizes = Object.fromEntries(Object.entries(doc.typography.roles).map(([k, r]) => [k, [r.sizePt, r.lineHeight, r.group, r.weight, r.style, r.trackingEm, r.transform]]));
   const facingHeaderIn = layout.alignsHeader && group.length === 1 ? facingHeader(doc, index) : undefined;
   // The layout id is part of the key: two recipe steps (or one step whose
@@ -352,5 +408,5 @@ export function recipeLayouts(doc: ResolvedDocument): { layout: LayoutDefinition
 
 /** Composition (regions + protected content) of a page — what the renderer and validation both use. */
 export function compositionFor(doc: ResolvedDocument, index: number): Composition {
-  return resolveComposition(geometryFor(doc, doc.recipe.pages[index]), solvePage(doc, index), doc.typography, doc.spacing);
+  return resolveComposition(contentGeometryFor(doc, doc.recipe.pages[index], index), solvePage(doc, index), doc.typography, doc.spacing);
 }

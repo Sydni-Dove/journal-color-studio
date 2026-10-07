@@ -189,4 +189,10 @@ export type SolvedPage = {
    * `ownColors`: in the art's own Journal Color Studio palette, not the product's.
    */
   surface?: { assetId: string; ownColors: boolean };
+  /**
+   * The page's content is solved in landscape and must be rotated 90°
+   * clockwise onto the portrait sheet when rendered (preview and print).
+   * The reader turns the physical planner to read it.
+   */
+  contentRotation?: 90;
 };

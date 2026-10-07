@@ -77,7 +77,7 @@ export function PagePreview({ doc, index, onIndex, debug, issueIds }: Props) {
   }, [index, pages.length, onIndex]);
 
   const shown = useMemo(() => (pages.length ? visibleIndices(doc, Math.min(index, pages.length - 1), spread && paged) : []), [doc, index, spread, paged, pages.length]);
-  const geos = shown.map((i) => geometryFor(doc, pages[i]));
+  const geos = shown.map((i) => geometryFor(doc, pages[i], i));
   const totalWIn = geos.reduce((s, g) => s + g.mediaWidthIn, 0);
   const maxHIn = Math.max(...geos.map((g) => g.mediaHeightIn), 1);
   const naturalW = totalWIn * CSS_PX_PER_IN + SPREAD_GAP_PX * (geos.length - 1);
@@ -180,7 +180,7 @@ export function PagePreview({ doc, index, onIndex, debug, issueIds }: Props) {
       <div className="preview-caption">
         {shown.map((i) => `Page ${pages[i].pageNumber}${pages[i].side === "recto" ? " (right-hand)" : pages[i].side === "verso" ? " (left-hand)" : ""}`).join("  ·  ")}
         {"  ·  "}
-        {doc.trim.widthIn}" × {doc.trim.heightIn}" page
+        {[...new Set(geos.map((g) => `${g.trimWidthIn}" × ${g.trimHeightIn}"`))].join(" + ")} page
         {current.physicalSheets ? `  ·  one design, printed on ${current.physicalSheets} sheets` : ""}
         {current.filler ? "  ·  extra notes page (keeps two-page spreads facing each other)" : ""}
       </div>

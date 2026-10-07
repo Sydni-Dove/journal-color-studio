@@ -1,0 +1,216 @@
+/**
+ * ROTATED MONTHLY CALENDAR — true 90° rotation of the monthly design:
+ *
+ *   The classic monthly calendar (title, weekday labels, 7-column grid,
+ *   notes sidebar) is solved in LANDSCAPE against the turned page geometry,
+ *   flagged with contentRotation: 90, and the renderer turns the painted
+ *   content 90° clockwise onto the portrait sheet. The reader turns the
+ *   physical planner to read it. Classic is the default; rotated is chosen
+ *   with layoutOptions.monthlyArrangement.
+ */
+import { describe, expect, it } from "vitest";
+import { contentGeometryFor, geometryFor, layoutAvailability, resolveDocument, solvePage } from "../src/engines/document/resolve";
+import { sidewaysGeometry } from "../src/engines/geometry/turn";
+import { monthlyArrangementOf } from "../src/layouts/planner/plannerOptions";
+import { addMonthly } from "../src/engines/recipe/pageBuilder";
+import { createProject } from "../src/presets/products/projectFactory";
+import type { BookNode } from "../src/types/recipe";
+import type { LayoutNode, TextNode } from "../src/types/layout";
+import type { LayoutOptions } from "../src/types/project";
+
+const paged = { bindingType: "coil", printProfileId: "coil-generic", duplex: true } as never;
+
+const planner = (structure: BookNode[], layoutOptions: Partial<LayoutOptions> = {}) =>
+  createProject("planner", {
+    dimensions: { sizePresetId: "7x9", orientation: "portrait" },
+    production: paged,
+    calendar: { startDate: "2027-01-01", endDate: "2027-02-28", weekStart: 0, sixRowMonths: true },
+    recipe: { items: [], ordering: "chronological", structure },
+    layoutOptions,
+  });
+
+const doc = (layoutOptions: Partial<LayoutOptions> = {}) => resolveDocument(planner(addMonthly([]), layoutOptions));
+const monthlySolved = (d: ReturnType<typeof resolveDocument>) => {
+  const i = d.recipe.pages.findIndex((p) => p.layoutId === "planner-monthly" && !p.filler);
+  return { index: i, solved: solvePage(d, i) };
+};
+const texts = (nodes: LayoutNode[]) => nodes.filter((n): n is TextNode => n.type === "text");
+
+describe("monthlyArrangementOf", () => {
+  it("defaults to classic; sideways only when chosen", () => {
+    expect(monthlyArrangementOf({})).toBe("classic");
+    expect(monthlyArrangementOf({ monthlyArrangement: "rotated" })).toBe("rotated");
+    expect(monthlyArrangementOf({ monthlyArrangement: "classic" })).toBe("classic");
+  });
+});
+
+describe("sidewaysGeometry", () => {
+  it("swaps width/height dimensions", () => {
+    const classic = doc({ monthlyArrangement: "classic" });
+    const ci = classic.recipe.pages.findIndex((p) => p.layoutId === "planner-monthly" && !p.filler);
+    const g = contentGeometryFor(classic, classic.recipe.pages[ci], ci); // explicit classic: paper geometry
+    const t = sidewaysGeometry(g);
+    expect(t.trimWidthIn).toBeCloseTo(g.trimHeightIn, 6);
+    expect(t.trimHeightIn).toBeCloseTo(g.trimWidthIn, 6);
+    expect(t.usableWidthIn).toBeCloseTo(g.usableHeightIn, 6);
+    expect(t.usableHeightIn).toBeCloseTo(g.usableWidthIn, 6);
+    expect(t.mediaWidthIn).toBeCloseTo(g.mediaHeightIn, 6);
+    expect(t.mediaHeightIn).toBeCloseTo(g.mediaWidthIn, 6);
+    expect(t.orientation).toBe("landscape");
+    // Double turn returns to the original dims.
+    const back = sidewaysGeometry(t);
+    expect(back.trimWidthIn).toBeCloseTo(g.trimWidthIn, 6);
+    expect(back.usableWidthIn).toBeCloseTo(g.usableWidthIn, 6);
+  });
+});
+
+describe("sidewaysGeometry: one turn, used everywhere", () => {
+  // The calendar disappeared when the drawing turned one way and the trim / margins / binding the other.
+  const page = () => {
+    const d = doc({ monthlyArrangement: "classic" });
+    const i = d.recipe.pages.findIndex((p) => p.layoutId === "planner-monthly" && !p.filler);
+    return geometryFor(d, d.recipe.pages[i], i);
+  };
+  it("the page's left edge (and its binding) becomes the top of the sideways content", () => {
+    const g = page();
+    const t = sidewaysGeometry(g);
+    expect(t.safe.top).toBeCloseTo(g.safe.left, 6);
+    expect(t.safe.left).toBeCloseTo(g.safe.bottom, 6);
+    expect(t.safe.bottom).toBeCloseTo(g.safe.right, 6);
+    expect(t.safe.right).toBeCloseTo(g.safe.top, 6);
+    for (const k of t.keepOuts) expect(k.edge).toBe(({ left: "top", top: "right", right: "bottom", bottom: "left" } as const)[g.keepOuts.find((z) => z.id === k.id)!.edge]);
+  });
+  it("the trim sits inside the media where the bleed puts it", () => {
+    const g = { ...page(), bleed: { top: 0.1, right: 0.2, bottom: 0.3, left: 0.4 }, trimOffset: { x: 0.4, y: 0.1 } };
+    g.mediaWidthIn = g.trimWidthIn + 0.6;
+    g.mediaHeightIn = g.trimHeightIn + 0.4;
+    const t = sidewaysGeometry(g);
+    expect(t.trimOffset.x).toBeCloseTo(t.bleed.left, 6);
+    expect(t.trimOffset.y).toBeCloseTo(t.bleed.top, 6);
+    expect(t.trimOffset.x + t.trimWidthIn + t.bleed.right).toBeCloseTo(t.mediaWidthIn, 6);
+    expect(t.trimOffset.y + t.trimHeightIn + t.bleed.bottom).toBeCloseTo(t.mediaHeightIn, 6);
+  });
+});
+
+describe("rotated monthly fit", () => {
+  it("fits against the landscape geometry and labels the variant rotated", () => {
+    const d = doc({ monthlyArrangement: "rotated" });
+    const avail = layoutAvailability(d);
+    const monthly = avail.find((a) => a.layoutId === "planner-monthly");
+    expect(monthly?.fit.ok).toBe(true);
+    if (monthly?.fit.ok) expect(monthly.fit.variantLabel).toContain("rotated");
+  });
+
+  it("fitMonthly measures wider cells in landscape than the portrait classic", () => {
+    const dClassic = doc({ monthlyArrangement: "classic" });
+    const dRotated = doc({ monthlyArrangement: "rotated" });
+    const pageOf = (dd: ReturnType<typeof resolveDocument>) => {
+      const i = dd.recipe.pages.findIndex((p) => p.layoutId === "planner-monthly" && !p.filler);
+      return contentGeometryFor(dd, dd.recipe.pages[i], i);
+    };
+    // contentGeometryFor returns the turned (landscape) geometry for rotated months.
+    const gRotated = pageOf(dRotated);
+    const gClassic = pageOf(dClassic);
+    expect(gRotated.usableWidthIn).toBeGreaterThan(gClassic.usableWidthIn);
+    expect(gRotated.usableWidthIn).toBeCloseTo(gClassic.usableHeightIn, 6);
+  });
+});
+
+describe("rotated monthly solve", () => {
+  it("flags the solved page with contentRotation 90", () => {
+    const d = doc({ monthlyArrangement: "rotated" });
+    const { solved } = monthlySolved(d);
+    expect(solved.contentRotation).toBe(90);
+  });
+
+  it("does not flag classic months", () => {
+    const d = doc({ monthlyArrangement: "classic" });
+    const { solved } = monthlySolved(d);
+    expect(solved.contentRotation).toBeUndefined();
+  });
+
+  it("solves nodes in landscape coordinates (wider than the portrait sheet)", () => {
+    const d = doc({ monthlyArrangement: "rotated" });
+    const { index, solved } = monthlySolved(d);
+    const grid = solved.nodes.find((n) => n.id === "month-grid");
+    expect(grid).toBeDefined();
+    // The grid is solved in the turned landscape geometry: wider than the
+    // portrait trim width.
+    const paperW = d.recipe.pages[index]
+      ? contentGeometryFor(d, d.recipe.pages[index], index)
+      : null;
+    expect(grid!.rect.w).toBeGreaterThan(0);
+    expect(paperW).not.toBeNull();
+    // Landscape content width exceeds the portrait usable width.
+    const classic = doc({ monthlyArrangement: "classic" });
+    const ci = classic.recipe.pages.findIndex((p) => p.layoutId === "planner-monthly" && !p.filler);
+    const classicGrid = solvePage(classic, ci).nodes.find((n) => n.id === "month-grid");
+    expect(grid!.rect.w).toBeGreaterThan(classicGrid!.rect.w);
+  });
+
+
+
+  it("ignores a saved monthly-landscape sheet override when the month is rotated", () => {
+    const p = createProject("planner", {
+      dimensions: { sizePresetId: "8x10", orientation: "portrait" },
+      production: paged,
+      calendar: { startDate: "2026-01-01", endDate: "2026-01-31", weekStart: 0, sixRowMonths: true },
+      recipe: { items: [], ordering: "chronological", structure: addMonthly([]) },
+      layoutOptions: {
+        monthlyArrangement: "rotated",
+        plannerPageOrientation: { monthly: "landscape" },
+      },
+    });
+    const d = resolveDocument(p);
+    const i = d.recipe.pages.findIndex((page) => page.layoutId === "planner-monthly" && !page.filler);
+    const physical = geometryFor(d, d.recipe.pages[i], i);
+    const content = contentGeometryFor(d, d.recipe.pages[i], i);
+    const solved = solvePage(d, i);
+    expect([physical.trimWidthIn, physical.trimHeightIn, physical.orientation]).toEqual([8, 10, "portrait"]);
+    expect([content.trimWidthIn, content.trimHeightIn, content.orientation]).toEqual([10, 8, "landscape"]);
+    expect(solved.contentRotation).toBe(90);
+    expect(solved.nodes.some((n) => n.id === "month-grid")).toBe(true);
+    expect(solved.diagnostics.some((x) => x.rule === "layout-incompatible" || x.rule === "layout-solver")).toBe(false);
+  });
+
+  it("does not disappear on an 8x10 portrait planner when rotated", () => {
+    const p = createProject("planner", {
+      dimensions: { sizePresetId: "custom", custom: { width: 8, height: 10, unit: "in" }, orientation: "portrait" },
+      production: paged,
+      calendar: { startDate: "2026-01-01", endDate: "2026-01-31", weekStart: 0, sixRowMonths: true },
+      recipe: { items: [], ordering: "chronological", structure: addMonthly([]) },
+      layoutOptions: { monthlyArrangement: "rotated" },
+    });
+    const d = resolveDocument(p);
+    const i = d.recipe.pages.findIndex((page) => page.layoutId === "planner-monthly" && !page.filler);
+    const solved = solvePage(d, i);
+    expect(solved.contentRotation).toBe(90);
+    expect(solved.nodes.length).toBeGreaterThan(0);
+    expect(solved.nodes.some((n) => n.id === "month-grid")).toBe(true);
+    expect(solved.diagnostics.some((x) => x.rule === "layout-incompatible" || x.rule === "layout-solver")).toBe(false);
+  });
+
+  it("keeps the classic 7-column structure (title, weekday labels, grid, dates)", () => {
+    const d = doc({ monthlyArrangement: "rotated" });
+    const { solved } = monthlySolved(d);
+    const ids = new Set(solved.nodes.map((n) => n.id));
+    expect(ids.has("month-header-title")).toBe(true);
+    expect(ids.has("month-grid")).toBe(true);
+    expect([...ids].some((id) => id.startsWith("month-weekdays-"))).toBe(true);
+    const dateTexts = texts(solved.nodes).filter((t) => /month-grid-.*-date/.test(t.id));
+    expect(dateTexts.length).toBeGreaterThan(27);
+  });
+
+  it("the rotated grid is substantially wider than the classic portrait grid", () => {
+    const dRot = doc({ monthlyArrangement: "rotated" });
+    const dClassic = doc({ monthlyArrangement: "classic" });
+    const gridOf = (dd: ReturnType<typeof resolveDocument>) => {
+      const i = dd.recipe.pages.findIndex((p) => p.layoutId === "planner-monthly" && !p.filler);
+      return solvePage(dd, i).nodes.find((n) => n.id === "month-grid")!;
+    };
+    const wRot = gridOf(dRot).rect.w;
+    const wClassic = gridOf(dClassic).rect.w;
+    // Landscape content width vs portrait: roughly the trim aspect ratio.
+    expect(wRot / wClassic).toBeGreaterThan(1.2);
+  });
+});

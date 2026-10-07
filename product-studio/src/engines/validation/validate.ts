@@ -5,7 +5,7 @@
 import { validateDimensions } from "../geometry/dimensions";
 import { validateCalendarSettings } from "../calendar/calendar";
 import { rectContains, rectsIntersect } from "../layout/math";
-import { geometryFor, resolveDocument, solvePage, type ResolvedDocument } from "../document/resolve";
+import { contentGeometryFor, geometryFor, resolveDocument, solvePage, type ResolvedDocument } from "../document/resolve";
 import { inkBoxFor } from "../typography/ink";
 import { compositionChecks } from "./composition";
 import { validateBook } from "./book";
@@ -160,7 +160,7 @@ function checkText(node: Extract<LayoutNode, { type: "text" }>, doc: ResolvedDoc
 
 export function validatePage(doc: ResolvedDocument, index: number, measure: TextMeasurer, solved?: SolvedPage): ValidationIssue[] {
   const page = doc.recipe.pages[index];
-  const g = geometryFor(doc, page);
+  const g = contentGeometryFor(doc, page, index);
   const s = solved ?? solvePage(doc, index);
   const issues: ValidationIssue[] = [];
   const counts = new Map<string, number>();

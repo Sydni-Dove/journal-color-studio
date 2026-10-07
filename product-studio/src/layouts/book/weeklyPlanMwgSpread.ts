@@ -22,6 +22,7 @@ import { getLayoutMeasurer, styleForRole } from "../../engines/typography/textMe
 import { gridPitchIn, lineSpacingIn } from "../../engines/patterns/patterns";
 import { minimumAreaFit, type LayoutContext, type LayoutDefinition } from "../shared/types";
 import { weightedStack } from "./guidedPage";
+import { weeklyPlanNotesOf, weeklyPlanPrioritiesOf } from "../planner/plannerOptions";
 
 /** Recto writing blocks: open journal, What did God say?, Response / action steps. */
 export const RECTO_WEIGHTS = [2, 1.2, 1];
@@ -95,10 +96,11 @@ function planMetrics(ctx: LayoutContext) {
   return { pitch, inset, footRow, footHeadH, footFixed, nameH, dateH, stackedH, inlineH, minLines };
 }
 
-/** Whole lines per row on one page, leaving room for the foot section's minimum rows. */
-function allotPage(rect: Rect, ctx: LayoutContext, rows: PlanRow[]): number[] {
+/** Whole lines per row on one page, leaving room for the foot section's minimum rows (none when the foot is off). */
+function allotPage(rect: Rect, ctx: LayoutContext, rows: PlanRow[], withFoot: boolean): number[] {
   const m = planMetrics(ctx);
-  const daysH = rect.h - m.footFixed - PRIORITY_ROWS * m.footRow;
+  const reserved = withFoot ? m.footFixed + PRIORITY_ROWS * m.footRow : 0;
+  const daysH = rect.h - reserved;
   return allotLines(Math.floor((daysH + 1e-9) / m.pitch), rows, m.minLines);
 }
 
@@ -108,9 +110,10 @@ function allotPage(rect: Rect, ctx: LayoutContext, rows: PlanRow[]): number[] {
  * the rest of the row, and the day's last line is a full-width hairline rule
  * that separates it from the next. A foot section closes the page on the same
  * pitch: Priorities (a checklist) or Notes (lines), taking every line the rows
- * leave.
+ * leave. Either foot section can be turned off in the planner options; the day
+ * rows then reclaim its space.
  */
-function drawPlan(id: string, rect: Rect, ctx: LayoutContext, week: CalendarWeek, rows: PlanRow[], lines: number[], foot: Foot) {
+function drawPlan(id: string, rect: Rect, ctx: LayoutContext, week: CalendarWeek, rows: PlanRow[], lines: number[], foot: Foot | null) {
   const s = ctx.spacing;
   const m = planMetrics(ctx);
   const { pitch, inset } = m;
@@ -121,8 +124,8 @@ function drawPlan(id: string, rect: Rect, ctx: LayoutContext, week: CalendarWeek
   // Rows are measured in whole writing lines. A row n lines tall draws n − 1 writing lines, and its n-th line
   // is the day's divider rule — a full-width hairline you can still write on.
   const used = lines.reduce((a, b) => a + b, 0) * pitch;
-  const footRows = Math.floor((rect.h - used - m.footFixed + 1e-9) / m.footRow);
-  const footH = m.footHeadH + s.headingToContentGap + footRows * m.footRow;
+  const footRows = foot ? Math.floor((rect.h - used - m.footFixed + 1e-9) / m.footRow) : 0;
+  const footH = foot ? m.footHeadH + s.headingToContentGap + footRows * m.footRow : 0;
   const bands: { y: number; h: number }[] = [];
   let y = rect.y;
   for (const n of lines) bands.push({ y, h: n * pitch }), (y += n * pitch);
@@ -157,19 +160,24 @@ function drawPlan(id: string, rect: Rect, ctx: LayoutContext, week: CalendarWeek
       if (m.inlineH > cell.h + 1e-6) diagnostics.push({ severity: "error", rule: "layout-incompatible", componentId: did, message: `The ${short[i]} row is shorter than its day label at this size.` });
     });
   });
-  const footRect: Rect = { x: rect.x, y: rect.y + rect.h - footH, w: rect.w, h: footH };
-  const fid = `${id}-${foot}`;
-  nodes.push(group(fid, "Section", footRect));
-  nodes.push(text(`${fid}-title`, { x: footRect.x, y: footRect.y, w: footRect.w, h: m.footHeadH }, foot === "priorities" ? ctx.wording.priorities : ctx.wording.notes, "subheading", { component: "SectionHeader" }));
-  const body: Rect = { x: footRect.x, y: footRect.y + m.footHeadH + s.headingToContentGap, w: footRect.w, h: footRows * m.footRow };
-  nodes.push(...(foot === "priorities" ? checklistRows(`${fid}-list`, body, ctx, m.footRow).nodes : writingSurface(`${fid}-list`, body, ctx)));
+  const footRect: Rect | null = foot ? { x: rect.x, y: rect.y + rect.h - footH, w: rect.w, h: footH } : null;
+  const footNodes: LayoutNode[] = [];
+  if (foot && footRect) {
+    const fid = `${id}-${foot}`;
+    footNodes.push(group(fid, "Section", footRect));
+    footNodes.push(text(`${fid}-title`, { x: footRect.x, y: footRect.y, w: footRect.w, h: m.footHeadH }, foot === "priorities" ? ctx.wording.priorities : ctx.wording.notes, "subheading", { component: "SectionHeader" }));
+    const body: Rect = { x: footRect.x, y: footRect.y + m.footHeadH + s.headingToContentGap, w: footRect.w, h: footRows * m.footRow };
+    footNodes.push(...(foot === "priorities" ? checklistRows(`${fid}-list`, body, ctx, m.footRow).nodes : writingSurface(`${fid}-list`, body, ctx)));
+  }
+  nodes.push(...footNodes);
   return { nodes, diagnostics, weekdayH: bands[rows.findIndex((r) => !r.weekend)]?.h ?? 0, foot: footRect };
 }
 
-/** The whole week on one page, closed by Priorities. */
+/** The whole week on one page, closed by Priorities (unless turned off). */
 function planOpen(id: string, rect: Rect, ctx: LayoutContext, week: CalendarWeek) {
   const rows = weekRows(week.days);
-  const plan = drawPlan(id, rect, ctx, week, rows, allotPage(rect, ctx, rows), "priorities");
+  const withFoot = weeklyPlanPrioritiesOf(ctx.options);
+  const plan = drawPlan(id, rect, ctx, week, rows, allotPage(rect, ctx, rows, withFoot), withFoot ? "priorities" : null);
   return { ...plan, priorities: plan.foot };
 }
 
@@ -177,18 +185,20 @@ function planOpen(id: string, rect: Rect, ctx: LayoutContext, week: CalendarWeek
  * The week across a spread: the first three weekdays (and a weekend day that
  * starts the week) on the left page, closed by Notes; the last two weekdays
  * and the weekend on the right, closed by Priorities. Weekdays get the same
- * number of lines on both pages.
+ * number of lines on both pages. Either foot section can be turned off in the
+ * planner options; the day rows then reclaim its space.
  */
 export function planAcross(ids: [string, string], rects: [Rect, Rect], ctx: LayoutContext, week: CalendarWeek) {
   const rows = weekRows(week.days);
   let seen = 0;
   const cut = rows.findIndex((r) => !r.weekend && ++seen === 4);
   const halves: [PlanRow[], PlanRow[]] = [rows.slice(0, cut), rows.slice(cut)];
-  const alloc = halves.map((h, k) => allotPage(rects[k], ctx, h));
+  const feet: [Foot | null, Foot | null] = [weeklyPlanNotesOf(ctx.options) ? "notes" : null, weeklyPlanPrioritiesOf(ctx.options) ? "priorities" : null];
+  const alloc = halves.map((h, k) => allotPage(rects[k], ctx, h, feet[k] !== null));
   const pick = (weekend: boolean) => Math.min(...halves.flatMap((h, k) => h.map((r, j) => (r.weekend === weekend ? alloc[k][j] : Infinity))));
   const wd = pick(false), we = Math.min(pick(true), wd);
   const lines = halves.map((h) => h.map((r) => (r.weekend ? we : wd)));
-  return halves.map((h, k) => drawPlan(ids[k], rects[k], ctx, week, h, lines[k], k === 0 ? "notes" : "priorities")) as [ReturnType<typeof drawPlan>, ReturnType<typeof drawPlan>];
+  return halves.map((h, k) => drawPlan(ids[k], rects[k], ctx, week, h, lines[k], feet[k])) as [ReturnType<typeof drawPlan>, ReturnType<typeof drawPlan>];
 }
 
 function solveSpread(ctx: LayoutContext): SolvedPage[] {
@@ -207,9 +217,9 @@ function solveSpread(ctx: LayoutContext): SolvedPage[] {
     nodes: [...f0.nodes, ...t0.nodes, ...plan.nodes],
     diagnostics: [...f0.diagnostics, ...t0.diagnostics, ...plan.diagnostics],
     metrics: [
-      { label: "Weekday section height (full width, open)", value: plan.weekdayH, unit: "in", provenance: { geometryClass: "user-design", basis: `body ${f0.body.h.toFixed(3)}" less Priorities, shared by Mon–Fri and the weekend row` } },
+      { label: "Weekday section height (full width, open)", value: plan.weekdayH, unit: "in", provenance: { geometryClass: "user-design", basis: `body ${f0.body.h.toFixed(3)}"${plan.priorities ? " less Priorities" : ""}, shared by Mon–Fri and the weekend row` } },
     ],
-    regions: { mainContent: f0.body, calendar: f0.body, notes: plan.priorities } satisfies LayoutRegions,
+    regions: { mainContent: f0.body, calendar: f0.body, ...(plan.priorities ? { notes: plan.priorities } : {}) } satisfies LayoutRegions,
   };
 
   // Recto — Meeting With God.

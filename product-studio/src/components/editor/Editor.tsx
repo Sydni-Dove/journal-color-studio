@@ -1,7 +1,7 @@
 import { LUXE_TITLE_FONT } from "../../presets/coverLuxe";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { PanelResizer, usePanelWidth } from "./PanelResizer";
-import { compositionFor, geometryFor, resolveDocument, solvePage, type ResolvedDocument } from "../../engines/document/resolve";
+import { compositionFor, contentGeometryFor, geometryFor, resolveDocument, solvePage, type ResolvedDocument } from "../../engines/document/resolve";
 import { planDecoration } from "../../themes/decorationPlan";
 import { computeUsage } from "../../engines/document/usage";
 import { createCanvasMeasurer, heuristicMeasurer, setLayoutMeasurer } from "../../engines/typography/textMeasure";
@@ -178,7 +178,7 @@ export function Editor({ project, onChange, onBack, saveStatus, cloudLabel }: Pr
   // How the decoration was composed on the page being viewed (shown in the Decoration panel).
   const decor = useMemo(() => {
     if (!doc || !doc.recipe.pages.length) return null;
-    const plan = planDecoration(geometryFor(doc, doc.recipe.pages[current]), doc.decorative, doc.colors, compositionFor(doc, current));
+    const plan = planDecoration(contentGeometryFor(doc, doc.recipe.pages[current], current), doc.decorative, doc.colors, compositionFor(doc, current));
     return { reports: plan?.reports ?? [], colors: doc.colors, pageNumber: doc.recipe.pages[current].pageNumber };
   }, [doc, current]);
   const nav: EditorNav = {
@@ -351,7 +351,7 @@ export function Editor({ project, onChange, onBack, saveStatus, cloudLabel }: Pr
                   {doc && doc.recipe.pages.length > 0 && (
                     <details className="section">
                       <summary>Developer: exact measurements</summary>
-                      <GeometryInfo doc={doc} geometry={geometryFor(doc, doc.recipe.pages[current])} solved={solvePage(doc, current)} />
+                      <GeometryInfo doc={doc} geometry={geometryFor(doc, doc.recipe.pages[current], current)} solved={solvePage(doc, current)} />
                     </details>
                   )}
                 </>
@@ -375,6 +375,7 @@ export function Editor({ project, onChange, onBack, saveStatus, cloudLabel }: Pr
       {exporting && doc && (
         <ExportDialog
           doc={doc}
+          usage={usage!}
           currentIndex={current}
           fontsReady={fontsReady}
           onClose={() => setExporting(false)}

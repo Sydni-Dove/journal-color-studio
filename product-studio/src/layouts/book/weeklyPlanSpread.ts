@@ -49,7 +49,7 @@ function solvePlanSpread(ctx: LayoutContext): SolvedPage[] {
       nodes: [...f[k].nodes, ...t.nodes, ...plan.nodes],
       diagnostics: [...f[k].diagnostics, ...t.diagnostics, ...plan.diagnostics],
       metrics: [{ label: "Weekday section height (full width, open)", value: plan.weekdayH, unit: "in", provenance: { geometryClass: "user-design", basis: "whole writing lines, equal for every weekday across the spread" } }],
-      regions: { mainContent: f[k].body, calendar: f[k].body, notes: plan.foot } satisfies LayoutRegions,
+      regions: { mainContent: f[k].body, calendar: f[k].body, ...(plan.foot ? { notes: plan.foot } : {}) } satisfies LayoutRegions,
     };
   });
 }

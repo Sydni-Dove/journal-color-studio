@@ -12,6 +12,10 @@
  *   sidebar OFF: verso = [Mon … Thu]                recto = [Fri, Sat, Sun, notes]
  * The extra slot always sits on the OUTER edge. Slots are equal on both pages.
  *
+ * The weekly sidebar is its own switch (independent of the monthly sidebar).
+ * The notes slot is its own switch too: turn it off and the seven days
+ * reclaim its space (the recto page then uses three wider tracks).
+ *
  * Both pages are ONE open connected grid (connectedTracks, zero gap): one
  * shared rule between neighbouring slots and no border around the page; the
  * header rule is drawn once across the grid and the morning / afternoon /
@@ -29,6 +33,7 @@ import type { WordingKey } from "../../types/tokens";
 import { connectedTracks, fitHeading, headerTitle, headingFitDiagnostic, pageFrame, PLANNER_GRID_GAP_IN, runsOf, SECTION_TEXT_ANCHORS, section, writingSurface } from "../shared/components";
 import { group, lineBoxIn, rule, text } from "../shared/nodes";
 import type { FitContext, FitResult, LayoutContext, LayoutDefinition } from "../shared/types";
+import { weeklyNotesOf, weeklySidebarOf } from "./plannerOptions";
 
 const SLOTS_PER_PAGE = 4;
 const SECTION_KEYS: WordingKey[] = ["morning", "afternoon", "evening"];
@@ -180,9 +185,15 @@ export const weeklySpread: LayoutDefinition = {
 
     type Slot = { kind: "day"; index: number } | { kind: "extra" };
     const days: Slot[] = week.days.map((_, i) => ({ kind: "day", index: i }));
-    const slots: Slot[][] = ctx.options.showSidebar
+    // The weekly sidebar and the notes slot are independent switches. With
+    // neither, the seven days fill the grid on their own (4 + 3 wider tracks).
+    const showSidebar = weeklySidebarOf(ctx.options);
+    const showNotes = !showSidebar && weeklyNotesOf(ctx.options);
+    const slots: Slot[][] = showSidebar
       ? [[{ kind: "extra" }, ...days.slice(0, 3)], days.slice(3)]
-      : [days.slice(0, 4), [...days.slice(4), { kind: "extra" }]];
+      : showNotes
+        ? [days.slice(0, 4), [...days.slice(4), { kind: "extra" }]]
+        : [days.slice(0, 4), days.slice(4)];
 
     const start = parseIso(week.startIso);
     const end = parseIso(week.endIso);
@@ -201,7 +212,10 @@ export const weeklySpread: LayoutDefinition = {
         : headerTitle(`wk${p}-header`, ctx, frame.zones, "monthYear", monthLabel, "weekTitle", "header-right");
       const nodes: LayoutNode[] = [...frame.nodes, ...title.nodes];
       const diagnostics = [...frame.diagnostics, ...title.diagnostics];
-      const grid = connectedTracks(`wk${p}-grid`, frame.body, SLOTS_PER_PAGE, horizontal ? "rows" : "columns");
+      // Each page's grid has exactly its own slots' tracks, so removing the
+      // notes slot widens the remaining day tracks (content reclaims the space).
+      const trackCount = slots[p].length;
+      const grid = connectedTracks(`wk${p}-grid`, frame.body, trackCount, horizontal ? "rows" : "columns");
       const tracks = grid.tracks;
       sizes.push(tracks.size);
       // An open grid: the shared rules between days stay (they are the structure); no box around the page.
@@ -222,7 +236,7 @@ export const weeklySpread: LayoutDefinition = {
           return;
         }
         // The outer slot (sidebar or notes) is a track of the same grid.
-        const sidebar = ctx.options.showSidebar;
+        const sidebar = showSidebar;
         const sid = sidebar ? `wk${p}-sidebar` : `wk${p}-notes`;
         const title = sidebar ? ctx.wording[ctx.options.sidebarContent] : ctx.wording.notes;
         const content = sidebar ? "checklist" : "surface";
@@ -244,7 +258,7 @@ export const weeklySpread: LayoutDefinition = {
       if (horizontal) {
         // One label-column rule per run of neighbouring day rows.
         const x = b.x + STUDIO_WEEKLY_VARIANTS.horizontal.dayLabelW.valueIn;
-        runsOf(SLOTS_PER_PAGE, isDay).forEach(([a, z], k) =>
+        runsOf(trackCount, isDay).forEach(([a, z], k) =>
           nodes.push(rule(`wk${p}-label-rule${k}`, x, tracks.starts[a], x, tracks.starts[z] + tracks.size, { strokePt, component: "Grid" })),
         );
       } else {
@@ -253,7 +267,7 @@ export const weeklySpread: LayoutDefinition = {
         // Section dividers: one rule per boundary per run of neighbouring days.
         const n = Math.max(1, ctx.options.sectionsPerDay);
         const secRows = distributeEqual(b.y + headH, b.h - headH, n, PLANNER_GRID_GAP_IN);
-        runsOf(SLOTS_PER_PAGE, isDay).forEach(([a, z], k) => {
+        runsOf(trackCount, isDay).forEach(([a, z], k) => {
           for (let j = 1; j < n; j++) {
             const y = secRows.starts[j];
             // Morning / afternoon / evening: light dividers in the writing-line color, not borders.
@@ -265,16 +279,16 @@ export const weeklySpread: LayoutDefinition = {
         { label: "Variant", value: horizontal ? 1 : 0, unit: "count", provenance: { geometryClass: "studio-recommended", basis: fit.variantLabel } },
         { label: "Week title zone", value: STUDIO_PLANNER.weeklyTitle.valueIn, unit: "in", provenance: STUDIO_PLANNER.weeklyTitle.provenance },
         horizontal
-          ? { label: "Day row height = H / 4 (connected grid)", value: tracks.size, unit: "in", provenance: { geometryClass: "user-design", basis: `${frame.body.h.toFixed(3)} / 4, zero internal gap` } }
-          : { label: "Slot width = W / 4 (connected grid)", value: tracks.size, unit: "in", provenance: { geometryClass: "user-design", basis: `${frame.body.w.toFixed(3)} / 4, zero internal gap` } },
+          ? { label: `Day row height = H / ${trackCount} (connected grid)`, value: tracks.size, unit: "in", provenance: { geometryClass: "user-design", basis: `${frame.body.h.toFixed(3)} / ${trackCount}, zero internal gap` } }
+          : { label: `Slot width = W / ${trackCount} (connected grid)`, value: tracks.size, unit: "in", provenance: { geometryClass: "user-design", basis: `${frame.body.w.toFixed(3)} / ${trackCount}, zero internal gap` } },
       ];
       if (!horizontal) metrics.push({ label: "Sections per day", value: ctx.options.sectionsPerDay, unit: "count", provenance: { geometryClass: "user-design", basis: "blueprint B2 default 3" } });
       const regions: LayoutRegions = { mainContent: frame.body, calendar: frame.body };
       const extra = slots[p].findIndex((x) => x.kind === "extra");
       if (extra >= 0) {
         const r = grid.trackRects[extra];
-        if (ctx.options.showSidebar) regions.sidebar = r;
-        if (!ctx.options.showSidebar || ctx.options.sidebarContent === "notes") regions.notes = r;
+        if (showSidebar) regions.sidebar = r;
+        if (!showSidebar || ctx.options.sidebarContent === "notes") regions.notes = r;
       }
       return { nodes, diagnostics, metrics, regions };
     });

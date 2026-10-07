@@ -12,6 +12,7 @@
  */
 import { bookSteps } from "../recipe/bookRecipe";
 import { recipeLayouts, type ResolvedDocument } from "../document/resolve";
+import { spreadModeOf } from "../../layouts/planner/plannerOptions";
 import type { ValidationIssue } from "../../types/validation";
 
 export function validateBook(doc: ResolvedDocument): ValidationIssue[] {
@@ -21,6 +22,9 @@ export function validateBook(doc: ResolvedDocument): ValidationIssue[] {
   const { pages, pageCount, diagnostics } = doc.recipe;
   const composite = !!doc.project.recipe.structure;
   const paged = pages.some((p) => p.side !== "single");
+  // Continuous flow never inserts fillers, so spreads may open on either side:
+  // side rules become advisory instead of errors.
+  const continuous = spreadModeOf(doc.project.layoutOptions) === "continuous";
 
   for (const d of diagnostics) out.push({ severity: d.severity, rule: composite ? "book-structure" : "page-count", page: null, componentId: d.itemId, message: d.message });
 
@@ -37,7 +41,7 @@ export function validateBook(doc: ResolvedDocument): ValidationIssue[] {
     if (p.spreadPart === 0) {
       const next = pages[i + 1];
       if (!next || next.spreadPart !== 1 || next.recipeItemId !== p.recipeItemId || next.key.replace(/:1$/, "") !== p.key.replace(/:0$/, "")) add("error", `The spread starting on page ${p.pageNumber} is broken (its right-hand page does not follow).`, p.pageNumber, p.recipeItemId);
-      if (paged && p.side !== "verso") add("error", `The spread starting on page ${p.pageNumber} opens on a right-hand page; spreads must open on the left.`, p.pageNumber, p.recipeItemId);
+      if (paged && p.side !== "verso") add(continuous ? "info" : "error", `The spread starting on page ${p.pageNumber} opens on a right-hand page${continuous ? " (continuous flow: no filler was inserted)" : "; spreads must open on the left"}.`, p.pageNumber, p.recipeItemId);
     }
     if (p.spreadPart === 1 && pages[i - 1]?.spreadPart !== 0) add("error", `Page ${p.pageNumber} is the right half of a spread with no left half.`, p.pageNumber, p.recipeItemId);
 
@@ -54,8 +58,11 @@ export function validateBook(doc: ResolvedDocument): ValidationIssue[] {
       const prev = pages[i - 1];
       if (prev && !prev.filler && prev.key === p.key) return;
       const rule = steps.get(p.recipeItemId)?.start;
-      if (rule === "recto" && p.side !== "recto") add("error", `"${p.module?.title}" must start on a right-hand page but starts on page ${p.pageNumber} (left).`, p.pageNumber, p.recipeItemId);
-      if (rule === "verso" && p.side !== "verso") add("error", `"${p.module?.title}" must start on a left-hand page but starts on page ${p.pageNumber} (right).`, p.pageNumber, p.recipeItemId);
+      // In continuous flow the engine inserts no fillers, so an explicit
+      // start side cannot always be honored: warn instead of error.
+      const level = continuous ? "warning" : "error";
+      if (rule === "recto" && p.side !== "recto") add(level, `"${p.module?.title}" must start on a right-hand page but starts on page ${p.pageNumber} (left)${continuous ? " — continuous flow inserts no filler to move it" : ""}.`, p.pageNumber, p.recipeItemId);
+      if (rule === "verso" && p.side !== "verso") add(level, `"${p.module?.title}" must start on a left-hand page but starts on page ${p.pageNumber} (right)${continuous ? " — continuous flow inserts no filler to move it" : ""}.`, p.pageNumber, p.recipeItemId);
     });
   }
 

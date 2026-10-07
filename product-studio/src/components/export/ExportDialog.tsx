@@ -3,13 +3,14 @@ import { TechnicalDetails } from "../help/visuals";
 import { useEffect, useMemo, useState } from "react";
 import type { ResolvedDocument } from "../../engines/document/resolve";
 import { planPrint } from "../../engines/print/printPlan";
-import { compositionFor, geometryFor, solvePage } from "../../engines/document/resolve";
+import { compositionFor, contentGeometryFor, solvePage } from "../../engines/document/resolve";
 import { coverSurfaceColors, coverSurfaceTheme } from "../../design-library/coverSurfaces";
 import { rasterRequests } from "../../themes/decorationPlan";
 import { prepareRasters } from "../../themes/recolor";
 import { createCanvasMeasurer, heuristicMeasurer } from "../../engines/typography/textMeasure";
 import { validateProject } from "../../engines/validation/validate";
 import type { ExportSettings } from "../../types/project";
+import type { ProjectUsage } from "../../engines/document/usage";
 import type { ValidationIssue } from "../../types/validation";
 import { Check, LabeledNumeric, Segmented } from "../editor/ui";
 import { PrintDocument } from "./PrintDocument";
@@ -74,6 +75,7 @@ export function IssueList({ issues, onGoTo }: { issues: ValidationIssue[]; onGoT
 
 type Props = {
   doc: ResolvedDocument;
+  usage: ProjectUsage;
   currentIndex: number;
   fontsReady: boolean;
   onClose: () => void;
@@ -98,7 +100,7 @@ export async function artReady(root: HTMLElement | null, timeoutMs = 30_000): Pr
   ]);
 }
 
-export function ExportDialog({ doc, currentIndex, fontsReady, onClose, onGoTo, onSettings }: Props) {
+export function ExportDialog({ doc, usage, currentIndex, fontsReady, onClose, onGoTo, onSettings }: Props) {
   const settings = doc.project.exportSettings;
   const [printing, setPrinting] = useState(false);
   const [preparing, setPreparing] = useState(false);
@@ -110,12 +112,12 @@ export function ExportDialog({ doc, currentIndex, fontsReady, onClose, onGoTo, o
     setPreparing(true);
     setPrepError(null);
     try {
-      const pages = [...new Set(plan.sequence)].map((i) => ({ g: geometryFor(doc, doc.recipe.pages[i]), comp: compositionFor(doc, i) }));
+      const pages = [...new Set(plan.sequence)].map((i) => ({ g: contentGeometryFor(doc, doc.recipe.pages[i], i), comp: compositionFor(doc, i) }));
       // Covers with their own design-library surface: prepared in that surface's colors, for those pages only.
       const surfaces = [...new Set(plan.sequence)].flatMap((i) => {
         const surface = solvePage(doc, i).surface;
         if (!surface) return [];
-        const page = { g: geometryFor(doc, doc.recipe.pages[i]), comp: { ...compositionFor(doc, i), ownArtwork: false } };
+        const page = { g: contentGeometryFor(doc, doc.recipe.pages[i], i), comp: { ...compositionFor(doc, i), ownArtwork: false } };
         return rasterRequests([page], coverSurfaceTheme(surface.assetId), coverSurfaceColors(surface.assetId, surface.ownColors, doc.colors));
       });
       await prepareRasters([...rasterRequests(pages, doc.background, doc.colors), ...rasterRequests(pages, doc.decorative, doc.colors), ...surfaces]);
@@ -169,6 +171,12 @@ export function ExportDialog({ doc, currentIndex, fontsReady, onClose, onGoTo, o
           value={settings.scope}
           options={[
             { value: "full", label: "Whole product" },
+            ...(usage.mixedPageOrientation
+              ? [
+                  { value: "landscape-pages" as const, label: "Landscape pages" },
+                  { value: "portrait-pages" as const, label: "Portrait pages" },
+                ]
+              : []),
             { value: "current-page", label: "Current page" },
             { value: "page-range", label: "Page range" },
           ]}

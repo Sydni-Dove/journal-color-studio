@@ -348,7 +348,9 @@ export function expandBook(structure: BookNode[], ctx: BookContext): ExpandedRec
       diagnostics.push({ severity: "error", itemId: step.id, message: `"${ctx.layoutLabel(step.layoutId)}" is a two-page spread; it must start on a left-hand page (start rule "${start}").` });
     }
     const wantVerso = start === "spread" || start === "verso" || n === 2;
-    const wrongSide = ctx.paged && ((wantVerso && pageNumber % 2 === 1) || (start === "recto" && pageNumber % 2 === 0));
+    // Continuous flow never inserts fillers: spreads may open on either side.
+    const preserveSpreads = (ctx.spreadMode ?? "preserve") === "preserve";
+    const wrongSide = preserveSpreads && ctx.paged && ((wantVerso && pageNumber % 2 === 1) || (start === "recto" && pageNumber % 2 === 0));
     const kind = periodKind(period);
     const title = step.title ?? moduleTitle(step.module, kind);
     const subtitle = periodLabel(ctx.calendar, period);

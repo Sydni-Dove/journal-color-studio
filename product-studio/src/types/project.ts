@@ -46,6 +46,50 @@ export type LayoutPlacement = "top-left" | "top-right" | "top-center";
 export type LayoutOptions = {
   datePlacement: LayoutPlacement;
   showSidebar: boolean;
+  /**
+   * Monthly calendar's notes sidebar, independent of the weekly sidebar.
+   * Absent = showSidebar (the legacy master switch).
+   */
+  monthlySidebar?: boolean;
+  /**
+   * Weekly spread's sidebar, independent of the monthly sidebar.
+   * Absent = showSidebar (the legacy master switch).
+   */
+  weeklySidebar?: boolean;
+  /**
+   * Weekly spread's extra Notes slot (shown when its sidebar is off).
+   * Absent = true. When false the seven days reclaim the slot's space.
+   */
+  weeklyNotes?: boolean;
+  /**
+   * Weekly plan spread's foot sections. Absent = true. When false the day
+   * rows reclaim the foot's space.
+   */
+  weeklyPlanNotes?: boolean;
+  weeklyPlanPriorities?: boolean;
+  /**
+   * Facing-page behavior for paged (book-like) products. "preserve" inserts
+   * a filler page so every two-page spread opens on a left-hand page;
+   * "continuous" flows pages with no fillers. Absent = "preserve".
+   */
+  spreadMode?: "preserve" | "continuous";
+  /**
+   * What a required filler page carries in preserve mode. Absent = "notes".
+   */
+  fillerKind?: "notes" | "blank";
+  /**
+   * Monthly calendar arrangement. "classic" = 7 day-columns × week rows, read
+   * upright; "rotated" = the whole monthly design (title, weekday labels,
+   * grid, notes) is laid out in landscape and rotated 90° onto the portrait
+   * sheet, so the reader turns the planner to read it. Absent = "classic".
+   */
+  monthlyArrangement?: "classic" | "rotated";
+  /**
+   * Page orientation per planner section. Each section absent here follows the
+   * project's orientation. Lets one planner carry e.g. landscape monthly pages
+   * with portrait daily/weekly pages.
+   */
+  plannerPageOrientation?: { monthly?: Orientation; weekly?: Orientation; daily?: Orientation };
   sidebarContent: WordingKey;
   sidebarWidthIn: number;
   sectionsPerDay: number;
@@ -86,7 +130,7 @@ export type LayoutOptions = {
 };
 
 export type ExportSettings = {
-  scope: "full" | "current-page" | "page-range";
+  scope: "full" | "current-page" | "page-range" | "landscape-pages" | "portrait-pages";
   pageRange?: { from: number; to: number };
   /** Pads: emit the master sheet once (false) or once per physical sheet (true). */
   repeatSheets: boolean;

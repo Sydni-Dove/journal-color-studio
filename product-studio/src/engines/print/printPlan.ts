@@ -4,7 +4,7 @@
  * editor (Preview = Print).
  */
 import type { ExportSettings } from "../../types/project";
-import { geometryFor, type ResolvedDocument } from "../document/resolve";
+import { geometryFor, trimForPage, type ResolvedDocument } from "../document/resolve";
 
 export type PrintPlan = {
   /** Page indices in output order (repeats included for repeated sheets). */
@@ -49,6 +49,13 @@ export function planPrint(doc: ResolvedDocument, settings: ExportSettings, curre
     default:
       indices = pages.map((_, i) => i);
   }
+  // Mixed-orientation products: export one orientation at a time, so every
+  // page in the job shares a media size (a browser print job has one @page box).
+  if (settings.scope === "landscape-pages" || settings.scope === "portrait-pages") {
+    const want = settings.scope === "landscape-pages" ? "landscape" : "portrait";
+    indices = indices.filter((i) => trimForPage(doc, pages[i], i).orientation === want);
+    if (!indices.length) errors.push(`This product has no ${want} pages.`);
+  }
 
   const sequence: number[] = [];
   for (const i of indices) {
@@ -61,7 +68,7 @@ export function planPrint(doc: ResolvedDocument, settings: ExportSettings, curre
     const g = geometryFor(doc, pages[i]);
     return `${g.mediaWidthIn.toFixed(4)}x${g.mediaHeightIn.toFixed(4)}`;
   }));
-  if (sizes.size > 1) errors.push("Pages in this export have different media sizes; export them separately.");
+  if (sizes.size > 1) errors.push("Pages in this export have different sizes — this product mixes landscape and portrait pages. Choose “Landscape pages” or “Portrait pages” under “What to export” to export each orientation on its own.");
   const g0 = geometryFor(doc, pages[indices[0] ?? 0]);
   // The sheet: the page's own size, or home paper turned to match the page (a landscape page on landscape paper).
   let sheetW = g0.mediaWidthIn, sheetH = g0.mediaHeightIn;
