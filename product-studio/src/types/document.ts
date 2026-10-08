@@ -101,18 +101,27 @@ export type TableComponent = Base & {
   rowSpace?: "compact" | "standard" | "spacious";
   space: SpaceRequest;
 };
+/** A printed list: items with nesting levels, marked by bullets, numbers (per level, across pages) or checkboxes. */
+export type ListComponent = Base & {
+  kind: "list";
+  label: string;
+  prompt?: string;
+  items: { text: string; level?: number }[];
+  marker: "bullet" | "number" | "checkbox";
+};
 /**
- * A repeating record (reserved): one record template drawn as many times as
- * the data or the page allows — notary journal entries, inventory items,
- * maintenance visits. Records never split across pages; `numbering`
- * continues across the whole document.
+ * A repeating record: one record template drawn `count` times — notary
+ * journal entries, inventory items, maintenance visits. A record is never
+ * split across pages; `numbering` continues across the whole document
+ * (records with the same `sequence` share one count).
  */
 export type RecordComponent = Base & {
   kind: "record";
   label: string;
+  prompt?: string;
   fields: FieldDef[];
-  perPage?: number | "fill";
-  numbering?: { prefix?: string; start: number };
+  count: number;
+  numbering?: { prefix?: string; start?: number; sequence?: string };
 };
 /** A titled group of components; it may repeat once per entry of a list binding (reserved). */
 export type SectionComponent = Base & { kind: "section"; label?: string; children: DocComponent[]; repeat?: "once" | "per-entry" };
@@ -128,6 +137,7 @@ export type DocComponent =
   | QuestionComponent
   | ChecklistComponent
   | TableComponent
+  | ListComponent
   | RecordComponent
   | SectionComponent
   | ImageComponent

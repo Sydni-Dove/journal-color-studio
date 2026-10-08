@@ -97,9 +97,16 @@ per product. Order of work:
    until it settles. Export (button and the moment before printing) waits until
    the fonts are loaded and the pages were laid out with them
    (`engines/print/readiness.ts`). Tests: `tests/measurement.test.tsx`.
-3. Component-level splitting in `paginateZones`: text by line, tables and lists
-   by row (header repeated), records kept whole, headings kept with what follows,
-   numbering across the document.
+3. **Shared content pagination** — done: one paginator (`paginateZones`) splits
+   sections in whole units through a `ZoneSplit` each section describes — body
+   text by line (paragraph / sentence ends preferred, ≥ 2 lines either side),
+   writing / checklist / table rows only when longer than a page (table header
+   repeated), printed lists by item, records whole and numbered across the
+   product (`engines/recipe/sequence.ts`); headings stay with what follows.
+   Every piece reports its source section and range (`SolvedPage.fragments`).
+   New sections: printed list and repeating record (`layouts/stationery/flowSurfaces.ts`).
+   Export is blocked, with a warning, when a font used on the exported pages
+   didn't load. Tests: `tests/content-pagination.test.tsx`.
 4. Data layer: typed records in the project (synced), a generic form editor and
    paste/CSV import.
 5. First proof: a devotional (long-form content from data).

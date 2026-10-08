@@ -86,6 +86,39 @@ export type ZoneRequest = {
   headIn?: number;
   /** Shared zones: the least writing height (overrides minLines; two sections side by side need the taller one's). */
   minIn?: number;
+  /** Content of a known height after the heading (a printed list, records): set, never shared or stretched. */
+  contentIn?: number;
+  /** A heading: kept on the same page as the start of the section after it. */
+  keepWithNext?: boolean;
+  /** How the section may continue across pages (absent = it moves or overflows whole, as before). */
+  split?: ZoneSplit;
+  /** Set by the paginator on a piece of a section that continues across pages. */
+  piece?: { from: number; to: number; count: number; part: number; unit: ZoneSplit["unit"] };
+};
+
+/**
+ * How one section continues across pages, in whole units — text lines, list
+ * items, table / checklist / writing rows, records. The paginator only ever
+ * chooses WHERE the breaks fall; `piece` builds the request for a range of
+ * units (the first piece holds the section's heading; a table piece repeats
+ * its header row), so content is never rewritten, reordered or shrunk.
+ */
+export type ZoneSplit = {
+  unit: "line" | "item" | "row" | "record";
+  /** How many units the section holds. */
+  count: number;
+  /** The request for units [from, to); `first` = the piece that carries the heading. Its height grows with the range. */
+  piece: (from: number, to: number, first: boolean) => ZoneRequest;
+  /** Fewest units at the top of a page / left for the next page (orphans and widows), when the section is long enough. */
+  minFirst: number;
+  minLast: number;
+  /**
+   * "flow": fill the space left on the page, then continue (running text, records);
+   * "whole-first": kept whole when it fits on a fresh page (tables, lists, writing), split only when it can't.
+   */
+  policy: "flow" | "whole-first";
+  /** How good a break after unit i is: 2 = a paragraph ends, 1 = a sentence ends, 0 = elsewhere. */
+  breakQuality?: (i: number) => 0 | 1 | 2;
 };
 
 export type ZoneOptions = {
@@ -101,6 +134,7 @@ export type ZoneOptions = {
 export function minZoneHeight(r: ZoneRequest, linePitch: number): number {
   const row = r.rowIn ?? linePitch;
   if (r.fixedIn !== undefined) return r.fixedIn;
+  if (r.contentIn !== undefined) return r.overheadIn + r.contentIn;
   if (r.lines !== undefined) return r.overheadIn + (r.headIn ?? 0) + r.lines * row;
   if (r.minIn !== undefined) return r.overheadIn + r.minIn;
   return r.overheadIn + (r.headIn ?? 0) + (r.minLines !== undefined ? r.minLines * row : MIN_RESPONSE_IN);
@@ -117,11 +151,36 @@ export function paginateZones(reqs: ZoneRequest[], pageHeights: (i: number) => n
   const pages: ZoneRequest[][] = [[]];
   let used = 0;
   let overflow = false;
-  for (const r0 of reqs) {
-    let r = r0;
+  const canAddPage = () => opts.flow && pages.length < (opts.maxPages ?? Infinity);
+  const startPage = () => {
+    pages.push([]);
+    used = 0;
+  };
+  const roomNow = () => pageHeights(pages.length - 1) - used - (pages[pages.length - 1].length ? gapIn : 0);
+  const put = (r: ZoneRequest) => {
     const cur = pages[pages.length - 1];
-    const room = () => pageHeights(pages.length - 1) - used - (cur.length ? gapIn : 0);
+    const need = minZoneHeight(r, linePitch);
+    if (need > roomNow() + 1e-6) overflow = true;
+    used += need + (cur.length ? gapIn : 0);
+    cur.push(r);
+  };
+  /** The least a section must place where it starts: whole, or its first piece of minFirst units. */
+  const startNeed = (r: ZoneRequest) => (r.split ? minZoneHeight(r.split.piece(0, Math.min(r.split.count, Math.max(1, r.split.minFirst)), true), linePitch) : minZoneHeight(r, linePitch));
+  for (let idx = 0; idx < reqs.length; idx++) {
+    let r = reqs[idx];
+    const cur = pages[pages.length - 1];
+    const room = roomNow;
     let need = minZoneHeight(r, linePitch);
+    // A heading stays with the start of the section after it: if that start won't fit below it, both begin the next page.
+    const next = reqs[idx + 1];
+    if (r.keepWithNext && next && cur.length && canAddPage() && need <= room() + 1e-6) {
+      const together = need + gapIn + startNeed(next);
+      if (together > room() + 1e-6 && together <= pageHeights(pages.length) + 1e-6) {
+        startPage();
+        put(r);
+        continue;
+      }
+    }
     if (need > room() + 1e-6 && opts.fewerLines && r.lines !== undefined) {
       const floor = r.minLines ?? DEFAULT_MIN_LINES_GEOMETRY;
       const fit = Math.floor((room() - r.overheadIn) / (r.rowIn ?? linePitch) + 1e-6);
@@ -130,14 +189,59 @@ export function paginateZones(reqs: ZoneRequest[], pageHeights: (i: number) => n
         need = minZoneHeight(r, linePitch);
       }
     }
-    if (need > room() + 1e-6 && cur.length && opts.flow && pages.length < (opts.maxPages ?? Infinity)) {
-      pages.push([r]);
-      used = need;
+    if (need <= room() + 1e-6) {
+      put(r);
       continue;
     }
-    if (need > room() + 1e-6) overflow = true;
-    used += need + (cur.length ? gapIn : 0);
-    cur.push(r);
+    const s = r.split;
+    // Kept whole: a section that cannot continue, or one that fits on a fresh page and prefers to stay whole.
+    // (Only when something is already on this page: an empty page is the freshest there is — and a first
+    // page, shorter under its title, is no reason to judge the section by a later page's height.)
+    const freshFits = cur.length > 0 && canAddPage() && need <= pageHeights(pages.length) + 1e-6;
+    if (!s || !opts.flow || s.count < 1 || (s.policy === "whole-first" && freshFits)) {
+      if (cur.length && canAddPage()) startPage();
+      put(r);
+      continue;
+    }
+    // Continues across pages in whole units: as many as fit on each page, never fewer than the minimums.
+    let from = 0, part = 0;
+    while (from < s.count) {
+      const first = from === 0, remaining = s.count - from;
+      const heightOf = (k: number) => minZoneHeight(s.piece(from, from + k, first), linePitch);
+      // The most units that fit here (heights only grow with more units).
+      let lo = 0, hi = remaining;
+      while (lo < hi) {
+        const mid = Math.ceil((lo + hi) / 2);
+        if (heightOf(mid) <= room() + 1e-6) lo = mid;
+        else hi = mid - 1;
+      }
+      let k = lo;
+      const minHere = Math.min(remaining, first ? s.minFirst : 1);
+      // Never leave fewer than minLast units for the next page.
+      if (k < remaining && remaining - k < s.minLast) k = Math.max(0, remaining - s.minLast);
+      // Prefer ending at a paragraph (up to 3 units back) or a sentence (up to 2 back) over a mid-sentence break.
+      if (k > minHere && k < remaining && s.breakQuality) {
+        const back = (q: 1 | 2, span: number) => {
+          for (let j = k; j >= Math.max(minHere, k - span); j--) if (j > 0 && s.breakQuality!(from + j - 1) >= q && remaining - j >= Math.min(s.minLast, remaining)) return j;
+          return 0;
+        };
+        k = back(2, 3) || back(1, 2) || k;
+      }
+      if (k < minHere) {
+        // Not enough room for a proper start here: begin on the next page.
+        if (pages[pages.length - 1].length && canAddPage()) {
+          startPage();
+          continue;
+        }
+        // Even an empty page cannot hold the minimum: place at least one unit and report the overflow.
+        k = Math.max(1, Math.min(remaining, k || 1));
+      }
+      if (!canAddPage() && from + k < s.count) k = remaining; // no more pages to continue on: the rest is reported as overflow
+      put({ ...s.piece(from, from + k, first), piece: { from, to: from + k, count: s.count, part, unit: s.unit } });
+      from += k;
+      part++;
+      if (from < s.count) startPage();
+    }
   }
   return { pages, overflow };
 }
@@ -195,9 +299,9 @@ export function resolveZones(reqs: ZoneRequest[], body: Rect, gapIn: number, rat
   const pitch = opts.linePitch ?? snapPitch;
   const problems: string[] = [];
   // Fixed rows and fixed line counts are set; the rest of the writing is shared.
-  const isShared = (r: ZoneRequest) => r.fixedIn === undefined && r.lines === undefined;
+  const isShared = (r: ZoneRequest) => r.fixedIn === undefined && r.lines === undefined && r.contentIn === undefined;
   const rowOf = (r: ZoneRequest) => r.rowIn ?? pitch;
-  const fixedH = (r: ZoneRequest) => (r.fixedIn !== undefined ? r.fixedIn : r.lines !== undefined ? r.overheadIn + (r.headIn ?? 0) + r.lines * rowOf(r) : 0);
+  const fixedH = (r: ZoneRequest) => (r.fixedIn !== undefined ? r.fixedIn : r.contentIn !== undefined ? r.overheadIn + r.contentIn : r.lines !== undefined ? r.overheadIn + (r.headIn ?? 0) + r.lines * rowOf(r) : 0);
   const fixed = reqs.reduce((a, r) => a + fixedH(r), 0);
   const overhead = reqs.reduce((a, r) => a + (isShared(r) ? r.overheadIn : 0), 0);
   const promptText = reqs.reduce((a, r) => a + (r.fixedIn === undefined ? (r.promptTextIn ?? r.overheadIn) : 0), 0);
@@ -252,7 +356,7 @@ export function resolveZones(reqs: ZoneRequest[], body: Rect, gapIn: number, rat
       y += r.fixedIn + gap;
       return { zone: r.zone, rect, head: null, response: rect };
     }
-    const responseH = r.lines !== undefined ? (r.headIn ?? 0) + r.lines * rowOf(r) : shareOf.get(idx) ?? 0;
+    const responseH = r.contentIn !== undefined ? r.contentIn : r.lines !== undefined ? (r.headIn ?? 0) + r.lines * rowOf(r) : shareOf.get(idx) ?? 0;
     const rect = { x: body.x, y, w: body.w, h: r.overheadIn + responseH };
     y += rect.h + gap;
     const head = r.overheadIn > 0 ? { x: rect.x, y: rect.y, w: rect.w, h: r.overheadIn } : null;

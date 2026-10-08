@@ -8,7 +8,8 @@ import { coverSurfaceColors, coverSurfaceTheme } from "../../design-library/cove
 import { rasterRequests } from "../../themes/decorationPlan";
 import { prepareRasters } from "../../themes/recolor";
 import { createCanvasMeasurer, getLayoutMeasurer, heuristicMeasurer } from "../../engines/typography/textMeasure";
-import { browserFontStatus, exportReadiness } from "../../engines/print/readiness";
+import { browserFontStatus, exportReadiness, fontsNotLoaded, fontsUsed } from "../../engines/print/readiness";
+import { findFont } from "../../presets/typography/typography";
 import { validateProject } from "../../engines/validation/validate";
 import type { ExportSettings } from "../../types/project";
 import type { ProjectUsage } from "../../engines/document/usage";
@@ -138,7 +139,13 @@ export function ExportDialog({ doc, usage, currentIndex, fontsReady, onClose, on
   }, [doc.project, pageIndices, fontsReady]);
 
   // Final pagination only: real fonts loaded and the pages laid out with them (engines/print/readiness.ts).
-  const readinessNow = () => exportReadiness({ fontsReady, browserFonts: browserFontStatus(), docMeasurerId: doc.measurerId, currentMeasurerId: getLayoutMeasurer().id, resolveNotes: doc.resolveNotes });
+  // The studio fonts the exported pages draw text in (a font chosen but used on no printed page doesn't block).
+  const families = useMemo(() => fontsUsed(doc, pageIndices), [doc, pageIndices]);
+  const readinessNow = () =>
+    exportReadiness({
+      fontsReady, browserFonts: browserFontStatus(), docMeasurerId: doc.measurerId, currentMeasurerId: getLayoutMeasurer().id, resolveNotes: doc.resolveNotes,
+      failedFonts: fontsReady ? fontsNotLoaded(families, (f) => findFont(f).family === f) : [],
+    });
   const readiness = readinessNow();
   // The latest check, for the moment just before printing (fonts can finish loading while artwork is prepared).
   const latestReadiness = useRef(readinessNow);
@@ -250,7 +257,7 @@ export function ExportDialog({ doc, usage, currentIndex, fontsReady, onClose, on
         <div className="row">
           <span className={`badge ${report.errorCount ? "badge--error" : "badge--ok"}`}>{report.errorCount} to fix</span>
           <span className={`badge ${report.warningCount ? "badge--warning" : ""}`}>{report.warningCount} to check</span>
-          <span className="hint">{report.checkedPages} page(s) checked · {readiness.ready ? "checked with your fonts" : "waiting for fonts…"}</span>
+          <span className="hint">{report.checkedPages} page(s) checked · {readiness.ready ? "checked with your fonts" : "not ready to export yet"}</span>
         </div>
         {plan.errors.map((e) => (
           <div key={e} className="issue issue--error">{e}</div>

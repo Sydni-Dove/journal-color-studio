@@ -50,7 +50,7 @@ export function guidedSpec(module: PageModuleContent | undefined, fallbackTitle:
     // Small fill-in fields from the header ("Date", "Source") sit on one row before the first section.
     zones: [
       ...(set.header?.fields?.some((f) => f.trim()) ? [{ key: "fields", label: "", surface: "fill-in" as const, weight: 0, fields: set.header.fields.filter((f) => f.trim()) }] : []),
-      ...blocksToZones(set, () => ({ surface: "pattern" })),
+      ...blocksToZones(set, () => ({ surface: "pattern" }), module?.sequenceStarts),
     ],
     gapIn: promptGap(spacing.section, set),
     legacyWeights: set.legacyWeights,

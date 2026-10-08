@@ -8,6 +8,7 @@
  *   products a filler page is inserted when a spread would start on a recto.
  */
 import type { PageModuleContent } from "../../types/recipe";
+import { recordStarts } from "./sequence";
 import type { CalendarData } from "../../types/calendar";
 import type { PageSide } from "../../types/geometry";
 import type { PageInstance, PeriodRef, ProductRecipe, RecipeItem } from "../../types/recipe";
@@ -170,6 +171,8 @@ export function expandRecipe(recipe: ProductRecipe, ctx: RecipeContext): Expande
   const units = orderUnits(recipe, ctx, diagnostics);
   const pages: PageInstance[] = [];
   let pageNumber = 1;
+  // Record numbering continues across the whole product, in page order.
+  const sequences = new Map<string, number>();
   let fillerCount = 0;
   const sideOf = (n: number): PageSide => (ctx.paged ? (n % 2 === 1 ? "recto" : "verso") : "single");
 
@@ -191,7 +194,8 @@ export function expandRecipe(recipe: ProductRecipe, ctx: RecipeContext): Expande
     }
     // A page type with its own prompt sections (Guided Lined Page in the simple page list) carries them as
     // its module, exactly as a book step does.
-    const module: PageModuleContent | undefined = u.item.promptSet ? { type: "guided", title: u.item.title ?? "Guided Page", prompts: [], promptSet: u.item.promptSet } : undefined;
+    const starts = recordStarts(u.item.promptSet, sequences);
+    const module: PageModuleContent | undefined = u.item.promptSet ? { type: "guided", title: u.item.title ?? "Guided Page", prompts: [], promptSet: u.item.promptSet, ...(starts ? { sequenceStarts: starts } : {}) } : undefined;
     // Content that doesn't fit one page continues on more pages (single-page layouts only).
     const flow = u.pages === 1 && !u.physicalSheets ? Math.max(1, ctx.flowPages?.(u.item.layoutId, module) ?? 1) : 1;
     for (let part = 0; part < u.pages * flow; part++) {

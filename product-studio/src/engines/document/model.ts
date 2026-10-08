@@ -75,6 +75,14 @@ export function blockToComponent(b: PromptBlock): DocComponent {
       return { ...base, kind: "divider" };
     case "spacer":
       return { ...base, kind: "spacer", size: b.spacer ?? "medium" };
+    case "list":
+      return { ...base, kind: "list", label: b.label, ...prompt, items: (b.items ?? []).map((it) => ({ ...it })), marker: b.listMarker ?? "bullet" };
+    case "record":
+      return {
+        ...base, kind: "record", label: b.label, ...prompt,
+        fields: (b.recordFields ?? []).map((label, i) => textField(`${b.id}.f${i}`, label)), count: Math.max(1, Math.round(b.recordCount ?? 1)),
+        ...(b.numbering ? { numbering: { ...b.numbering } } : {}),
+      };
     default:
       if (b.responseStyle === "checkboxes")
         return {
@@ -120,7 +128,7 @@ function spaceToBlock(s: SpaceRequest): Partial<PromptBlock> {
 
 /**
  * A component as a PromptSet section, for the components today's pages can
- * draw. Records, sections and images are not drawable yet: they are reported
+ * draw. Sections and images are not drawable yet: they are reported
  * (null) rather than silently dropped or approximated.
  */
 export function componentToBlock(c: DocComponent, p: ComponentPresentation = {}): PromptBlock | null {
@@ -158,6 +166,13 @@ export function componentToBlock(c: DocComponent, p: ComponentPresentation = {})
       };
     case "question":
       return { id: c.id, label: c.label, ...(c.prompt !== undefined ? { prompt: c.prompt } : {}), ...(c.response !== "pattern" ? { responseStyle: c.response } : {}), ...spaceToBlock(c.space), ...style };
+    case "list":
+      return { id: c.id, kind: "list", label: c.label, ...(c.prompt !== undefined ? { prompt: c.prompt } : {}), items: c.items.map((it) => ({ ...it })), listMarker: c.marker, ...style };
+    case "record":
+      return {
+        id: c.id, kind: "record", label: c.label, ...(c.prompt !== undefined ? { prompt: c.prompt } : {}),
+        recordFields: c.fields.map((f) => f.label), recordCount: c.count, ...(c.numbering ? { numbering: { ...c.numbering } } : {}), ...style,
+      };
     default:
       return null;
   }

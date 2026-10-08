@@ -13,17 +13,18 @@
  * squeezed below the page's line spacing.
  */
 import { DEFAULT_FUNCTIONAL_PATTERN, lineSpacingIn } from "../../engines/patterns/patterns";
-import { paginateZones, resolveZones, type ZoneRequest } from "../../engines/stationery/geometry";
+import { paginateZones, resolveZones, type ZoneRequest, type ZoneSplit } from "../../engines/stationery/geometry";
 import { getLayoutMeasurer, styleForRole } from "../../engines/typography/textMeasure";
 import { STUDIO_PLANNER } from "../../presets/studioDefaults";
 import { DEFAULT_WORDING } from "../../presets/wording";
 import type { Rect } from "../../types/geometry";
-import type { LayoutDiagnostic, LayoutMetric, LayoutNode, SolvedPage, TextNode } from "../../types/layout";
+import type { LayoutDiagnostic, LayoutMetric, LayoutNode, PageFragment, SolvedPage, TextNode } from "../../types/layout";
 import { minZoneHeight } from "../../engines/stationery/geometry";
 import { canSitBeside, frameOf as sectionFrameOf, isComposedHeader, kindOf, requestedLines, TABLE_ROW_SCALE, spaceOf, SPACER_HEIGHTS, SPACING_FACTOR, type GuidedHeader, type PromptBlock, type PromptSet, type ResponseStyle, type SectionFrame } from "../../types/prompts";
 import type { StationeryZone, SurfaceKind } from "../../types/stationery";
 import type { ColorToken, TypographyRole } from "../../types/tokens";
 import { fillInIn, fillInRows, isFixedSurface, SURFACES, tableHeaderIn } from "../stationery/surfaces";
+import { measureList, recordHeightIn } from "../stationery/flowSurfaces";
 import { fitHeading, headerTitle, pageFrame } from "./components";
 import { box, group, lineBoxIn, rule, text } from "./nodes";
 import type { FitContext, LayoutContext } from "./types";
@@ -68,9 +69,9 @@ const RESPONSE_SURFACE: Record<ResponseStyle, SurfaceKind> = { ruled: "lined", b
  * creator kept "the page's own style" (a recipe zone's surface, or the
  * project's writing lines).
  */
-export function blocksToZones(set: PromptSet, surfaceOf: (b: PromptBlock) => { surface: SurfaceKind; treatment?: StationeryZone["treatment"] }): StationeryZone[] {
+export function blocksToZones(set: PromptSet, surfaceOf: (b: PromptBlock) => { surface: SurfaceKind; treatment?: StationeryZone["treatment"] }, sequenceStarts?: Record<string, number>): StationeryZone[] {
   const zones = set.blocks.map((b): StationeryZone => {
-    const zone = blockZone(set, b, surfaceOf);
+    const zone = blockZone(set, b, surfaceOf, sequenceStarts);
     const frame = sectionFrameOf(set, b);
     return frame === "open" || zone.surface === "divider" || zone.surface === "spacer" ? zone : { ...zone, frame };
   });
@@ -86,7 +87,13 @@ export function blocksToZones(set: PromptSet, surfaceOf: (b: PromptBlock) => { s
 }
 
 /** One block as a page zone. */
-function blockZone(set: PromptSet, b: PromptBlock, surfaceOf: (b: PromptBlock) => { surface: SurfaceKind; treatment?: StationeryZone["treatment"] }): StationeryZone {
+function blockZone(set: PromptSet, b: PromptBlock, surfaceOf: (b: PromptBlock) => { surface: SurfaceKind; treatment?: StationeryZone["treatment"] }, sequenceStarts?: Record<string, number>): StationeryZone {
+  const headingStyle = {
+    ...(b.headingAlign && b.headingAlign !== "left" ? { headingAlign: b.headingAlign } : {}),
+    ...(b.headingRule ? { headingRule: true } : {}),
+    ...(b.headingFont ? { headingFont: b.headingFont } : {}),
+    ...(b.headingSizePt ? { headingSizePt: b.headingSizePt } : {}),
+  };
   // Page Composer sections without writing space.
   switch (kindOf(b)) {
     case "heading": {
@@ -99,6 +106,8 @@ function blockZone(set: PromptSet, b: PromptBlock, surfaceOf: (b: PromptBlock) =
       return {
         ...base,
         label: b.label,
+        // A heading starts what follows it: never left alone at the bottom of a page.
+        ...(b.label.trim() ? { keepWithNext: true } : {}),
         ...(b.textStyle === "title" ? { labelRole: "pageTitle" as const } : {}),
         ...(b.prompt?.trim() ? { prompt: b.prompt.trim() } : {}),
         ...(b.headingAlign && b.headingAlign !== "left" ? { headingAlign: b.headingAlign } : {}),
@@ -117,6 +126,16 @@ function blockZone(set: PromptSet, b: PromptBlock, surfaceOf: (b: PromptBlock) =
       return { key: b.id, label: "", surface: "divider", weight: 0, optional: true };
     case "spacer":
       return { key: b.id, label: "", surface: "spacer", weight: 0, optional: true, heightIn: SPACER_HEIGHTS[b.spacer ?? "medium"] };
+    case "list":
+      return { key: b.id, label: b.label, ...(b.prompt?.trim() ? { prompt: b.prompt.trim() } : {}), ...headingStyle, surface: "list", weight: 0, optional: true, listItems: b.items ?? [], listMarker: b.listMarker ?? "bullet" };
+    case "record":
+      return {
+        key: b.id, label: b.label, ...(b.prompt?.trim() ? { prompt: b.prompt.trim() } : {}), ...headingStyle, surface: "record", weight: 0, optional: true,
+        recordFields: b.recordFields ?? [], recordCount: Math.max(1, Math.round(b.recordCount ?? 1)),
+        // Numbered in book order by the recipe (module.sequenceStarts); a page outside a book starts at its own start.
+        recordStart: sequenceStarts?.[b.id] ?? b.numbering?.start ?? 1,
+        ...(b.numbering?.prefix !== undefined ? { recordPrefix: b.numbering.prefix } : {}),
+      };
   }
   const own = surfaceOf(b);
   const lines = requestedLines(set, b);
@@ -250,7 +269,12 @@ function requestOne(m: Measured, ctx: LayoutContext, width: number): ZoneRequest
   const inner = Math.max(0, width - ins.l - ins.r);
   if (m.zone.surface === "fill-in") return { zone: m.zone, overheadIn: 0, fixedIn: fillInRows(m.zone.fields?.length ? m.zone.fields : [m.zone.label], inner, ctx).heightIn + ins.t + ins.b };
   if (m.zone.surface === "divider" || m.zone.surface === "spacer") return { zone: m.zone, overheadIn: 0, fixedIn: m.zone.heightIn ?? ctx.spacing.section };
+  if (m.zone.surface === "list" || m.zone.surface === "record") {
+    const units = flowUnits(m.zone, inner, ctx);
+    return { zone: m.zone, overheadIn: m.overhead + ins.t + ins.b, promptTextIn: m.promptText, contentIn: units.reduce((a, u) => a + u, 0) };
+  }
   return {
+    ...(m.zone.keepWithNext ? { keepWithNext: true } : {}),
     zone: m.zone,
     // A framed section's padding sits above its heading and below its writing.
     overheadIn: m.overhead + ins.t + ins.b,
@@ -263,6 +287,84 @@ function requestOne(m: Measured, ctx: LayoutContext, width: number): ZoneRequest
       ? { rowIn: ctx.spacing.listRow * (m.zone.table?.rowScale ?? 1), headIn: tableHeaderIn(m.zone, inner, ctx), ...(m.zone.table?.minRows ? { minLines: m.zone.table.minRows } : {}) }
       : {}),
   };
+}
+
+/** Heights of a list's items or a section's records at this inner width (records include the gap after each). */
+function flowUnits(zone: StationeryZone, inner: number, ctx: LayoutContext): number[] {
+  if (zone.surface === "list") return measureList(zone, inner, ctx).items.map((it) => it.heightIn);
+  const r = recordHeightIn(zone, inner, ctx);
+  return Array.from({ length: zone.recordCount ?? 1 }, (_, i) => r.recordIn + (i < (zone.recordCount ?? 1) - 1 ? r.gapIn : 0));
+}
+
+/** Lines of body text, with whether each ends its paragraph (wrapText's lines, paragraph by paragraph). */
+function paragraphEnds(value: string, width: number, ctx: LayoutContext): boolean[] {
+  return value.split("\n").flatMap((para) => wrapText(para, width, ctx, "body").map((_, i, a) => i === a.length - 1));
+}
+
+/** Writing surfaces whose requested lines may continue on another page when they are longer than a whole page. */
+const WRITING_SURFACES = new Set<SurfaceKind>(["lined", "pattern", "blank", "dot-grid", "graph-grid", "prompt-response", "reflection", "prayer", "scripture"]);
+
+/**
+ * How a measured section may continue across pages (layouts never split on
+ * their own: the paginator picks the breaks, these describe the units):
+ *   body text   by line (paragraph and sentence ends preferred; ≥ 2 lines either side)
+ *   writing     by line, only when longer than a page (fixed line counts)
+ *   checklist   by item, table by row (header row repeated), only when longer than a page
+ *   list        by item, only when longer than a page; record by record, filling each page
+ * Every piece is the same section: its heading on the first piece, its key, its numbering.
+ */
+function splitOf(m: Measured, req: ZoneRequest, ctx: LayoutContext, width: number, byZone: Map<StationeryZone, Measured>): ZoneSplit | undefined {
+  const z = m.zone;
+  if (z.pair || req.fixedIn !== undefined) return undefined;
+  const ins = frameInsets(z.frame, ctx);
+  const pad = ins.t + ins.b;
+  const inner = Math.max(0, width - ins.l - ins.r);
+  const cont: Measured = { ...m, heading: null, headingH: 0, promptLines: [], promptH: 0, overhead: 0, promptText: 0, badge: 0 };
+  // A piece draws as itself: its measurement carries the piece's zone (its range, its rows), never the whole section's.
+  const register = (zone: StationeryZone, measured: Measured) => (byZone.set(zone, { ...measured, zone }), zone);
+  const rangeOf = (from: number, to: number, count: number) => ({ from, to, count, part: 0 });
+  // Body text: the section IS its lines.
+  if (z.promptRole === "body" && z.lines === 0 && m.promptLines.length && !m.headingH) {
+    const lines = m.promptLines, line = lineBoxIn(ctx.typography, "body");
+    const ends = paragraphEnds(z.prompt ?? "", inner, ctx);
+    const sentence = (i: number) => /[.!?]["”’)\]]*$/.test(lines[i] ?? "");
+    return {
+      unit: "line", count: lines.length, minFirst: 2, minLast: 2, policy: "flow",
+      breakQuality: (i) => (ends[i] ? 2 : sentence(i) ? 1 : 0),
+      piece: (from, to) => {
+        const promptH = (to - from) * line;
+        const zone = register({ ...z, range: rangeOf(from, to, lines.length) }, { ...m, promptLines: lines.slice(from, to), promptH, promptText: promptH, overhead: promptH + ctx.spacing.headingToContentGap });
+        return { zone, overheadIn: promptH + ctx.spacing.headingToContentGap + pad, promptTextIn: promptH, lines: 0 };
+      },
+    };
+  }
+  // Rows of writing, checklist items, table rows: same row height on every piece; a table repeats its header row.
+  const rows = req.lines;
+  if (rows !== undefined && rows > 0 && (WRITING_SURFACES.has(z.surface) || z.surface === "checkbox" || z.surface === "table")) {
+    return {
+      unit: z.surface === "table" ? "row" : z.surface === "checkbox" ? "item" : "line", count: rows, minFirst: 2, minLast: 2, policy: "whole-first",
+      piece: (from, to, first) => {
+        const zone = register({ ...z, lines: to - from, range: rangeOf(from, to, rows) }, first ? m : cont);
+        return { ...req, zone, overheadIn: first ? req.overheadIn : pad, promptTextIn: first ? req.promptTextIn : 0, lines: to - from, minLines: undefined, keepWithNext: undefined };
+      },
+    };
+  }
+  // List items and records: whole units of their own heights.
+  if (z.surface === "list" || z.surface === "record") {
+    const units = flowUnits(z, inner, ctx);
+    const gapAfter = z.surface === "record" ? recordHeightIn(z, inner, ctx).gapIn : 0;
+    return {
+      unit: z.surface === "list" ? "item" : "record", count: units.length, minFirst: z.surface === "list" ? 2 : 1, minLast: z.surface === "list" ? 2 : 1,
+      policy: z.surface === "list" ? "whole-first" : "flow",
+      piece: (from, to, first) => {
+        const zone = register({ ...z, range: rangeOf(from, to, units.length) }, first ? m : cont);
+        // A piece ends without the gap that separates it from the next record.
+        const contentIn = units.slice(from, to).reduce((a, u) => a + u, 0) - (to < units.length ? gapAfter : 0);
+        return { zone, overheadIn: first ? req.overheadIn : pad, promptTextIn: first ? req.promptTextIn : 0, contentIn };
+      },
+    };
+  }
+  return undefined;
 }
 
 /**
@@ -637,9 +739,15 @@ const pitchOf = (ctx: LayoutContext) => lineSpacingIn(ctx.pattern.kind === "blan
 
 /** Split the spec's zones over as many pages as the content needs (flow), or keep them on one. */
 function plan(spec: ZonePageSpec, ctx: LayoutContext, bodies: Rect[], maxPages: number) {
-  const measured = measure(spec.zones, bodies[0]?.w ?? 0, ctx);
+  const width = bodies[0]?.w ?? 0;
+  const measured = measure(spec.zones, width, ctx);
   const byZone = new Map(measured.map((m) => [m.zone, m]));
-  const reqs = measured.map((m) => requestOf(m, ctx, bodies[0]?.w ?? 0, pitchOf(ctx)));
+  // Each request may continue across pages; its pieces register their own (sliced) measurements in byZone.
+  const reqs = measured.map((m) => {
+    const req = requestOf(m, ctx, width, pitchOf(ctx));
+    const split = spec.flow ? splitOf(m, req, ctx, width, byZone) : undefined;
+    return split ? { ...req, split } : req;
+  });
   const heightOf = (i: number) => (bodies[Math.min(i, bodies.length - 1)] ?? { h: 0 }).h;
   const paged = paginateZones(reqs, heightOf, spec.gapIn, pitchOf(ctx), { flow: spec.flow, fewerLines: spec.fewerLines, maxPages });
   return { byZone, ...paged };
@@ -694,6 +802,7 @@ export function solveZonePages(spec: ZonePageSpec, ctx: LayoutContext, pageIndex
     const diagnostics = [...f.diagnostics];
     const metrics: LayoutMetric[] = [];
     const reqs = p.pages[k] ?? [];
+    const fragments: PageFragment[] = reqs.filter((r) => r.piece).map((r) => ({ componentId: r.zone.key, unit: r.piece!.unit, from: r.piece!.from, to: r.piece!.to, count: r.piece!.count, part: r.piece!.part }));
     if (!reqs.length) {
       // A continuation page the content no longer needs (e.g. after fewer prompts): open writing space.
       const out = SURFACES[spec.emptySurface](`${spec.idPrefix}${pi}-writing`, f.body, { key: "writing", label: "", surface: spec.emptySurface, weight: 1 }, ctx);
@@ -784,7 +893,7 @@ export function solveZonePages(spec: ZonePageSpec, ctx: LayoutContext, pageIndex
         nodes.push(rule(`${spec.idPrefix}${pi}-${z.zone.key}-divider`, z.rect.x, y, z.rect.x + z.rect.w, y, { strokePt: Math.max(0.5, ctx.pattern.lineWeightPt), component: "Divider" }));
       }
     });
-    return { nodes, diagnostics, metrics, regions: { mainContent: f.body, writingArea: f.body } };
+    return { nodes, diagnostics, metrics, regions: { mainContent: f.body, writingArea: f.body }, ...(fragments.length ? { fragments } : {}) };
   });
 }
 

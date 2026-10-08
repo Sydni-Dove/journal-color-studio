@@ -170,6 +170,8 @@ export type LayoutMetric = {
   provenance: Provenance;
 };
 
+export type PageFragment = { componentId: string; unit: "line" | "item" | "row" | "record"; from: number; to: number; count: number; part: number };
+
 export type SolvedPage = {
   nodes: LayoutNode[];
   diagnostics: LayoutDiagnostic[];
@@ -189,6 +191,12 @@ export type SolvedPage = {
    * `ownColors`: in the art's own Journal Color Studio palette, not the product's.
    */
   surface?: { assetId: string; ownColors: boolean };
+  /**
+   * Pieces of sections that continue across pages, on this page: the section (its
+   * source id), what was split and which units this page holds — so continuity can be
+   * checked (every line, item, row and record exactly once, in order).
+   */
+  fragments?: PageFragment[];
   /**
    * The page's content is solved in landscape and must be rotated 90°
    * clockwise onto the portrait sheet when rendered (preview and print).

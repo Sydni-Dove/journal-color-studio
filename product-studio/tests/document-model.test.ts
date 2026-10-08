@@ -71,6 +71,8 @@ const KITCHEN_SINK: PromptSet = {
     { id: "s1", kind: "spacer", label: "", spacer: "small" },
     { id: "s2", kind: "spacer", label: "" },
     { id: "q3", label: "Notes", responseStyle: "blank" },
+    { id: "l1", kind: "list", label: "Packing", listMarker: "number", items: [{ text: "Clothes" }, { text: "Shoes", level: 1 }, { text: "Socks", level: 1 }, { text: "Bible" }] },
+    { id: "r1", kind: "record", label: "Journal entries", recordFields: ["Date", "Signer", "ID type"], recordCount: 2, numbering: { prefix: "Entry", start: 5 } },
   ],
 };
 
@@ -126,10 +128,10 @@ describe("today's pages through the universal model", () => {
   });
   it("components today's pages can't draw yet are reported, never dropped silently", () => {
     const v = promptSetToDocument(KITCHEN_SINK);
-    const record: DocComponent = { id: "r1", kind: "record", label: "Journal entry", fields: [{ key: "signer", label: "Signer", valueType: "text" }], numbering: { start: 1 } };
-    const out = documentToPromptSet({ ...v, structure: { ...v.structure, components: [...v.structure.components, record] } });
-    expect(out.notDrawable).toEqual(["r1"]);
-    expect(componentToBlock(record)).toBeNull();
+    const image: DocComponent = { id: "img1", kind: "image", assetRef: "library:dove", alt: "Dove" };
+    const out = documentToPromptSet({ ...v, structure: { ...v.structure, components: [...v.structure.components, image] } });
+    expect(out.notDrawable).toEqual(["img1"]);
+    expect(componentToBlock(image)).toBeNull();
   });
 });
 

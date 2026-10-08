@@ -22,6 +22,7 @@
  * next page is on the wrong side. Spreads always open on a verso.
  */
 import { formatWeekRange, MONTH_NAMES } from "../calendar/calendar";
+import { recordStarts } from "./sequence";
 import { getModule, modulePrompts, moduleStart, moduleTitle, type PeriodKind } from "../../presets/modules";
 import type { CalendarData } from "../../types/calendar";
 import type { PageSide } from "../../types/geometry";
@@ -327,6 +328,8 @@ export function expandBook(structure: BookNode[], ctx: BookContext): ExpandedRec
   let fillers = 0;
   const sideOf = (n: number): PageSide => (ctx.paged ? (n % 2 === 1 ? "recto" : "verso") : "single");
   const badPeriod = new Set<string>();
+  // Record numbering continues across the whole book, in page order.
+  const sequences = new Map<string, number>();
 
   for (const leaf of leaves) {
     const { step, period } = leaf;
@@ -370,7 +373,8 @@ export function expandBook(structure: BookNode[], ctx: BookContext): ExpandedRec
     const base = `${step.id}@${leaf.path}:${periodKey(period)}#${leaf.copy}`;
     if (seen.has(base)) diagnostics.push({ severity: "error", itemId: step.id, message: `"${title}" is generated twice for ${subtitle ?? periodKey(period)}.` });
     seen.add(base);
-    const module = { type: step.module, title, subtitle, prompts: step.prompts ?? modulePrompts(step.module, kind), ...(step.promptSet ? { promptSet: step.promptSet } : {}), ...(step.cover ? { cover: step.cover } : {}) };
+    const starts = recordStarts(step.promptSet, sequences);
+    const module = { type: step.module, title, subtitle, prompts: step.prompts ?? modulePrompts(step.module, kind), ...(step.promptSet ? { promptSet: step.promptSet } : {}), ...(step.cover ? { cover: step.cover } : {}), ...(starts ? { sequenceStarts: starts } : {}) };
     // Prompts that don't fit one page continue on more pages (single-page layouts only).
     const flow = n === 1 ? Math.max(1, ctx.flowPages?.(step.layoutId, module) ?? 1) : 1;
     for (let part = 0; part < n * flow; part++) {

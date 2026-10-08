@@ -38,7 +38,11 @@ export type SurfaceKind =
   /** Page Composer: open space of a fixed height. */
   | "spacer"
   /** Page Composer: graph grid at the product's grid size. */
-  | "graph-grid";
+  | "graph-grid"
+  /** A printed list (bullets, numbers or checkboxes; nested levels). */
+  | "list"
+  /** Repeating records: numbered entries of labelled blanks. */
+  | "record";
 
 /** A research table column: reference width in inches, scaled by the geometry layer to the page. */
 export type TableColumn = { key: string; label: string; referenceWidthIn: number };
@@ -113,6 +117,22 @@ export type StationeryZone = {
   frame?: import("./prompts").SectionFrame;
   /** Page Composer: two writing sections side by side (this zone is the pair; the layout draws both). */
   pair?: [StationeryZone, StationeryZone];
+  /** A heading section: kept on the same page as the start of the section after it. */
+  keepWithNext?: boolean;
+  /** List surfaces: the printed items and their marker. */
+  listItems?: import("./prompts").ListItem[];
+  listMarker?: import("./prompts").ListMarker;
+  /** Record surfaces: one record's blanks, how many records, the first record's number and its prefix. */
+  recordFields?: string[];
+  recordCount?: number;
+  recordStart?: number;
+  recordPrefix?: string;
+  /**
+   * A piece of a section that continues across pages (set by the paginator, never by content):
+   * the units it holds — text lines, list items, table / checklist / writing rows, records — as
+   * [from, to) of `count`, and its part number. Drawn from the full section, so numbering continues.
+   */
+  range?: { from: number; to: number; count: number; part: number };
 };
 
 export type StationeryPageSpec = {

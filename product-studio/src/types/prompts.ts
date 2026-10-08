@@ -61,7 +61,18 @@ export type SpaceMode = "fixed" | "fill" | "equal";
  * Every kind flows top to bottom in the page's structured layout: nothing is
  * positioned by hand, overlaps or leaves the print-safe area.
  */
-export type PromptBlockKind = "prompt" | "heading" | "info" | "divider" | "spacer";
+export type PromptBlockKind = "prompt" | "heading" | "info" | "divider" | "spacer" | "list" | "record";
+
+/** A printed list item; `level` 0 = top level, 1 = nested under the item before it, … */
+export type ListItem = { text: string; level?: number };
+/** How a printed list marks its items. Numbers count per level ("1." / "a." / "i."), across page breaks. */
+export type ListMarker = "bullet" | "number" | "checkbox";
+/**
+ * A repeating record's numbering: "No. 1", "No. 2", … across the whole product.
+ * Records with the same `sequence` share one count (default: the section's own id,
+ * so every copy of a page continues its numbers).
+ */
+export type RecordNumbering = { prefix?: string; start?: number; sequence?: string };
 
 /**
  * How a section will be filled in (a later Fill Mode attaches real content to
@@ -136,6 +147,13 @@ export type PromptBlock = {
   taskLines?: boolean;
   /** Spacer: how much open space. */
   spacer?: SpacerSize;
+  /** List: its printed items, in order, and how they are marked. */
+  items?: ListItem[];
+  listMarker?: ListMarker;
+  /** Record: the labelled blanks of one record, how many records the section prints, and their numbering. */
+  recordFields?: string[];
+  recordCount?: number;
+  numbering?: RecordNumbering;
   /** How the section is filled in later (default: list for checklists and tables, field otherwise). */
   content?: PromptBlockContent;
   /** The section heading ("MY RESPONSE", "What did God say?"); may be empty (prompt only). */

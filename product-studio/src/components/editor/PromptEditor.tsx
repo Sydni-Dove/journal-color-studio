@@ -84,6 +84,8 @@ const KIND_SUMMARY: Record<Exclude<PromptBlockKind, "prompt">, (b: PromptBlock) 
   heading: (b) => `${TEXT_STYLE_LABEL[b.textStyle ?? "heading"]}${b.textStyle !== "body" && b.prompt?.trim() ? " + text" : ""}`,
   info: (b) => `Info row · ${plural(Math.min(MAX_INFO_FIELDS, (b.fields ?? []).filter((f) => f.trim()).length) || 1, "blank")}`,
   divider: () => "Line",
+  list: (b) => `List · ${plural((b.items ?? []).length, "item")}`,
+  record: (b) => `Records · ${plural(b.recordCount ?? 1, "record")} of ${plural((b.recordFields ?? []).length, "blank")}`,
   spacer: (b) => `${(b.spacer ?? "medium")[0].toUpperCase()}${(b.spacer ?? "medium").slice(1)} space`,
 };
 

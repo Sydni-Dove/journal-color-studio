@@ -17,6 +17,7 @@ import { getLayoutMeasurer, styleForRole } from "../../engines/typography/textMe
 import { checklistRows, fitHeading, HEADING_MIN_PT, writingSurface } from "../shared/components";
 import { box, group, lineBoxIn, rule, text } from "../shared/nodes";
 import type { LayoutContext } from "../shared/types";
+import { drawList, drawRecords } from "./flowSurfaces";
 
 export type SurfaceResult = { nodes: LayoutNode[]; diagnostics: LayoutDiagnostic[]; metrics: LayoutMetric[] };
 type SurfaceRenderer = (id: string, rect: Rect, zone: StationeryZone, ctx: LayoutContext) => SurfaceResult;
@@ -197,6 +198,9 @@ export const SURFACES: Record<SurfaceKind, SurfaceRenderer> = {
   // A thin rule across the section's width, centred in its band.
   divider: (id, rect, _z, ctx) => empty([group(id, "Section", rect), rule(`${id}-rule`, rect.x, rect.y + rect.h / 2, rect.x + rect.w, rect.y + rect.h / 2, { strokePt: Math.max(0.5, ctx.pattern.lineWeightPt), component: "Section" })]),
   spacer: (id, rect) => empty([group(id, "Section", rect)]),
+  // Sequences of whole units that may continue across pages (layouts/stationery/flowSurfaces.ts).
+  list: (id, rect, z, ctx) => empty(drawList(id, rect, z, ctx)),
+  record: (id, rect, z, ctx) => empty(drawRecords(id, rect, z, ctx)),
 };
 
 /** Surfaces with a fixed height instead of writing space: fill-in rows, dividers and spacers. */

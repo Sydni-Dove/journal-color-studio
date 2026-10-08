@@ -145,6 +145,11 @@ export type PageModuleContent = {
   promptSet?: import("./prompts").PromptSet;
   /** Cover / divider page settings (absent on other pages). */
   cover?: CoverDividerSettings;
+  /**
+   * Record sections: the number this instance's first record gets, by section id —
+   * assigned in book order by the recipe, so numbering runs across the whole product.
+   */
+  sequenceStarts?: Record<string, number>;
 };
 
 export type PeriodRef =
