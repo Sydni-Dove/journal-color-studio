@@ -52,7 +52,8 @@ export function App() {
   /** updatedAt of the version this tab loaded or last saved: a newer stored one came from another tab. */
   const base = useRef<string | null>(null);
   const current = useRef<ProductProject | null>(null);
-  const [conflict, setConflict] = useState<string | null>(null);
+  /** A message about something that happened to the person's products (a kept copy, a deletion from another device…). */
+  const [notice, setNotice] = useState<string | null>(null);
   /** Bumped when another tab's version replaces this tab's: the editor starts fresh (its undo history was of the old one). */
   const [generation, setGeneration] = useState(0);
 
@@ -65,16 +66,32 @@ export function App() {
       if (mine && !dirty.current) openLoaded(mine);
       refresh();
     },
-    onConflict: (newer, copyName) => {
+    onEvent: (e) => {
       const open = current.current;
-      if (open && open.id === newer.id) {
-        base.current = newer.updatedAt;
-        current.current = newer;
-        dirty.current = false;
-        setView((v) => (v.kind === "edit" && v.project.id === newer.id ? { kind: "edit", project: newer } : v));
-        setGeneration((g) => g + 1);
+      if (e.kind === "kept-both") {
+        if (open && open.id === e.current.id) {
+          base.current = e.current.updatedAt;
+          current.current = e.current;
+          dirty.current = false;
+          setView((v) => (v.kind === "edit" && v.project.id === e.current.id ? { kind: "edit", project: e.current } : v));
+          setGeneration((g) => g + 1);
+          setNotice(`This project was also changed on another device, so the newest version is open here. The other version was kept as a separate project: “${e.copy.name}”.`);
+        } else setNotice(`“${e.current.name}” was changed on two devices. Both versions were kept: the newest as “${e.current.name}”, the other as “${e.copy.name}”.`);
+      } else if (e.kind === "deleted-elsewhere") {
+        if (open && open.id === e.id) {
+          if (e.recovered) openLoaded(e.recovered);
+          else {
+            current.current = null;
+            dirty.current = false;
+            setView({ kind: "list" });
+          }
+        }
+        if (e.recovered) setNotice(`“${e.name}” was deleted on another device. The edits made here that weren't saved online yet were kept as a separate project: “${e.recovered.name}”.`);
+        else if (open && open.id === e.id) setNotice(`“${e.name}” was deleted on another device.`);
+      } else {
+        setNotice(`“${e.name}” was changed on another device after you deleted it, so it was kept (nothing was lost). Delete it again if you no longer need it.`);
+        void cloudRef.current.sync();
       }
-      setConflict(`${copyName}|device`);
       refresh();
     },
   });
@@ -94,7 +111,7 @@ export function App() {
         current.current = r.stored;
         setView((v) => (v.kind === "edit" && v.project.id === p.id ? { kind: "edit", project: r.stored } : v));
         setGeneration((g) => g + 1);
-        setConflict(r.copy.name);
+        setNotice(`This project was changed in another tab, so that newer version is open here. Your edits were kept as a separate project: “${r.copy.name}”.`);
       } else base.current = p.updatedAt;
       dirty.current = false;
       setSaveStatus("saved");
@@ -112,7 +129,7 @@ export function App() {
     base.current = p.updatedAt;
     current.current = p;
     dirty.current = false;
-    setConflict(null);
+    setNotice(null);
     setGeneration((g) => g + 1);
     setView({ kind: "edit", project: p });
   };
@@ -156,12 +173,13 @@ export function App() {
     window.location.reload();
   };
   const banner = stale ? <UpdateBanner onReload={reload} /> : null;
+  const noticeBanner = notice ? <div className="update-banner" role="alert"><span>{notice}</span><button type="button" className="btn" onClick={() => setNotice(null)}>OK</button></div> : null;
   if (view.kind === "new") return <>{banner}<NewProductWizard start={view.start} onCreate={open} onCancel={() => setView({ kind: "list" })} /></>;
   if (view.kind === "edit") {
     return (
       <>
       {banner}
-      {conflict && <div className="update-banner" role="alert"><span>This project was changed {conflict.endsWith("|device") ? "on another device" : "in another tab"}, so that newer version is open here. Your edits were kept as a separate project: “{conflict.replace(/\|device$/, "")}”.</span><button type="button" className="btn" onClick={() => setConflict(null)}>OK</button></div>}
+      {noticeBanner}
       <Editor
         key={`${view.project.id}:${generation}`}
         project={view.project}
@@ -180,6 +198,7 @@ export function App() {
   return (
     <>
     {banner}
+    {noticeBanner}
     <ProjectList
       projects={projects}
       meta={projectMeta}
@@ -199,8 +218,9 @@ export function App() {
         open({ ...withVariant, updatedAt: new Date().toISOString() });
       }}
       onDelete={(id) => {
-        store.remove(id);
-        void cloud.removed(id);
+        const p = store.load(id);
+        if (p) void cloud.remove(p); // removes it here at once; online when it can (remembered until then)
+        else store.remove(id);
         refresh();
       }}
       account={<CloudAccount email={cloud.session?.user.email ?? null} status={cloud.status} error={cloud.error} onSignIn={cloud.signIn} onSignOut={() => void cloud.signOut()} onRetry={() => void cloud.sync()} />}

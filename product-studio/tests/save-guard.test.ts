@@ -43,7 +43,8 @@ describe("saveGuarded", () => {
     expect(store.load(loaded.id)!.name).toBe("Prophetic Journal — tab A edits");
     if (r.status === "conflict") {
       expect(r.copy.id).not.toBe(loaded.id);
-      expect(store.load(r.copy.id)!.name).toBe("Prophetic Journal (changes from another tab)");
+      // Neutral copy name: the name, what it is, when its edits were saved (accurate in every tab and on every device).
+      expect(store.load(r.copy.id)!.name).toMatch(/^Prophetic Journal \(other version · saved Sep 30, 2026, \d{1,2}:20:00 [AP]M\)$/);
       expect(r.stored.name).toBe("Prophetic Journal — tab A edits");
     }
   });

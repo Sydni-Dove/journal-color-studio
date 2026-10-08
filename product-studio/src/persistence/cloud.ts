@@ -6,6 +6,8 @@
  * sign-in / start-up both sides are merged so each device ends up with the
  * newest version of every product. Nothing is ever overwritten silently:
  * a newer online version stays, and the other edits are kept as a copy.
+ * Deleting hides the row (deleted_at) rather than removing it, so every
+ * device learns of the deletion and the product is never uploaded again.
  *
  * The publishable key is meant for browsers; the rows are protected by the
  * table's row level security (each signed-in account sees only its own).
@@ -17,22 +19,28 @@ export const SUPABASE_URL = "https://jnlvvlkwskidloripvtp.supabase.co";
 export const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_lopqr1HC3kjSio_vVFN_tg_VdBoTi4R";
 const TABLE = "product_studio_projects";
 
-export type CloudProject = { id: string; name: string; updatedAt: string; data: ProductProject };
+/** An online row. `deletedAt` is set when the product was deleted (on any device): the row stays, unlisted, so other devices learn of the deletion. */
+export type CloudProject = { id: string; name: string; updatedAt: string; data: ProductProject; deletedAt?: string | null };
 
 /** What the studio needs from an online store (a fake one in tests). */
 export interface CloudBackend {
+  /** Every row — deleted ones included (marked `deletedAt`), so a sync can carry deletions to this device. */
   list(): Promise<CloudProject[]>;
+  /** One row, deleted or not. */
   get(id: string): Promise<CloudProject | null>;
-  put(p: ProductProject): Promise<void>;
   /**
-   * Write `p` only if the online copy is still at `expected` (its updatedAt), or — with
-   * `expected` null — only if there is no listed online copy (none yet, or one removed on
-   * another device, which is brought back). Each write is one statement on the server, so
-   * two devices saving at once can never both succeed. false = the online copy is not at
-   * `expected` (nothing was written).
+   * Write `p` only if the online copy is still at `expected` (its updatedAt) and not deleted,
+   * or — with `expected` null — only if there is no row for it at all. Each write is one
+   * statement on the server, so two devices saving at once can never both succeed, and a
+   * deleted product is never written back. false = nothing was written.
    */
   putIf(p: ProductProject, expected: string | null): Promise<boolean>;
-  remove(id: string): Promise<void>;
+  /**
+   * Delete (hide) a product, but only if the online copy is not newer than `upTo` — the version
+   * that was deleted. Edits another device saved after it are never hidden. One statement.
+   * true = it is deleted online now (or already was); false = a newer version is online.
+   */
+  removeIf(id: string, upTo: string): Promise<boolean>;
 }
 
 let client: SupabaseClient | null = null;
@@ -41,46 +49,44 @@ export function supabase(): SupabaseClient {
   return client;
 }
 
+const iso = (t: string | null | undefined) => (t ? new Date(t).toISOString() : null);
+
 export const supabaseBackend = (): CloudBackend => {
   const db = () => supabase().from(TABLE);
-  const row = (r: { id: string; name: string; updated_at: string; data: ProductProject }): CloudProject => ({ id: r.id, name: r.name, updatedAt: new Date(r.updated_at).toISOString(), data: r.data });
+  const row = (r: { id: string; name: string; updated_at: string; data: ProductProject; deleted_at: string | null }): CloudProject => ({ id: r.id, name: r.name, updatedAt: iso(r.updated_at)!, data: r.data, deletedAt: iso(r.deleted_at) });
+  const COLS = "id,name,updated_at,data,deleted_at";
   return {
     async list() {
-      const { data, error } = await db().select("id,name,updated_at,data").is("deleted_at", null);
+      const { data, error } = await db().select(COLS);
       if (error) throw error;
       return (data ?? []).map(row);
     },
     async get(id) {
-      const { data, error } = await db().select("id,name,updated_at,data").eq("id", id).is("deleted_at", null).maybeSingle();
+      const { data, error } = await db().select(COLS).eq("id", id).maybeSingle();
       if (error) throw error;
       return data ? row(data) : null;
     },
-    async put(p) {
-      const { error } = await db().upsert({ id: p.id, name: p.name, data: p, updated_at: p.updatedAt, deleted_at: null }, { onConflict: "owner_id,id" });
-      if (error) throw error;
-    },
     async putIf(p, expected) {
-      const values = { id: p.id, name: p.name, data: p, updated_at: p.updatedAt, deleted_at: null };
+      const values = { id: p.id, name: p.name, data: p, updated_at: p.updatedAt };
       if (expected === null) {
-        // A product that isn't online yet: insert, never overwrite (the primary key refuses a second copy).
+        // A product that isn't online yet: insert, never overwrite (the primary key refuses a second copy,
+        // and a deleted product's row stays, so it is never added back under its old id).
         const { error } = await db().insert(values);
         if (!error) return true;
-        if (error.code !== "23505") throw error;
-        // A row exists. If it was removed (on another device) while this device still has the product,
-        // bring it back with these contents — again only while it is still removed. A live row is never touched.
-        const revived = await db().update(values).eq("id", p.id).not("deleted_at", "is", null).select("id");
-        if (revived.error) throw revived.error;
-        return (revived.data ?? []).length === 1;
+        if (error.code === "23505") return false;
+        throw error;
       }
-      // Compare-and-swap: the row changes only while it is still the version this save started from.
-      const { data, error } = await db().update(values).eq("id", p.id).eq("updated_at", expected).select("id");
+      // Compare-and-swap: the row changes only while it is still the version this save started from, and not deleted.
+      const { data, error } = await db().update(values).eq("id", p.id).eq("updated_at", expected).is("deleted_at", null).select("id");
       if (error) throw error;
       return (data ?? []).length === 1;
     },
-    async remove(id) {
-      // Kept online (recoverable), just no longer listed.
-      const { error } = await db().update({ deleted_at: new Date().toISOString() }).eq("id", id);
+    async removeIf(id, upTo) {
+      const { data, error } = await db().update({ deleted_at: new Date().toISOString() }).eq("id", id).lte("updated_at", upTo).is("deleted_at", null).select("id");
       if (error) throw error;
+      if ((data ?? []).length === 1) return true;
+      const now = await this.get(id);
+      return !now || !!now.deletedAt; // gone or already deleted: done; otherwise a newer version is online
     },
   };
 };
@@ -95,6 +101,10 @@ export type SyncPlan = {
    * sides, and the older is kept as a copy — no edits are lost.
    */
   keepBoth: { newer: ProductProject; older: ProductProject; olderFrom: "this device" | "online"; expected: string | null }[];
+  /** Deleted on another device, unchanged here since: remove from this device. */
+  removeHere: string[];
+  /** Deleted on another device, but changed here since (edits not yet online): keep these edits as a recovered copy, never discard them. */
+  recover: ProductProject[];
 };
 
 /**
@@ -111,20 +121,28 @@ export const sameContent = (a: ProductProject, b: ProductProject) => canonicalJs
 /**
  * Merge by product, using the version both sides last agreed on (`baseOf`):
  *   changed only online → here; changed only here → online;
- *   changed on both sides → keep both (newer as the product, older as a copy).
+ *   changed on both sides → keep both (newer as the product, older as a copy);
+ *   deleted online → removed here, unless changed here since (then those edits are recovered as a copy).
  * Without a known base (never synced on this device) two differing versions are
- * both kept rather than guessed at. Nothing is deleted.
+ * both kept rather than guessed at. Nothing is lost.
  */
 export function planSync(local: ProductProject[], remote: CloudProject[], baseOf: (id: string) => string | undefined = () => undefined): SyncPlan {
   const byId = new Map(local.map((p) => [p.id, p]));
   const seen = new Set<string>();
-  const plan: SyncPlan = { toLocal: [], toCloud: [], keepBoth: [] };
+  const plan: SyncPlan = { toLocal: [], toCloud: [], keepBoth: [], removeHere: [], recover: [] };
   for (const r of remote) {
     seen.add(r.id);
     const l = byId.get(r.id);
+    const base = baseOf(r.id);
+    if (r.deletedAt) {
+      if (!l) continue;
+      // Unchanged here since this device last agreed with the online copy (or the very version that was deleted): follow the deletion.
+      if ((base !== undefined && l.updatedAt <= base) || l.updatedAt <= r.updatedAt || sameContent(l, r.data)) plan.removeHere.push(r.id);
+      else plan.recover.push(l);
+      continue;
+    }
     if (!l) { plan.toLocal.push(r.data); continue; }
     if (l.updatedAt === r.updatedAt) continue;
-    const base = baseOf(r.id);
     if (base !== undefined && l.updatedAt === base) { plan.toLocal.push(r.data); continue; }
     if (base !== undefined && r.updatedAt === base) { plan.toCloud.push({ project: l, expected: r.updatedAt }); continue; }
     // Both changed (or unknown): keep both unless they only differ in their save time.
@@ -140,12 +158,14 @@ export function planSync(local: ProductProject[], remote: CloudProject[], baseOf
   return plan;
 }
 
-export type CloudSave = { status: "saved" } | { status: "conflict"; newer: ProductProject };
+export type CloudSave = { status: "saved" } | { status: "conflict"; newer: ProductProject } | { status: "deleted" };
 
 /**
  * Send one save online. If the online copy is newer than the version this edit
  * started from (another device saved since), nothing is overwritten: the
- * caller keeps the newer one and saves these edits as a copy.
+ * caller keeps the newer one and saves these edits as a copy. If the product
+ * was deleted on another device, nothing is written back under its id: the
+ * caller keeps these edits as a recovered copy.
  */
 export async function saveOnline(backend: CloudBackend, p: ProductProject, base: string | null): Promise<CloudSave> {
   // Each attempt is one compare-and-swap on the server; between attempts we only learn what is there now.
@@ -154,9 +174,10 @@ export async function saveOnline(backend: CloudBackend, p: ProductProject, base:
     if (await backend.putIf(p, expected)) return { status: "saved" };
     const online = await backend.get(p.id);
     if (!online) {
-      expected = null; // not online (yet, or any more): add it
+      expected = null; // not online yet: add it
       continue;
     }
+    if (online.deletedAt) return { status: "deleted" };
     if (online.updatedAt === p.updatedAt) return { status: "saved" }; // this very version is already there
     // Another device saved after these edits started: keep theirs, these edits become a copy.
     if (!base || online.updatedAt > base) return { status: "conflict", newer: online.data };

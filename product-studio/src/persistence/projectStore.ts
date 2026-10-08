@@ -1,5 +1,6 @@
 import { migrateLayers } from "../themes/layers";
 import { normalizeData } from "../engines/data/data";
+import { copyName } from "./copyNames";
 import type { DecorativeTheme } from "../types/theme";
 /**
  * Project persistence — localStorage, one key per project plus an index.
@@ -128,7 +129,7 @@ export type GuardedSave = { status: "saved" } | { status: "conflict"; stored: Pr
 export function saveGuarded(store: ProjectStore, project: ProductProject, base: string | null): GuardedSave {
   const stored = store.load(project.id);
   if (stored && base && stored.updatedAt > base) {
-    const copy = duplicateProject(project, `${project.name} (changes from another tab)`);
+    const copy = duplicateProject(project, copyName(project.name, "other-version", project.updatedAt));
     store.save(copy);
     return { status: "conflict", stored, copy };
   }
