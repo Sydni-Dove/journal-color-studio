@@ -51,6 +51,7 @@ export type BoxNode = NodeBase & {
   fill: ColorToken | null;
   fillOpacity: number;
   radiusIn: number;
+  leopard?: boolean;
 };
 
 /** `failed`: the heading could not fit even at the minimum — it is reported (heading-fit) and kept inside its box. */
@@ -127,6 +128,7 @@ export type CheckboxNode = NodeBase & {
 };
 
 export type RuleNode = NodeBase & {
+  dashed?: boolean;
   type: "rule";
   x1: number;
   y1: number;
@@ -167,6 +169,10 @@ export type LayoutMetric = {
 };
 
 export type SolvedPage = {
+  /** Manufacturing cut sheets use plain white stock without page decoration. */
+  manufacturingSheet?: boolean;
+  /** Physical page intentionally carries no printed artwork or pattern. */
+  blankPage?: boolean;
   nodes: LayoutNode[];
   diagnostics: LayoutDiagnostic[];
   metrics: LayoutMetric[];

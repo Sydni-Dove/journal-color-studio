@@ -31,6 +31,9 @@ export type RecipeOrdering =
 export type ProductRecipe = {
   items: RecipeItem[];
   ordering: RecipeOrdering;
+  /** Bound-book pagination. Omitted keeps the legacy spread behavior. */
+  facingPages?: "preserve" | "continuous";
+  fillerPage?: "notes" | "blank";
   /**
    * Composite book structure (optional). When present it defines the book —
    * nested period groups, module steps and cadence — and `items` is ignored
@@ -42,6 +45,7 @@ export type ProductRecipe = {
 // ─── Composite book recipe ─────────────────────────────────────────────────
 /** A page's PURPOSE. Its design is the step's layout (one purpose, many possible layouts). */
 export type PageModuleType =
+  | "tab-sheet"
   | "cover-page"
   | "divider-page"
   | "monthly-calendar"
@@ -99,6 +103,7 @@ export type BookStep = {
   /** Title override (otherwise the module's title for the period). */
   title?: string;
   cover?: CoverDividerSettings;
+  tabSheet?: TabSheetSettings;
   /** Prompt overrides for guided pages. */
   prompts?: string[];
 };
@@ -115,7 +120,7 @@ export type BookGroup = {
 export type BookNode = BookStep | BookGroup;
 
 /** Module content handed to the layout (title for the period + prompts). */
-export type PageModuleContent = { type: PageModuleType; title: string; subtitle?: string; prompts: string[]; cover?: CoverDividerSettings };
+export type PageModuleContent = { type: PageModuleType; title: string; subtitle?: string; prompts: string[]; cover?: CoverDividerSettings; tabSheet?: TabSheetSettings };
 
 export type PeriodRef =
   | { kind: "none" }
@@ -159,4 +164,17 @@ export type CoverDividerSettings = {
   outlines?: boolean;
   leopard?: boolean;
   tab?: { show: boolean; label?: string; style?: "staggered" | "rounded"; order?: number; count?: number; color?: import("./tokens").ColorToken; leopard?: boolean };
+};
+
+/** Cut-and-fold pieces printed on a separate sheet, with physical attachment allowance. */
+export type TabPiece = { label: string; color?: import("./tokens").ColorToken; leopard?: boolean };
+export type TabSheetSettings = {
+  entries?: TabPiece[];
+  fromDividers?: boolean;
+  widthIn?: number;
+  heightIn?: number;
+  attachIn?: number;
+  rounded?: boolean;
+  guides?: boolean;
+  dividerHeightIn?: number;
 };

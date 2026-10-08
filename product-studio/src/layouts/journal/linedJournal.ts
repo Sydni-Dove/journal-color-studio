@@ -8,7 +8,10 @@ import { fitCount } from "../../engines/layout/math";
 import { fillWritingRegion, lineSpacingIn } from "../../engines/patterns/patterns";
 import { STUDIO_JOURNAL } from "../../presets/studioDefaults";
 import type { LayoutMetric, LayoutNode, SolvedPage } from "../../types/layout";
-import { pageFrame, positionText } from "../shared/components";
+import { headerTitle, pageFrame, positionText } from "../shared/components";
+import { rule } from "../shared/nodes";
+import { STUDIO_STROKES } from "../../presets/studioDefaults";
+import { monthlyTitleHeight } from "../planner/monthlyCalendar";
 import { minimumAreaFit, type LayoutCapability, type LayoutContext, type LayoutDefinition } from "../shared/types";
 
 const WRITING_PAGE: Omit<LayoutCapability, "wordingKeys" | "supportedProductTypes"> = {
@@ -79,5 +82,24 @@ export const notesPage: LayoutDefinition = {
   period: "none",
   capability: { ...WRITING_PAGE, supportedProductTypes: ["journal", "notebook", "planner", "insert", "notepad", "worksheet", "tracker", "custom"], wordingKeys: ["notes"] },
   fit: minimumAreaFit(1.5, 2, "Notes page"),
-  solve: (ctx) => [writingPage(ctx, ctx.wording.notes)],
+  solve: (ctx) => {
+    if (ctx.filler && ctx.facingPage?.layoutId === "planner-monthly") {
+      const headerH = monthlyTitleHeight({ page: ctx.facingPage.geometry, spacing: ctx.spacing, typography: ctx.typography, options: ctx.options });
+      const frame = pageFrame(ctx, 0, { headerH });
+      const title = headerTitle("notes-facing-month-header", ctx, frame.zones, "pageTitle", ctx.wording.notes, "monthTitle", "header-left");
+      const g = ctx.pages[0];
+      const marginX = g.boundEdge === "right" ? g.trimWidthIn - ctx.pattern.marginLineIn : ctx.pattern.marginLineIn;
+      return [{ nodes: [...frame.nodes, ...title.nodes, ...fillWritingRegion("notes-facing-month-writing", frame.body, ctx.pattern, marginX), rule("notes-facing-month-bottom", frame.body.x, frame.body.y + frame.body.h, frame.body.x + frame.body.w, frame.body.y + frame.body.h, { strokePt: STUDIO_STROKES.headerRulePt, component: "Grid" })], diagnostics: [...frame.diagnostics, ...title.diagnostics], metrics: [], regions: { mainContent: frame.body, writingArea: frame.body } }];
+    }
+    return [writingPage(ctx, ctx.wording.notes)];
+  },
+};
+
+/** Intentionally blank physical page used only when a bound spread needs alignment. */
+export const blankFillerPage: LayoutDefinition = {
+  ...notesPage,
+  id: "blank-filler-page",
+  label: "Blank filler page",
+  description: "An intentionally blank page for facing-page alignment.",
+  solve: () => [{ blankPage: true, nodes: [], diagnostics: [], metrics: [] }],
 };

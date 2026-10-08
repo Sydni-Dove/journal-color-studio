@@ -1,17 +1,19 @@
 import { neutralLuxeDividers } from "../../presets/bookRecipes";
-import { CoverDividerControls } from "./CoverDividerControls";
+import { useState } from "react";
+import { createProject } from "../../presets/products/projectFactory";
+import { localProjectStore } from "../../persistence/projectStore";
 /**
  * BOOK STRUCTURE — the composite recipe as the book reads: sections (Front
  * Matter, Every Month, Every Week, End of…), and in each the pages it holds,
  * how often, and in what design. Structure only: page design (wording, type,
  * colour, surface, decoration, spacing) stays in the design panels.
  */
-import { layoutAvailability, type ResolvedDocument } from "../../engines/document/resolve";
+import type { ResolvedDocument } from "../../engines/document/resolve";
 import { addNode, bookOutline, duplicateNode, moveNode, newSection, newStep, removeNode, structureFromItems, updateNode } from "../../engines/recipe/bookEdit";
 import { getLayout } from "../../layouts/registry";
 import { BOOK_PRESETS } from "../../presets/bookRecipes";
 import { MONTH_NAMES } from "../../engines/calendar/calendar";
-import { getModule, moduleTitle, PAGE_MODULES } from "../../presets/modules";
+import { getModule, moduleTitle } from "../../presets/modules";
 import type { ProductProject } from "../../types/project";
 import type { BookGroup, BookNode, BookStep, PageStartRule, RecipeCadence } from "../../types/recipe";
 import { Field, NumberField, Section, Select } from "./ui";
@@ -52,11 +54,9 @@ const stepName = (s: BookStep, scope: Scope) =>
   s.title || (s.module === "monthly-calendar" || s.module === "weekly-planner" ? getModule(s.module).label : moduleTitle(s.module, scope === "none" ? "none" : scope));
 
 function StepCard({ s, siblings, scope, props, first, last }: { s: BookStep; siblings: BookNode[]; scope: Scope; props: Props & { goToStep: (id: string) => void }; first: boolean; last: boolean }) {
-  const { update, doc } = props;
+  const { update } = props;
   const set = (patch: Partial<BookStep>) => update((p) => ({ ...p, recipe: { ...p.recipe, structure: updateNode(p.recipe.structure!, s.id, (n) => ({ ...n, ...patch }) as BookNode) } }));
   const edit = (fn: (nodes: BookNode[]) => BookNode[]) => update((p) => ({ ...p, recipe: { ...p.recipe, structure: fn(p.recipe.structure!) } }));
-  const mod = getModule(s.module);
-  const avail = layoutAvailability(doc);
   const layout = getLayout(s.layoutId);
   const two = layout.pages === 2;
   const word = SCOPE_WORD[scope];
@@ -67,7 +67,6 @@ function StepCard({ s, siblings, scope, props, first, last }: { s: BookStep; sib
     ...ENDS[scope].map((k) => ({ value: `end:${k}`, label: `End of each ${k}` })),
     ...siblings.filter((x): x is BookStep => x.kind === "step" && x.id !== s.id).map((x) => ({ value: `after:${x.id}`, label: `After “${stepName(x, scope)}”` })),
   ];
-  const guided = s.layoutId === "guided-page";
   return (
     <details className="card book-step" data-step={s.id}>
       <summary className="book-step__title">
@@ -75,26 +74,7 @@ function StepCard({ s, siblings, scope, props, first, last }: { s: BookStep; sib
         {(s.copies ?? 1) > 1 ? ` × ${s.copies}` : s.cadence.type === "copies" && s.cadence.count > 1 ? ` × ${s.cadence.count}` : ""}
         <span className="hint"> · {cadenceOptions.find((o) => o.value === cadenceValue(s.cadence))?.label ?? s.cadence.type} · {layout.label}</span>
       </summary>
-      <div className="row">
-        <Select
-          label="Page purpose"
-          value={s.module}
-          options={PAGE_MODULES.map((m) => ({ value: m.type, label: m.label }))}
-          onChange={(module) => {
-            const m = getModule(module);
-            set({ module, layoutId: m.layouts.includes(s.layoutId) ? s.layoutId : m.layouts[0], title: undefined, prompts: undefined });
-          }}
-        />
-        <Select
-          label="Design"
-          value={s.layoutId}
-          options={mod.layouts.map((id) => {
-            const a = avail.find((x) => x.layoutId === id);
-            return { value: id, label: `${getLayout(id).label}${a && !a.fit.ok ? " — doesn't fit this size" : ""}` };
-          })}
-          onChange={(layoutId) => set({ layoutId, start: getLayout(layoutId).pages === 2 ? undefined : s.start })}
-        />
-      </div>
+      <p className="hint">Page category: {getModule(s.module).label} · Layout: {layout.label}. Select this page to edit either choice.</p>
       <div className="row">
         <Select label="How often" value={cadenceValue(s.cadence)} options={cadenceOptions} onChange={(v) => set({ cadence: cadenceFrom(v, s.cadence) })} />
         {s.cadence.type === "copies" ? (
@@ -108,22 +88,7 @@ function StepCard({ s, siblings, scope, props, first, last }: { s: BookStep; sib
       ) : (
         <Select label="Starts on" value={s.start ?? "any"} options={(["any", "recto", "verso"] as const).map((v) => ({ value: v, label: START_LABEL[v] }))} onChange={(start) => set({ start: start === "any" ? undefined : start })} />
       )}
-      {mod.type !== "monthly-calendar" && mod.type !== "weekly-planner" && (
-        <Field label={s.module === "divider-page" ? "Section name" : s.module === "cover-page" ? "Title" : "Page title"}>
-          <input type="text" value={s.title ?? ""} placeholder={moduleTitle(s.module, scope === "none" ? "none" : scope)} onChange={(e) => set({ title: e.target.value || undefined })} />
-        </Field>
-      )}
-      {(s.module === "cover-page" || s.module === "divider-page") && <CoverDividerControls step={s} set={set} titleFont={doc.typography.fonts.cover} onTitleFont={(cover) => update((p) => ({ ...p, typography: { ...p.typography, fonts: { ...p.typography.fonts, cover }, roleOverrides: { ...p.typography.roleOverrides, coverTitle: { ...p.typography.roleOverrides.coverTitle, sizePt: 150, weight: cover === "The Nautigal" || cover === "Dancing Script" ? 700 : 400, color: "text", transform: "none", trackingEm: 0, lineHeight: 1.2 } } } }))} applyPreset={() => update((p) => ({ ...p, colors: { paletteId: "neutral-cheetah-luxe", overrides: {} }, typography: { ...p.typography, fonts: { ...p.typography.fonts, cover: "The Nautigal" }, roleOverrides: { ...p.typography.roleOverrides, coverTitle: { ...p.typography.roleOverrides.coverTitle, sizePt: 150, color: "text", weight: 700, transform: "none", trackingEm: 0, lineHeight: 1.2 }, coverSubtitle: { ...p.typography.roleOverrides.coverSubtitle, sizePt: 10, color: "text", transform: "uppercase", trackingEm: 0.22 } } } }))}/>}
-      {guided && (
-        <Field label="Prompts (one per line)">
-          <textarea
-            rows={Math.max(3, (s.prompts ?? mod.prompts.none).length)}
-            value={(s.prompts ?? mod.prompts[scope === "none" ? "none" : scope] ?? mod.prompts.none).join("\n")}
-            onChange={(e) => set({ prompts: e.target.value.split("\n") })}
-            onBlur={(e) => set({ prompts: e.target.value.split("\n").map((x) => x.trim()).filter(Boolean) })}
-          />
-        </Field>
-      )}
+      <p className="hint">Edit this page's title, guided sections, cover or tabs under Extra content after choosing “Show pages.”</p>
       <div className="card-actions">
         <button className="btn" disabled={first} onClick={() => edit((n) => moveNode(n, s.id, -1))}>Move up</button>
         <button className="btn" disabled={last} onClick={() => edit((n) => moveNode(n, s.id, 1))}>Move down</button>
@@ -136,7 +101,14 @@ function StepCard({ s, siblings, scope, props, first, last }: { s: BookStep; sib
 }
 
 function NodeList({ nodes, scope, parentId, props }: { nodes: BookNode[]; scope: Scope; parentId: string | null; props: Props & { goToStep: (id: string) => void } }) {
+  const [tabsSaved, setTabsSaved] = useState(false);
   const edit = (fn: (n: BookNode[]) => BookNode[]) => props.update((p) => ({ ...p, recipe: { ...p.recipe, structure: fn(p.recipe.structure!) } }));
+  const saveSeparateTabs = () => {
+    const labels = nodes.filter((node): node is BookStep => node.kind === "step" && node.module === "divider-page").map((node) => node.cover?.tab?.label ?? node.title ?? "Tab");
+    const tabStep: BookStep = { ...newStep("tab-sheet"), tabSheet: { entries: (labels.length ? labels : ["Tab 1", "Tab 2", "Tab 3"]).map((label) => ({ label })), fromDividers: false, dividerHeightIn: props.doc.trim.heightIn } };
+    localProjectStore.save(createProject("worksheet", { name: `${props.project.name} · Separate Tabs`, dimensions: { sizePresetId: "8.5x11", orientation: "portrait" }, colors: { paletteId: props.project.colors.paletteId, overrides: props.doc.colors }, typography: { fonts: props.doc.typography.fonts, roleOverrides: props.doc.typography.roles }, recipe: { items: [], ordering: "sequential", structure: [tabStep] } }));
+    setTabsSaved(true);
+  };
   return (
     <div className="book-list">
       {nodes.map((n, i) =>
@@ -150,11 +122,13 @@ function NodeList({ nodes, scope, parentId, props }: { nodes: BookNode[]; scope:
         <button className="btn" onClick={() => edit((x) => addNode(x, parentId, newStep("lined-journal", { type: "once" })))}>+ Add page</button>
         <button className="btn" onClick={() => edit((x) => addNode(x, parentId, newStep("cover-page")))}>+ Cover</button>
         <button className="btn" onClick={() => edit((x) => addNode(x, parentId, newStep("divider-page")))}>+ Divider / tab page</button>
+        <button className="btn" onClick={saveSeparateTabs}>Create separate physical tab sheet</button>
         <button className="btn" onClick={() => edit((x) => neutralLuxeDividers().reduce((n, page) => addNode(n, parentId, page), x))}>+ Coordinating cover & 9 dividers</button>
         {scope !== "week" && (
           <button className="btn" onClick={() => edit((x) => addNode(x, parentId, newSection(scope === "none" ? "Front Matter" : "Every Week", scope === "none" ? undefined : "week")))}>+ Add section</button>
         )}
       </div>
+      {tabsSaved && <p role="status" className="hint">Separate Letter tab product saved. Return to Projects to open and edit it.</p>}
     </div>
   );
 }
@@ -201,6 +175,10 @@ export function BookStructurePanel(props: Props & { goToStep: (id: string) => vo
   };
   return (
     <Section title={`Book structure${structure ? ` · ${doc.recipe.pageCount} pages` : ""}`} open={!!structure}>
+      <div className="row">
+        <Select label="Facing pages" value={project.recipe.facingPages ?? "preserve"} options={[{ value: "preserve", label: "Preserve spreads" }, { value: "continuous", label: "Continuous pages" }]} onChange={(facingPages) => update((p) => ({ ...p, recipe: { ...p.recipe, facingPages } }))} />
+        {(project.recipe.facingPages ?? "preserve") === "preserve" && <Select label="Alignment page" value={project.recipe.fillerPage ?? "notes"} options={[{ value: "notes", label: "Notes" }, { value: "blank", label: "Blank" }]} onChange={(fillerPage) => update((p) => ({ ...p, recipe: { ...p.recipe, fillerPage } }))} />}
+      </div>
       {!structure ? (
         <>
           <p className="hint">Build a planner inside a journal (or a journal inside a planner): sections that repeat every month or week, with the pages each one holds.</p>

@@ -21,6 +21,7 @@ export function validateBook(doc: ResolvedDocument): ValidationIssue[] {
   const { pages, pageCount, diagnostics } = doc.recipe;
   const composite = !!doc.project.recipe.structure;
   const paged = pages.some((p) => p.side !== "single");
+  const preserveSpreads = doc.project.recipe.facingPages !== "continuous";
 
   for (const d of diagnostics) out.push({ severity: d.severity, rule: composite ? "book-structure" : "page-count", page: null, componentId: d.itemId, message: d.message });
 
@@ -37,7 +38,7 @@ export function validateBook(doc: ResolvedDocument): ValidationIssue[] {
     if (p.spreadPart === 0) {
       const next = pages[i + 1];
       if (!next || next.spreadPart !== 1 || next.recipeItemId !== p.recipeItemId || next.key.replace(/:1$/, "") !== p.key.replace(/:0$/, "")) add("error", `The spread starting on page ${p.pageNumber} is broken (its right-hand page does not follow).`, p.pageNumber, p.recipeItemId);
-      if (paged && p.side !== "verso") add("error", `The spread starting on page ${p.pageNumber} opens on a right-hand page; spreads must open on the left.`, p.pageNumber, p.recipeItemId);
+      if (paged && preserveSpreads && p.side !== "verso") add("error", `The spread starting on page ${p.pageNumber} opens on a right-hand page; spreads must open on the left.`, p.pageNumber, p.recipeItemId);
     }
     if (p.spreadPart === 1 && pages[i - 1]?.spreadPart !== 0) add("error", `Page ${p.pageNumber} is the right half of a spread with no left half.`, p.pageNumber, p.recipeItemId);
 
@@ -47,7 +48,7 @@ export function validateBook(doc: ResolvedDocument): ValidationIssue[] {
     }
   });
 
-  if (composite && paged) {
+  if (composite && paged && preserveSpreads) {
     const steps = new Map(bookSteps(doc.project.recipe.structure!).map(({ step }) => [step.id, step]));
     pages.forEach((p, i) => {
       if (p.filler || p.spreadPart === 1) return;

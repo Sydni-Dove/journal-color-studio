@@ -38,7 +38,7 @@ export function DotGrid({ node }: { node: DotsNode }) {
   );
 }
 
-export function Box({ node }: { node: BoxNode }) {
+export function Box({ node, patternId }: { node: BoxNode; patternId?: string }) {
   const { x, y, w, h } = node.rect;
   const sw = ptToIn(node.strokePt);
   return (
@@ -48,7 +48,7 @@ export function Box({ node }: { node: BoxNode }) {
       width={w}
       height={h}
       rx={node.radiusIn}
-      style={{ fill: node.fill ? colorVar(node.fill) : "none", fillOpacity: node.fillOpacity, stroke: node.stroke ? colorVar(node.stroke) : "none" }}
+      style={{ fill: node.leopard ? `url(#${patternId})` : node.fill ? colorVar(node.fill) : "none", fillOpacity: node.fillOpacity, stroke: node.stroke ? colorVar(node.stroke) : "none" }}
       strokeWidth={sw}
       data-node={node.id}
     />
@@ -66,7 +66,7 @@ export function Checkbox({ node }: { node: CheckboxNode }) {
 }
 
 export function Divider({ node }: { node: RuleNode }) {
-  return <line x1={node.x1} y1={node.y1} x2={node.x2} y2={node.y2} style={strokeStyle(node.color)} strokeWidth={ptToIn(node.strokePt)} data-node={node.id} />;
+  return <line x1={node.x1} y1={node.y1} x2={node.x2} y2={node.y2} style={strokeStyle(node.color)} strokeWidth={ptToIn(node.strokePt)} strokeDasharray={node.dashed ? "0.04 0.03" : undefined} data-node={node.id} />;
 }
 
 // ─── Text primitive (HTML, positioned in inches) ───────────────────────────
@@ -133,7 +133,7 @@ export const StructureLayer = memo(function StructureLayer({ nodes }: { nodes: L
           case "circle":
             return <ellipse key={n.id} cx={n.rect.x + n.rect.w / 2} cy={n.rect.y + n.rect.h / 2} rx={n.rect.w / 2} ry={n.rect.h / 2} style={{ fill: n.leopard ? `url(#${patternId})` : n.fill ? colorVar(n.fill) : "none", stroke: n.outline ? colorVar("text") : "none" }} strokeWidth={0.008} data-node={n.id} />;
           case "box":
-            return <Box key={n.id} node={n} />;
+            return <Box key={n.id} node={n} patternId={patternId} />;
           case "checkbox":
             return <Checkbox key={n.id} node={n} />;
           case "rule":

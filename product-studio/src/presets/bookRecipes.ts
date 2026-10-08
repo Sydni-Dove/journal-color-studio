@@ -36,9 +36,22 @@ export function meetingsWithGodBook(includeDaily = false): BookNode[] {
   ];
 }
 
+/** Full writing week followed by a separate guided meeting; saved hybrid recipes stay unchanged. */
+export function meetingsWithGodWritingBook(includeDaily = false): BookNode[] {
+  const nodes = meetingsWithGodBook(includeDaily);
+  const month = nodes[1] as BookGroup;
+  const week = month.children[1] as BookGroup;
+  const spread = week.children[0] as BookStep;
+  spread.layoutId = "planner-weekly-writing-spread";
+  const meeting = step("meeting-with-god", { type: "after-module", moduleId: spread.id });
+  (week.children[1] as BookStep).cadence = { type: "after-module", moduleId: meeting.id };
+  week.children.splice(1, 0, meeting);
+  return nodes;
+}
+
 export const BOOK_PRESETS: { id: string; label: string; build: () => BookNode[] }[] = [
-  { id: "meetings-with-god", label: "Meetings With God planner (plan + journal)", build: meetingsWithGodBook },
-  { id: "meetings-with-god-daily", label: "Meetings With God planner + daily pages", build: () => meetingsWithGodBook(true) },
+  { id: "meetings-with-god", label: "Meetings With God planner (plan + journal)", build: meetingsWithGodWritingBook },
+  { id: "meetings-with-god-daily", label: "Meetings With God planner + daily pages", build: () => meetingsWithGodWritingBook(true) },
   {
     id: "planner-journal",
     label: "Monthly + weekly planner with journal pages",

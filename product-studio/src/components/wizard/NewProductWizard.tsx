@@ -25,6 +25,9 @@ import type { SpacingDensity } from "../../types/tokens";
 import type { WeekStart } from "../../types/calendar";
 import { Field, NumberField } from "../editor/ui";
 import { layoutAvailability, resolveDocument } from "../../engines/document/resolve";
+import { section, step } from "../../presets/bookRecipes";
+import type { ProductRecipe } from "../../types/recipe";
+import { LayoutThumbnail } from "../preview/LayoutThumbnail";
 
 function Choices<T extends string>({ value, options, onChange }: { value: T; options: { value: T; label: string }[]; onChange: (v: T) => void }) {
   return (
@@ -38,7 +41,39 @@ function Choices<T extends string>({ value, options, onChange }: { value: T; opt
   );
 }
 
-const PRODUCT_ORDER: ProductType[] = ["notepad", "journal", "planner", "deskpad", "notebook", "insert", "worksheet", "tracker"];
+const PRODUCT_ORDER: ProductType[] = ["planner", "journal", "notepad", "deskpad", "notebook", "insert", "worksheet", "tracker", "custom"];
+const PAGE_LAYOUTS: Record<string, { id: string; label: string; detail: string }[]> = {
+  "notepad-todo": [{ id: "notepad-todo", label: "To-do sheet", detail: "One repeated master sheet with checklist rows." }],
+  "notepad-grocery": [{ id: "notepad-grocery", label: "Grocery list", detail: "One repeated master sheet with list sections." }],
+  "notepad-lined": [{ id: "notes-page", label: "Writing sheet", detail: "One repeated sheet for open notes." }],
+  "planner-monthly": [{ id: "planner-monthly", label: "Monthly calendar", detail: "One dated calendar page each month." }],
+  "planner-weekly": [
+    { id: "planner-weekly-spread", label: "Classic Weekly — day columns", detail: "Two pages; automatically uses day rows when columns cannot fit." },
+    { id: "planner-weekly-writing-spread", label: "Classic Weekly — day rows", detail: "Two pages; full-width writing space for each day." },
+  ],
+  "planner-daily": [{ id: "planner-daily", label: "Daily schedule", detail: "One dated page per day with schedule and task areas." }],
+  "journal-lined": [{ id: "journal-lined", label: "Full-page writing", detail: "Choose ruled, blank, dot or graph writing space in the editor." }],
+  "journal-guided": [{ id: "guided-page", label: "Guided journal", detail: "A titled page with editable guided writing sections." }],
+  "worksheet-guided": [{ id: "guided-page", label: "Guided worksheet", detail: "One page with editable prompt and response sections." }],
+  "tracker-weekly": [{ id: "tracker-weekly", label: "Weekly tracker grid", detail: "Editable item rows with seven check boxes each." }],
+  "custom-guided": [{ id: "guided-page", label: "Custom guided page", detail: "Start with editable sections; add or reorder pages later." }],
+  "deskpad-weekly": [{ id: "deskpad-weekly", label: "Weekly desk pad", detail: "One large repeated master sheet." }],
+};
+const WEEKLY_EXTRAS = [
+  { id: "notes", label: "Notes page", module: "notes" },
+  { id: "reflection", label: "Guided reflection page", module: "reflection" },
+  { id: "meeting-with-god", label: "Meeting With God page", module: "meeting-with-god" },
+] as const;
+export function weeklyRecipeWithExtras(layoutId: string, extras: string[]): ProductRecipe {
+  const weekly = step("weekly-planner", { type: "once" }, { layoutId });
+  let previousId = weekly.id;
+  const additions = WEEKLY_EXTRAS.filter((x) => extras.includes(x.id)).map((x) => {
+    const next = step(x.module, { type: "after-module", moduleId: previousId });
+    previousId = next.id;
+    return next;
+  });
+  return { items: [], ordering: "chronological", structure: [section("Every Week", [weekly, ...additions], "week")] };
+}
 const nextYear = new Date().getFullYear() + 1;
 
 export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: ProductProject) => void; onCancel: () => void; start?: WizardStart }) {
@@ -56,6 +91,10 @@ export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: 
   const recipes = recipePresetsFor(type);
   const [recipeId, setRecipeId] = useState(start?.recipeId && recipes.some((r) => r.id === start.recipeId) ? start.recipeId : recipes[0].id);
   const recipe = recipes.find((r) => r.id === recipeId) ?? recipes[0];
+  const preparedBooks = recipes.filter((r) => r.id.startsWith("book-") || r.id === "planner-monthly-weekly");
+  const pageRecipes = recipes.filter((r) => !preparedBooks.includes(r));
+  const [layoutId, setLayoutId] = useState<string | null>(null);
+  const [weeklyExtras, setWeeklyExtras] = useState<string[]>([]);
   const [density, setDensity] = useState<SpacingDensity>("balanced");
   const [paletteId, setPaletteId] = useState(PALETTES[0].id);
   const [heading, setHeading] = useState(DEFAULT_FONTS.headings);
@@ -76,6 +115,8 @@ export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: 
     setBindingChoice(preferred.id);
     setProfileId(d.defaultPrintProfile);
     setRecipeId(recipePresetsFor(t)[0].id);
+    setLayoutId(null);
+    setWeeklyExtras([]);
     setSheets(t === "deskpad" ? STUDIO_PAD.deskPadSheets : STUDIO_PAD.defaultSheets);
   };
 
@@ -98,6 +139,13 @@ export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: 
   };
 
   const isPad = getBindingProfile(binding.bindingType).sheetCountIsMetadata;
+  const thumbnailProject = useMemo(() => createProject(type, {
+    dimensions: { sizePresetId: sizeId, custom: sizeId === CUSTOM_SIZE_ID ? custom : undefined, orientation },
+    production: { bindingType: binding.bindingType, boundEdge: binding.boundEdge, printProfileId: profileId, duplex: getBindingProfile(binding.bindingType).boundEdgeMode === "book-spine" },
+    spacing: { density, overrides: {} }, colors: { paletteId, overrides: {} },
+    typography: { fonts: { ...DEFAULT_FONTS, headings: heading, accent: heading }, roleOverrides: {} },
+    layoutOptions: recipe.layoutOptions,
+  }), [type, sizeId, custom, orientation, binding, profileId, density, paletteId, heading, recipe]);
 
   // Which layouts fit the chosen size + binding (same fit() the editor uses).
   const fitById = useMemo(() => {
@@ -114,17 +162,21 @@ export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: 
       return new Map();
     }
   }, [type, sizeId, custom, orientation, binding, profileId, density, recipe]);
-  const recipeFit = (r: (typeof recipes)[number]) => {
-    const ids = recipeSteps(r.build({ count: 1, sheets: 1 })).map((i) => i.layoutId);
+  const recipeFit = (r: (typeof recipes)[number], chosenLayout?: string | null) => {
+    const ids = recipeSteps(r.build({ count: 1, sheets: 1 })).map((i) => r.id === recipeId && chosenLayout && r.id === "planner-weekly" ? chosenLayout : i.layoutId);
     const bad = ids.map((id) => fitById.get(id)).find((f) => f && !f.ok);
     return bad && !bad.ok ? bad.reason : null;
   };
-  const recipeProblem = recipeFit(recipe);
-  const needsCount = recipe.id === "journal-lined" || recipe.id === "planner-monthly-weekly";
+  const recipeProblem = recipeFit(recipe, layoutId);
+  const needsCount = recipe.id === "journal-lined" || recipe.id === "journal-guided" || recipe.id === "planner-monthly-weekly";
 
   const generate = () => {
     const sizeLabel = sizeId === CUSTOM_SIZE_ID ? `${custom.width}×${custom.height}${custom.unit}` : sizes.find((s) => s.id === sizeId)?.label ?? sizeId;
     const b = getBindingProfile(binding.bindingType);
+    let built: ProductRecipe = recipe.build({ count: needsCount ? (recipe.id === "planner-monthly-weekly" ? 10 : count) : count, sheets });
+    if (recipe.id === "planner-weekly") {
+      built = weeklyRecipeWithExtras(layoutId ?? "planner-weekly-spread", weeklyExtras);
+    }
     const project = createProject(type, {
       name: name.trim() || `${sizeLabel} ${recipe.label} ${def.label}`,
       dimensions: { sizePresetId: sizeId, custom: sizeId === CUSTOM_SIZE_ID ? custom : undefined, orientation },
@@ -136,7 +188,7 @@ export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: 
         duplex: b.boundEdgeMode === "book-spine",
         sheetsPerPad: isPad ? sheets : undefined,
       },
-      recipe: recipe.build({ count: needsCount ? (recipe.id === "planner-monthly-weekly" ? 10 : count) : count, sheets }),
+      recipe: built,
       calendar: recipe.needsCalendar ? { startDate: `${year}-01-01`, endDate: `${year}-12-31`, weekStart, sixRowMonths: true } : undefined,
       spacing: { density, overrides: {} },
       colors: { paletteId, overrides: {} },
@@ -155,6 +207,7 @@ export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: 
       <p className="lede">You decide the product. Product Studio solves the geometry.</p>
 
       <h2 id="wizard-templates">Starter templates</h2>
+      <p className="hint">A template combines pages, content, order and a starting design. You can edit all of them afterward.</p>
       <div className="card-grid">
         {TEST_PRODUCTS.map((t) => (
           <button key={t.id} className="card card--pick" onClick={() => onCreate(t.build())}>
@@ -214,18 +267,39 @@ export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: 
         </section>
 
         <section className="step">
-          <h3>4 · Layout</h3>
-          <div className="choice-row" role="group">
-            {recipes.map((r) => {
+          <h3>4 · Pages and layout</h3>
+          <p className="hint">First choose the kind of page or prepared book. Then choose how the page is arranged.</p>
+          <h4>Page category</h4>
+          <div className="choice-row" role="group" aria-label="Page category">
+            {pageRecipes.map((r) => {
               const problem = recipeFit(r);
               return (
-                <button key={r.id} type="button" className="choice" aria-pressed={r.id === recipeId} disabled={!!problem} title={problem ?? undefined} onClick={() => setRecipeId(r.id)}>
+                <button key={r.id} type="button" className="choice" aria-pressed={r.id === recipeId} disabled={!!problem} title={problem ?? undefined} onClick={() => { setRecipeId(r.id); setLayoutId(null); setWeeklyExtras([]); }}>
                   {r.label}
                   {problem ? " (doesn't fit this size)" : ""}
                 </button>
               );
             })}
           </div>
+          {preparedBooks.length > 0 && <><h4>Prepared book structures</h4><p className="hint">These combine several page categories and set their order and repeat rules. You can edit each page afterward.</p><div className="choice-row" role="group" aria-label="Prepared books">{preparedBooks.map((r) => {
+            const problem = recipeFit(r);
+            return <button key={r.id} type="button" className="choice" aria-pressed={r.id === recipeId} disabled={!!problem} title={problem ?? undefined} onClick={() => { setRecipeId(r.id); setLayoutId(null); setWeeklyExtras([]); }}>{r.label}{problem ? " (doesn't fit this size)" : ""}</button>;
+          })}</div></>}
+          {PAGE_LAYOUTS[recipe.id] && (
+            <div>
+              <h4>Layout</h4>
+              <div className="layout-gallery">
+                {PAGE_LAYOUTS[recipe.id].map((option) => {
+                  const fit = fitById.get(option.id);
+                  return <button key={option.id} type="button" className="layout-card" aria-pressed={(layoutId ?? PAGE_LAYOUTS[recipe.id][0].id) === option.id} disabled={!!fit && !fit.ok} onClick={() => setLayoutId(option.id)}>
+                    <LayoutThumbnail project={thumbnailProject} layoutId={option.id}/>
+                    <strong>{option.label}</strong><span>{option.detail}</span><small>{fit?.ok ? fit.variantLabel : fit?.reason ?? ""}</small>
+                  </button>;
+                })}
+              </div>
+            </div>
+          )}
+          {recipe.id === "planner-weekly" && <div><h4>Additional pages after each weekly spread</h4><p className="hint">Day writing space stays inside the weekly layout. These are separate pages in the weekly section.</p>{WEEKLY_EXTRAS.map((extra) => <label key={extra.id} className="check"><input type="checkbox" checked={weeklyExtras.includes(extra.id)} onChange={(e) => setWeeklyExtras((xs) => e.target.checked ? [...xs, extra.id] : xs.filter((x) => x !== extra.id))}/>{extra.label}</label>)}</div>}
           {recipeProblem && <div className="issue issue--error">{recipeProblem}</div>}
           {recipe.needsCalendar && (
             <div className="row">
@@ -238,7 +312,7 @@ export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: 
               </Field>
             </div>
           )}
-          {recipe.id === "journal-lined" && <NumberField label="Pages" step={1} min={1} value={count} onChange={(c) => setCount(Math.max(1, Math.round(c)))} />}
+          {(recipe.id === "journal-lined" || recipe.id === "journal-guided") && <NumberField label="Pages" step={1} min={1} value={count} onChange={(c) => setCount(Math.max(1, Math.round(c)))} />}
           {isPad && (
             <Field label="Sheets per pad">
               <select value={sheets} onChange={(e) => setSheets(+e.target.value)}>
@@ -251,7 +325,7 @@ export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: 
         </section>
 
         <section className="step">
-          <h3>5 · Look</h3>
+          <h3>5 · Starting design</h3>
           <Choices value={density} options={(Object.keys(SPACING_LABELS) as SpacingDensity[]).map((d) => ({ value: d, label: d[0].toUpperCase() + d.slice(1) }))} onChange={setDensity} />
           <Field label="Colors">
             <select value={paletteId} onChange={(e) => setPaletteId(e.target.value)}>

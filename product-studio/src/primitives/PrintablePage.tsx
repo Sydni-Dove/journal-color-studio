@@ -64,9 +64,9 @@ export const PrintablePage = memo(function PrintablePage({ geometry: g, solved, 
   return (
     <div className={`ps-page ps-page--${mode}`} style={style}>
       {/* 1 background */}
-      <div className="ps-layer ps-bg" />
+      <div className="ps-layer ps-bg" style={solved.manufacturingSheet || solved.blankPage ? { background: "white" } : undefined} />
       {/* 2 decorative */}
-      <DecorativeLayer geometry={g} theme={decorative} colors={colors} composition={composition} />
+      {!solved.manufacturingSheet && !solved.blankPage && <DecorativeLayer geometry={g} theme={decorative} colors={colors} composition={composition} />}
       {/* 3 functional pattern */}
       <SafeArea geometry={g}>
         <PatternLayer nodes={solved.nodes} />

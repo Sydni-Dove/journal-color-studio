@@ -174,9 +174,12 @@ export const weeklySpread: LayoutDefinition = {
 
     type Slot = { kind: "day"; index: number } | { kind: "extra" };
     const days: Slot[] = week.days.map((_, i) => ({ kind: "day", index: i }));
-    const slots: Slot[][] = ctx.options.showSidebar
+    const extraEnabled = ctx.options.showSidebar
+      ? (ctx.options.sidebarContent === "priorities" ? ctx.options.weeklyPriorities !== false : ctx.options.sidebarContent === "notes" ? ctx.options.weeklyNotes !== false : true)
+      : ctx.options.weeklyNotes !== false;
+    const slots: Slot[][] = ctx.options.showSidebar && extraEnabled
       ? [[{ kind: "extra" }, ...days.slice(0, 3)], days.slice(3)]
-      : [days.slice(0, 4), [...days.slice(4), { kind: "extra" }]];
+      : [days.slice(0, 4), [...days.slice(4), ...(extraEnabled ? [{ kind: "extra" } as Slot] : [])]];
 
     const start = parseIso(week.startIso);
     const end = parseIso(week.endIso);
@@ -194,7 +197,7 @@ export const weeklySpread: LayoutDefinition = {
         : headerTitle(`wk${p}-header`, ctx, frame.zones, "monthYear", monthLabel, "weekTitle", "header-right");
       const nodes: LayoutNode[] = [...frame.nodes, ...title.nodes];
       const diagnostics = [...frame.diagnostics, ...title.diagnostics];
-      const grid = connectedTracks(`wk${p}-grid`, frame.body, SLOTS_PER_PAGE, horizontal ? "rows" : "columns");
+      const grid = connectedTracks(`wk${p}-grid`, frame.body, slots[p].length, horizontal ? "rows" : "columns");
       const tracks = grid.tracks;
       sizes.push(tracks.size);
       nodes.push(...grid.nodes);
@@ -236,7 +239,7 @@ export const weeklySpread: LayoutDefinition = {
       if (horizontal) {
         // One label-column rule per run of neighbouring day rows.
         const x = b.x + STUDIO_WEEKLY_VARIANTS.horizontal.dayLabelW.valueIn;
-        runsOf(SLOTS_PER_PAGE, isDay).forEach(([a, z], k) =>
+        runsOf(slots[p].length, isDay).forEach(([a, z], k) =>
           nodes.push(rule(`wk${p}-label-rule${k}`, x, tracks.starts[a], x, tracks.starts[z] + tracks.size, { strokePt, component: "Grid" })),
         );
       } else {
@@ -245,7 +248,7 @@ export const weeklySpread: LayoutDefinition = {
         // Section dividers: one rule per boundary per run of neighbouring days.
         const n = Math.max(1, ctx.options.sectionsPerDay);
         const secRows = distributeEqual(b.y + headH, b.h - headH, n, PLANNER_GRID_GAP_IN);
-        runsOf(SLOTS_PER_PAGE, isDay).forEach(([a, z], k) => {
+        runsOf(slots[p].length, isDay).forEach(([a, z], k) => {
           for (let j = 1; j < n; j++) {
             const y = secRows.starts[j];
             nodes.push(rule(`wk${p}-sec${j}-run${k}`, tracks.starts[a], y, tracks.starts[z] + tracks.size, y, { strokePt, component: "Grid" }));
@@ -270,7 +273,7 @@ export const weeklySpread: LayoutDefinition = {
       return { nodes, diagnostics, metrics, regions };
     });
 
-    if (Math.abs(sizes[0] - sizes[1]) > 1e-4) {
+    if (extraEnabled && Math.abs(sizes[0] - sizes[1]) > 1e-4) {
       pages[1].diagnostics.push({
         severity: "error",
         rule: "equal-columns",

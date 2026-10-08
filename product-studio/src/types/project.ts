@@ -46,6 +46,10 @@ export type LayoutPlacement = "top-left" | "top-right" | "top-center";
 export type LayoutOptions = {
   datePlacement: LayoutPlacement;
   showSidebar: boolean;
+  /** Planner content switches. Missing values preserve saved-project defaults. */
+  monthlyNotes?: boolean;
+  weeklyNotes?: boolean;
+  weeklyPriorities?: boolean;
   sidebarContent: WordingKey;
   sidebarWidthIn: number;
   sectionsPerDay: number;

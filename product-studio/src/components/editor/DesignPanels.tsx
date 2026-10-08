@@ -26,20 +26,24 @@ type PanelProps = { project: ProductProject; update: Update; usage: ProjectUsage
 
 const SIDEBAR_HEADINGS: WordingKey[] = ["notes", "priorities", "topPriorities", "weeklyFocus", "toDo", "goals", "prayer", "prayerRequests", "gratitude", "scripture", "kingdomAssignments"];
 
-export function LayoutPanel({ project, update, usage, nav }: PanelProps) {
+export function LayoutPanel({ project, update, usage, nav, mode = "layout" }: PanelProps & { mode?: "layout" | "writing" | "content" | "design" }) {
   const o = project.layoutOptions;
   const set = (patch: Partial<ProductProject["layoutOptions"]>) => update((p) => ({ ...p, layoutOptions: { ...p.layoutOptions, ...patch } }));
-  const any = usage.datePlacement || usage.sidebar.supported || usage.sectionsPerDay || usage.writingRows || usage.pageNumbers || usage.footer;
+  const daily = usage.layouts.some(({ layout }) => layout.id === "planner-daily");
+  const monthly = usage.layouts.some(({ layout }) => layout.id === "planner-monthly");
+  const weekly = usage.layouts.some(({ layout }) => layout.id === "planner-weekly-spread");
+  const writingWeek = usage.layouts.some(({ layout }) => layout.id === "planner-weekly-writing-spread");
+  const any = mode === "layout" ? usage.datePlacement || daily : mode === "writing" ? usage.sectionsPerDay || usage.writingRows : mode === "content" ? usage.sidebar.supported || monthly || weekly || writingWeek || daily : usage.pageNumbers || usage.footer;
   if (!any) return null;
   return (
-    <Section title="Layout options">
-      {usage.layouts.map(({ layout, fit }) => (
+    <Section title={mode === "layout" ? "Arrangement details" : mode === "writing" ? "Writing capacity" : mode === "content" ? "Extra areas" : "Page furniture"}>
+      {mode === "layout" && usage.layouts.map(({ layout, fit }) => (
         <p key={layout.id} className="hint">
           {layout.label}: {fit.ok ? fit.variantLabel : `unavailable — ${fit.reason}`}
         </p>
       ))}
-      {usage.datePlacement && <AppliesTo ids={usage.consumers.datePlacement} nav={nav} />}
-      {usage.datePlacement && (
+      {mode === "layout" && usage.datePlacement && <AppliesTo ids={usage.consumers.datePlacement} nav={nav} />}
+      {mode === "layout" && usage.datePlacement && (
         <Segmented
           label="Date placement in calendar cells"
           value={o.datePlacement}
@@ -47,7 +51,7 @@ export function LayoutPanel({ project, update, usage, nav }: PanelProps) {
           onChange={(datePlacement) => set({ datePlacement })}
         />
       )}
-      {usage.sidebar.supported && (
+      {mode === "content" && usage.sidebar.supported && (
         <>
           {usage.sidebar.available && <AppliesTo ids={usage.consumers.sidebar} nav={nav} />}
           <label className="check">
@@ -65,18 +69,22 @@ export function LayoutPanel({ project, update, usage, nav }: PanelProps) {
           )}
         </>
       )}
-      {usage.sectionsPerDay && <AppliesTo ids={usage.consumers.sectionsPerDay} nav={nav} />}
-      {usage.sectionsPerDay && <NumberField label="Sections per day" step={1} min={1} max={6} value={o.sectionsPerDay} onChange={(v) => set({ sectionsPerDay: Math.max(1, Math.round(v)) })} />}
-      {usage.writingRows && <NumberField label="Writing rows per day" step={1} min={1} max={8} value={o.writingRowsPerDay} onChange={(v) => set({ writingRowsPerDay: Math.max(1, Math.round(v)) })} />}
-      {usage.layouts.some(({ layout }) => layout.id === "planner-daily") && (
+      {mode === "content" && monthly && <Check label="Monthly Notes sidebar" checked={o.monthlyNotes ?? o.showSidebar} onChange={(monthlyNotes) => set({ monthlyNotes })} />}
+      {mode === "content" && weekly && <Check label="Weekly Notes area" checked={o.weeklyNotes !== false} onChange={(weeklyNotes) => set({ weeklyNotes })} />}
+      {mode === "content" && (weekly || writingWeek) && <Check label="Weekly Priorities area" checked={o.weeklyPriorities !== false} onChange={(weeklyPriorities) => set({ weeklyPriorities })} />}
+      {mode === "content" && daily && (["priorities", "toDo", "notes"] as const).map((key) => <Check key={key} label={`Daily ${key === "toDo" ? "Tasks" : key[0].toUpperCase() + key.slice(1)}`} checked={o.dailySections.includes(key)} onChange={(enabled) => set({ dailySections: enabled ? [...o.dailySections, key] : o.dailySections.filter((section) => section !== key) })} />)}
+      {mode === "writing" && usage.sectionsPerDay && <AppliesTo ids={usage.consumers.sectionsPerDay} nav={nav} />}
+      {mode === "writing" && usage.sectionsPerDay && <NumberField label="Writing sections per day" step={1} min={1} max={6} value={o.sectionsPerDay} onChange={(v) => set({ sectionsPerDay: Math.max(1, Math.round(v)) })} />}
+      {mode === "writing" && usage.writingRows && <NumberField label="Writing rows per day" step={1} min={1} max={8} value={o.writingRowsPerDay} onChange={(v) => set({ writingRowsPerDay: Math.max(1, Math.round(v)) })} />}
+      {mode === "layout" && daily && (
         <>
           <NumberField label="Daily schedule starts (24-hour)" step={1} min={0} max={23} value={o.hourStart} onChange={(v) => set({ hourStart: Math.max(0, Math.min(o.hourEnd, Math.round(v))) })} />
           <NumberField label="Daily schedule ends (24-hour)" step={1} min={0} max={23} value={o.hourEnd} onChange={(v) => set({ hourEnd: Math.max(o.hourStart, Math.min(23, Math.round(v))) })} />
           <Check label="Daily half-hour rows" checked={o.halfHours} onChange={(halfHours) => set({ halfHours })} />
         </>
       )}
-      {usage.pageNumbers && <Check label="Page numbers" checked={o.showPageNumbers} onChange={(showPageNumbers) => set({ showPageNumbers })} />}
-      {usage.footer && <Check label="Footer (product title)" checked={o.showFooter} onChange={(showFooter) => set({ showFooter })} />}
+      {mode === "design" && usage.pageNumbers && <Check label="Page numbers" checked={o.showPageNumbers} onChange={(showPageNumbers) => set({ showPageNumbers })} />}
+      {mode === "design" && usage.footer && <Check label="Footer (product title)" checked={o.showFooter} onChange={(showFooter) => set({ showFooter })} />}
     </Section>
   );
 }

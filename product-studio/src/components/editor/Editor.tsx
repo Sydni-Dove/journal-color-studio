@@ -14,6 +14,7 @@ import { PagePreview, visibleIndices } from "../preview/PagePreview";
 import { ColorPanel, DecorationPanel, LayoutPanel, PatternPanel, SpacingPanel, TextPlacementPanel, TypographyPanel, VariantsPanel, WordingPanel } from "./DesignPanels";
 import { PagesPanel, ProductPanel, ProductionPanel } from "./ProductionPanels";
 import { BookOutlinePanel, BookStructurePanel } from "./BookPanels";
+import { SelectedContentPanel, SelectedLayoutPanel } from "./SelectedPagePanels";
 import { Section, type EditorNav } from "./ui";
 import { getLayout } from "../../layouts/registry";
 
@@ -33,6 +34,7 @@ function tryResolve(p: ProductProject): { doc: ResolvedDocument | null; error: s
 }
 
 export function Editor({ project, onChange, onBack, saveStatus }: Props) {
+  const [workspace, setWorkspace] = useState<"pages" | "layout" | "writing" | "content" | "design" | "production">("pages");
   // Open on the first real page (spread products start with a filler page).
   const [index, setIndex] = useState(() => {
     try {
@@ -112,30 +114,29 @@ export function Editor({ project, onChange, onBack, saveStatus }: Props) {
 
       <div className="editor" style={{ "--ui-panel-w": `${panel.width}px` } as CSSProperties}>
         <aside className="panel" aria-label="Product controls">
-          <ProductPanel project={project} update={update} />
-          <ProductionPanel project={project} update={update} doc={doc} nav={doc ? nav : null} />
+          <nav className="editor-workspaces" aria-label="Editing area">
+            {([ ["pages", "Pages & order"], ["layout", "Layout"], ["writing", "Writing space"], ["content", "Extra content"], ["design", "Design"], ["production", "Size & print"] ] as const).map(([id, label]) => <button key={id} type="button" aria-current={workspace === id ? "page" : undefined} onClick={() => setWorkspace(id)}>{label}</button>)}
+          </nav>
+          {workspace === "production" && <><ProductPanel project={project} update={update} /><ProductionPanel project={project} update={update} doc={doc} nav={doc ? nav : null} /></>}
           {doc && usage && (
             <>
-              <PagesPanel nav={nav} project={project} update={update} doc={doc} usage={usage} />
-              {!doc.binding.sheetCountIsMetadata && <BookStructurePanel project={project} update={update} doc={doc} goToStep={nav.goToItem} />}
-              {doc.recipe.pageCount > 1 && <BookOutlinePanel doc={doc} current={current} goTo={setIndex} />}
-              <LayoutPanel nav={nav} project={project} update={update} usage={usage} />
-              <PatternPanel nav={nav} project={project} update={update} usage={usage} />
-              <SpacingPanel nav={nav} project={project} update={update} usage={usage} />
-              <TypographyPanel nav={nav} project={project} update={update} usage={usage} />
-              <ColorPanel nav={nav} project={project} update={update} usage={usage} />
-              <WordingPanel nav={nav} project={project} update={update} usage={usage} />
-              <TextPlacementPanel nav={nav} project={project} update={update} usage={usage} />
-              <DecorationPanel nav={nav} project={project} update={update} usage={usage} decor={decor} />
-              <VariantsPanel nav={nav} project={project} update={update} usage={usage} />
+              {workspace === "pages" && <>
+                <PagesPanel nav={nav} project={project} update={update} doc={doc} usage={usage} />
+                {!doc.binding.sheetCountIsMetadata && <BookStructurePanel project={project} update={update} doc={doc} goToStep={(id) => { nav.goToItem(id); setWorkspace("content"); }} />}
+                {doc.recipe.pageCount > 1 && <BookOutlinePanel doc={doc} current={current} goTo={setIndex} />}
+              </>}
+              {workspace === "layout" && <><SelectedLayoutPanel project={project} update={update} doc={doc} index={current}/><LayoutPanel nav={nav} project={project} update={update} usage={usage} /></>}
+              {workspace === "writing" && <><LayoutPanel mode="writing" nav={nav} project={project} update={update} usage={usage} /><PatternPanel nav={nav} project={project} update={update} usage={usage} /><SpacingPanel nav={nav} project={project} update={update} usage={usage} /></>}
+              {workspace === "content" && <><SelectedContentPanel project={project} update={update} doc={doc} index={current}/><LayoutPanel mode="content" nav={nav} project={project} update={update} usage={usage} /><WordingPanel nav={nav} project={project} update={update} usage={usage} /></>}
+              {workspace === "design" && <><LayoutPanel mode="design" nav={nav} project={project} update={update} usage={usage} /><TypographyPanel nav={nav} project={project} update={update} usage={usage} /><ColorPanel nav={nav} project={project} update={update} usage={usage} /><TextPlacementPanel nav={nav} project={project} update={update} usage={usage} /><DecorationPanel nav={nav} project={project} update={update} usage={usage} decor={decor} /><VariantsPanel nav={nav} project={project} update={update} usage={usage} /></>}
             </>
           )}
 
-          <Section title={`Page check${check ? ` · ${check.errorCount}E ${check.warningCount}W` : ""}`}>
+          {workspace === "production" && <Section title={`Page check${check ? ` · ${check.errorCount}E ${check.warningCount}W` : ""}`}>
             {check ? <IssueList issues={check.issues} onGoTo={goToPage} /> : <p className="hint">—</p>}
-          </Section>
+          </Section>}
 
-          <Section title="Debug geometry overlay">
+          {workspace === "production" && <Section title="Debug geometry overlay">
             <div className="row">
               <button className="btn" onClick={() => setDebug(DEBUG_ALL)}>All on</button>
               <button className="btn" onClick={() => setDebug(DEBUG_OFF)}>All off</button>
@@ -147,9 +148,9 @@ export function Editor({ project, onChange, onBack, saveStatus }: Props) {
               </label>
             ))}
             <p className="hint">The overlay is editor-only and never prints.</p>
-          </Section>
+          </Section>}
 
-          {doc && doc.recipe.pages.length > 0 && (
+          {workspace === "production" && doc && doc.recipe.pages.length > 0 && (
             <details className="section">
               <summary>Geometry info</summary>
               <GeometryInfo doc={doc} geometry={geometryFor(doc, doc.recipe.pages[current])} solved={solvePage(doc, current)} />

@@ -170,45 +170,22 @@ export function PagesPanel({ project, update, doc, usage, nav }: PanelProps & { 
   const avail = layoutAvailability(doc).filter((a) => a.supportedType);
   const setItems = (next: RecipeItem[]) => update((p) => ({ ...p, recipe: { ...p.recipe, items: next } }));
 
-  const changeLayout = (item: RecipeItem, layoutId: string) =>
-    update((p) => {
-      const layout = getLayout(layoutId);
-      const kinds = repeatsFor(layoutId, isPad);
-      const kind = kinds.includes(item.repeat.kind) ? item.repeat.kind : kinds.includes(layout.capability.defaultRepeat) ? layout.capability.defaultRepeat : kinds[0];
-      const calendar = layout.capability.requiresCalendar && !p.calendar ? { startDate: `${nextYear}-01-01`, endDate: `${nextYear}-12-31`, weekStart: 1 as const, sixRowMonths: true } : p.calendar;
-      return {
-        ...p,
-        calendar,
-        recipe: { ...p.recipe, items: p.recipe.items.map((x) => (x.id === item.id ? { ...x, layoutId, repeat: repeatFor(kind, x.repeat, sheets) } : x)) },
-      };
-    });
-
   const cal = project.calendar;
   const setCal = (patch: Partial<NonNullable<ProductProject["calendar"]>>) =>
     update((p) => ({ ...p, calendar: { ...(p.calendar ?? { startDate: `${nextYear}-01-01`, endDate: `${nextYear}-12-31`, weekStart: 1, sixRowMonths: true }), ...patch } }));
 
   return (
-    <Section title={`Pages${isPad ? "" : ` · ${doc.recipe.pageCount} page${doc.recipe.pageCount === 1 ? "" : "s"}`}`} open>
+    <Section title={`Pages & book order${isPad ? "" : ` · ${doc.recipe.pageCount} page${doc.recipe.pageCount === 1 ? "" : "s"}`}`} open>
       {project.recipe.structure && <p className="hint">This product uses a book structure (below). Its date range and week start are set here.</p>}
       {!project.recipe.structure && items.map((it, i) => {
         const a = avail.find((x) => x.layoutId === it.layoutId);
         const kinds = repeatsFor(it.layoutId, isPad);
         return (
           <div key={it.id} className="card">
-            <Field label={isPad ? "Sheet layout" : `Step ${i + 1} layout`}>
-              <select value={it.layoutId} onChange={(e) => changeLayout(it, e.target.value)}>
-                {avail.map((x) => (
-                  <option key={x.layoutId} value={x.layoutId} disabled={!x.fit.ok}>
-                    {x.label}
-                    {x.fit.ok ? (x.fit.variant !== "standard" ? ` — ${x.fit.variantLabel}` : "") : " — doesn't fit this size"}
-                  </option>
-                ))}
-              </select>
-            </Field>
+            <strong>{isPad ? "Master sheet" : `Page step ${i + 1}`}</strong>
+            <p className="hint">{getLayout(it.layoutId).label}{a?.fit.ok ? ` · ${a.fit.variantLabel}` : ""}. Select this page, then use Layout to change its arrangement.</p>
             {a && !a.fit.ok && <div className="issue issue--error">{a.fit.reason}</div>}
-            {items.length > 1 && nav.currentLayoutId !== it.layoutId && (
-              <button type="button" className="btn btn--ghost" style={{ justifySelf: "start" }} onClick={() => nav.goToItem(it.id)}>Show this step's first page</button>
-            )}
+            <button type="button" className="btn btn--ghost" style={{ justifySelf: "start" }} onClick={() => nav.goToItem(it.id)}>Show this page</button>
             {kinds.length > 1 ? (
               <div className="row">
                 <Select label="Repeat" value={it.repeat.kind} options={kinds.map((k) => ({ value: k, label: REPEAT_LABELS[k] }))} onChange={(kind) => setItems(items.map((x) => (x.id === it.id ? { ...x, repeat: repeatFor(kind, x.repeat, sheets) } : x)))} />

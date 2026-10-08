@@ -158,7 +158,7 @@ export function PagePreview({ doc, index, onIndex, debug, issueIds }: Props) {
         {"  ·  "}
         {doc.trim.widthIn}" × {doc.trim.heightIn}" trim
         {current.physicalSheets ? `  ·  master sheet × ${current.physicalSheets} sheets (manufacturing metadata)` : ""}
-        {current.filler ? "  ·  filler page (keeps spreads on a left-hand page)" : ""}
+        {current.filler ? `  ·  ${current.layoutId === "blank-filler-page" ? "blank" : "notes"} alignment page` : ""}
       </div>
     </>
   );

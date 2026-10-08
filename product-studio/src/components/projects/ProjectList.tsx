@@ -10,7 +10,7 @@ import { PRODUCT_FAMILIES, type ProductFamilyId, type WizardStart } from "../../
 import { findSizePreset } from "../../presets/sizes/sizePresets";
 import type { ProjectSummary } from "../../persistence/projectStore";
 
-export type ProjectMeta = { pages: number; pad: boolean; sheets?: number; book: boolean } | null;
+export type ProjectMeta = { pages: number; pad: boolean; sheets?: number; book: boolean; hybrid?: boolean } | null;
 
 type Props = {
   projects: ProjectSummary[];
@@ -54,6 +54,12 @@ const GLYPH: Record<ProductFamilyId, ReactNode> = {
     <>
       <path d="M4 7h11v20H4zM17 7h11v20H17z" />
       <path d="M4 12h11M8 16h3M8 20h3M20 12h5M20 16h5M20 20h5" />
+    </>
+  ),
+  tracker: (
+    <>
+      <rect x="5" y="5" width="22" height="22" rx="2" />
+      <path d="M5 12h22M12 12v15M17 12v15M22 12v15M8 17h2M8 22h2" />
     </>
   ),
   devotional: (
@@ -104,7 +110,8 @@ function Glyph({ id }: { id: ProductFamilyId }) {
 
 function describe(p: ProjectSummary, m: ProjectMeta): string {
   const size = findSizePreset(p.sizePresetId)?.label ?? p.sizePresetId;
-  const type = m?.book ? "Planner + Journal book" : (PRODUCT_TYPES[p.productType]?.label ?? p.productType);
+  const baseType = PRODUCT_TYPES[p.productType]?.label ?? p.productType;
+  const type = m?.hybrid ? "Planner + Journal book" : m?.book ? `${baseType} book` : baseType;
   const pages = !m ? "" : m.pad ? ` · ${m.sheets ? `${m.sheets} sheets, ` : ""}one master sheet` : ` · ${m.pages} page${m.pages === 1 ? "" : "s"}`;
   return `${type} · ${size}${pages}`;
 }

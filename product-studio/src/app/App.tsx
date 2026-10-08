@@ -7,8 +7,16 @@ import { NewProductWizard } from "../components/wizard/NewProductWizard";
 import { resolveColors } from "../presets/themes/palettes";
 import { addVariantFromCurrent, duplicateProject, localProjectStore, type ProjectSummary } from "../persistence/projectStore";
 import type { ProductProject } from "../types/project";
+import type { BookNode } from "../types/recipe";
 
 type View = { kind: "list" } | { kind: "new"; start?: WizardStart } | { kind: "edit"; project: ProductProject };
+
+function isPlannerJournalHybrid(nodes: BookNode[]): boolean {
+  const kinds = new Set<string>();
+  const visit = (list: BookNode[]) => list.forEach((node) => node.kind === "group" ? visit(node.children) : kinds.add(node.module));
+  visit(nodes);
+  return [...kinds].some((kind) => ["monthly-calendar", "weekly-planner", "daily-planner"].includes(kind)) && [...kinds].some((kind) => ["lined-journal", "meeting-with-god", "reflection", "prayer"].includes(kind));
+}
 
 /** Page count / pad sheets / book flag for the home screen (expansion only — no page is solved). */
 function projectMeta(id: string): ProjectMeta {
@@ -16,7 +24,7 @@ function projectMeta(id: string): ProjectMeta {
   if (!p) return null;
   try {
     const doc = resolveDocument(p);
-    return { pages: doc.recipe.pageCount, pad: doc.binding.sheetCountIsMetadata, sheets: p.production.sheetsPerPad, book: !!p.recipe.structure };
+    return { pages: doc.recipe.pageCount, pad: doc.binding.sheetCountIsMetadata, sheets: p.production.sheetsPerPad, book: !!p.recipe.structure, hybrid: !!p.recipe.structure && isPlannerJournalHybrid(p.recipe.structure) };
   } catch {
     return null;
   }

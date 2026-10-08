@@ -7,7 +7,7 @@ import { chromium, type Browser, type Page } from "playwright-core";
 import { preview, type PreviewServer } from "vite";
 import { mkdir } from "node:fs/promises";
 import { resolveDocument } from "../../src/engines/document/resolve";
-import { meetingsWithGodBook, step } from "../../src/presets/bookRecipes";
+import { meetingsWithGodWritingBook, step } from "../../src/presets/bookRecipes";
 import { createProject } from "../../src/presets/products/projectFactory";
 import type { ProductProject } from "../../src/types/project";
 
@@ -32,7 +32,7 @@ function project(size = "8.5x11") {
     name: "Daily QA", dimensions: { sizePresetId: size, orientation: "portrait" },
     production: { bindingType: "coil", printProfileId: "coil-generic", duplex: true },
     calendar: { startDate: "2027-01-29", endDate: "2027-02-03", weekStart: 1, sixRowMonths: true },
-    recipe: { items: [], ordering: "chronological", structure: meetingsWithGodBook(true) },
+    recipe: { items: [], ordering: "chronological", structure: meetingsWithGodWritingBook(true) },
     layoutOptions: { showPageNumbers: true },
   });
 }
@@ -58,20 +58,28 @@ async function shot(page: Page, name: string) {
 }
 
 describe("Daily planner browser QA", () => {
-  it("Letter: three writing lines per day, connected week and adjoining Meeting With God", async () => {
-    const p = project(), doc = resolveDocument(p), page = await open(p);
-    const i = doc.recipe.pages.findIndex((p) => p.layoutId === "weekly-plan-mwg-spread");
-    await go(page, i + 1);
-    await expect.poll(() => page.locator('.ps-page--editor path[data-node^="mw0-days-d"]').count()).toBe(7);
-    const paths = await page.locator('.ps-page--editor path[data-node^="mw0-days-d"]').evaluateAll((els) => els.map((e) => e.getAttribute("d")!.match(/M/g)!.length));
-    expect(paths).toEqual(Array(7).fill(3));
-    await expect.poll(() => page.locator(".badge").first().textContent()).toMatch(/Page OK/);
-    await shot(page, "weekly-letter");
-    await page.getByRole("button", { name: "Next page" }).click();
-    await expect.poll(() => page.locator('.ps-page--editor [data-node="mw1-header-title"]').textContent()).toBe("Meeting With God");
-    await shot(page, "meeting-with-god");
-    await page.context().close();
-  });
+  for (const size of ["8.5x11", "7x9", "6x9"]) {
+    it(`${size}: seven days across a connected spread, four or more lines each, then Meeting With God`, async () => {
+      const p = project(size), doc = resolveDocument(p), page = await open(p);
+      const i = doc.recipe.pages.findIndex((p) => p.layoutId === "planner-weekly-writing-spread");
+      let total = 0;
+      for (let part = 0; part < 2; part++) {
+        await go(page, i + part + 1);
+        const paths = page.locator('.ps-page--editor path[data-node^="ww"][data-node*="-days-d"]');
+        await expect.poll(() => paths.count()).toBe(part === 0 ? 4 : 3);
+        const counts = await paths.evaluateAll((els) => els.map((e) => e.getAttribute("d")!.match(/M/g)!.length));
+        expect(counts.every((n) => n >= 4)).toBe(true);
+        total += counts.length;
+        await expect.poll(() => page.locator(".badge").first().textContent()).toMatch(/Page OK/);
+        await shot(page, `weekly-${size}-${part}`);
+      }
+      expect(total).toBe(7);
+      await go(page, i + 3);
+      await expect.poll(() => page.locator('.ps-page--editor').textContent()).toMatch(/Meeting With God/);
+      await shot(page, `meeting-with-god-${size}`);
+      await page.context().close();
+    });
+  }
   it("select daily page purpose and cadence, save, reopen, edit schedule hours", async () => {
     const p = project();
     p.recipe.structure = [step("notes", { type: "copies", count: 1 }, { id: "edit-daily" })];

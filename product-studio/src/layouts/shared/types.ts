@@ -28,6 +28,9 @@ export type LayoutContext = {
   period: PeriodRef;
   /** Composite books: the page's module (purpose title + prompts). Layouts may use it or ignore it. */
   module?: PageModuleContent;
+  /** Physical facing page, for layouts that share frame measurements. */
+  facingPage?: { layoutId: string; geometry: PageGeometry; filler: boolean };
+  filler?: boolean;
 };
 
 /** Inputs a layout needs to decide whether (and how) it fits a page. */

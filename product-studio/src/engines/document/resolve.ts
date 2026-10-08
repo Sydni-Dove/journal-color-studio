@@ -126,6 +126,7 @@ export function resolveDocument(input: ProductProject): ResolvedDocument {
       calendar,
       paged,
       fillerLayoutId: FILLER_LAYOUT_ID,
+      blankFillerLayoutId: "blank-filler-page",
       pagesPerInstance: (id) => getLayout(id).pages,
       layoutPeriod: (id) => getLayout(id).period,
       layoutLabel: (id) => getLayout(id).label,
@@ -184,6 +185,12 @@ export function solvePage(doc: ResolvedDocument, index: number): SolvedPage {
   const group = instancePages(doc, index);
   const layout = getLayout(group[0].layoutId);
   const geometries = group.map((p) => geometryFor(doc, p));
+  const pageIndex = doc.recipe.pages.indexOf(group[0]);
+  const peerIndex = group[0].side === "verso" ? pageIndex + 1 : group[0].side === "recto" ? pageIndex - 1 : -1;
+  const peer = doc.recipe.pages[peerIndex];
+  const facingPage = peer && peer.side !== "single" && peer.side !== group[0].side &&
+    ((group[0].filler && peer.layoutId === "planner-monthly") || (peer.filler && group[0].layoutId === "planner-monthly"))
+    ? { layoutId: peer.layoutId, geometry: geometryFor(doc, peer), filler: !!peer.filler } : undefined;
   const typeSizes = Object.fromEntries(Object.entries(doc.typography.roles).map(([k, r]) => [k, [r.sizePt, r.lineHeight, r.group, r.weight, r.style, r.trackingEm, r.transform]]));
   // The layout id is part of the key: two recipe steps (or one step whose
   // layout changed) can share a page key, and must never share solved output.
@@ -191,6 +198,7 @@ export function solvePage(doc: ResolvedDocument, index: number): SolvedPage {
     layout.id,
     group.map((p) => p.key + p.pageNumber),
     group[0].module ?? null,
+    facingPage ? [facingPage.layoutId, facingPage.geometry.safe, facingPage.geometry.side] : null,
     geometries.map((g) => [g.trimWidthIn, g.trimHeightIn, g.safe, g.side]),
     doc.spacing,
     typeSizes,
@@ -215,6 +223,8 @@ export function solvePage(doc: ResolvedDocument, index: number): SolvedPage {
       weekStart: doc.weekStart,
       period: group[0].period,
       module: group[0].module,
+      facingPage,
+      filler: !!group[0].filler,
     };
     try {
       return layout.solve(ctx);

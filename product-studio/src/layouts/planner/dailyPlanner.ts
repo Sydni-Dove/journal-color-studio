@@ -53,7 +53,8 @@ function solveDaily(ctx: LayoutContext): SolvedPage[] {
   const body = { ...b, y: b.y + dateH + s.section, h: b.h - dateH - s.section };
   // Adjacent headings must keep their label inset from the schedule border.
   const columnGap = Math.max(s.column, s.sectionHeadingInset, s.labelToBorderInset);
-  const scheduleW = (body.w - columnGap) * 0.55;
+  const hasSideSections = (["priorities", "toDo", "notes"] as const).some((key) => ctx.options.dailySections.includes(key));
+  const scheduleW = hasSideSections ? (body.w - columnGap) * 0.55 : body.w;
   const schedule = { ...body, w: scheduleW };
   const right = { ...body, x: body.x + scheduleW + columnGap, w: body.w - scheduleW - columnGap };
   const scheduleSection = section("daily-schedule", schedule, ctx.wording.schedule, ctx, "blank", { semantic: "sectionHeading" });
@@ -74,13 +75,15 @@ function solveDaily(ctx: LayoutContext): SolvedPage[] {
     nodes.push(text(`daily-hour-${i}`, { x: r.x + s.labelToBorderInset, y: r.y, w: timeW - 2 * s.labelToBorderInset, h: r.h }, label, "label", { component: "TimeLabel" }));
   });
   const diagnostics = [...frame.diagnostics, ...header.diagnostics, ...scheduleSection.diagnostics];
-  const rects = weightedStack(right.y, right.h, [1, 1.5, 2], s.section).map((r) => ({ ...right, ...r }));
-  (["priorities", "toDo", "notes"] as const).forEach((key, i) => {
+  const keys = (["priorities", "toDo", "notes"] as const).filter((key) => ctx.options.dailySections.includes(key));
+  const weights = keys.map((key) => key === "notes" ? 2 : key === "toDo" ? 1.5 : 1);
+  const rects = keys.length ? weightedStack(right.y, right.h, weights, s.section).map((r) => ({ ...right, ...r })) : [];
+  keys.forEach((key, i) => {
     const sec = section(`daily-${key}`, rects[i], ctx.wording[key], ctx, key === "notes" ? "surface" : "checklist", { semantic: "sectionHeading" });
     nodes.push(...sec.nodes);
     diagnostics.push(...sec.diagnostics);
   });
-  return [{ nodes, diagnostics, regions: { mainContent: b, writingArea: body, notes: rects[2] }, metrics: [
+  return [{ nodes, diagnostics, regions: { mainContent: b, writingArea: body, ...(keys.includes("notes") ? { notes: rects[keys.indexOf("notes")] } : {}) }, metrics: [
     { label: "Daily schedule row height", value: rows.h / hours.length, unit: "in", provenance: { geometryClass: "user-design", basis: "available schedule height / selected time slots; research 1.4 minimum hourly row 0.3 inches" } },
     { label: "Daily date header", value: STUDIO_PLANNER.dailyDateHeader.valueIn, unit: "in", provenance: STUDIO_PLANNER.dailyDateHeader.provenance },
   ] }];

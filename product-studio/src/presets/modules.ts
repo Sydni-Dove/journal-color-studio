@@ -29,6 +29,7 @@ export type PageModuleDefinition = {
 const GUIDED = ["guided-page", "journal-lined"];
 
 export const PAGE_MODULES: PageModuleDefinition[] = [
+  { type: "tab-sheet", label: "Cover & Divider Pages · Separate tab sheet", layouts: ["tab-sheet"], defaultCadence: { type: "once" }, titles: { none: "Separate Tabs" }, prompts: { none: [] } },
   { type: "cover-page", label: "Cover & Divider Pages · Cover / title page", layouts: ["cover-page"], defaultCadence: { type: "once" }, titles: { none: "Plan" }, prompts: { none: [] } },
   { type: "divider-page", label: "Cover & Divider Pages · Section divider / tab page", layouts: ["divider-page"], defaultCadence: { type: "once" }, titles: { none: "Prayer" }, prompts: { none: [] } },
   { type: "daily-planner", label: "Daily planner", layouts: ["planner-daily"], defaultCadence: { type: "daily" }, titles: { none: "Daily Plan" }, prompts: { none: [] } },
@@ -36,7 +37,7 @@ export const PAGE_MODULES: PageModuleDefinition[] = [
   {
     type: "weekly-planner",
     label: "Weekly planner",
-    layouts: ["planner-weekly-spread", "weekly-plan-mwg-spread"],
+    layouts: ["planner-weekly-spread", "planner-weekly-writing-spread", "weekly-plan-mwg-spread"],
     defaultCadence: { type: "weekly" },
     titles: { none: "Week" },
     prompts: { none: [] },
@@ -50,6 +51,7 @@ export const PAGE_MODULES: PageModuleDefinition[] = [
     prompts: { none: ["Time with God", "What did God say?", "Response / action steps"] },
   },
   { type: "lined-journal", label: "Journal page", layouts: ["journal-lined"], defaultCadence: { type: "copies", count: 1 }, titles: { none: "Journal" }, prompts: { none: [] } },
+  { type: "tracker", label: "Tracker", layouts: ["tracker-weekly"], defaultCadence: { type: "copies", count: 1 }, titles: { none: "Weekly Tracker" }, prompts: { none: ["Prayer", "Scripture", "Movement", "Water"] } },
   { type: "notes", label: "Notes page", layouts: ["notes-page"], defaultCadence: { type: "copies", count: 1 }, titles: { none: "Notes" }, prompts: { none: [] } },
   { type: "prayer", label: "Prayer", layouts: GUIDED, defaultCadence: { type: "once" }, titles: { none: "Prayer" }, prompts: { none: ["Praise & thanksgiving", "Requests", "Answers"] } },
   { type: "vision", label: "Vision", layouts: GUIDED, defaultCadence: { type: "once" }, titles: { none: "Vision" }, prompts: { none: ["What God has shown me", "Where I am going", "What it will look like"] } },

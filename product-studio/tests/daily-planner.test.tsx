@@ -7,7 +7,7 @@ import { heuristicMeasurer } from "../src/engines/typography/textMeasure";
 import { validateProject } from "../src/engines/validation/validate";
 import { lineSpacingIn } from "../src/engines/patterns/patterns";
 import { writingLinePositions, rectContains } from "../src/engines/layout/math";
-import { meetingsWithGodBook, step } from "../src/presets/bookRecipes";
+import { meetingsWithGodBook, meetingsWithGodWritingBook, step } from "../src/presets/bookRecipes";
 import { createProject, type ProjectPatch } from "../src/presets/products/projectFactory";
 import { PrintablePage } from "../src/primitives/PrintablePage";
 import type { BookNode } from "../src/types/recipe";
@@ -125,5 +125,41 @@ describe("Daily planner and composite recipes", () => {
     expect(solved.nodes.filter((n) => n.component === "TimeLabel")).toHaveLength(21);
     expect(solved.metrics[0].value).toBeGreaterThanOrEqual(0.15);
     expect(validateProject(doc.project, heuristicMeasurer).issues.filter((x) => x.severity === "error")).toEqual([]);
+  });
+});
+
+describe("Full weekly writing spread", () => {
+  for (const size of ["8.5x11", "7x9", "6x9"]) {
+    for (const rulingPreset of ["college", "wide", "narrow"] as const) {
+      it(`${size} ${rulingPreset}: seven days have at least four lines with unchanged pitch and safe margins`, () => {
+        const doc = book(size, [step("weekly-planner", { type: "weekly" }, { layoutId: "planner-weekly-writing-spread" })], { functionalPattern: { rulingPreset } });
+        const i = doc.recipe.pages.findIndex((p) => p.spreadPart === 0);
+        const solved = [solvePage(doc, i), solvePage(doc, i + 1)];
+        const days = solved.flatMap((p) => p.nodes.filter((n) => n.type === "lines" && /^ww\d-days-d\d-surface$/.test(n.id)));
+        expect(days).toHaveLength(7);
+        for (const n of days) if (n.type === "lines") {
+          expect(n.positions.length).toBeGreaterThanOrEqual(4);
+          expect(n.positions[1] - n.positions[0]).toBeCloseTo(lineSpacingIn(doc.project.functionalPattern), 8);
+        }
+        solved.forEach((p, part) => p.nodes.filter((n) => n.functional).forEach((n) => expect(rectContains(geometryFor(doc, doc.recipe.pages[i + part]).safeRect, n.rect), n.id).toBe(true)));
+        expect(validateProject(doc.project, heuristicMeasurer).issues.filter((x) => x.severity === "error")).toEqual([]);
+      });
+    }
+  }
+  it("new presets connect the two-page week to a guided meeting, journal and optional daily pages", () => {
+    const doc = book("8.5x11", meetingsWithGodWritingBook(true));
+    for (const [i, p] of doc.recipe.pages.entries()) if (p.layoutId === "planner-weekly-writing-spread" && p.spreadPart === 0) {
+      expect(p.side).toBe("verso");
+      expect(doc.recipe.pages[i + 1].spreadPart).toBe(1);
+      expect(doc.recipe.pages.slice(i + 2, i + 5).map((p) => p.module?.type)).toEqual(["meeting-with-god", "lined-journal", "lined-journal"]);
+    }
+    expect(doc.recipe.pages.filter((p) => p.module?.type === "daily-planner")).toHaveLength(6);
+  });
+  it("blocks undersized pages and excessive custom ruling instead of shrinking lines", () => {
+    const structure = [step("weekly-planner", { type: "weekly" }, { layoutId: "planner-weekly-writing-spread" })];
+    for (const doc of [book("5x7", structure), book("8.5x11", structure, { functionalPattern: { rulingPreset: "custom", customLineSpacingIn: 1 } })]) {
+      const i = doc.recipe.pages.findIndex((p) => p.spreadPart === 0);
+      expect(solvePage(doc, i).diagnostics[0].rule).toBe("layout-incompatible");
+    }
   });
 });

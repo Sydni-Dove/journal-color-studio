@@ -67,6 +67,9 @@ function measure(ctx: FitContext, v: Variant, withSidebar: boolean): Measure {
 }
 
 const fits = (m: Measure, v: Variant) => m.colW + 1e-6 >= v.zones.minCellW.valueIn && m.rowH + 1e-6 >= v.zones.minCellH.valueIn;
+const wantsSidebar = (options: FitContext["options"]) => options.sidebarContent === "notes"
+  ? (options.monthlyNotes ?? options.showSidebar)
+  : options.showSidebar;
 /** The month title must fit the page width — a variant is never offered if its title would overflow. */
 const titleFits = (ctx: FitContext) => widestTitleIn(ctx) <= ctx.page.usableWidthIn - 2 * ctx.spacing.page + 1e-6;
 
@@ -83,7 +86,7 @@ export function fitMonthly(ctx: FitContext): FitResult {
       ? `A ${ctx.options.sidebarWidthIn}" sidebar would take more than ${Math.round(STUDIO_MONTHLY_VARIANTS.maxSidebarShare * 100)}% of this page's width.`
       : "The page is too narrow for a sidebar beside a full 7-column grid.";
   for (const v of VARIANTS) {
-    if (titleFits(ctx) && fits(measure(ctx, v, v.allowsSidebar && ctx.options.showSidebar && sidebarFits), v)) {
+    if (titleFits(ctx) && fits(measure(ctx, v, v.allowsSidebar && wantsSidebar(ctx.options) && sidebarFits), v)) {
       return { ok: true, variant: v.id, variantLabel: v.label, sidebarAvailable: v.allowsSidebar && sidebarFits, sidebarReason: v.allowsSidebar ? sidebarReason : `${v.label} has no sidebar.` };
     }
   }
@@ -95,6 +98,12 @@ export function fitMonthly(ctx: FitContext): FitResult {
     ok: false,
     reason: `Too small for a monthly calendar: cells would be ${m.colW.toFixed(2)}" × ${m.rowH.toFixed(2)}" (minimum ${STUDIO_MONTHLY_VARIANTS.micro.minCellW.valueIn}" × ${STUDIO_MONTHLY_VARIANTS.micro.minCellH.valueIn}").`,
   };
+}
+
+/** Title-zone height shared with a Notes filler on the facing page. */
+export function monthlyTitleHeight(ctx: FitContext): number {
+  const fit = fitMonthly(ctx);
+  return (VARIANTS.find((v) => v.id === (fit.ok ? fit.variant : "full")) ?? VARIANTS[0]).zones.titleH.valueIn;
 }
 
 export const monthlyCalendar: LayoutDefinition = {
@@ -133,13 +142,13 @@ export const monthlyCalendar: LayoutDefinition = {
       return [{ nodes: [], metrics: [], diagnostics: [{ severity: "error", rule: "layout-incompatible", componentId: "planner-monthly", message: fit.reason }] }];
     }
     const v = VARIANTS.find((x) => x.id === fit.variant)!;
-    const showSidebar = ctx.options.showSidebar && fit.sidebarAvailable;
+    const showSidebar = wantsSidebar(ctx.options) && fit.sidebarAvailable;
 
     const frame = pageFrame(ctx, 0, { headerH: v.zones.titleH.valueIn });
     const title = headerTitle("month-header", ctx, frame.zones, "monthYear", `${month.name} ${month.year}`, "monthTitle", "header-left");
     const nodes: LayoutNode[] = [...frame.nodes, ...title.nodes];
     const diagnostics = [...frame.diagnostics, ...title.diagnostics];
-    if (ctx.options.showSidebar && !showSidebar) {
+    if (wantsSidebar(ctx.options) && !showSidebar) {
       diagnostics.push({ severity: "info", rule: "sidebar-unavailable", componentId: "month-sidebar", message: `Sidebar hidden: ${fit.sidebarReason}` });
     }
 

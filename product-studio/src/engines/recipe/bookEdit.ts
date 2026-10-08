@@ -77,8 +77,10 @@ export function newSection(label: string, period?: BookGroup["period"]): BookGro
 }
 
 const MODULE_FOR_LAYOUT: Record<string, BookStep["module"]> = {
+  "tab-sheet": "tab-sheet",
   "cover-page": "cover-page",
   "divider-page": "divider-page",
+  "planner-weekly-writing-spread": "weekly-planner",
   "planner-monthly": "monthly-calendar",
   "planner-daily": "daily-planner",
   "planner-weekly-spread": "weekly-planner",
@@ -127,7 +129,7 @@ const monthOf = (p: PageInstance, weeks: Map<string, string>): string | null =>
   p.period.kind === "month" ? p.period.key : p.period.kind === "week" ? (weeks.get(p.period.key) ?? null) : p.period.kind === "day" ? p.period.iso.slice(0, 7) : null;
 
 function rowLabel(p: PageInstance, layoutLabel: (id: string) => string): { label: string; detail?: string } {
-  if (p.filler) return { label: "Notes", detail: p.fillerReason ?? "Keeps the next spread on a left-hand page" };
+  if (p.filler) return { label: p.layoutId === "blank-filler-page" ? "Blank" : "Notes", detail: p.fillerReason ?? "Keeps the next spread on a left-hand page" };
   const m = p.module;
   if (!m) return { label: layoutLabel(p.layoutId) };
   if (m.type === "monthly-calendar") return { label: m.subtitle ?? m.title, detail: layoutLabel(p.layoutId) };

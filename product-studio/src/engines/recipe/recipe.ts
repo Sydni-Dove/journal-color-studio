@@ -20,6 +20,8 @@ export type RecipeContext = {
   paged: boolean;
   /** Layout used for inserted filler pages. */
   fillerLayoutId: string;
+  blankFillerLayoutId?: string;
+  preserveSpreads?: boolean;
   /** Composite books: the period a layout needs, and its label (for diagnostics). */
   layoutPeriod?: (layoutId: string) => "none" | "month" | "week" | "day";
   layoutLabel?: (layoutId: string) => string;
@@ -155,6 +157,9 @@ export function recipeSteps(recipe: ProductRecipe): { id: string; layoutId: stri
 }
 
 export function expandRecipe(recipe: ProductRecipe, ctx: RecipeContext): ExpandedRecipe {
+  const continuous = recipe.facingPages === "continuous";
+  const fillerLayoutId = recipe.fillerPage === "blank" ? (ctx.blankFillerLayoutId ?? ctx.fillerLayoutId) : ctx.fillerLayoutId;
+  ctx = { ...ctx, fillerLayoutId, preserveSpreads: !continuous };
   // Composite book structure: nested sections + cadence (engines/recipe/bookRecipe).
   if (recipe.structure) return expandBook(recipe.structure, { ...ctx, layoutPeriod: ctx.layoutPeriod ?? (() => "none"), layoutLabel: ctx.layoutLabel ?? ((id) => id) });
   const diagnostics: RecipeDiagnostic[] = [];
@@ -166,7 +171,7 @@ export function expandRecipe(recipe: ProductRecipe, ctx: RecipeContext): Expande
 
   for (const u of units) {
     const pk = periodKey(u.period);
-    if (u.pages === 2 && ctx.paged && pageNumber % 2 === 1) {
+    if (u.pages === 2 && ctx.paged && ctx.preserveSpreads !== false && pageNumber % 2 === 1) {
       // A spread must open on a verso (left page).
       pages.push({
         key: `filler:${fillerCount++}`,
@@ -197,7 +202,7 @@ export function expandRecipe(recipe: ProductRecipe, ctx: RecipeContext): Expande
     diagnostics.push({
       severity: "info",
       itemId: "recipe",
-      message: `${fillerCount} filler page(s) inserted so every two-page spread opens on a left-hand page.`,
+      message: `${fillerCount} ${recipe.fillerPage === "blank" ? "blank" : "notes"} filler page(s) inserted so every two-page spread opens on a left-hand page.`,
     });
   }
   return { pages, diagnostics, pageCount: pages.length };

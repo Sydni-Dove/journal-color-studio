@@ -20,9 +20,9 @@ import { weightedStack } from "./guidedPage";
 /** Recto writing blocks: open journal, What did God say?, Response / action steps. */
 const RECTO_WEIGHTS = [2, 1.2, 1];
 
-function dayRows(id: string, rect: Rect, ctx: LayoutContext, names: string[], dates: number[]): LayoutNode[] {
+export function dayRows(id: string, rect: Rect, ctx: LayoutContext, names: string[], dates: number[]): LayoutNode[] {
   const s = ctx.spacing;
-  const grid = connectedTracks(id, rect, 7, "rows");
+  const grid = connectedTracks(id, rect, names.length, "rows");
   const labelW = STUDIO_WEEKLY_VARIANTS.horizontal.dayLabelW.valueIn;
   const nameH = lineBoxIn(ctx.typography, "subheading");
   const dateH = lineBoxIn(ctx.typography, "date");

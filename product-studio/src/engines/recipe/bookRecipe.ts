@@ -327,7 +327,7 @@ export function expandBook(structure: BookNode[], ctx: BookContext): ExpandedRec
       diagnostics.push({ severity: "error", itemId: step.id, message: `"${ctx.layoutLabel(step.layoutId)}" is a two-page spread; it must start on a left-hand page (start rule "${start}").` });
     }
     const wantVerso = start === "spread" || start === "verso" || n === 2;
-    const wrongSide = ctx.paged && ((wantVerso && pageNumber % 2 === 1) || (start === "recto" && pageNumber % 2 === 0));
+    const wrongSide = ctx.paged && ctx.preserveSpreads !== false && ((wantVerso && pageNumber % 2 === 1) || (start === "recto" && pageNumber % 2 === 0));
     const kind = periodKind(period);
     const title = step.title ?? moduleTitle(step.module, kind);
     const subtitle = periodLabel(ctx.calendar, period);
@@ -356,18 +356,25 @@ export function expandBook(structure: BookNode[], ctx: BookContext): ExpandedRec
         spreadPart: n === 2 ? (part as 0 | 1) : undefined,
         pageNumber,
         side: sideOf(pageNumber),
-        module: { type: step.module, title, subtitle, cover: step.cover, prompts: step.prompts ?? modulePrompts(step.module, kind) },
+        module: { type: step.module, title, subtitle, cover: step.cover, tabSheet: step.tabSheet, prompts: step.prompts ?? modulePrompts(step.module, kind) },
       });
       pageNumber++;
     }
   }
+  // A separate cut sheet can coordinate with divider steps, including dividers without printed markers.
+  const dividers = pages.filter((p) => p.module?.type === "divider-page");
+  const distinct = dividers.filter((p, i) => dividers.findIndex((x) => x.recipeItemId === p.recipeItemId) === i);
+  pages.forEach((p) => {
+    if (p.module?.type !== "tab-sheet" || p.module.tabSheet?.fromDividers === false || !distinct.length) return;
+    p.module = { ...p.module, tabSheet: { ...p.module.tabSheet, entries: distinct.map((d) => ({ label: d.module!.cover?.tab?.label ?? d.module!.title, color: d.module!.cover?.tab?.color, leopard: d.module!.cover?.tab?.leopard })) } };
+  });
   // Auto-distribute the printed divider tabs across the actual expanded book.
   const tabPages = pages.filter((p) => p.module?.type === "divider-page" && p.module.cover?.tab?.show);
   tabPages.forEach((p, i) => {
     const cover = p.module!.cover!;
     p.module = { ...p.module!, cover: { ...cover, tab: { ...cover.tab!, order: cover.tab!.order ?? i + 1, count: cover.tab!.count ?? tabPages.length } } };
   });
-  if (fillers) diagnostics.push({ severity: "info", itemId: "recipe", message: `${fillers} intentional notes page(s) inserted so modules start on their required side.` });
+  if (fillers) diagnostics.push({ severity: "info", itemId: "recipe", message: `${fillers} intentional ${ctx.fillerLayoutId === "blank-filler-page" ? "blank" : "notes"} page(s) inserted so modules start on their required side.` });
   if (!pages.length) diagnostics.push({ severity: "warning", itemId: "recipe", message: "This book structure produces no pages yet." });
   return { pages, diagnostics, pageCount: pages.length };
 }
