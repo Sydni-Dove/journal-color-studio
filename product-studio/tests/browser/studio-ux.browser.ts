@@ -239,8 +239,8 @@ describe("Prompt editor in a book", () => {
     const page = await home([p], DESKTOP);
     await page.locator(".card", { hasText: "PE" }).first().getByRole("button", { name: "Open" }).click();
     await page.waitForSelector(".ps-page--editor");
-    // Open the step's card in Book structure.
-    await page.locator('details.book-step[data-step="mwg"] > summary').click();
+    // Guided steps expose Sections immediately in Book structure.
+    await expect(page.locator('details.book-step[data-step="mwg"]').evaluate((d) => (d as HTMLDetailsElement).open)).resolves.toBe(true);
     const editor = page.getByTestId("prompt-editor").first();
     await editor.scrollIntoViewIfNeeded();
     await editor.locator("details.subsection > summary", { hasText: "More section options" }).click();
@@ -271,7 +271,7 @@ describe("Guided Lined Page", () => {
       await page.waitForSelector(".ps-page--editor");
       await expect.poll(() => page.locator(".badge").first().textContent()).toBe("Page OK");
       // The page's step: one section that fills the page, shown with its real line count.
-      await page.locator("details.book-step > summary").first().click();
+      await expect(page.locator("details.book-step").first().evaluate((d) => (d as HTMLDetailsElement).open)).resolves.toBe(true);
       const editor = page.getByTestId("prompt-editor").first();
       await expect.poll(() => rows(editor)).toEqual([expect.stringMatching(/^The Word\s*Fills space · \d{2} lines/)]);
       // Three Prompt Response: 8 + 8 lines, Prayer fills what is left.
@@ -301,7 +301,7 @@ describe("Guided Lined Page", () => {
       await page.reload();
       await page.locator(".card").first().getByRole("button", { name: "Open" }).click();
       await page.waitForSelector(".ps-page--editor");
-      await page.locator("details.book-step > summary").first().click();
+      await expect(page.locator("details.book-step").first().evaluate((d) => (d as HTMLDetailsElement).open)).resolves.toBe(true);
       await expect.poll(() => rows(page.getByTestId("prompt-editor").first())).toEqual(saved);
       await page.context().close();
     });

@@ -27,9 +27,9 @@ export function tabGeometry(g: PageGeometry, tab: NonNullable<CoverDividerSettin
 
 /**
  * NEUTRAL CHEETAH LUXE — measured from the reference cover (Letter, "Plan / WITH
- * PURPOSE"). Every shape is a fraction of the trim: x of its width, y of its
- * height, r of the page's Letter-proportioned size, so each trim gets the same
- * composition. Circles run off the trim edge (decoration, never content).
+ * PURPOSE"). The references below preserve the Letter artwork. On smaller
+ * trims, luxeComposition resolves new anchors against the usable width before
+ * drawing. Circles may run off the trim edge (decoration, never content).
  * Drawn in order: color circles, cheetah circles, then the thin rings over them.
  */
 type LuxeCircle = { id: string; x: number; y: number; r: number; fill?: ColorToken };
@@ -76,6 +76,39 @@ export const COVER_TEXT: TextZone = { titleX: 0.52, titleBase: 0.68, titleW: 0.9
 export const COVER_TITLE_GAP_R = 0.146, COVER_SUB_BELOW_R = 0.0336;
 export const DIVIDER_TEXT: TextZone = { titleX: 0.5, titleBase: 0.56, titleW: 0.74, titleH: 0.24, subX: 0.5, subY: 0.6, subW: 0.6, subLineGap: 0.04, stack: false, ruleGap: 0.036, ruleW: 0.12, ruleX: 0.5 };
 const RING_PT = 1.9, RULE_PT = 1.8;
+
+/** The artwork is composed against the available trim and live area, not resized from Letter. */
+export function luxeComposition(g: PageGeometry, divider: boolean) {
+  const width = g.safeRect.w;
+  const size = width >= 6.5 ? "large" : width >= 5.1 ? "medium" : width >= 4 ? "compact" : "small";
+  const zone = { ...(divider ? DIVIDER_TEXT : COVER_TEXT) };
+  const shapes = [...LUXE_CIRCLES, ...LUXE_CHEETAH, ...LUXE_RINGS].map((c) => ({ ...c }));
+  if (size !== "large") {
+    const compact = size === "compact" || size === "small";
+    for (const c of shapes) {
+      // Place the upper ornaments above the lettering; side circles stay on the fore edge.
+      if (c.id === "luxe-blush") { c.x = compact ? 0.82 : 0.78; c.y = 0.16; }
+      if (c.id === "luxe-cheetah-top") { c.x = compact ? 1.02 : 0.98; c.y = 0.12; }
+      if (c.id === "luxe-terracotta") c.x = compact ? 1.13 : 1.08;
+      if (c.id === "luxe-ring-right") c.x = compact ? 1.17 : 1.15;
+      if (compact && c.id === "luxe-burgundy") c.r *= size === "small" ? 0.78 : 0.86;
+      if (compact && c.id === "luxe-blush") c.r *= 0.82;
+    }
+    if (!divider) {
+      zone.titleW = compact ? 0.78 : 0.85;
+      zone.titleH = compact ? 0.32 : 0.39;
+      zone.subX = compact ? 0.67 : 0.62;
+      zone.subW = compact ? 0.46 : 0.36;
+      zone.ruleX = zone.subX;
+      zone.ruleW = compact ? 0.2 : 0.18;
+      zone.subLineGap = compact ? 0.038 : 0.041;
+    } else {
+      zone.titleW = compact ? 0.68 : 0.71;
+      zone.subW = compact ? 0.7 : 0.64;
+    }
+  }
+  return { size, zone, shapes };
+}
 
 /** One line of the title, as large as the width allows (the role's size is the ceiling). */
 function fillTitle(value: string, rect: Rect, ctx: LayoutContext): TextFit & { ok: boolean } {
@@ -127,14 +160,15 @@ function solve(ctx: LayoutContext, divider: boolean): SolvedPage[] {
   const tabRoom = tab ? tab.w + 0.16 : 0;
   const content = { ...s, x: tab && tabEdge(g) === "left" ? s.x + tabRoom : s.x, w: s.w - tabRoom };
   const W = g.trimWidthIn, H = g.trimHeightIn;
-  // Circles keep the reference's proportions on any trim: sized from the page's Letter-proportioned width.
+  const composition = luxeComposition(g, divider);
+  // Circle scale follows physical trim size; composition anchors adapt to the live width.
   const R = Math.min(W, (H * 8.5) / 11);
   const circle = (c: LuxeCircle, extra: Partial<CircleNode>) =>
     nodes.push({ id: c.id, type: "circle", component: "Section", rect: { x: c.x * W - c.r * R, y: c.y * H - c.r * R, w: 2 * c.r * R, h: 2 * c.r * R }, functional: false, fill: c.fill ?? null, ...extra });
   if (opt.preset !== "plain") {
-    if (opt.circles !== false) LUXE_CIRCLES.forEach((c) => circle(c, {}));
-    if (opt.leopard !== false) LUXE_CHEETAH.forEach((c) => circle(c, { leopard: true }));
-    if (opt.outlines !== false) LUXE_RINGS.forEach((c) => circle(c, { outline: true, stroke: "lineArt", strokePt: RING_PT }));
+    if (opt.circles !== false) composition.shapes.slice(0, LUXE_CIRCLES.length).forEach((c) => circle(c, {}));
+    if (opt.leopard !== false) composition.shapes.slice(LUXE_CIRCLES.length, LUXE_CIRCLES.length + LUXE_CHEETAH.length).forEach((c) => circle(c, { leopard: true }));
+    if (opt.outlines !== false) composition.shapes.slice(LUXE_CIRCLES.length + LUXE_CHEETAH.length).forEach((c) => circle(c, { outline: true, stroke: "lineArt", strokePt: RING_PT }));
   }
   // Text anchors: the reference's, kept inside the live area (and clear of a tab).
   const shift = opt.position === "upper" ? -0.09 : opt.position === "lower" ? 0.07 : 0;
@@ -151,13 +185,14 @@ function solve(ctx: LayoutContext, divider: boolean): SolvedPage[] {
     if (!fitted.ok) diagnostics.push({ severity: "error", rule: "heading-fit", componentId: id, message: "This wording is too long. Shorten it or choose a larger page." });
     nodes.push(node);
   };
-  const Z = divider ? DIVIDER_TEXT : COVER_TEXT;
+  const Z = composition.zone;
   // Title: one line of script, as wide as the zone allows (the cover's the widest, a divider's smaller).
   const tx = clampX(Z.titleX * W, Z.titleW * W);
   const titleFit = fillTitle(title, { ...tx, y: 0, h: Math.min(content.h, H * Z.titleH) }, ctx);
   const titleH = (titleFit.sizePt * titleFit.lineHeight) / 72;
-  const burgundy = LUXE_CIRCLES[0];
-  const titleTop = divider ? (Z.titleBase + shift) * H - titleH : burgundy.y * H + burgundy.r * R + COVER_TITLE_GAP_R * R + shift * H;
+  const burgundy = composition.shapes[0];
+  const titleGap = composition.size === "large" ? COVER_TITLE_GAP_R : composition.size === "medium" ? 0.13 : 0.11;
+  const titleTop = divider ? (Z.titleBase + shift) * H - titleH : burgundy.y * H + burgundy.r * R + titleGap * R + shift * H;
   const titleRect = { ...tx, y: clampY(titleTop, titleH), h: titleH };
   push("cover-title", title, titleRect, "coverTitle", titleFit);
   // Subtitle: stacked, widely spaced, right of centre under the title.
@@ -172,7 +207,8 @@ function solve(ctx: LayoutContext, divider: boolean): SolvedPage[] {
     const tail = descenderOver(title, titleRect, titleFit.sizePt, left, sx, ctx) ? DESCENDER_EM * (titleFit.sizePt / 72) : 0;
     const firstLine = divider ? (Z.subY + shift) * H : titleRect.y + titleRect.h + COVER_SUB_BELOW_R * R;
     // Never above the title's box: on a small trim the design-scale gap is less than half a subtitle line.
-    const top = Math.max(firstLine - (subFit.sizePt * subFit.lineHeight) / 72 / 2, titleRect.y + titleRect.h) + tail;
+    const protectedGap = divider ? 0 : composition.size === "large" ? 0 : Math.max(0.1, titleFit.sizePt / 72 * (composition.size === "small" ? 0.13 : 0.1));
+    const top = Math.max(firstLine - (subFit.sizePt * subFit.lineHeight) / 72 / 2, titleRect.y + titleRect.h + protectedGap) + tail;
     const subRect = { ...sx, y: clampY(top, subH), h: subH };
     push("cover-subtitle", subtitle, subRect, "coverSubtitle", subFit);
     below = subRect.y + subRect.h;

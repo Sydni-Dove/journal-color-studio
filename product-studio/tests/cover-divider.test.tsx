@@ -5,7 +5,7 @@ import { resolveDocument, solvePage, geometryFor, compositionFor } from "../src/
 import { planDecoration } from "../src/themes/decorationPlan";
 import { SIZE_PRESETS } from "../src/presets/sizes/sizePresets";
 import { rectContains } from "../src/engines/layout/math";
-import { LUXE_CHEETAH, LUXE_CIRCLES, LUXE_RINGS, tabEdge, tabGeometry } from "../src/layouts/book/coverDivider";
+import { LUXE_CHEETAH, LUXE_CIRCLES, LUXE_RINGS, luxeComposition, tabEdge, tabGeometry } from "../src/layouts/book/coverDivider";
 import { LUXE_SUBTITLE_STYLE, LUXE_TITLE_FONT, luxeTitleStyle, NEUTRAL_LUXE_ID } from "../src/presets/coverLuxe";
 import { findPalette } from "../src/presets/themes/palettes";
 import { validateProject } from "../src/engines/validation/validate";
@@ -73,11 +73,15 @@ describe("Reusable covers and printed tabs", () => {
       const W = g.trimWidthIn, H = g.trimHeightIn, R = Math.min(W, (H * 8.5) / 11);
       const circle = (id: string) => s.nodes.find((n) => n.id === id)!;
       // Every shape at its reference position (fractions of the trim), in draw order: fills, cheetah, rings.
-      for (const ref of [...LUXE_CIRCLES, ...LUXE_CHEETAH, ...LUXE_RINGS]) {
+      for (const ref of luxeComposition(g, false).shapes) {
         const n = circle(ref.id);
         expect(n.rect.x + n.rect.w / 2, `${size} ${ref.id}`).toBeCloseTo(ref.x * W, 6);
         expect(n.rect.y + n.rect.h / 2).toBeCloseTo(ref.y * H, 6);
         expect(n.rect.w / 2).toBeCloseTo(ref.r * R, 6);
+      }
+      if (size === "5.5x8.5" || size === "a5") {
+        expect(luxeComposition(g, false).size).toBe("compact");
+        expect(circle("luxe-burgundy").rect.w / 2).toBeLessThan(LUXE_CIRCLES[0].r * R);
       }
       const order = s.nodes.filter((n) => n.type === "circle").map((n) => n.id);
       expect(order).toEqual([...LUXE_CIRCLES, ...LUXE_CHEETAH, ...LUXE_RINGS].map((r) => r.id));
@@ -133,6 +137,23 @@ describe("Neutral Cheetah Luxe cover composition (the design's type and artwork,
       recipe: { items: [], ordering: "sequential", structure: [...neutralLuxeDividers(), step("lined-journal", { type: "once" })] },
     });
   const SIZES = ["8.5x11", "8x10", "7x9", "7x9.25", "6x9", "5.5x8.5", "a5"];
+
+  it("fits and separates title and subtitle on small and custom portrait trims", () => {
+    for (const size of ["8.5x11", "8x10", "7x9.25", "7x9", "6x9", "5.5x8.5", "a5", "5x7", "a6", "custom"]) {
+      const p = createProject("planner", {
+        dimensions: { sizePresetId: size, orientation: "portrait", ...(size === "custom" ? { custom: { width: 5.2, height: 8.2, unit: "in" as const } } : {}) },
+        production: { bindingType: "coil", printProfileId: "coil-generic", duplex: true },
+        recipe: { items: [], ordering: "sequential", structure: [step("cover-page", { type: "once" }, { title: "Plan", cover: { subtitle: "WITH PURPOSE" } })] },
+      });
+      const d = resolveDocument(p), g = geometryFor(d, d.recipe.pages[0]), solved = solvePage(d, 0);
+      const title = solved.nodes.find((n) => n.id === "cover-title")!;
+      const subtitle = solved.nodes.find((n) => n.id === "cover-subtitle")!;
+      expect(rectContains(g.safeRect, title.rect), size).toBe(true);
+      expect(rectContains(g.safeRect, subtitle.rect), size).toBe(true);
+      expect(subtitle.rect.y - (title.rect.y + title.rect.h), size).toBeGreaterThanOrEqual(luxeComposition(g, false).size === "large" ? 0 : 0.09);
+      expect(solved.diagnostics.filter((x) => x.severity === "error"), size).toEqual([]);
+    }
+  });
 
   it("the design's script title applies by itself; the project's other fonts are untouched", () => {
     const doc = resolveDocument(themed("8.5x11"));
