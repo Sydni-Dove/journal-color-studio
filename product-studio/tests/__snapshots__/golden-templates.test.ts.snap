@@ -1,0 +1,1261 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`existing templates print exactly as before > book-daily-planner @ 5.5x8.5 1`] = `
+{
+  "groups": [
+    "1-25:a22d844e0e32",
+    "26-50:08a1b5bfe2eb",
+    "51-75:f45e295f3b5a",
+    "76-100:9be55895835a",
+    "101-125:d3f76dbdeed5",
+    "126-150:89f4e055c794",
+    "151-175:53a0d8e3d9da",
+    "176-200:cd00d57adb71",
+    "201-225:c675b9240332",
+    "226-250:4ccd7642e856",
+    "251-275:8ab35a0e58fb",
+    "276-300:c6ba324b2417",
+    "301-325:aed817de92fd",
+    "326-350:8bfe71dae98e",
+    "351-375:810fe61edee9",
+    "376-400:10de70b714a9",
+    "401-425:4f5f7980e681",
+    "426-450:f4fc09c6ae00",
+    "451-475:d73ffc12b67f",
+    "476-500:4525bc3e0a1f",
+    "501-525:a8a4a66c58e7",
+    "526-550:40c0ccbd19b4",
+    "551-575:9a7d4ef49283",
+    "576-600:9e61add4b807",
+    "601-625:308fd2d5f0fd",
+    "626-650:751bd836d5df",
+    "651-658:5ba5e8f5f1c4",
+  ],
+  "pageCount": 658,
+  "plan": "08bfef898a4f",
+  "recipeDiagnostics": [
+    "info:52 notes page(s) added so each page starts on the side it needs.",
+  ],
+}
+`;
+
+exports[`existing templates print exactly as before > book-daily-planner @ 7x9 1`] = `
+{
+  "groups": [
+    "1-25:c4554ad1e8c9",
+    "26-50:62cfebf660be",
+    "51-75:278e37bb5b81",
+    "76-100:84a0194e2c7f",
+    "101-125:c4c027723d42",
+    "126-150:2fe58c66110f",
+    "151-175:67c3f6f904d1",
+    "176-200:6b07c870eb9c",
+    "201-225:57dbb27e3707",
+    "226-250:6119f5a7081d",
+    "251-275:2092a2fa4f75",
+    "276-300:f64ad26b16d9",
+    "301-325:fc7b7518f7c2",
+    "326-350:1bbdf660e240",
+    "351-375:a6b33478fc20",
+    "376-400:6386bb6e8cdf",
+    "401-425:d616be010264",
+    "426-450:b018b70d55d8",
+    "451-475:fd817376f9e1",
+    "476-500:99e18c0d26d1",
+    "501-525:cee322a70597",
+    "526-550:fb0088df1b60",
+    "551-575:6877653ba468",
+    "576-600:52dea5f17aea",
+    "601-625:ea7d4c585158",
+    "626-650:77138a347813",
+    "651-658:3774af9226f4",
+  ],
+  "pageCount": 658,
+  "plan": "08bfef898a4f",
+  "recipeDiagnostics": [
+    "info:52 notes page(s) added so each page starts on the side it needs.",
+  ],
+}
+`;
+
+exports[`existing templates print exactly as before > book-daily-planner @ 8.5x11 1`] = `
+{
+  "groups": [
+    "1-25:7f68fbe06a64",
+    "26-50:af54eb775e36",
+    "51-75:f3b098fa5ead",
+    "76-100:c542241bdf82",
+    "101-125:00190b43666a",
+    "126-150:7f923c7bf096",
+    "151-175:af1e671dbce1",
+    "176-200:80dcc84caf1b",
+    "201-225:e2a4c60b80ec",
+    "226-250:d2c64e470cf6",
+    "251-275:dee21575b1ef",
+    "276-300:5c5815568285",
+    "301-325:38acf2364366",
+    "326-350:8f04acb86885",
+    "351-375:052ecbfe4b19",
+    "376-400:74324589290a",
+    "401-425:5d60445ac720",
+    "426-450:da7c5fe4d7fb",
+    "451-475:80262792549d",
+    "476-500:28dd49482272",
+    "501-525:02f38376e281",
+    "526-550:c22e8f5777dd",
+    "551-575:620e5bdd6f4d",
+    "576-600:9a9102944d10",
+    "601-625:9f2d6e72d123",
+    "626-650:377147bc4e01",
+    "651-658:d7079c18aa1d",
+  ],
+  "pageCount": 658,
+  "plan": "08bfef898a4f",
+  "recipeDiagnostics": [
+    "info:52 notes page(s) added so each page starts on the side it needs.",
+  ],
+}
+`;
+
+exports[`existing templates print exactly as before > book-meetings-with-god @ 5.5x8.5 1`] = `
+{
+  "groups": [
+    "1-25:b7cec759899f",
+    "26-50:47a310d94918",
+    "51-75:104d6fcd37a7",
+    "76-100:ba3a502605c8",
+    "101-125:1cf4f53a890e",
+    "126-150:12867d1b0283",
+    "151-175:ced05e77fb7f",
+    "176-200:51189b9fa8e7",
+    "201-225:f2466c86dd5c",
+    "226-250:00e39867a8b6",
+    "251-275:84b15dec116f",
+    "276-300:d1a532694f56",
+    "301-325:c887fd44edd1",
+    "326-350:19a571b78b3a",
+    "351-354:37fad17676c6",
+  ],
+  "pageCount": 354,
+  "plan": "48139c34d8d8",
+  "recipeDiagnostics": [
+    "info:3 notes page(s) added so each page starts on the side it needs.",
+  ],
+}
+`;
+
+exports[`existing templates print exactly as before > book-meetings-with-god @ 7x9 1`] = `
+{
+  "groups": [
+    "1-25:8257520f613d",
+    "26-50:0531d9be2b06",
+    "51-75:6a1a75702821",
+    "76-100:048d389c5139",
+    "101-125:7f0efc7dfbd2",
+    "126-150:f3525045882a",
+    "151-175:1467729c8e0a",
+    "176-200:ef32237c60cd",
+    "201-225:0937c9b5efd5",
+    "226-250:7d0b9ee76d29",
+    "251-275:effbf9733f8d",
+    "276-300:7bd927406a16",
+    "301-325:56a22a74e5bc",
+    "326-350:6a226f57d51f",
+    "351-354:6112be42a7ef",
+  ],
+  "pageCount": 354,
+  "plan": "48139c34d8d8",
+  "recipeDiagnostics": [
+    "info:3 notes page(s) added so each page starts on the side it needs.",
+  ],
+}
+`;
+
+exports[`existing templates print exactly as before > book-meetings-with-god @ 8.5x11 1`] = `
+{
+  "groups": [
+    "1-25:fb68e051db9e",
+    "26-50:185a50228b39",
+    "51-75:a9df2b3afcc4",
+    "76-100:41a969897f89",
+    "101-125:ae9c39fdecd8",
+    "126-150:d1948040a3bd",
+    "151-175:1c0491f07f2b",
+    "176-200:3110013ee602",
+    "201-225:d239f2f9c6ae",
+    "226-250:c7955fbb89fc",
+    "251-275:e348fb2a6561",
+    "276-300:82315a7b100e",
+    "301-325:b135cbcca626",
+    "326-350:b3a87ecdd0e9",
+    "351-354:254bd3861400",
+  ],
+  "pageCount": 354,
+  "plan": "48139c34d8d8",
+  "recipeDiagnostics": [
+    "info:3 notes page(s) added so each page starts on the side it needs.",
+  ],
+}
+`;
+
+exports[`existing templates print exactly as before > book-meetings-with-god-daily @ 5.5x8.5 1`] = `
+{
+  "groups": [
+    "1-25:b33a493ee615",
+    "26-50:63890a1d7a93",
+    "51-75:9a1c5795e0f1",
+    "76-100:749e179bfe59",
+    "101-125:b50c6ae7a4b4",
+    "126-150:6e1f31bf1dec",
+    "151-175:0d4ca933713e",
+    "176-200:a85219bc3be0",
+    "201-225:8314f70ef29b",
+    "226-250:9e3f5a567b3b",
+    "251-275:5ab993959767",
+    "276-300:88f19f8dbe26",
+    "301-325:ad400013a51e",
+    "326-350:3e1394063fa2",
+    "351-375:6cb1ec86ffb5",
+    "376-400:1b03c3f8e082",
+    "401-425:12408d0fc1bc",
+    "426-450:c6c570ca29a4",
+    "451-475:31ff1226f5f1",
+    "476-500:fbc138c000f9",
+    "501-525:1166184f6e76",
+    "526-550:1d34560524a4",
+    "551-575:e1d6a1ccf47d",
+    "576-600:0b56c5570a6a",
+    "601-625:4e4e1be68279",
+    "626-650:3997fa3a4ede",
+    "651-675:c2cc01ed7d6c",
+    "676-700:b0c878554866",
+    "701-725:59a4c9b2fd2b",
+    "726-750:62275b399b1a",
+    "751-766:ea2d2bef6609",
+  ],
+  "pageCount": 766,
+  "plan": "104c9fe0828d",
+  "recipeDiagnostics": [
+    "info:50 notes page(s) added so each page starts on the side it needs.",
+  ],
+}
+`;
+
+exports[`existing templates print exactly as before > book-meetings-with-god-daily @ 7x9 1`] = `
+{
+  "groups": [
+    "1-25:27528c964e44",
+    "26-50:9701ec284d59",
+    "51-75:00cce6ce127e",
+    "76-100:2dfd2bfb2df0",
+    "101-125:75a77348ccae",
+    "126-150:bdf2dc7a6c54",
+    "151-175:30d63d099435",
+    "176-200:f45c5ce9a83b",
+    "201-225:5e8702d371ca",
+    "226-250:99dc7484d7f4",
+    "251-275:1db091564da8",
+    "276-300:a4a10980f8ca",
+    "301-325:966afbff859c",
+    "326-350:2db792442745",
+    "351-375:5999ac3d8e10",
+    "376-400:1d6c0ea32570",
+    "401-425:03795bf3513a",
+    "426-450:44ddbde22a24",
+    "451-475:c9ae87bcb69b",
+    "476-500:1593cc6e1e2d",
+    "501-525:4f3af80d0291",
+    "526-550:ef2e9b5a878f",
+    "551-575:1dbf14051efa",
+    "576-600:97369b2716c5",
+    "601-625:5a9da182b3ed",
+    "626-650:3f39f913dd41",
+    "651-675:3aa40040a612",
+    "676-700:4ddf4a6d08b4",
+    "701-725:858e0d48630a",
+    "726-750:c97848afef84",
+    "751-766:49586186c602",
+  ],
+  "pageCount": 766,
+  "plan": "104c9fe0828d",
+  "recipeDiagnostics": [
+    "info:50 notes page(s) added so each page starts on the side it needs.",
+  ],
+}
+`;
+
+exports[`existing templates print exactly as before > book-meetings-with-god-daily @ 8.5x11 1`] = `
+{
+  "groups": [
+    "1-25:6498492dbe0b",
+    "26-50:d9a7e44e3c68",
+    "51-75:90d793a77f8d",
+    "76-100:d87b9841a48a",
+    "101-125:4443c6c385cd",
+    "126-150:40897e4f7c64",
+    "151-175:504ff9c11d8d",
+    "176-200:a4e8e901fb89",
+    "201-225:b7f544098503",
+    "226-250:a8788d40e922",
+    "251-275:bb02c41e4af1",
+    "276-300:d74146bde17b",
+    "301-325:ce2c9b6eeae2",
+    "326-350:4f32b6bf3786",
+    "351-375:9a398d76facc",
+    "376-400:2de2298cff76",
+    "401-425:73f629644d27",
+    "426-450:a73bb3cd929d",
+    "451-475:c13a77d07813",
+    "476-500:e00318cd9fca",
+    "501-525:a75ed1585c6c",
+    "526-550:03ffd55759ba",
+    "551-575:fe55f2c3471e",
+    "576-600:5d2d41fc8873",
+    "601-625:b58f6e126c05",
+    "626-650:76424c6db8b1",
+    "651-675:94cd6c5dc7e7",
+    "676-700:6b1d481ba057",
+    "701-725:776b9f7d1636",
+    "726-750:1b1917b1e0be",
+    "751-766:eb5de2e1bdb0",
+  ],
+  "pageCount": 766,
+  "plan": "104c9fe0828d",
+  "recipeDiagnostics": [
+    "info:50 notes page(s) added so each page starts on the side it needs.",
+  ],
+}
+`;
+
+exports[`existing templates print exactly as before > book-planner-journal @ 5.5x8.5 1`] = `
+{
+  "groups": [
+    "1-25:bec6dd1fec09",
+    "26-50:05f668340c8d",
+    "51-75:843578157441",
+    "76-100:1a6c2fdc5785",
+    "101-125:62e7721435e4",
+    "126-150:1f5dcd2a0ccb",
+    "151-175:3e7e1f19c779",
+    "176-200:e0c999d268b5",
+    "201-216:c3ca7ac0086c",
+  ],
+  "pageCount": 216,
+  "plan": "e55fe9a56878",
+  "recipeDiagnostics": [
+    "info:43 notes page(s) added so each page starts on the side it needs.",
+  ],
+}
+`;
+
+exports[`existing templates print exactly as before > book-planner-journal @ 7x9 1`] = `
+{
+  "groups": [
+    "1-25:99bcc78051e1",
+    "26-50:54f763a7c36f",
+    "51-75:71248dc98cc5",
+    "76-100:a52d15e6cfdb",
+    "101-125:c47bfe67014a",
+    "126-150:33ef49b664da",
+    "151-175:369250386445",
+    "176-200:87c1f6287d12",
+    "201-216:f12a6dbcbc9e",
+  ],
+  "pageCount": 216,
+  "plan": "e55fe9a56878",
+  "recipeDiagnostics": [
+    "info:43 notes page(s) added so each page starts on the side it needs.",
+  ],
+}
+`;
+
+exports[`existing templates print exactly as before > book-planner-journal @ 8.5x11 1`] = `
+{
+  "groups": [
+    "1-25:9a9fef72596a",
+    "26-50:31d843121cb7",
+    "51-75:05f79211087f",
+    "76-100:087529f50a7c",
+    "101-125:ec93c2680de3",
+    "126-150:32eb5041f78c",
+    "151-175:3480f9b8a2e9",
+    "176-200:384a6d2e4210",
+    "201-216:8824bc4d9b6a",
+  ],
+  "pageCount": 216,
+  "plan": "e55fe9a56878",
+  "recipeDiagnostics": [
+    "info:43 notes page(s) added so each page starts on the side it needs.",
+  ],
+}
+`;
+
+exports[`existing templates print exactly as before > custom-page @ 5.5x8.5 1`] = `
+{
+  "groups": [
+    "1-1:42681d74fd52",
+  ],
+  "pageCount": 1,
+  "plan": "fa88b63b2708",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > custom-page @ 7x9 1`] = `
+{
+  "groups": [
+    "1-1:6a0368596a6a",
+  ],
+  "pageCount": 1,
+  "plan": "fa88b63b2708",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > custom-page @ 8.5x11 1`] = `
+{
+  "groups": [
+    "1-1:59fe8743a8d9",
+  ],
+  "pageCount": 1,
+  "plan": "fa88b63b2708",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > design preset dove-blush-script on planner-monthly-weekly @ 7x9 1`] = `
+{
+  "groups": [
+    "1-25:ef4aac44cc6e",
+    "26-50:1c184ff95113",
+    "51-75:613f73fcf08e",
+    "76-100:2a5b3e98b785",
+    "101-125:286bf5247878",
+    "126-134:07abf89e88a8",
+  ],
+  "pageCount": 134,
+  "plan": "c54127d45110",
+  "recipeDiagnostics": [
+    "info:13 notes page(s) added so each page starts on the side it needs.",
+  ],
+}
+`;
+
+exports[`existing templates print exactly as before > design preset dove-signature on planner-monthly-weekly @ 7x9 1`] = `
+{
+  "groups": [
+    "1-25:c0ec96ae6ea0",
+    "26-50:1c184ff95113",
+    "51-75:613f73fcf08e",
+    "76-100:2a5b3e98b785",
+    "101-125:286bf5247878",
+    "126-134:07abf89e88a8",
+  ],
+  "pageCount": 134,
+  "plan": "c54127d45110",
+  "recipeDiagnostics": [
+    "info:13 notes page(s) added so each page starts on the side it needs.",
+  ],
+}
+`;
+
+exports[`existing templates print exactly as before > design preset neutral-cheetah-luxe on planner-monthly-weekly @ 7x9 1`] = `
+{
+  "groups": [
+    "1-25:c0ec96ae6ea0",
+    "26-50:1c184ff95113",
+    "51-75:613f73fcf08e",
+    "76-100:2a5b3e98b785",
+    "101-125:286bf5247878",
+    "126-134:07abf89e88a8",
+  ],
+  "pageCount": 134,
+  "plan": "c54127d45110",
+  "recipeDiagnostics": [
+    "info:13 notes page(s) added so each page starts on the side it needs.",
+  ],
+}
+`;
+
+exports[`existing templates print exactly as before > deskpad-weekly @ 5.5x8.5 1`] = `
+{
+  "groups": [
+    "1-1:87a5c24cf52a",
+  ],
+  "pageCount": 1,
+  "plan": "88500e963b74",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > deskpad-weekly @ 7x9 1`] = `
+{
+  "groups": [
+    "1-1:a954835f4892",
+  ],
+  "pageCount": 1,
+  "plan": "88500e963b74",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > deskpad-weekly @ 8.5x11 1`] = `
+{
+  "groups": [
+    "1-1:38cc5890f0f7",
+  ],
+  "pageCount": 1,
+  "plan": "88500e963b74",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > guided-lined @ 5.5x8.5 1`] = `
+{
+  "groups": [
+    "1-1:c9be805165c0",
+  ],
+  "pageCount": 1,
+  "plan": "23c94ff6d29e",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > guided-lined @ 7x9 1`] = `
+{
+  "groups": [
+    "1-1:64c047c6280d",
+  ],
+  "pageCount": 1,
+  "plan": "23c94ff6d29e",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > guided-lined @ 8.5x11 1`] = `
+{
+  "groups": [
+    "1-1:e0f3c5c99d85",
+  ],
+  "pageCount": 1,
+  "plan": "23c94ff6d29e",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > journal-lined @ 5.5x8.5 1`] = `
+{
+  "groups": [
+    "1-1:dae07d7f1d30",
+  ],
+  "pageCount": 1,
+  "plan": "accd0b9c318f",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > journal-lined @ 7x9 1`] = `
+{
+  "groups": [
+    "1-1:45a78194c805",
+  ],
+  "pageCount": 1,
+  "plan": "accd0b9c318f",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > journal-lined @ 8.5x11 1`] = `
+{
+  "groups": [
+    "1-1:4ccc51c89266",
+  ],
+  "pageCount": 1,
+  "plan": "accd0b9c318f",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > notepad-daily @ 5.5x8.5 1`] = `
+{
+  "groups": [
+    "1-1:efe48773031f",
+  ],
+  "pageCount": 1,
+  "plan": "7b40efd547c0",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > notepad-daily @ 7x9 1`] = `
+{
+  "groups": [
+    "1-1:4b54f6aac47c",
+  ],
+  "pageCount": 1,
+  "plan": "7b40efd547c0",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > notepad-daily @ 8.5x11 1`] = `
+{
+  "groups": [
+    "1-1:b9c91113b798",
+  ],
+  "pageCount": 1,
+  "plan": "7b40efd547c0",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > notepad-daily-todo @ 5.5x8.5 1`] = `
+{
+  "groups": [
+    "1-1:22c52c9de07a",
+  ],
+  "pageCount": 1,
+  "plan": "7b40efd547c0",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > notepad-daily-todo @ 7x9 1`] = `
+{
+  "groups": [
+    "1-1:92df5dceb367",
+  ],
+  "pageCount": 1,
+  "plan": "7b40efd547c0",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > notepad-daily-todo @ 8.5x11 1`] = `
+{
+  "groups": [
+    "1-1:18798a1db3d4",
+  ],
+  "pageCount": 1,
+  "plan": "7b40efd547c0",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > notepad-grocery @ 5.5x8.5 1`] = `
+{
+  "groups": [
+    "1-1:16f58f0426cb",
+  ],
+  "pageCount": 1,
+  "plan": "17f7f6d5d826",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > notepad-grocery @ 7x9 1`] = `
+{
+  "groups": [
+    "1-1:7fca09482a2a",
+  ],
+  "pageCount": 1,
+  "plan": "17f7f6d5d826",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > notepad-grocery @ 8.5x11 1`] = `
+{
+  "groups": [
+    "1-1:ff15355f994d",
+  ],
+  "pageCount": 1,
+  "plan": "17f7f6d5d826",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > notepad-lined @ 5.5x8.5 1`] = `
+{
+  "groups": [
+    "1-1:925184c51205",
+  ],
+  "pageCount": 1,
+  "plan": "3ce031798b03",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > notepad-lined @ 7x9 1`] = `
+{
+  "groups": [
+    "1-1:3dff9c53aea8",
+  ],
+  "pageCount": 1,
+  "plan": "3ce031798b03",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > notepad-lined @ 8.5x11 1`] = `
+{
+  "groups": [
+    "1-1:aa4fd715879e",
+  ],
+  "pageCount": 1,
+  "plan": "3ce031798b03",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > notepad-todo @ 5.5x8.5 1`] = `
+{
+  "groups": [
+    "1-1:8f6bcf04695a",
+  ],
+  "pageCount": 1,
+  "plan": "b2a1043ce0e2",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > notepad-todo @ 7x9 1`] = `
+{
+  "groups": [
+    "1-1:8e5eab4f83f9",
+  ],
+  "pageCount": 1,
+  "plan": "b2a1043ce0e2",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > notepad-todo @ 8.5x11 1`] = `
+{
+  "groups": [
+    "1-1:4d8752bcf031",
+  ],
+  "pageCount": 1,
+  "plan": "b2a1043ce0e2",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > planner-daily-page @ 5.5x8.5 1`] = `
+{
+  "groups": [
+    "1-25:22bb5e360226",
+    "26-50:635ad0041c78",
+    "51-75:277ce4b870dc",
+    "76-100:f42428d1fbed",
+    "101-125:ea4147d6a2f8",
+    "126-150:e88d00081202",
+    "151-175:ec0fa5f373c6",
+    "176-200:1390ec20e86d",
+    "201-225:df21e3432584",
+    "226-250:f165733ceae8",
+    "251-275:008485474d7c",
+    "276-300:79c920d74e5e",
+    "301-325:cec80b466582",
+    "326-350:34ce7404ad3e",
+    "351-365:c9481ee9183b",
+  ],
+  "pageCount": 365,
+  "plan": "14aeff81daec",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > planner-daily-page @ 7x9 1`] = `
+{
+  "groups": [
+    "1-25:93780a52150f",
+    "26-50:be46b82881fa",
+    "51-75:70b4d55e79b4",
+    "76-100:1eb79d18f07b",
+    "101-125:4895d8dbbe00",
+    "126-150:a79a186e54ef",
+    "151-175:5c902d2c40c3",
+    "176-200:6d1566d121b2",
+    "201-225:2928ebae4449",
+    "226-250:ef67c5fd44de",
+    "251-275:4b27dfb8881a",
+    "276-300:5cfc0dbf6536",
+    "301-325:d20585506d8a",
+    "326-350:a7fc52607525",
+    "351-365:ce04fb00aff2",
+  ],
+  "pageCount": 365,
+  "plan": "14aeff81daec",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > planner-daily-page @ 8.5x11 1`] = `
+{
+  "groups": [
+    "1-25:72eadadd492b",
+    "26-50:2dceed3d86f2",
+    "51-75:c1d668821fd9",
+    "76-100:e517f3543b78",
+    "101-125:7a56e76268cc",
+    "126-150:582ce5fa2e8d",
+    "151-175:6367df353a09",
+    "176-200:c562cd663a0e",
+    "201-225:31ce1a1a4c5e",
+    "226-250:92837d4f6016",
+    "251-275:99b2e01ea370",
+    "276-300:c0c23e39ea1c",
+    "301-325:04ca07db6892",
+    "326-350:7ea0288fb620",
+    "351-365:b88a50cb432b",
+  ],
+  "pageCount": 365,
+  "plan": "14aeff81daec",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > planner-monthly @ 5.5x8.5 1`] = `
+{
+  "groups": [
+    "1-12:44e33db5befe",
+  ],
+  "pageCount": 12,
+  "plan": "0d64696794a1",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > planner-monthly @ 7x9 1`] = `
+{
+  "groups": [
+    "1-12:907773798dde",
+  ],
+  "pageCount": 12,
+  "plan": "0d64696794a1",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > planner-monthly @ 8.5x11 1`] = `
+{
+  "groups": [
+    "1-12:a22a71440ec1",
+  ],
+  "pageCount": 12,
+  "plan": "0d64696794a1",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > planner-monthly-weekly @ 5.5x8.5 1`] = `
+{
+  "groups": [
+    "1-25:97e45a7560ac",
+    "26-50:89c322b76624",
+    "51-75:28c8260c3644",
+    "76-100:463db9be8ef4",
+    "101-125:4ef5c21e2f31",
+    "126-134:1313434a8689",
+  ],
+  "pageCount": 134,
+  "plan": "c54127d45110",
+  "recipeDiagnostics": [
+    "info:13 notes page(s) added so each page starts on the side it needs.",
+  ],
+}
+`;
+
+exports[`existing templates print exactly as before > planner-monthly-weekly @ 7x9 1`] = `
+{
+  "groups": [
+    "1-25:c0ec96ae6ea0",
+    "26-50:1c184ff95113",
+    "51-75:613f73fcf08e",
+    "76-100:2a5b3e98b785",
+    "101-125:286bf5247878",
+    "126-134:07abf89e88a8",
+  ],
+  "pageCount": 134,
+  "plan": "c54127d45110",
+  "recipeDiagnostics": [
+    "info:13 notes page(s) added so each page starts on the side it needs.",
+  ],
+}
+`;
+
+exports[`existing templates print exactly as before > planner-monthly-weekly @ 8.5x11 1`] = `
+{
+  "groups": [
+    "1-25:524b5d8d7c7c",
+    "26-50:ab2428a74b7e",
+    "51-75:20b1a61c91ad",
+    "76-100:dfe83eafc0c3",
+    "101-125:510233a52934",
+    "126-134:5803e5dfa772",
+  ],
+  "pageCount": 134,
+  "plan": "c54127d45110",
+  "recipeDiagnostics": [
+    "info:13 notes page(s) added so each page starts on the side it needs.",
+  ],
+}
+`;
+
+exports[`existing templates print exactly as before > planner-weekly @ 5.5x8.5 1`] = `
+{
+  "groups": [
+    "1-25:51b73cb410c0",
+    "26-50:10573bcb0aba",
+    "51-75:aa1a18b992cf",
+    "76-100:f70d9d6b668e",
+    "101-107:99a680b08862",
+  ],
+  "pageCount": 107,
+  "plan": "358c5b8982aa",
+  "recipeDiagnostics": [
+    "info:1 filler page(s) inserted so every two-page spread opens on a left-hand page.",
+  ],
+}
+`;
+
+exports[`existing templates print exactly as before > planner-weekly @ 7x9 1`] = `
+{
+  "groups": [
+    "1-25:eed9d8ada7dc",
+    "26-50:80a60ce305a4",
+    "51-75:82705aa77d70",
+    "76-100:76070856af25",
+    "101-107:aa555b8271ec",
+  ],
+  "pageCount": 107,
+  "plan": "358c5b8982aa",
+  "recipeDiagnostics": [
+    "info:1 filler page(s) inserted so every two-page spread opens on a left-hand page.",
+  ],
+}
+`;
+
+exports[`existing templates print exactly as before > planner-weekly @ 8.5x11 1`] = `
+{
+  "groups": [
+    "1-25:6fd7e2675084",
+    "26-50:d164c3f8813d",
+    "51-75:5aab4a686640",
+    "76-100:70b178a0a4f5",
+    "101-107:ae5ef2b36235",
+  ],
+  "pageCount": 107,
+  "plan": "358c5b8982aa",
+  "recipeDiagnostics": [
+    "info:1 filler page(s) inserted so every two-page spread opens on a left-hand page.",
+  ],
+}
+`;
+
+exports[`existing templates print exactly as before > planner-weekly-mwg @ 5.5x8.5 1`] = `
+{
+  "groups": [
+    "1-25:dfe955f55fb9",
+    "26-50:66b98fa27261",
+    "51-75:684fce341eef",
+    "76-100:06e5e3e8c321",
+    "101-107:0992f7bade1b",
+  ],
+  "pageCount": 107,
+  "plan": "a51280c2b3ea",
+  "recipeDiagnostics": [
+    "info:1 filler page(s) inserted so every two-page spread opens on a left-hand page.",
+  ],
+}
+`;
+
+exports[`existing templates print exactly as before > planner-weekly-mwg @ 7x9 1`] = `
+{
+  "groups": [
+    "1-25:8161f1d807d6",
+    "26-50:2e1ca4820965",
+    "51-75:cebc8cc7e2e8",
+    "76-100:4385b9583a8f",
+    "101-107:ce3242e4b65f",
+  ],
+  "pageCount": 107,
+  "plan": "a51280c2b3ea",
+  "recipeDiagnostics": [
+    "info:1 filler page(s) inserted so every two-page spread opens on a left-hand page.",
+  ],
+}
+`;
+
+exports[`existing templates print exactly as before > planner-weekly-mwg @ 8.5x11 1`] = `
+{
+  "groups": [
+    "1-25:1a43ad48dd52",
+    "26-50:f4f9f07ad3f2",
+    "51-75:7e0fb165e3aa",
+    "76-100:6480d5179cf1",
+    "101-107:ac953c187294",
+  ],
+  "pageCount": 107,
+  "plan": "a51280c2b3ea",
+  "recipeDiagnostics": [
+    "info:1 filler page(s) inserted so every two-page spread opens on a left-hand page.",
+  ],
+}
+`;
+
+exports[`existing templates print exactly as before > planner-weekly-plan-spread @ 5.5x8.5 1`] = `
+{
+  "groups": [
+    "1-25:33e66615cf40",
+    "26-50:0f0cbc929c3c",
+    "51-75:65873fff0d71",
+    "76-100:057ccd0a6b2d",
+    "101-107:de531287ce88",
+  ],
+  "pageCount": 107,
+  "plan": "150caf0d78c7",
+  "recipeDiagnostics": [
+    "info:1 filler page(s) inserted so every two-page spread opens on a left-hand page.",
+  ],
+}
+`;
+
+exports[`existing templates print exactly as before > planner-weekly-plan-spread @ 7x9 1`] = `
+{
+  "groups": [
+    "1-25:c009a7ab4f9f",
+    "26-50:a5dea8658c5d",
+    "51-75:2598d1935b3b",
+    "76-100:61f5909b2db0",
+    "101-107:666d31f6e84b",
+  ],
+  "pageCount": 107,
+  "plan": "150caf0d78c7",
+  "recipeDiagnostics": [
+    "info:1 filler page(s) inserted so every two-page spread opens on a left-hand page.",
+  ],
+}
+`;
+
+exports[`existing templates print exactly as before > planner-weekly-plan-spread @ 8.5x11 1`] = `
+{
+  "groups": [
+    "1-25:e81aba8de3f4",
+    "26-50:a222989d8abc",
+    "51-75:e997a5e96811",
+    "76-100:ec7488f9ea13",
+    "101-107:048d91273192",
+  ],
+  "pageCount": 107,
+  "plan": "150caf0d78c7",
+  "recipeDiagnostics": [
+    "info:1 filler page(s) inserted so every two-page spread opens on a left-hand page.",
+  ],
+}
+`;
+
+exports[`existing templates print exactly as before > stationery:devotional-daily-reflection.stacked @ 5.5x8.5 1`] = `
+{
+  "groups": [
+    "1-1:3f1912ba1a7b",
+  ],
+  "pageCount": 1,
+  "plan": "b6b35fc3cc32",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > stationery:devotional-daily-reflection.stacked @ 7x9 1`] = `
+{
+  "groups": [
+    "1-1:97a31d9080ba",
+  ],
+  "pageCount": 1,
+  "plan": "b6b35fc3cc32",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > stationery:devotional-daily-reflection.stacked @ 8.5x11 1`] = `
+{
+  "groups": [
+    "1-1:b1f5667e19ae",
+  ],
+  "pageCount": 1,
+  "plan": "b6b35fc3cc32",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > stationery:devotional-soap.four-band @ 5.5x8.5 1`] = `
+{
+  "groups": [
+    "1-1:6b1a3319ab6b",
+  ],
+  "pageCount": 1,
+  "plan": "7df12d980017",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > stationery:devotional-soap.four-band @ 7x9 1`] = `
+{
+  "groups": [
+    "1-1:3f3cbb635483",
+  ],
+  "pageCount": 1,
+  "plan": "7df12d980017",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > stationery:devotional-soap.four-band @ 8.5x11 1`] = `
+{
+  "groups": [
+    "1-1:f6fe2b75ea96",
+  ],
+  "pageCount": 1,
+  "plan": "7df12d980017",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > stationery:devotional-verse-mapping.spread @ 5.5x8.5 1`] = `
+{
+  "groups": [
+    "1-3:ae0fecd8f99b",
+  ],
+  "pageCount": 3,
+  "plan": "1831682b5c8f",
+  "recipeDiagnostics": [
+    "info:1 filler page(s) inserted so every two-page spread opens on a left-hand page.",
+  ],
+}
+`;
+
+exports[`existing templates print exactly as before > stationery:devotional-verse-mapping.spread @ 7x9 1`] = `
+{
+  "groups": [
+    "1-3:5a1b58f784c6",
+  ],
+  "pageCount": 3,
+  "plan": "1831682b5c8f",
+  "recipeDiagnostics": [
+    "info:1 filler page(s) inserted so every two-page spread opens on a left-hand page.",
+  ],
+}
+`;
+
+exports[`existing templates print exactly as before > stationery:devotional-verse-mapping.spread @ 8.5x11 1`] = `
+{
+  "groups": [
+    "1-3:c84d8da3d40d",
+  ],
+  "pageCount": 3,
+  "plan": "1831682b5c8f",
+  "recipeDiagnostics": [
+    "info:1 filler page(s) inserted so every two-page spread opens on a left-hand page.",
+  ],
+}
+`;
+
+exports[`existing templates print exactly as before > stationery:worksheet-prayer-log.table @ 5.5x8.5 1`] = `
+{
+  "groups": [
+    "1-1:4486e7465586",
+  ],
+  "pageCount": 1,
+  "plan": "37ce2dc1c729",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > stationery:worksheet-prayer-log.table @ 7x9 1`] = `
+{
+  "groups": [
+    "1-1:6511733a65f5",
+  ],
+  "pageCount": 1,
+  "plan": "37ce2dc1c729",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > stationery:worksheet-prayer-log.table @ 8.5x11 1`] = `
+{
+  "groups": [
+    "1-1:1bd22ef0a5e3",
+  ],
+  "pageCount": 1,
+  "plan": "37ce2dc1c729",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > stationery:worksheet-prompt.prompt-response @ 5.5x8.5 1`] = `
+{
+  "groups": [
+    "1-1:e1e206893037",
+  ],
+  "pageCount": 1,
+  "plan": "c80ffe6ffb6b",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > stationery:worksheet-prompt.prompt-response @ 7x9 1`] = `
+{
+  "groups": [
+    "1-1:03ff374cd8ca",
+  ],
+  "pageCount": 1,
+  "plan": "c80ffe6ffb6b",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > stationery:worksheet-prompt.prompt-response @ 8.5x11 1`] = `
+{
+  "groups": [
+    "1-1:ab6f81068bec",
+  ],
+  "pageCount": 1,
+  "plan": "c80ffe6ffb6b",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > stationery:worksheet-reading-tracker.table @ 5.5x8.5 1`] = `
+{
+  "groups": [
+    "1-1:bb40bd921ad2",
+  ],
+  "pageCount": 1,
+  "plan": "359d70963d5e",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > stationery:worksheet-reading-tracker.table @ 7x9 1`] = `
+{
+  "groups": [
+    "1-1:2567b9eb4800",
+  ],
+  "pageCount": 1,
+  "plan": "359d70963d5e",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > stationery:worksheet-reading-tracker.table @ 8.5x11 1`] = `
+{
+  "groups": [
+    "1-1:fab6e8ca4ebf",
+  ],
+  "pageCount": 1,
+  "plan": "359d70963d5e",
+  "recipeDiagnostics": [],
+}
+`;
