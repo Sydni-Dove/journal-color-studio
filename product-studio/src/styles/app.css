@@ -1903,3 +1903,80 @@ button.family-card:focus-visible {
 .cloud-account__actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .cloud-account__problem { color: #9b1c1c; }
 .save-status__cloud { opacity: 0.8; }
+
+/* Content data (components/editor/DataPanel.tsx) */
+.data-panel {
+  display: grid;
+  gap: 10px;
+}
+.data-textarea {
+  width: 100%;
+  border: 1px solid var(--ui-line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font: inherit;
+  resize: vertical;
+  background: #fff;
+}
+.data-record {
+  border: 1px solid var(--ui-line);
+  border-radius: 8px;
+  padding: 0 10px;
+}
+.data-record > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--ui-touch);
+  cursor: pointer;
+}
+.data-record__title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.data-field-row {
+  display: grid;
+  gap: 6px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--ui-line);
+}
+.data-issue,
+.field > .data-issue {
+  font-size: 12px;
+  color: #a1460f;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 600;
+}
+.data-value [aria-invalid="true"] {
+  border-color: #c2621f;
+}
+.data-import-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+.data-import {
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.data-import th,
+.data-import td {
+  border: 1px solid var(--ui-line);
+  padding: 4px 6px;
+  text-align: left;
+  vertical-align: top;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.data-import--bad {
+  background: #fdecdc;
+}
+.data-import--skip {
+  color: var(--ui-muted);
+  text-decoration: line-through;
+}

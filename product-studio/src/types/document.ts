@@ -54,6 +54,8 @@ export type FieldDef = {
   options?: string[];
   /** How much room a value usually needs, in characters (guides column widths and wrapping). */
   expectedLength?: number;
+  /** Every entry should have a value (reported when missing; never blocks saving). */
+  required?: boolean;
 };
 
 // ─── Components ──────────────────────────────────────────────────────────────
@@ -184,6 +186,16 @@ export type FieldValue = string | number | boolean | null;
 /** One entry of a list (a devotional day, an inventory item): stable id, values by field key. */
 export type DataRecord = { id: string; values: Record<string, FieldValue> };
 export type DocumentData = { values: Record<string, FieldValue>; lists: Record<string, DataRecord[]> };
+
+/**
+ * A named, typed list of entries the maker fills in — devotional days,
+ * inventory items, journal entries, clients. Its fields are its schema; its
+ * records hold the values (by field key, with stable ids). Independent of any
+ * page, template, size or style: pages will read it (a later phase), never own it.
+ */
+export type DataCollection = { id: string; name: string; fields: FieldDef[]; records: DataRecord[] };
+/** A product's own data. Stored inside the product, so it saves, undoes and syncs with it. */
+export type ProjectData = { version: 1; collections: DataCollection[] };
 
 // ─── Requirements (reserved — not used by any feature yet) ───────────────────
 

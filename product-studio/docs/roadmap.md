@@ -107,8 +107,19 @@ per product. Order of work:
    New sections: printed list and repeating record (`layouts/stationery/flowSurfaces.ts`).
    Export is blocked, with a warning, when a font used on the exported pages
    didn't load. Tests: `tests/content-pagination.test.tsx`.
-4. Data layer: typed records in the project (synced), a generic form editor and
-   paste/CSV import.
+4. **Data layer** — done: named lists of typed entries stored in the product
+   (`ProductProject.data`; `engines/data/data.ts`), so they save, undo and sync
+   with it. Entries have stable ids; values are read by their field's type and
+   anything a type can't read is kept as typed and flagged, never dropped
+   (changing a field's type or removing a field keeps every value). Editor area
+   "Content data" (`components/editor/DataPanel.tsx`): forms built from each
+   list's fields, add / edit / reorder / duplicate / delete, paste or CSV import
+   with header detection, column matching and a preview. Online saving: every
+   write is a compare-and-swap on `updated_at`, and a sync that finds a product
+   changed on two devices keeps both (the newer as the product, the older as a
+   named copy) using the version each device last agreed on
+   (`persistence/sync.ts`). Pages don't read data yet, so nothing printed
+   changed. Tests: `tests/data-collections.test.tsx`, `tests/cloud-sync.test.ts`.
 5. First proof: a devotional (long-form content from data).
 6. Second proof: an inventory notebook (blank repeating records, typed tables,
    content-aware columns, both orientations) — with no engine changes.

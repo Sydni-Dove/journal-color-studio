@@ -7,10 +7,11 @@
  */
 import { useState, type ReactNode } from "react";
 
-export type AreaId = "pages" | "layout" | "writing" | "add" | "style" | "setup" | "print" | "advanced";
+export type AreaId = "pages" | "data" | "layout" | "writing" | "add" | "style" | "setup" | "print" | "advanced";
 
 export const AREAS: { id: AreaId; title: string; blurb: string }[] = [
   { id: "pages", title: "Pages", blurb: "What's in this product and how often each page repeats" },
+  { id: "data", title: "Content data", blurb: "Lists of entries for this product: days, items, log entries" },
   { id: "layout", title: "Page layout", blurb: "How this page is arranged" },
   { id: "writing", title: "Writing", blurb: "Writing lines and writing space" },
   { id: "add", title: "Add to page", blurb: "Sections, prompts and extras on this page" },

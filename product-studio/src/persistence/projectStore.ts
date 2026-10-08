@@ -1,4 +1,5 @@
 import { migrateLayers } from "../themes/layers";
+import { normalizeData } from "../engines/data/data";
 import type { DecorativeTheme } from "../types/theme";
 /**
  * Project persistence — localStorage, one key per project plus an index.
@@ -51,7 +52,10 @@ export function migrate(raw: unknown): ProductProject | null {
     // than guessed at.
     return null;
   }
-  return migrateLayers(migrateDecoration(p));
+  const migrated = migrateLayers(migrateDecoration(p));
+  // Product data keeps every value; only its shape is repaired (absent stays absent).
+  if (migrated.data === undefined) return migrated;
+  return { ...migrated, data: normalizeData(migrated.data) };
 }
 
 /**

@@ -210,6 +210,8 @@ export type ProductProject = {
    * of the sections, so editing that page never changes the design.
    */
   pageDesigns?: PageDesign[];
+  /** The product's own data: collections of typed entries (engines/data/data.ts). Absent until the first collection. */
+  data?: import("./document").ProjectData;
   activeVariantId: string | null;
   origin: ProjectOrigin;
 

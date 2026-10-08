@@ -24,6 +24,13 @@ export interface CloudBackend {
   list(): Promise<CloudProject[]>;
   get(id: string): Promise<CloudProject | null>;
   put(p: ProductProject): Promise<void>;
+  /**
+   * Write `p` only if the online copy is still at `expected` (its updatedAt), or — with
+   * `expected` null — only if there is no online copy yet. One statement on the server, so
+   * two devices saving at once can never both succeed. false = the online copy is not at
+   * `expected` (nothing was written).
+   */
+  putIf(p: ProductProject, expected: string | null): Promise<boolean>;
   remove(id: string): Promise<void>;
 }
 
@@ -51,6 +58,20 @@ export const supabaseBackend = (): CloudBackend => {
       const { error } = await db().upsert({ id: p.id, name: p.name, data: p, updated_at: p.updatedAt, deleted_at: null }, { onConflict: "owner_id,id" });
       if (error) throw error;
     },
+    async putIf(p, expected) {
+      const values = { id: p.id, name: p.name, data: p, updated_at: p.updatedAt, deleted_at: null };
+      if (expected === null) {
+        // A product that isn't online yet: insert, never overwrite (the primary key refuses a second copy).
+        const { error } = await db().insert(values);
+        if (!error) return true;
+        if (error.code === "23505") return false;
+        throw error;
+      }
+      // Compare-and-swap: the row changes only while it is still the version this save started from.
+      const { data, error } = await db().update(values).eq("id", p.id).eq("updated_at", expected).select("id");
+      if (error) throw error;
+      return (data ?? []).length === 1;
+    },
     async remove(id) {
       // Kept online (recoverable), just no longer listed.
       const { error } = await db().update({ deleted_at: new Date().toISOString() }).eq("id", id);
@@ -60,24 +81,49 @@ export const supabaseBackend = (): CloudBackend => {
 };
 
 export type SyncPlan = {
-  /** Newer online (or only online): save these on this device. */
+  /** Changed only online (or only online): save these on this device. */
   toLocal: ProductProject[];
-  /** Newer on this device (or only here): send these online. */
-  toCloud: ProductProject[];
+  /** Changed only here (or only here): send these online — `expected` is the online version they replace (null = new). */
+  toCloud: { project: ProductProject; expected: string | null }[];
+  /**
+   * Changed on BOTH sides since they last agreed: the newer becomes the product on both
+   * sides, and the older is kept as a copy — no edits are lost.
+   */
+  keepBoth: { newer: ProductProject; older: ProductProject; olderFrom: "this device" | "online"; expected: string | null }[];
 };
 
-/** Merge by product: the newer version of each wins on both sides; nothing is deleted. */
-export function planSync(local: ProductProject[], remote: CloudProject[]): SyncPlan {
+/** Two versions with the same content (only their save time differs). */
+const sameContent = (a: ProductProject, b: ProductProject) => JSON.stringify({ ...a, updatedAt: "" }) === JSON.stringify({ ...b, updatedAt: "" });
+
+/**
+ * Merge by product, using the version both sides last agreed on (`baseOf`):
+ *   changed only online → here; changed only here → online;
+ *   changed on both sides → keep both (newer as the product, older as a copy).
+ * Without a known base (never synced on this device) two differing versions are
+ * both kept rather than guessed at. Nothing is deleted.
+ */
+export function planSync(local: ProductProject[], remote: CloudProject[], baseOf: (id: string) => string | undefined = () => undefined): SyncPlan {
   const byId = new Map(local.map((p) => [p.id, p]));
   const seen = new Set<string>();
-  const plan: SyncPlan = { toLocal: [], toCloud: [] };
+  const plan: SyncPlan = { toLocal: [], toCloud: [], keepBoth: [] };
   for (const r of remote) {
     seen.add(r.id);
     const l = byId.get(r.id);
-    if (!l || r.updatedAt > l.updatedAt) plan.toLocal.push(r.data);
-    else if (l.updatedAt > r.updatedAt) plan.toCloud.push(l);
+    if (!l) { plan.toLocal.push(r.data); continue; }
+    if (l.updatedAt === r.updatedAt) continue;
+    const base = baseOf(r.id);
+    if (base !== undefined && l.updatedAt === base) { plan.toLocal.push(r.data); continue; }
+    if (base !== undefined && r.updatedAt === base) { plan.toCloud.push({ project: l, expected: r.updatedAt }); continue; }
+    // Both changed (or unknown): keep both unless they only differ in their save time.
+    const localNewer = l.updatedAt > r.updatedAt;
+    if (sameContent(l, r.data)) {
+      if (localNewer) plan.toCloud.push({ project: l, expected: r.updatedAt });
+      else plan.toLocal.push(r.data);
+      continue;
+    }
+    plan.keepBoth.push(localNewer ? { newer: l, older: r.data, olderFrom: "online", expected: r.updatedAt } : { newer: r.data, older: l, olderFrom: "this device", expected: r.updatedAt });
   }
-  for (const l of local) if (!seen.has(l.id)) plan.toCloud.push(l);
+  for (const l of local) if (!seen.has(l.id)) plan.toCloud.push({ project: l, expected: null });
   return plan;
 }
 
@@ -89,10 +135,22 @@ export type CloudSave = { status: "saved" } | { status: "conflict"; newer: Produ
  * caller keeps the newer one and saves these edits as a copy.
  */
 export async function saveOnline(backend: CloudBackend, p: ProductProject, base: string | null): Promise<CloudSave> {
-  const online = await backend.get(p.id);
-  if (online && base && online.updatedAt > base && online.updatedAt !== p.updatedAt) return { status: "conflict", newer: online.data };
-  await backend.put(p);
-  return { status: "saved" };
+  // Each attempt is one compare-and-swap on the server; between attempts we only learn what is there now.
+  let expected = base;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    if (await backend.putIf(p, expected)) return { status: "saved" };
+    const online = await backend.get(p.id);
+    if (!online) {
+      expected = null; // not online (yet, or any more): add it
+      continue;
+    }
+    if (online.updatedAt === p.updatedAt) return { status: "saved" }; // this very version is already there
+    // Another device saved after these edits started: keep theirs, these edits become a copy.
+    if (!base || online.updatedAt > base) return { status: "conflict", newer: online.data };
+    // The online copy is older than these edits' starting point (earlier edits here never reached it): replace it — atomically.
+    expected = online.updatedAt;
+  }
+  throw new Error("The online copy kept changing while saving; your edits are kept on this device and will be sent at the next sync.");
 }
 
 export type { Session };

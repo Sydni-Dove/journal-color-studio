@@ -18,6 +18,7 @@ import type { BookNode } from "../../types/recipe";
 import { PagesPanel, PlannerSetupPanel, ProductPanel, ProductionPanel } from "./ProductionPanels";
 import { BookOutlinePanel, BookStructurePanel, ThisPagePanel } from "./BookPanels";
 import { PagesBuilder } from "./PagesBuilder";
+import { DataPanel, dataSummary } from "./DataPanel";
 import { DesignPresetsPanel } from "./DesignPresetsPanel";
 import { AreaList, AreaView, useArea, type AreaId } from "./Areas";
 import { ThisPageHeading, AddToPageHint } from "./ThisPage";
@@ -214,6 +215,7 @@ export function Editor({ project, onChange, onBack, saveStatus, cloudLabel }: Pr
   const summaries: Partial<Record<AreaId, string>> = doc
     ? {
         pages: `${doc.recipe.pageCount} page${doc.recipe.pageCount === 1 ? "" : "s"}${doc.calendar ? (doc.calendar.settings.undated ? " · Undated" : ` · ${doc.calendar.settings.startDate.slice(0, 4)}`) : ""}`,
+        data: dataSummary(project.data),
         layout: `This page: ${pageInfo(doc, current).typeLabel}`,
         style: findPalette(project.colors.paletteId)?.label ?? "Colors, background, decorations and typography",
         setup: `${SIZE_PRESETS.find((z) => z.id === project.dimensions.sizePresetId)?.label ?? "Custom size"} · ${BINDING_PROFILES[project.production.bindingType]?.label ?? project.production.bindingType}`,
@@ -266,6 +268,7 @@ export function Editor({ project, onChange, onBack, saveStatus, cloudLabel }: Pr
                   <p className="hint">To move between the printed pages, use <strong>Browse pages</strong> above the preview.</p>
                 </>
               )}
+              {area === "data" && <DataPanel data={project.data} onChange={(fn) => update((p) => ({ ...p, data: fn(p.data) }))} />}
               {area === "layout" && doc && usage && (
                 <>
                   <ThisPageHeading doc={doc} current={current} onDuplicate={duplicateCurrent} />
