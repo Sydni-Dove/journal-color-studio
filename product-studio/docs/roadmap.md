@@ -120,6 +120,15 @@ per product. Order of work:
    named copy) using the version each device last agreed on
    (`persistence/sync.ts`). Pages don't read data yet, so nothing printed
    changed. Tests: `tests/data-collections.test.tsx`, `tests/cloud-sync.test.ts`.
+   Deletion travels between devices: a deleted product's row is kept with
+   `deleted_at` and listed to every device; a device with no unsynced edits
+   removes it, unsynced edits become a "(recovered after deletion · saved …)"
+   copy under a new id, the deleted id is never written back, deletions made
+   offline are remembered until they reach the online copy, and a deletion
+   never hides newer edits saved on another device. Copies are named neutrally
+   (`persistence/copyNames.ts`: "<name> (other version · saved <time>)").
+   Verified live against Supabase with `tests/live/cloud-live.ts` (run by hand
+   in a signed-in dev page; 29/29) and in two signed-in browser sessions.
 5. First proof: a devotional (long-form content from data).
 6. Second proof: an inventory notebook (blank repeating records, typed tables,
    content-aware columns, both orientations) — with no engine changes.
