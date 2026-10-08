@@ -165,7 +165,9 @@ export function paginateZones(reqs: ZoneRequest[], pageHeights: (i: number) => n
     cur.push(r);
   };
   /** The least a section must place where it starts: whole, or its first piece of minFirst units. */
-  const startNeed = (r: ZoneRequest) => (r.split ? minZoneHeight(r.split.piece(0, Math.min(r.split.count, Math.max(1, r.split.minFirst)), true), linePitch) : minZoneHeight(r, linePitch));
+  // A section too short to leave minLast units after its first minFirst can only start whole.
+  const firstUnits = (sp: ZoneSplit) => (sp.count - Math.max(1, sp.minFirst) < sp.minLast ? sp.count : Math.max(1, sp.minFirst));
+  const startNeed = (r: ZoneRequest) => (r.split ? minZoneHeight(r.split.piece(0, Math.min(r.split.count, firstUnits(r.split)), true), linePitch) : minZoneHeight(r, linePitch));
   for (let idx = 0; idx < reqs.length; idx++) {
     let r = reqs[idx];
     const cur = pages[pages.length - 1];

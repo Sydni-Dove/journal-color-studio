@@ -12,6 +12,50 @@ import {
   parseDelimited, planImport, recordIssues, removeCollection, removeField, removeRecord, renameCollection, setValue, updateField, VALUE_TYPE_LABEL,
 } from "../../engines/data/data";
 import { Check, Field, Section } from "./ui";
+import { DEVOTIONAL_STRUCTURES, matchRoles, ROLE_LABEL, usesCollection, type DevotionalRole } from "../../presets/devotionalStructures";
+import type { BookNode } from "../../types/recipe";
+
+/** What the panel needs to print a list as the product's pages. */
+export type BookLink = { structure: BookNode[] | undefined; use: (structureId: string, collectionId: string) => void };
+
+/** Print this list as a devotional: choose a structure, see which fields it prints (and which it doesn't), use it. */
+function DevotionalBox({ c, book }: { c: DataCollection; book: BookLink }) {
+  const [structure, setStructure] = useState(DEVOTIONAL_STRUCTURES[0].id);
+  const [done, setDone] = useState<string | null>(null);
+  const { map, unused } = matchRoles(c);
+  const used = usesCollection(book.structure, c.id);
+  const roles = Object.keys(ROLE_LABEL) as DevotionalRole[];
+  const fieldLabel = (key: string) => c.fields.find((f) => f.key === key)?.label ?? key;
+  const chosen = DEVOTIONAL_STRUCTURES.find((x) => x.id === structure)!;
+  return (
+    <Section title={`Print as a devotional${used ? " · in use" : ""}`} open={used}>
+      <p className="hint">{used ? `This product's pages are made from “${c.name}”: one day per entry, in this list's order. Choose another structure any time — the entries stay as they are.` : `Make this product's pages from “${c.name}”: one day per entry, in this list's order. The entries are never changed; page size, binding and style still come from the product.`}</p>
+      <Field label="Structure">
+        <select value={structure} aria-label="Devotional structure" onChange={(e) => { setStructure(e.target.value); setDone(null); }}>
+          {DEVOTIONAL_STRUCTURES.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}
+        </select>
+      </Field>
+      <p className="hint">{chosen.description}</p>
+      <ul className="data-roles">
+        {roles.map((r) => (
+          <li key={r}>{ROLE_LABEL[r]}: {map[r] ? <strong>{fieldLabel(map[r]!)}</strong> : <span className="hint">no field — not printed</span>}</li>
+        ))}
+      </ul>
+      {unused.length > 0 && <p className="data-issue" role="note">Not printed by this structure: {unused.map((f) => `“${f.label}”`).join(", ")}. Rename a field to one of the parts above to print it.</p>}
+      <div className="row">
+        <button
+          type="button"
+          className="btn btn--primary"
+          disabled={!map.teaching && !map.title && !map.scripture}
+          onClick={() => { book.use(structure, c.id); setDone(`The pages now follow “${chosen.label}”. Any cover, divider and back cover pages were kept; Undo restores the previous pages.`); }}
+        >
+          {used ? "Switch to this structure" : "Make the pages from this list"}
+        </button>
+      </div>
+      {done && <p className="hint" role="status">{done}</p>}
+    </Section>
+  );
+}
 
 const PAGE_SIZE = 20;
 
@@ -268,7 +312,7 @@ export function dataSummary(data: ProjectData | undefined): string | undefined {
   return `${cs.length} list${cs.length === 1 ? "" : "s"} · ${n} entr${n === 1 ? "y" : "ies"}`;
 }
 
-export function DataPanel({ data, onChange }: { data: ProjectData | undefined; onChange: (fn: (d: ProjectData | undefined) => ProjectData) => void }) {
+export function DataPanel({ data, onChange, book }: { data: ProjectData | undefined; onChange: (fn: (d: ProjectData | undefined) => ProjectData) => void; book?: BookLink }) {
   const cs = data?.collections ?? [];
   const [selected, setSelected] = useState<string | null>(cs[0]?.id ?? null);
   const [name, setName] = useState("");
@@ -285,7 +329,7 @@ export function DataPanel({ data, onChange }: { data: ProjectData | undefined; o
   };
   return (
     <div className="data-panel">
-      <p className="hint">They save, undo and sync with the product. Pages don't use them yet, so nothing here changes what prints.</p>
+      <p className="hint">They save, undo and sync with the product. A list prints only when the pages are made from it (Print as a devotional).</p>
       {cs.length > 0 && c && (
         <>
           <Field label="List">
@@ -300,6 +344,7 @@ export function DataPanel({ data, onChange }: { data: ProjectData | undefined; o
           <RecordsEditor key={`r-${c.id}`} c={c} set={onChange} />
           <ImportBox key={`i-${c.id}`} c={c} set={onChange} />
           <FieldsEditor key={`f-${c.id}`} c={c} set={onChange} />
+          {book && <DevotionalBox key={`d-${c.id}`} c={c} book={book} />}
         </>
       )}
       <Section title="New list" open={cs.length === 0}>

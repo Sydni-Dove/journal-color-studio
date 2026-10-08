@@ -15,6 +15,8 @@ import { bindPromptSet, fillTemplate, entryValues } from "../src/engines/data/bi
 import { addCollection, addRecord, moveRecord, setValue } from "../src/engines/data/data";
 import { DEVOTIONAL_STRUCTURES, matchRoles, withDevotionalStructure } from "../src/presets/devotionalStructures";
 import { step } from "../src/presets/bookRecipes";
+import { validateProject } from "../src/engines/validation/validate";
+import { heuristicMeasurer } from "../src/engines/typography/textMeasure";
 import { sampleData, sampleDevotional, sampleEntry, sizeOf, type DevotionalOpts } from "./fixtures/devotionalSamples";
 import type { LayoutNode } from "../src/types/layout";
 import type { ProductProject } from "../src/types/project";
@@ -135,10 +137,21 @@ describe("a devotional from saved entries", () => {
     for (const s of DEVOTIONAL_STRUCTURES) checkDevotional({ days: 7, structure: s.id });
   });
 
-  it("each day starts on a right-hand page: intentional, labelled notes pages fill the gaps", () => {
+  it("each day starts on a right-hand page: intentional, labelled notes pages fill the gaps; continued pages may fall on either side", () => {
     const { pages, firstPageOf } = checkDevotional({ days: 7, structure: "right-hand" });
     for (const pageNo of firstPageOf.values()) expect(pageNo % 2, `day starting on p${pageNo}`).toBe(1);
     expect(pages.some(({ pg }) => pg.filler)).toBe(true);
+    expect(pages.some(({ pg }) => (pg.flowPart ?? 0) > 0 && pg.side === "verso")).toBe(true);
+    // The book check agrees: no start-side errors (it never applies a start side to continued pages).
+    const issues = validateProject(sampleDevotional({ days: 7, structure: "right-hand" }), heuristicMeasurer).issues.filter((x) => x.severity === "error" && /must start on/.test(x.message));
+    expect(issues.map((x) => x.message)).toEqual([]);
+  });
+
+  it("the book check finds nothing to fix in a full devotional (every structure)", () => {
+    for (const s of DEVOTIONAL_STRUCTURES) {
+      const errors = validateProject(sampleDevotional({ days: 14, structure: s.id }), heuristicMeasurer).issues.filter((x) => x.severity === "error");
+      expect(errors.map((x) => `${x.rule}: ${x.message}`), s.id).toEqual([]);
+    }
   });
 
   it("40 days on several page sizes, orientations and bindings", () => {

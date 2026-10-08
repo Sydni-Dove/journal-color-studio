@@ -87,7 +87,7 @@ const flowing: Build = (collectionId, m) => [
       ...body("dev-scripture", "Scripture", m.scripture),
       ...body("dev-teaching", "", m.teaching),
       ...questions("dev-questions", m.questions),
-      writing("dev-response", m.questions ? "" : "Reflect", 8),
+      writing("dev-response", m.questions ? "Your reflections" : "Reflect", 8),
       ...body("dev-prayer", "Prayer", m.prayer),
       ...body("dev-application", "Apply", m.application),
       writing("dev-next-step", "My next step", 3),
@@ -99,7 +99,7 @@ const flowing: Build = (collectionId, m) => [
 const readingThenJournal: Build = (collectionId, m) => [
   perEntry("dev-each-day", collectionId, [
     page("dev-reading", m, [...body("dev-scripture", "Scripture", m.scripture), ...body("dev-teaching", "", m.teaching)]),
-    page("dev-journal", m, [...questions("dev-questions", m.questions), writing("dev-response", m.questions ? "" : "Reflect"), ...body("dev-prayer", "Prayer", m.prayer), ...body("dev-application", "Apply", m.application)], { subtitle: titles(m).subtitle ?? titles(m).title }),
+    page("dev-journal", m, [...questions("dev-questions", m.questions), writing("dev-response", m.questions ? "Your reflections" : "Reflect"), ...body("dev-prayer", "Prayer", m.prayer), ...body("dev-application", "Apply", m.application)], { subtitle: titles(m).subtitle ?? titles(m).title }),
   ]),
 ];
 

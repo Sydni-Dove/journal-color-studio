@@ -19,6 +19,7 @@ import { PagesPanel, PlannerSetupPanel, ProductPanel, ProductionPanel } from "./
 import { BookOutlinePanel, BookStructurePanel, ThisPagePanel } from "./BookPanels";
 import { PagesBuilder } from "./PagesBuilder";
 import { DataPanel, dataSummary } from "./DataPanel";
+import { withDevotionalStructure } from "../../presets/devotionalStructures";
 import { DesignPresetsPanel } from "./DesignPresetsPanel";
 import { AreaList, AreaView, useArea, type AreaId } from "./Areas";
 import { ThisPageHeading, AddToPageHint } from "./ThisPage";
@@ -216,7 +217,8 @@ export function Editor({ project, onChange, onBack, saveStatus, cloudLabel }: Pr
     ? {
         pages: `${doc.recipe.pageCount} page${doc.recipe.pageCount === 1 ? "" : "s"}${doc.calendar ? (doc.calendar.settings.undated ? " · Undated" : ` · ${doc.calendar.settings.startDate.slice(0, 4)}`) : ""}`,
         data: dataSummary(project.data),
-        layout: `This page: ${pageInfo(doc, current).typeLabel}`,
+        // A product can have no pages yet (a devotional list with no entries, an empty page list).
+        layout: doc.recipe.pages[current] ? `This page: ${pageInfo(doc, current).typeLabel}` : "No pages yet",
         style: findPalette(project.colors.paletteId)?.label ?? "Colors, background, decorations and typography",
         setup: `${SIZE_PRESETS.find((z) => z.id === project.dimensions.sizePresetId)?.label ?? "Custom size"} · ${BINDING_PROFILES[project.production.bindingType]?.label ?? project.production.bindingType}`,
         print: check ? (check.errorCount ? `${check.errorCount} to fix before printing` : check.warningCount ? `${check.warningCount} to check` : "This page checks out") : undefined,
@@ -268,7 +270,20 @@ export function Editor({ project, onChange, onBack, saveStatus, cloudLabel }: Pr
                   <p className="hint">To move between the printed pages, use <strong>Browse pages</strong> above the preview.</p>
                 </>
               )}
-              {area === "data" && <DataPanel data={project.data} onChange={(fn) => update((p) => ({ ...p, data: fn(p.data) }))} />}
+              {area === "data" && (
+                <DataPanel
+                  data={project.data}
+                  onChange={(fn) => update((p) => ({ ...p, data: fn(p.data) }))}
+                  book={{
+                    structure: project.recipe.structure,
+                    use: (structureId, collectionId) =>
+                      update((p) => {
+                        const c = p.data?.collections.find((x) => x.id === collectionId);
+                        return c ? { ...p, recipe: { ...p.recipe, structure: withDevotionalStructure(p.recipe.structure, structureId, c) } } : p;
+                      }),
+                  }}
+                />
+              )}
               {area === "layout" && doc && usage && (
                 <>
                   <ThisPageHeading doc={doc} current={current} onDuplicate={duplicateCurrent} />

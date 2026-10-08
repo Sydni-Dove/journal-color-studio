@@ -341,9 +341,15 @@ function GroupCard({ g, scope, props, first, last, edit }: { g: BookGroup; scope
   const inner: Scope = g.period ?? scope;
   const periods: Scope[] = ["none", ...(SMALLER[scope].filter((k) => k !== "day") as Scope[])];
   const set = (patch: Partial<BookGroup>) => edit((n) => updateNode(n, g.id, (x) => ({ ...x, ...patch }) as BookNode));
+  const list = g.entries ? props.project.data?.collections.find((c) => c.id === g.entries!.collectionId) : undefined;
   return (
     <fieldset className="book-section" data-section={g.id}>
-      <legend>{g.label || SECTION_LABEL[g.period ?? "none"]}{g.designId ? ` · ${g.children.length} page${g.children.length === 1 ? "" : "s"} from your page design` : ""}</legend>
+      <legend>{g.label || SECTION_LABEL[g.period ?? "none"]}{g.designId ? ` · ${g.children.length} page${g.children.length === 1 ? "" : "s"} from your page design` : ""}{list ? ` · once per entry of “${list.name}” (${list.records.length})` : ""}</legend>
+      {g.entries && (
+        <p className="hint">
+          {list ? `These pages repeat for each entry of “${list.name}”, in its order, and print that entry's words. Edit the words in Content data. In a page title, {title} or {day|#} prints that field (# = the entry's place).` : "This section repeats for each entry of a list that no longer exists. Choose a list in Content data."}
+        </p>
+      )}
       <NodeList nodes={g.children} scope={inner} parentId={g.id} props={props} />
       <details className="book-section__settings">
         <summary>Section settings</summary>
@@ -352,7 +358,7 @@ function GroupCard({ g, scope, props, first, last, edit }: { g: BookGroup; scope
             <input type="text" value={g.label ?? ""} placeholder={SECTION_LABEL[g.period ?? "none"]} onChange={(e) => set({ label: e.target.value })} />
           </Field>
           {/* Pages from a page design are a set number of pages (Pages → Number of pages), never a repeating section. */}
-          {!g.designId && <Select label="How often this section repeats" value={g.period ?? "none"} options={periods.map((p) => ({ value: p, label: SECTION_LABEL[p] }))} onChange={(v) => set({ period: v === "none" ? undefined : (v as BookGroup["period"]) })} />}
+          {!g.designId && !g.entries && <Select label="How often this section repeats" value={g.period ?? "none"} options={periods.map((p) => ({ value: p, label: SECTION_LABEL[p] }))} onChange={(v) => set({ period: v === "none" ? undefined : (v as BookGroup["period"]) })} />}
         </div>
         <div className="card-actions">
           <button className="btn" disabled={first} onClick={() => edit((n) => moveNode(n, g.id, -1))}>Move section up</button>

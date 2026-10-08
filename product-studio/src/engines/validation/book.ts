@@ -54,7 +54,8 @@ export function validateBook(doc: ResolvedDocument): ValidationIssue[] {
   if (composite && paged) {
     const steps = new Map(bookSteps(doc.project.recipe.structure!).map(({ step }) => [step.id, step]));
     pages.forEach((p, i) => {
-      if (p.filler || p.spreadPart === 1) return;
+      // A start side applies to where a page begins: never to the pages its content continues onto.
+      if (p.filler || p.spreadPart === 1 || (p.flowPart ?? 0) > 0) return;
       const prev = pages[i - 1];
       if (prev && !prev.filler && prev.key === p.key) return;
       const rule = steps.get(p.recipeItemId)?.start;
