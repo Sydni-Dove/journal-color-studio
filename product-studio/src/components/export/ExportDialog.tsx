@@ -1,13 +1,14 @@
 import { plainIssue, SEVERITY_LABEL } from "../help/plainIssues";
 import { TechnicalDetails } from "../help/visuals";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ResolvedDocument } from "../../engines/document/resolve";
 import { planPrint } from "../../engines/print/printPlan";
 import { compositionFor, contentGeometryFor, solvePage } from "../../engines/document/resolve";
 import { coverSurfaceColors, coverSurfaceTheme } from "../../design-library/coverSurfaces";
 import { rasterRequests } from "../../themes/decorationPlan";
 import { prepareRasters } from "../../themes/recolor";
-import { createCanvasMeasurer, heuristicMeasurer } from "../../engines/typography/textMeasure";
+import { createCanvasMeasurer, getLayoutMeasurer, heuristicMeasurer } from "../../engines/typography/textMeasure";
+import { browserFontStatus, exportReadiness } from "../../engines/print/readiness";
 import { validateProject } from "../../engines/validation/validate";
 import type { ExportSettings } from "../../types/project";
 import type { ProjectUsage } from "../../engines/document/usage";
@@ -136,7 +137,13 @@ export function ExportDialog({ doc, usage, currentIndex, fontsReady, onClose, on
     return validateProject(doc.project, measure, { pageIndices });
   }, [doc.project, pageIndices, fontsReady]);
 
-  const blocked = !report.exportAllowed || plan.errors.length > 0 || !fontsReady;
+  // Final pagination only: real fonts loaded and the pages laid out with them (engines/print/readiness.ts).
+  const readinessNow = () => exportReadiness({ fontsReady, browserFonts: browserFontStatus(), docMeasurerId: doc.measurerId, currentMeasurerId: getLayoutMeasurer().id, resolveNotes: doc.resolveNotes });
+  const readiness = readinessNow();
+  // The latest check, for the moment just before printing (fonts can finish loading while artwork is prepared).
+  const latestReadiness = useRef(readinessNow);
+  latestReadiness.current = readinessNow;
+  const blocked = !report.exportAllowed || plan.errors.length > 0 || !readiness.ready;
 
   useEffect(() => {
     if (!printing) return;
@@ -150,7 +157,15 @@ export function ExportDialog({ doc, usage, currentIndex, fontsReady, onClose, on
       .then(() =>
         requestAnimationFrame(() =>
           requestAnimationFrame(() => {
-            if (!cancelled) window.print();
+            if (cancelled) return;
+            // Checked again now: a font that finished meanwhile means new pagination, not this print tree.
+            const r = latestReadiness.current();
+            if (!r.ready) {
+              setPrinting(false);
+              setPrepError(`Not printed: ${r.reason}`);
+              return;
+            }
+            window.print();
           }),
         ),
       );
@@ -235,7 +250,7 @@ export function ExportDialog({ doc, usage, currentIndex, fontsReady, onClose, on
         <div className="row">
           <span className={`badge ${report.errorCount ? "badge--error" : "badge--ok"}`}>{report.errorCount} to fix</span>
           <span className={`badge ${report.warningCount ? "badge--warning" : ""}`}>{report.warningCount} to check</span>
-          <span className="hint">{report.checkedPages} page(s) checked · {fontsReady ? "checked with your fonts" : "waiting for fonts…"}</span>
+          <span className="hint">{report.checkedPages} page(s) checked · {readiness.ready ? "checked with your fonts" : "waiting for fonts…"}</span>
         </div>
         {plan.errors.map((e) => (
           <div key={e} className="issue issue--error">{e}</div>
@@ -248,6 +263,7 @@ export function ExportDialog({ doc, usage, currentIndex, fontsReady, onClose, on
           }}
         />
         {prepError && <div className="issue issue--error">{prepError}</div>}
+        {!readiness.ready && <p className="hint" data-export-readiness="waiting">{readiness.reason}</p>}
         {!report.exportAllowed && <p className="hint">Fix the items marked “Needs fixing before export” to export. Nothing is exported with a known problem.</p>}
         <div className="row" style={{ justifyContent: "flex-end" }}>
           <button className="btn" onClick={onClose}>Close</button>

@@ -90,8 +90,13 @@ per product. Order of work:
    to/from today's PromptSet — every shipped prompt set prints identically after
    a round trip; a semantic fingerprint that ignores styling; per-requirement
    standings). Nothing is drawn from the model yet.
-2. Measurement safety: measure continuation on the narrower of the left/right
-   pages; block export until real fonts are measured.
+2. **Measurement and export readiness** — done: continuation pages are measured
+   on both sides (mirrored binding margins; the usable page is the same size on
+   both for every binding today, pinned by a test) and on the book's FINAL page
+   count — a spine gutter grows in printer bands, so the count is re-measured
+   until it settles. Export (button and the moment before printing) waits until
+   the fonts are loaded and the pages were laid out with them
+   (`engines/print/readiness.ts`). Tests: `tests/measurement.test.tsx`.
 3. Component-level splitting in `paginateZones`: text by line, tables and lists
    by row (header repeated), records kept whole, headings kept with what follows,
    numbering across the document.

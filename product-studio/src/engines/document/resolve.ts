@@ -24,7 +24,7 @@ import { isScriptFont, withLuxeCoverType } from "../../presets/coverLuxe";
 import { resolveWording } from "../../presets/wording";
 import type { BindingProfile } from "../../types/binding";
 import type { CalendarData, WeekStart } from "../../types/calendar";
-import type { PageGeometry } from "../../types/geometry";
+import type { PageGeometry, PageSide } from "../../types/geometry";
 import { sidewaysGeometry } from "../geometry/turn";
 import type { SolvedPage } from "../../types/layout";
 import type { PrintProfile } from "../../types/print";
@@ -115,6 +115,14 @@ export type ResolvedDocument = {
   /** BACKGROUND / surface layer (solid, marble, pattern, watercolor), drawn under the elements. */
   background: DecorativeTheme;
   duplex: boolean;
+  /**
+   * The text measurer the pages were laid out with ("heuristic" until the real
+   * fonts are loaded, then "canvas:…"). Export only proceeds when this is the
+   * real-font measurer for the current fonts (engines/print/readiness.ts).
+   */
+  measurerId: string;
+  /** Measurement notes from resolving (e.g. the page count did not settle). */
+  resolveNotes: string[];
 };
 
 function isPaged(binding: BindingProfile, duplex: boolean): boolean {
@@ -163,29 +171,58 @@ export function resolveDocument(input: ProductProject): ResolvedDocument {
   // paging, and the facing-page behavior (spread mode + filler kind).
   const recipeKey = JSON.stringify([project.recipe, project.calendar, paged, base.spreadMode, base.fillerLayoutId]);
   let recipe = recipeCache.get(recipeKey, () => expandRecipe(project.recipe, base));
-  // Content that continues on more pages (prompt + response pages): measure against this product's page, then
-  // expand again with the continuation pages. (Geometry depends on the page count only through the spine, so
-  // the first pass's page is the right size to measure on.)
+  const resolveNotes: string[] = [];
+  // Content that continues on more pages (prompt + response pages): measure it against this product's own pages,
+  // then expand again with the continuation pages. Two things change what a page holds:
+  //   · the side: left- and right-hand pages mirror the binding margins, so both are measured and the larger
+  //     page count is used (they are the same width for every binding today; tests/measurement.test pins that);
+  //   · the page count: a spine binding's gutter grows with the book's thickness in printer bands (KDP, Lulu), so
+  //     continuation pages can push the book into a band with a wider gutter and a narrower page. The count is
+  //     measured again until the pages it was measured on are the pages the book ends up with.
   if (recipe.pages.some((pg) => getLayout(pg.layoutId).flowPages)) {
     const spacing = resolveSpacing(project.spacing.density, project.spacing.overrides);
-    const typography = resolveTypography(project.typography.fonts, project.typography.roleOverrides);
-    const page = computePageGeometry({
-      trim,
-      binding,
-      boundEdge: project.production.boundEdge,
-      printProfile,
-      includeBleed: project.production.includeBleed,
-      pageCount: recipe.pageCount,
-      side: paged ? "recto" : "single",
-      duplex,
-      recommendedOverrides: PRODUCT_RECOMMENDED_MARGINS[project.productType],
-      userMargins: project.production.userMargins,
-    });
-    const fit = { page, spacing, typography, options: project.layoutOptions, pattern: project.functionalPattern };
-    const flowKey = JSON.stringify([recipeKey, trim, project.production, project.productType, spacing, project.typography, project.layoutOptions, project.functionalPattern, getLayoutMeasurer().id]);
-    recipe = recipeCache.get(flowKey, () =>
-      expandRecipe(project.recipe, { ...base, flowPages: (id, module) => getLayout(id).flowPages?.({ ...fit, module }) ?? 1 }),
-    );
+    // The type the pages are drawn with (incl. a designed cover's), so measuring and drawing agree.
+    const typography = bookTypography(project, recipe);
+    const sides: PageSide[] = paged ? ["recto", "verso"] : ["single"];
+    const pagesAt = (pageCount: number) =>
+      sides.map((side) =>
+        computePageGeometry({
+          trim,
+          binding,
+          boundEdge: project.production.boundEdge,
+          printProfile,
+          includeBleed: project.production.includeBleed,
+          pageCount,
+          side,
+          duplex,
+          recommendedOverrides: PRODUCT_RECOMMENDED_MARGINS[project.productType],
+          userMargins: project.production.userMargins,
+        }),
+      );
+    // What measuring depends on: the usable page on each side (not the count itself, so books in one band share a cache).
+    const pageKey = (pages: PageGeometry[]) => JSON.stringify(pages.map((g) => [g.safeRect, g.trimWidthIn, g.trimHeightIn]));
+    const measuredOn = (pages: PageGeometry[]) => {
+      const fits = pages.map((page) => ({ page, spacing, typography, options: project.layoutOptions, pattern: project.functionalPattern }));
+      const flowKey = JSON.stringify([recipeKey, pageKey(pages), project.productType, spacing, project.typography, project.layoutOptions, project.functionalPattern, getLayoutMeasurer().id]);
+      return recipeCache.get(flowKey, () =>
+        expandRecipe(project.recipe, { ...base, flowPages: (id, module) => Math.max(...fits.map((f) => getLayout(id).flowPages?.({ ...f, module }) ?? 1)) }),
+      );
+    };
+    // The gutter only grows with the page count, and more continuation pages only follow from a narrower page,
+    // so this settles in a step or two (bounded for safety).
+    let measuredPages = pagesAt(recipe.pageCount);
+    let settled = false;
+    for (let round = 0; round < 8; round++) {
+      const next = measuredOn(measuredPages);
+      const finalPages = pagesAt(next.pageCount);
+      recipe = next;
+      if (pageKey(finalPages) === pageKey(measuredPages)) {
+        settled = true;
+        break;
+      }
+      measuredPages = finalPages;
+    }
+    if (!settled) resolveNotes.push("Continuation pages were measured on the final page size, but the page count did not settle; check pages that continue.");
   }
 
   return {
@@ -208,6 +245,8 @@ export function resolveDocument(input: ProductProject): ResolvedDocument {
       return { decorative: normalizeDecoration(layers.elements), background: normalizeDecoration(layers.background) };
     })(),
     duplex,
+    measurerId: getLayoutMeasurer().id,
+    resolveNotes,
   };
 }
 
