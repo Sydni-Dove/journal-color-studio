@@ -80,16 +80,7 @@ export function useCloud({ store, onLocalChanged, onConflict }: Hooks, backendFo
     if (!b) return;
     setStatus("syncing");
     try {
-      const r = await saveOnline(b, p, base);
-      if (r.status === "saved") bases.set(p.id, p.updatedAt);
-      if (r.status === "conflict") {
-        const copy = duplicateProject(p, `${p.name} (changes from another device)`);
-        store.save(r.newer);
-        bases.set(r.newer.id, r.newer.updatedAt);
-        store.save(copy);
-        if (await b.putIf(copy, null)) bases.set(copy.id, copy.updatedAt);
-        hooks.current.onConflict(r.newer, copy.name);
-      }
+      await applySave(store, b, bases, p, base, (newer, copyName) => hooks.current.onConflict(newer, copyName));
       setStatus("saved");
       setError(null);
     } catch (e) {
@@ -128,6 +119,25 @@ const defaultBases = storageBases();
  * meanwhile is simply left for the next sync. Returns the products saved on
  * this device (to refresh the list and any open product).
  */
+/**
+ * Send one save online. If another device saved this product since these edits
+ * started, its newer version becomes the product here, and these edits are kept
+ * as a copy named "… (version from this device)" — here and online.
+ */
+export async function applySave(store: ProjectStore, b: CloudBackend, bases: SyncBases, p: ProductProject, base: string | null, onKeptBoth: (newer: ProductProject, copyName: string) => void): Promise<void> {
+  const r = await saveOnline(b, p, base);
+  if (r.status === "saved") {
+    bases.set(p.id, p.updatedAt);
+    return;
+  }
+  const copy = duplicateProject(p, `${p.name} (version from this device)`);
+  store.save(r.newer);
+  bases.set(r.newer.id, r.newer.updatedAt);
+  store.save(copy);
+  if (await b.putIf(copy, null)) bases.set(copy.id, copy.updatedAt);
+  onKeptBoth(r.newer, copy.name);
+}
+
 export async function applySync(store: ProjectStore, b: CloudBackend, bases: SyncBases, onKeptBoth: (newer: ProductProject, copyName: string) => void): Promise<ProductProject[]> {
   const local = store.list().map((s) => store.load(s.id)).filter((p): p is ProductProject => !!p);
   const remote = await b.list();

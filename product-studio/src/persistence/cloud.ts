@@ -26,7 +26,8 @@ export interface CloudBackend {
   put(p: ProductProject): Promise<void>;
   /**
    * Write `p` only if the online copy is still at `expected` (its updatedAt), or — with
-   * `expected` null — only if there is no online copy yet. One statement on the server, so
+   * `expected` null — only if there is no listed online copy (none yet, or one removed on
+   * another device, which is brought back). Each write is one statement on the server, so
    * two devices saving at once can never both succeed. false = the online copy is not at
    * `expected` (nothing was written).
    */
@@ -64,8 +65,12 @@ export const supabaseBackend = (): CloudBackend => {
         // A product that isn't online yet: insert, never overwrite (the primary key refuses a second copy).
         const { error } = await db().insert(values);
         if (!error) return true;
-        if (error.code === "23505") return false;
-        throw error;
+        if (error.code !== "23505") throw error;
+        // A row exists. If it was removed (on another device) while this device still has the product,
+        // bring it back with these contents — again only while it is still removed. A live row is never touched.
+        const revived = await db().update(values).eq("id", p.id).not("deleted_at", "is", null).select("id");
+        if (revived.error) throw revived.error;
+        return (revived.data ?? []).length === 1;
       }
       // Compare-and-swap: the row changes only while it is still the version this save started from.
       const { data, error } = await db().update(values).eq("id", p.id).eq("updated_at", expected).select("id");
@@ -92,8 +97,16 @@ export type SyncPlan = {
   keepBoth: { newer: ProductProject; older: ProductProject; olderFrom: "this device" | "online"; expected: string | null }[];
 };
 
-/** Two versions with the same content (only their save time differs). */
-const sameContent = (a: ProductProject, b: ProductProject) => JSON.stringify({ ...a, updatedAt: "" }) === JSON.stringify({ ...b, updatedAt: "" });
+/**
+ * A value as JSON with every object's keys sorted. The online copy comes back
+ * from Postgres jsonb, which stores object keys in its own order, so plain
+ * JSON.stringify would call identical products different.
+ */
+export function canonicalJson(v: unknown): string {
+  return JSON.stringify(v, (_k, x) => (x && typeof x === "object" && !Array.isArray(x) ? Object.fromEntries(Object.keys(x).sort().map((k) => [k, x[k]])) : x));
+}
+/** Two versions with the same content (only their save time differs; key order never matters). */
+export const sameContent = (a: ProductProject, b: ProductProject) => canonicalJson({ ...a, updatedAt: "" }) === canonicalJson({ ...b, updatedAt: "" });
 
 /**
  * Merge by product, using the version both sides last agreed on (`baseOf`):

@@ -16,20 +16,26 @@ const at = (p: ProductProject, t: string, name = p.name): ProductProject => ({ .
 const online = (p: ProductProject): CloudProject => ({ id: p.id, name: p.name, updatedAt: p.updatedAt, data: p });
 
 /** An online store whose conditional write behaves like the server's single UPDATE … WHERE updated_at = expected. */
-function fakeBackend(rows: ProductProject[] = []): CloudBackend & { rows: Map<string, ProductProject> } {
+function fakeBackend(rows: ProductProject[] = []): CloudBackend & { rows: Map<string, ProductProject>; removed: Map<string, ProductProject> } {
   const map = new Map(rows.map((r) => [r.id, r]));
+  const removed = new Map<string, ProductProject>(); // removed rows stay online, unlisted (like deleted_at)
   return {
     rows: map,
+    removed,
     list: async () => [...map.values()].map(online),
     get: async (id) => (map.has(id) ? online(map.get(id)!) : null),
     put: async (p) => void map.set(p.id, p),
     putIf: async (p, expected) => {
       const cur = map.get(p.id);
       if (expected === null ? cur !== undefined : cur?.updatedAt !== expected) return false;
+      removed.delete(p.id);
       map.set(p.id, p);
       return true;
     },
-    remove: async (id) => void map.delete(id),
+    remove: async (id) => {
+      if (map.has(id)) removed.set(id, map.get(id)!);
+      map.delete(id);
+    },
   };
 }
 function memoryStore(rows: ProductProject[] = []): ProjectStore & { rows: Map<string, ProductProject> } {
@@ -71,7 +77,9 @@ describe("planSync", () => {
   });
   it("never synced on this device (no base): differing versions are both kept, never guessed; identical content isn't copied", () => {
     expect(planSync([at(a, T1, "A here")], [online(at(a, T2, "A online"))]).keepBoth).toHaveLength(1);
-    const same = planSync([at(a, T1)], [online(at(a, T2))]);
+    // The online copy comes back from jsonb with its keys in another order: still the same content.
+    const reordered = (p: ProductProject): ProductProject => JSON.parse(JSON.stringify(Object.fromEntries(Object.entries(p).reverse())));
+    const same = planSync([at(a, T1)], [online(reordered(at(a, T2)))]);
     expect(same.keepBoth).toEqual([]);
     expect(same.toLocal.map((p) => p.updatedAt)).toEqual([T2]);
   });
@@ -128,6 +136,13 @@ describe("saveOnline (compare-and-swap)", () => {
     const n = at(createProject("journal", { name: "New" }), T1);
     expect(await saveOnline(be, n, null)).toEqual({ status: "saved" });
     expect(be.rows.get(n.id)!.name).toBe("New");
+  });
+  it("a product removed on another device but still edited here is brought back, not lost or stuck", async () => {
+    const p = at(createProject("journal", { name: "P" }), T0);
+    const be = fakeBackend([p]);
+    await be.remove(p.id);
+    expect(await saveOnline(be, at(p, T1, "P kept here"), T0)).toEqual({ status: "saved" });
+    expect(be.rows.get(p.id)!.name).toBe("P kept here");
   });
   it("two devices saving from the same version at the same moment: exactly one is saved, the other is told", async () => {
     const p = at(createProject("journal", { name: "P" }), T0);
