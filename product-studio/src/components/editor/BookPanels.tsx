@@ -15,6 +15,7 @@ import { PromptEditor, type PromptFit } from "./PromptEditor";
 import { sectionLineCounts, sectionPages } from "../../layouts/shared/promptPages";
 import { promptSetFromList } from "../../types/prompts";
 import { layoutAvailability, solvePage, type ResolvedDocument } from "../../engines/document/resolve";
+import { entryContentIds } from "../../engines/data/bind";
 import { addNode, bookOutline, duplicateNode, moveNode, newSection, newStep, removeNode, structureFromItems, updateNode } from "../../engines/recipe/bookEdit";
 import { getLayout } from "../../layouts/registry";
 import { BOOK_PRESETS } from "../../presets/bookRecipes";
@@ -308,7 +309,7 @@ function StepCard({ s, siblings, scope, props, first, last }: { s: BookStep; sib
       <div className="card-actions">
         <button className="btn" disabled={first} onClick={() => edit((n) => moveNode(n, s.id, -1))}>Move up</button>
         <button className="btn" disabled={last} onClick={() => edit((n) => moveNode(n, s.id, 1))}>Move down</button>
-        <button className="btn" onClick={() => edit((n) => duplicateNode(n, s.id))}>Duplicate</button>
+        {!entryContentIds(props.project.recipe.structure ?? []).has(s.id) && <button className="btn" onClick={() => edit((n) => duplicateNode(n, s.id))}>Duplicate</button>}
         <button className="btn btn--danger" onClick={() => edit((n) => removeNode(n, s.id))}>Remove</button>
         <button className="btn btn--ghost" onClick={() => props.goToStep(s.id)}>Show pages</button>
       </div>
@@ -363,7 +364,7 @@ function GroupCard({ g, scope, props, first, last, edit }: { g: BookGroup; scope
         <div className="card-actions">
           <button className="btn" disabled={first} onClick={() => edit((n) => moveNode(n, g.id, -1))}>Move section up</button>
           <button className="btn" disabled={last} onClick={() => edit((n) => moveNode(n, g.id, 1))}>Move section down</button>
-          <button className="btn" onClick={() => edit((n) => duplicateNode(n, g.id))}>Duplicate section</button>
+          {!entryContentIds(props.project.recipe.structure ?? []).has(g.id) && <button className="btn" onClick={() => edit((n) => duplicateNode(n, g.id))}>Duplicate section</button>}
           <button className="btn btn--danger" onClick={() => edit((n) => removeNode(n, g.id))}>Remove section</button>
         </div>
       </details>

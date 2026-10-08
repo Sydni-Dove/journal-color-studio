@@ -17,6 +17,7 @@
  * Saving never overwrites an existing design: a name already in use is refused
  * and the maker chooses another.
  */
+import { entryContentIds } from "../data/bind";
 import type { PageDesign, ProductProject } from "../../types/project";
 import type { BookGroup, BookNode, BookStep, RecipeCadence } from "../../types/recipe";
 import type { PromptSet } from "../../types/prompts";
@@ -134,6 +135,7 @@ export function nextPageName(name: string, taken: Set<string>): string {
  * pages keep their printed title.
  */
 export function duplicatePage(nodes: BookNode[], stepId: string): { nodes: BookNode[]; id: string } | null {
+  if (entryContentIds(nodes).has(stepId)) return null; // a page that prints a list's entries: copying it would print them twice
   const all: BookStep[] = [];
   (function walk(ns: BookNode[]) {
     for (const n of ns) n.kind === "group" ? walk(n.children) : all.push(n);
@@ -163,7 +165,11 @@ export function duplicatePage(nodes: BookNode[], stepId: string): { nodes: BookN
 export const MAX_REPEATS = 50;
 const isCover = (n: BookNode) => n.kind === "step" && (n.module === "cover-page" || n.module === "back-cover");
 /** The rows that can be repeated (everything but the front and end covers). */
-export const repeatableNodes = (nodes: BookNode[]) => nodes.filter((n) => !isCover(n));
+export const repeatableNodes = (nodes: BookNode[]) => {
+  // Sections that print a list's entries are never repeated (their words would print twice).
+  const entries = entryContentIds(nodes);
+  return nodes.filter((n) => !isCover(n) && !entries.has(n.id));
+};
 /** Every step inside a row (itself, or a group's pages). */
 export function stepsOf(n: BookNode): BookStep[] {
   return n.kind === "step" ? [n] : n.children.flatMap(stepsOf);
@@ -188,7 +194,7 @@ export function repeatIndex(nodes: BookNode[], ids: string[], place: RepeatPlace
 }
 
 export function repeatPages(nodes: BookNode[], ids: string[], times: number, index: number): BookNode[] {
-  const chosen = nodes.filter((n) => ids.includes(n.id) && !isCover(n));
+  const chosen = repeatableNodes(nodes).filter((n) => ids.includes(n.id));
   const n = Math.max(0, Math.min(MAX_REPEATS, Math.floor(times)));
   if (!chosen.length || !n) return nodes;
   const taken = new Set(nodes.flatMap(stepsOf).map((s) => s.title ?? ""));

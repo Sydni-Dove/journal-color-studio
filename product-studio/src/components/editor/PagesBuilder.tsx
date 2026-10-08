@@ -21,6 +21,7 @@ import {
 import { getLayout } from "../../layouts/registry";
 import { addPageFromDesign, duplicatePage, isDesignGroup, MAX_DESIGN_PAGES, MAX_REPEATS, moveAmong, removePageDesign, repeatableNodes, repeatIndex, repeatPages, setDesignPageCount, stepFromDesign, stepsOf, type RepeatPlace } from "../../engines/recipe/pageDesigns";
 import { Segmented } from "./ui";
+import { entryContentIds } from "../../engines/data/bind";
 import { PageThumb } from "../preview/PageThumb";
 import { usePhone } from "../../utils/usePhone";
 import { neutralLuxeDividers } from "../../presets/bookRecipes";
@@ -37,7 +38,9 @@ const nextYear = new Date().getFullYear() + 1;
 const DATED_CATEGORIES: BuilderCategory[] = ["yearly", "monthly", "weekly", "daily"];
 
 /** "Every month", "After the weekly pages", "End of each month", "× 3" — how often, in words. */
-function howOften(r: BuilderRow, rows: BuilderRow[]): string {
+function howOften(r: BuilderRow, rows: BuilderRow[], project?: ProductProject): string {
+  const list = entryList(r, project);
+  if (list) return `Once per entry of “${list.name}” (${list.records.length})`;
   const c = r.step.cadence;
   const period = stepPeriod(r.step, r.parents);
   switch (c.type) {
@@ -55,6 +58,19 @@ function howOften(r: BuilderRow, rows: BuilderRow[]): string {
       return `Every ${period}`;
   }
 }
+
+/** The content list a row's section repeats for, if any. */
+const entryList = (r: BuilderRow, project?: ProductProject) => {
+  const g = r.parents.find((x) => x.entries);
+  return g ? project?.data?.collections.find((c) => c.id === g.entries!.collectionId) ?? { name: "a list that no longer exists", records: [] } : undefined;
+};
+/** A title template in words: "{title}" → "[Title]" (the field it prints, by its label). */
+const templateName = (t: string, project?: ProductProject) =>
+  t.replace(/\{([^{}]+)\}/g, (_m, inner: string) => {
+    const k = inner.split("|")[0].trim();
+    const f = k === "#" ? null : project?.data?.collections.flatMap((c) => c.fields).find((x) => x.key === k);
+    return `[${k === "#" ? "number" : f?.label ?? k}]`;
+  });
 
 const rowName = (s: BookStep, period: string = "none") =>
   s.module === "monthly-calendar" || s.module === "weekly-planner" || s.module === "daily-planner" || s.module === "back-cover" || s.module === "cover-page"
@@ -142,15 +158,15 @@ function Category({ cat, rows, allRows, edit, onEdit, doc, structure, project }:
         ) : (
           <div key={it.r.step.id} className="builder-row" data-step={it.r.step.id}>
             <div className="builder-row__text">
-              <span className="builder-row__name">{rowName(it.r.step, stepPeriod(it.r.step, it.r.parents))}</span>
+              <span className="builder-row__name">{entryList(it.r, project) ? templateName(rowName(it.r.step, stepPeriod(it.r.step, it.r.parents)), project) : rowName(it.r.step, stepPeriod(it.r.step, it.r.parents))}</span>
               <span className="builder-row__detail">
-                {layoutName(it.r.step.layoutId, getLayout(it.r.step.layoutId).label)} · {howOften(it.r, allRows)}
+                {layoutName(it.r.step.layoutId, getLayout(it.r.step.layoutId).label)} · {howOften(it.r, allRows, project)}
                 {it.r.step.module === "divider-page" ? ` · ${it.r.step.cover?.tab?.show ? `Tab: ${(it.r.step.cover.tab.label ?? it.r.step.title ?? "").toUpperCase() || "on"}` : "No tab"}` : ""}
               </span>
             </div>
             <div className="builder-row__actions">
               <button type="button" className="btn" onClick={() => onEdit(it.r.step.id)} aria-label={`Edit ${rowName(it.r.step)}`}>Edit</button>
-              {movable && (
+              {movable && !entryContentIds(structure).has(it.r.step.id) && (
                 <button type="button" className="btn" onClick={() => edit((n) => duplicatePage(n, it.r.step.id)?.nodes ?? n)} aria-label={`Duplicate ${rowName(it.r.step)}`}>Duplicate</button>
               )}
               {moveButtons(it.r.step.id, rowName(it.r.step))}

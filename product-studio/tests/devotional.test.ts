@@ -15,6 +15,8 @@ import { bindPromptSet, fillTemplate, entryValues } from "../src/engines/data/bi
 import { addCollection, addRecord, moveRecord, setValue } from "../src/engines/data/data";
 import { DEVOTIONAL_STRUCTURES, matchRoles, withDevotionalStructure } from "../src/presets/devotionalStructures";
 import { step } from "../src/presets/bookRecipes";
+import { duplicateNode } from "../src/engines/recipe/bookEdit";
+import { duplicatePage, repeatableNodes, repeatPages } from "../src/engines/recipe/pageDesigns";
 import { validateProject } from "../src/engines/validation/validate";
 import { heuristicMeasurer } from "../src/engines/typography/textMeasure";
 import { sampleData, sampleDevotional, sampleEntry, sizeOf, type DevotionalOpts } from "./fixtures/devotionalSamples";
@@ -208,6 +210,26 @@ describe("content and structure stay separate", () => {
     const current = [step("cover-page", { type: "once" }), step("lined-journal", { type: "copies", count: 3 }), step("back-cover", { type: "once" })];
     const next = withDevotionalStructure(current, "flowing", c);
     expect(next.map((n) => (n.kind === "step" ? n.module : "days"))).toEqual(["cover-page", "days", "back-cover"]);
+  });
+
+  it("what prints a list's entries can't be duplicated or repeated (its words would print twice); other pages still can", () => {
+    const p = sampleDevotional({ days: 3 });
+    const notes = step("lined-journal", { type: "copies", count: 2 });
+    const structure = [...p.recipe.structure!, notes];
+    const group = structure[0];
+    const dayPage = group.kind === "group" ? group.children[0].id : "";
+    expect(duplicateNode(structure, group.id)).toBe(structure);
+    expect(duplicateNode(structure, dayPage)).toBe(structure);
+    expect(duplicatePage(structure, dayPage)).toBeNull();
+    expect(repeatableNodes(structure).map((n) => n.id)).toEqual([notes.id]);
+    expect(repeatPages(structure, [group.id], 2, structure.length)).toBe(structure);
+    expect(duplicateNode(structure, notes.id)).toHaveLength(structure.length + 1);
+    // A page with no entry fields inside the per-entry section (a plain journal page each day) may be duplicated.
+    const plain = step("lined-journal", { type: "once" });
+    const withPlain = structure.map((n) => (n.id === group.id && n.kind === "group" ? { ...n, children: [...n.children, plain] } : n));
+    expect(duplicatePage(withPlain, plain.id)).not.toBeNull();
+    const words = solveAll({ ...p, recipe: { ...p.recipe, structure: duplicateNode(structure, dayPage) } }).pages.flatMap(({ s }) => s.nodes.map(textOf).join(" ").match(TOKEN) ?? []).filter((w) => !w.includes("tit"));
+    expect(words).toEqual(expectedTokens(3));
   });
 
   it("a list that was deleted, or has no entries, is reported — never a silent empty book", () => {

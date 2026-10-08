@@ -3,6 +3,7 @@
  * these) and the lightweight generated-pages OUTLINE used for navigation —
  * text rows only, so a 300-page book never renders 300 previews.
  */
+import { entryContentIds } from "../data/bind";
 import type { ExpandedRecipe } from "./recipe";
 import type { BookGroup, BookNode, BookStep, PageInstance, ProductRecipe, RecipeCadence, RecipeItem, RepeatRule } from "../../types/recipe";
 import { getModule } from "../../presets/modules";
@@ -55,10 +56,12 @@ export function cloneNode(n: BookNode): BookNode {
 }
 
 /** Duplicate a node right after itself. */
-export function duplicateNode(nodes: BookNode[], id: string): BookNode[] {
+export function duplicateNode(nodes: BookNode[], id: string, root: BookNode[] = nodes): BookNode[] {
+  // Never copy what prints a list's entries (its words would print twice).
+  if (entryContentIds(root).has(id)) return nodes;
   const i = nodes.findIndex((n) => n.id === id);
   if (i >= 0) return [...nodes.slice(0, i + 1), cloneNode(nodes[i]), ...nodes.slice(i + 1)];
-  return nodes.map((n) => (n.kind === "group" ? { ...n, children: duplicateNode(n.children, id) } : n));
+  return nodes.map((n) => (n.kind === "group" ? { ...n, children: duplicateNode(n.children, id, root) } : n));
 }
 
 /** Append a node to a section (null = the top level). */

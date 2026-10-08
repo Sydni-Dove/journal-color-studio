@@ -21,6 +21,7 @@
  */
 import type { DataCollection, DataRecord } from "../../types/document";
 import type { PromptBlock, PromptSet } from "../../types/prompts";
+import type { BookNode } from "../../types/recipe";
 import { displayValue } from "./data";
 
 /** A line its writer already numbered or bulleted. */
@@ -95,4 +96,30 @@ export function bindPromptSet(set: PromptSet, c: DataCollection, r: DataRecord, 
         }
       : {}),
   };
+}
+
+/**
+ * Parts of a book that print a list's entries: per-entry sections, the steps
+ * in them whose sections name a field, and every section containing either.
+ * Copying one would print entries twice, so duplicate and repeat refuse them.
+ */
+export function entryContentIds(nodes: BookNode[]): Set<string> {
+  const out = new Set<string>();
+  const walk = (ns: BookNode[], inEntries: boolean): boolean => {
+    let any = false;
+    for (const n of ns) {
+      if (n.kind === "step") {
+        if (inEntries && n.promptSet?.blocks.some((b) => b.content?.key)) {
+          out.add(n.id);
+          any = true;
+        }
+      } else if (walk(n.children, inEntries || !!n.entries) || n.entries) {
+        out.add(n.id);
+        any = true;
+      }
+    }
+    return any;
+  };
+  walk(nodes, false);
+  return out;
 }

@@ -129,7 +129,23 @@ per product. Order of work:
    (`persistence/copyNames.ts`: "<name> (other version · saved <time>)").
    Verified live against Supabase with `tests/live/cloud-live.ts` (run by hand
    in a signed-in dev page; 29/29) and in two signed-in browser sessions.
-5. First proof: a devotional (long-form content from data).
+5. **First proof: a devotional from saved entries** — done. A book section
+   repeats once per entry of a content list (`BookGroup.entries`), in the
+   list's order, each entry's stable id in its page keys. Page sections name the
+   field they print (`content.key`); `engines/data/bind.ts` fills them per entry
+   (body text flows across pages through the shared paginator; questions print
+   as a numbered list, or as written when already numbered; `{field}` / `{#}`
+   in titles). Empty values leave their section out; nothing is shortened,
+   rewritten, duplicated or moved between sections, and anything that prints
+   entries can't be duplicated or repeated. `presets/devotionalStructures.ts`:
+   three structures matched to a list's fields by key or label (unprinted
+   fields are reported), chosen in Content data → Print as a devotional;
+   switching structure, size or binding never touches the entries. Fixes found
+   on the way: a start side no longer applies to continued pages, and a heading
+   is never left alone above a section too short to split. Tests:
+   `tests/devotional.test.ts` (7 / 40 / 365 days, short and very long entries,
+   every structure, several sizes, landscape, perfect-bound and coil); a
+   138-page Chrome PDF was checked word by word.
 6. Second proof: an inventory notebook (blank repeating records, typed tables,
    content-aware columns, both orientations) — with no engine changes.
 7. Layout alternatives and suggestions; 8. AI-generated document structures
