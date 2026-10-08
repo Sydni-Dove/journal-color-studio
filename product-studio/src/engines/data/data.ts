@@ -221,8 +221,8 @@ export const COLLECTION_STARTERS: { id: string; label: string; fields: FieldDef[
     id: "devotional", label: "Devotional days",
     fields: [
       { key: "day", label: "Day", valueType: "number" }, { key: "title", label: "Title", valueType: "text", required: true },
-      { key: "scripture", label: "Scripture", valueType: "reference" }, { key: "reading", label: "Devotional text", valueType: "longText", required: true },
-      { key: "questions", label: "Reflection questions", valueType: "longText" }, { key: "prayer", label: "Prayer", valueType: "longText" }, { key: "action", label: "Action step", valueType: "text" },
+      { key: "scripture", label: "Scripture", valueType: "longText" }, { key: "reading", label: "Teaching", valueType: "longText", required: true },
+      { key: "questions", label: "Reflection questions", valueType: "longText" }, { key: "prayer", label: "Prayer", valueType: "longText" }, { key: "action", label: "Application", valueType: "longText" },
     ],
   },
   {

@@ -23,6 +23,7 @@
  */
 import { formatWeekRange, MONTH_NAMES } from "../calendar/calendar";
 import { recordStarts } from "./sequence";
+import { bindPromptSet, entryValues, fillTemplate } from "../data/bind";
 import { getModule, modulePrompts, moduleStart, moduleTitle, type PeriodKind } from "../../presets/modules";
 import type { CalendarData } from "../../types/calendar";
 import type { PageSide } from "../../types/geometry";
@@ -64,10 +65,12 @@ export function periodKey(p: PeriodRef): string {
       return p.key;
     case "day":
       return p.iso;
+    case "entry":
+      return `e:${p.recordId}`;
   }
 }
 
-const periodKind = (p: PeriodRef): PeriodKind => (p.kind === "none" || p.kind === "copy" ? "none" : p.kind);
+const periodKind = (p: PeriodRef): PeriodKind => (p.kind === "none" || p.kind === "copy" || p.kind === "entry" ? "none" : p.kind);
 
 export function periodLabel(cal: CalendarData | null, p: PeriodRef): string | undefined {
   if (!cal) return undefined;
@@ -307,6 +310,16 @@ function expandList(nodes: BookNode[], scope: PeriodRef, path: string, ctx: Book
 }
 
 function expandGroup(g: BookGroup, scope: PeriodRef, path: string, order: number, ctx: BookContext, diags: RecipeDiagnostic[]): Item[] {
+  if (g.entries) {
+    // Once per entry of a content list, in the list's order; each entry keeps its stable id in its pages' keys.
+    const c = ctx.data?.collections.find((x) => x.id === g.entries!.collectionId);
+    if (!c) {
+      diags.push({ severity: "error", itemId: g.id, message: `"${g.label ?? "A section"}" repeats for each entry of a list that no longer exists. Choose a list in Content data.` });
+      return [];
+    }
+    if (!c.records.length) diags.push({ severity: "warning", itemId: g.id, message: `"${c.name}" has no entries yet, so "${g.label ?? "this section"}" has no pages. Add entries in Content data.` });
+    return [{ leaves: c.records.flatMap((r, index) => expandList(g.children, { kind: "entry", collectionId: c.id, recordId: r.id, index }, `${path}/${g.id}/e:${r.id}`, ctx, diags)), sort: null, order }];
+  }
   if (!g.period) return [{ leaves: expandList(g.children, scope, `${path}/${g.id}`, ctx, diags), sort: null, order }];
   const cal = ctx.calendar;
   if (!cal) {
@@ -316,6 +329,13 @@ function expandGroup(g: BookGroup, scope: PeriodRef, path: string, order: number
   const periods = periodsWithin(cal, scope, g.period);
   if (!periods.length && !hasSharedWeek(cal, scope, g.period)) diags.push({ severity: "error", itemId: g.id, message: `"Every ${g.period}" has no ${g.period}s inside this ${PERIOD_LABEL[periodKind(scope) as RecipePeriod | "none"]} section.` });
   return periods.map((p) => ({ leaves: expandList(g.children, p, `${path}/${periodKey(p)}`, ctx, diags), sort: startKey(cal, p), order }));
+}
+
+/** The list and entry a per-entry page reads (null when the entry was removed since). */
+function entryOf(ctx: BookContext, p: Extract<PeriodRef, { kind: "entry" }>) {
+  const c = ctx.data?.collections.find((x) => x.id === p.collectionId);
+  const r = c?.records.find((x) => x.id === p.recordId);
+  return c && r ? { c, r } : null;
 }
 
 // ─── Paging ────────────────────────────────────────────────────────────────
@@ -355,8 +375,13 @@ export function expandBook(structure: BookNode[], ctx: BookContext): ExpandedRec
     const preserveSpreads = (ctx.spreadMode ?? "preserve") === "preserve";
     const wrongSide = preserveSpreads && ctx.paged && ((wantVerso && pageNumber % 2 === 1) || (start === "recto" && pageNumber % 2 === 0));
     const kind = periodKind(period);
-    const title = step.title ?? moduleTitle(step.module, kind);
-    const subtitle = periodLabel(ctx.calendar, period);
+    // A page of a per-entry section reads its entry: the title and subtitle may name fields, and sections print the entry's values.
+    const entry = period.kind === "entry" ? entryOf(ctx, period) : null;
+    if (period.kind === "entry" && !entry) continue;
+    const values = entry ? entryValues(entry.c, entry.r, period.kind === "entry" ? period.index : 0) : null;
+    const title = (values && step.title ? fillTemplate(step.title, values).trim() : step.title) || moduleTitle(step.module, kind);
+    const subtitle = values ? (step.subtitle ? fillTemplate(step.subtitle, values).trim() || undefined : undefined) : periodLabel(ctx.calendar, period);
+    const promptSet = entry && step.promptSet && period.kind === "entry" ? bindPromptSet(step.promptSet, entry.c, entry.r, period.index) : step.promptSet;
     if (wrongSide) {
       pages.push({
         key: `filler:${fillers++}`,
@@ -373,8 +398,8 @@ export function expandBook(structure: BookNode[], ctx: BookContext): ExpandedRec
     const base = `${step.id}@${leaf.path}:${periodKey(period)}#${leaf.copy}`;
     if (seen.has(base)) diagnostics.push({ severity: "error", itemId: step.id, message: `"${title}" is generated twice for ${subtitle ?? periodKey(period)}.` });
     seen.add(base);
-    const starts = recordStarts(step.promptSet, sequences);
-    const module = { type: step.module, title, subtitle, prompts: step.prompts ?? modulePrompts(step.module, kind), ...(step.promptSet ? { promptSet: step.promptSet } : {}), ...(step.cover ? { cover: step.cover } : {}), ...(starts ? { sequenceStarts: starts } : {}) };
+    const starts = recordStarts(promptSet, sequences);
+    const module = { type: step.module, title, subtitle, prompts: step.prompts ?? modulePrompts(step.module, kind), ...(promptSet ? { promptSet } : {}), ...(step.cover ? { cover: step.cover } : {}), ...(starts ? { sequenceStarts: starts } : {}) };
     // Prompts that don't fit one page continue on more pages (single-page layouts only).
     const flow = n === 1 ? Math.max(1, ctx.flowPages?.(step.layoutId, module) ?? 1) : 1;
     for (let part = 0; part < n * flow; part++) {

@@ -33,6 +33,8 @@ export type RecipeContext = {
   layoutLabel?: (layoutId: string) => string;
   /** Pages one instance of a single-page layout needs (content that continues on another page). Default 1. */
   flowPages?: (layoutId: string, module?: import("../../types/recipe").PageModuleContent) => number;
+  /** The product's content lists: sections that repeat per entry read them (never stored in the recipe). */
+  data?: import("../../types/document").ProjectData;
 };
 
 export type RecipeDiagnostic = { severity: "error" | "warning" | "info"; itemId: string; message: string };
@@ -69,6 +71,8 @@ function periodKey(p: PeriodRef): string {
       return p.key;
     case "day":
       return p.iso;
+    case "entry":
+      return `e:${p.recordId}`;
   }
 }
 

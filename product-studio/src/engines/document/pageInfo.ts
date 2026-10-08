@@ -139,6 +139,8 @@ const undatedMonth = (doc: ResolvedDocument, key: string) => `Month ${(doc.calen
 const monthName = (doc: ResolvedDocument, key: string) => (doc.calendar?.settings.undated ? undatedMonth(doc, key) : monthLabel(key));
 
 function dateOf(doc: ResolvedDocument, p: PageInstance): { dateLabel?: string; monthKey?: string } {
+  // A page of a list entry (a devotional day): its own line ("Day 12"), else its place in the list.
+  if (p.period.kind === "entry") return { dateLabel: p.module?.subtitle ?? `Entry ${p.period.index + 1}` };
   if (doc.calendar?.settings.undated) return undatedDateOf(doc, p);
   const period = p.period;
   switch (period.kind) {

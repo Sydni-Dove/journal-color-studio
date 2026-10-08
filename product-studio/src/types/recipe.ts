@@ -105,8 +105,14 @@ export type BookStep = {
   copies?: number;
   /** Default: "spread" for two-page layouts, otherwise "any". */
   start?: PageStartRule;
-  /** Title override (otherwise the module's title for the period). */
+  /**
+   * Title override (otherwise the module's title for the period). Inside a section that repeats
+   * per list entry, `{fieldKey}` is replaced by that entry's value (`{#}` = its place in the list;
+   * `{day|#}` = the day field, else its place).
+   */
   title?: string;
+  /** Inside a per-entry section: the line beside the title ("Day {day|#}"), with the same `{…}` fields. */
+  subtitle?: string;
   /** Cover / divider page settings (absent on other pages and legacy projects). */
   cover?: CoverDividerSettings;
   /** Prompt overrides for guided pages (saved before prompt blocks; still read). */
@@ -123,6 +129,12 @@ export type BookGroup = {
   id: string;
   label?: string;
   period?: "year" | "quarter" | "month" | "week";
+  /**
+   * Repeat this section once per entry of a content list (ProductProject.data), in the list's
+   * order. Its pages read that entry's values: sections whose `content.key` names one of the
+   * list's fields print it (engines/data/bind.ts). Not combined with `period`.
+   */
+  entries?: { collectionId: string };
   children: BookNode[];
   /**
    * Pages added from a saved page design ("Project Snapshot × 8"): each child
@@ -159,7 +171,9 @@ export type PeriodRef =
   | { kind: "quarter"; key: string }
   | { kind: "month"; key: string }
   | { kind: "week"; key: string }
-  | { kind: "day"; iso: string };
+  | { kind: "day"; iso: string }
+  /** One entry of a content list (ProductProject.data): its stable id and its place in the list (0-based). */
+  | { kind: "entry"; collectionId: string; recordId: string; index: number };
 
 export type PageInstance = {
   /** Stable key used for caching solved layouts. */

@@ -11,6 +11,7 @@
  * Colors and decorative themes are applied at render time only, so changing
  * them never re-solves geometry or dates.
  */
+import type { BookNode } from "../../types/recipe";
 import { getLayout, FILLER_LAYOUT_ID, BLANK_FILLER_LAYOUT_ID, LAYOUTS } from "../../layouts/registry";
 import { fillerKindOf, monthlyArrangementOf, spreadModeOf } from "../../layouts/planner/plannerOptions";
 import type { FitResult, LayoutContext, LayoutDefinition } from "../../layouts/shared/types";
@@ -148,6 +149,9 @@ function bookTypography(project: ProductProject, recipe: ExpandedRecipe): Typogr
   return recipe.pages.some(designedCoverPage) ? withLuxeCoverType(t, project.typography.roleOverrides) : t;
 }
 
+/** Whether a book has sections that repeat per content-list entry (only then does expansion read the data). */
+const usesEntries = (nodes: BookNode[] | undefined): boolean => !!nodes?.some((n) => n.kind === "group" && (!!n.entries || usesEntries(n.children)));
+
 export function resolveDocument(input: ProductProject): ResolvedDocument {
   const project = applyVariant(input);
   const productType = PRODUCT_TYPES[project.productType];
@@ -166,10 +170,12 @@ export function resolveDocument(input: ProductProject): ResolvedDocument {
     pagesPerInstance: (id: string) => getLayout(id).pages,
     layoutPeriod: (id: string) => getLayout(id).period,
     layoutLabel: (id: string) => getLayout(id).label,
+    data: project.data,
   };
   // The recipe key covers everything expansion reads: recipe, calendar,
-  // paging, and the facing-page behavior (spread mode + filler kind).
-  const recipeKey = JSON.stringify([project.recipe, project.calendar, paged, base.spreadMode, base.fillerLayoutId]);
+  // paging, the facing-page behavior (spread mode + filler kind) and the
+  // content lists that per-entry sections read (absent for most products, so their keys are unchanged).
+  const recipeKey = JSON.stringify([project.recipe, project.calendar, paged, base.spreadMode, base.fillerLayoutId, ...(project.data && usesEntries(project.recipe.structure) ? [project.data] : [])]);
   let recipe = recipeCache.get(recipeKey, () => expandRecipe(project.recipe, base));
   const resolveNotes: string[] = [];
   // Content that continues on more pages (prompt + response pages): measure it against this product's own pages,
