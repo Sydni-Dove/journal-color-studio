@@ -72,6 +72,43 @@ A "next" family is shown on the home screen but is never clickable.
   offered for monthly calendars, weekly planners, vision, mission, goals or
   reviews.
 
+## Universal document foundation (in progress)
+
+Product Studio is becoming a universal structured-document creator (devotionals,
+workbooks, curricula, inventory notebooks, notary journals, intake forms,
+maintenance logs, planners…) built from ONE set of components, not a generator
+per product. Order of work:
+
+0. **Protect existing work** — done: unsaved local branches backed up to
+   `backup/*` on GitHub; `tests/golden-templates.test.ts` snapshots what every
+   existing template prints (32 templates × 3 trims + every design preset).
+   Refactors must leave it unchanged; a deliberate change updates it in the
+   same commit and says why.
+1. **Document model** — done (foundation only): `types/document.ts` (components
+   with stable ids and typed fields; presentation hints kept apart; data;
+   reserved requirements) and `engines/document/model.ts` (lossless conversion
+   to/from today's PromptSet — every shipped prompt set prints identically after
+   a round trip; a semantic fingerprint that ignores styling; per-requirement
+   standings). Nothing is drawn from the model yet.
+2. Measurement safety: measure continuation on the narrower of the left/right
+   pages; block export until real fonts are measured.
+3. Component-level splitting in `paginateZones`: text by line, tables and lists
+   by row (header repeated), records kept whole, headings kept with what follows,
+   numbering across the document.
+4. Data layer: typed records in the project (synced), a generic form editor and
+   paste/CSV import.
+5. First proof: a devotional (long-form content from data).
+6. Second proof: an inventory notebook (blank repeating records, typed tables,
+   content-aware columns, both orientations) — with no engine changes.
+7. Layout alternatives and suggestions; 8. AI-generated document structures
+   (same components, no coordinates); 9. Requirements Assistant (reserved in the
+   model now; not built in these phases).
+
+Rules: the collection owns words, the recipe owns order, pagination owns page
+breaks, solvers own geometry, and preview and print draw the same pages.
+Requirements are data about a document; they never decide layout, and the
+studio never makes a blanket compliance claim.
+
 ## Content Template Engine (planned — not built)
 
 Devotionals, workbooks, guided and prompt journals, and course companions
