@@ -98,12 +98,19 @@ const REFERENCE = [
 ];
 const COMPLIANCE = /\b(?:compliant|compliance|complies|meets (?:all |the )?(?:legal|regulatory|state|federal|statutory)|legally (?:valid|binding|required|sufficient|compliant)|required by (?:law|regulation|statute)|(?:HIPAA|OSHA|GDPR|FERPA|ADA|IRS)[- ](?:approved|compliant|ready)|satisfies (?:the )?(?:law|regulation)s?|certified)\b/i;
 
+/** The sentence (or line) of `text` a pattern matches, to quote in a flag. */
+function sentenceWith(text: string, re: RegExp): string {
+  const s = text.split(/\n+|(?<=[.!?])\s+/).map((x) => x.trim()).find((x) => re.test(x)) ?? text.trim();
+  return s.length > 160 ? `${s.slice(0, 159)}…` : s;
+}
+
 function flagsIn(text: string, where: string, aiWrote: boolean): Flag[] {
   const out: Flag[] = [];
   if (!text) return out;
   // A claim of compliance is flagged whoever wrote it; a reference only when the AI supplied it (the maker's own are theirs).
-  if (COMPLIANCE.test(text)) out.push({ kind: "compliance", text: text.slice(0, 160), where });
-  if (aiWrote && REFERENCE.some((r) => r.test(text))) out.push({ kind: "reference", text: text.slice(0, 160), where });
+  if (COMPLIANCE.test(text)) out.push({ kind: "compliance", text: sentenceWith(text, COMPLIANCE), where });
+  const ref = REFERENCE.find((r) => r.test(text));
+  if (aiWrote && ref) out.push({ kind: "reference", text: sentenceWith(text, ref), where });
   return out;
 }
 
@@ -274,7 +281,16 @@ export function checkSpec(raw: unknown, input: { description: string; content?: 
 function placedText(spec: DocSpec): string {
   const out: string[] = [];
   for (const s of spec.sections) for (const c of s.components) if (c.source === "user") out.push(c.label ?? "", c.text ?? "", ...c.items);
-  if (spec.entries?.source === "user") for (const r of spec.entries.records) for (const v of r.values) out.push(v.value);
+  if (spec.entries?.source === "user") {
+    for (const r of spec.entries.records) for (const v of r.values) out.push(v.value);
+    // A per-entry page's title prints each entry's own values ("Day {day}: {title}" → "Day 1: Morning Light").
+    for (const sec of spec.sections)
+      if (sec.repeat.mode === "per-entry")
+        spec.entries.records.forEach((r, i) => {
+          const get = (k: string) => (k === "#" ? String(i + 1) : r.values.find((v) => v.key === k)?.value ?? "");
+          out.push(sec.title.replace(/\{([^{}]+)\}/g, (_m, inner: string) => inner.split("|").map((k) => get(k.trim().toLowerCase())).find((v) => v.trim()) ?? ""));
+        });
+  }
   return normWords(out.join("\n"));
 }
 
