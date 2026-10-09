@@ -101,6 +101,7 @@ export function blockToComponent(b: PromptBlock): DocComponent {
           ...(t.columnTypes ? { sizedByContent: true } : {}),
           ...(t.numbering ? { numbering: { ...t.numbering } } : {}),
           ...(t.columnWidths ? { columnWidths: [...t.columnWidths] } : {}),
+          ...(t.headerLines ? { headerLines: t.headerLines } : {}),
         };
       }
       return { ...base, kind: "question", label: b.label, ...prompt, response: b.responseStyle ?? "pattern", space: spaceOf(b) };
@@ -170,6 +171,7 @@ export function componentToBlock(c: DocComponent, p: ComponentPresentation = {})
           ...(c.sizedByContent ? { columnTypes: c.columns.map((f) => f.valueType) } : {}),
           ...(c.numbering ? { numbering: { ...c.numbering } } : {}),
           ...(c.columnWidths ? { columnWidths: [...c.columnWidths] } : {}),
+          ...(c.headerLines ? { headerLines: c.headerLines } : {}),
         },
         ...style,
       };

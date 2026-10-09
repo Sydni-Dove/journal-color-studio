@@ -62,6 +62,8 @@ export type TableSpec = {
   minRows?: number;
   /** Numbered rows: the first column (key "no") prints this instance's numbers, from `start` (a continued piece adds its row offset). */
   numbers?: { start: number; widest: string };
+  /** Lines a column heading may wrap onto before it is set smaller (default 2). */
+  headerLines?: 2 | 3;
 };
 
 export type StationeryZone = {

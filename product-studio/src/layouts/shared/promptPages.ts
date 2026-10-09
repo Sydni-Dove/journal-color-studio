@@ -163,6 +163,7 @@ function blockZone(set: PromptSet, b: PromptBlock, surfaceOf: (b: PromptBlock) =
             ...(numbered ? { numbers: tableNumbers(sequenceStarts?.[b.id] ?? b.table!.numbering!.start ?? 1, lines!) } : {}),
             showHeader: b.table?.showHeader !== false,
             borders: b.table?.borders ?? "grid",
+            ...(b.table?.headerLines ? { headerLines: b.table.headerLines } : {}),
             ...(b.table?.rowSpace && b.table.rowSpace !== "standard" ? { rowScale: TABLE_ROW_SCALE[b.table.rowSpace] } : {}),
             // Filling the space: the chosen rows are the least it draws.
             ...(lines === undefined ? { minRows: Math.max(1, b.table?.rows ?? b.lineCount ?? 6) } : {}),

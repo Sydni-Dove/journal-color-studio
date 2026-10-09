@@ -38,6 +38,8 @@ export type PromptTable = {
    * kept exactly — automatic sizing and layout suggestions only share out the rest of the table.
    */
   columnWidths?: (number | null)[];
+  /** Lines a column heading may wrap onto before it is set smaller (default 2). */
+  headerLines?: 2 | 3;
   /**
    * Number the rows in a narrow first column ("No."), continuing across the whole product: every copy
    * of the page, and every page the table continues onto, carries on the count. A numbered table prints

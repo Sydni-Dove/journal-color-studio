@@ -19,6 +19,7 @@ import { PagesPanel, PlannerSetupPanel, ProductPanel, ProductionPanel } from "./
 import { BookOutlinePanel, BookStructurePanel, ThisPagePanel } from "./BookPanels";
 import { PagesBuilder } from "./PagesBuilder";
 import { DataPanel, dataSummary } from "./DataPanel";
+import { LayoutAssistant } from "./LayoutAssistant";
 import { withDevotionalStructure } from "../../presets/devotionalStructures";
 import { refitAfterEdit } from "../../engines/recipe/fitRows";
 import { DesignPresetsPanel } from "./DesignPresetsPanel";
@@ -340,6 +341,7 @@ export function Editor({ project, onChange, onBack, saveStatus, cloudLabel }: Pr
                   <div className="card-actions">
                     <button className="btn btn--primary" disabled={!doc} onClick={() => setExporting(true)}>Print / Save PDF…</button>
                   </div>
+                  <LayoutAssistant project={project} update={update} />
                   <Section title={`Page check${check ? ` · ${check.errorCount} to fix · ${check.warningCount} to check` : ""}`} open>
                     <p className="hint">Checks the page you are viewing (and its facing page). The whole product is checked again when you print.</p>
                     {check ? <IssueList issues={check.issues} onGoTo={goToPage} /> : <p className="hint">—</p>}

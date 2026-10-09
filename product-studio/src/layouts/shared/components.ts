@@ -291,7 +291,7 @@ const HEADING_STEP_PT = 0.5;
 
 export type HeadingFit = TextFit & { ok: boolean; heightIn: number; widthIn: number; excessIn: number };
 
-export function fitHeading(value: string, role: TypographyRole, area: { w: number; h: number }, ctx: Pick<LayoutContext, "typography">, measure: TextMeasurer = getLayoutMeasurer().measure): HeadingFit {
+export function fitHeading(value: string, role: TypographyRole, area: { w: number; h: number }, ctx: Pick<LayoutContext, "typography">, measure: TextMeasurer = getLayoutMeasurer().measure, maxLines: 2 | 3 = 2): HeadingFit {
   const r = ctx.typography.roles[role];
   const base = styleForRole(ctx.typography, role);
   const caps = r.transform === "uppercase" || r.transform === "small-caps";
@@ -310,6 +310,18 @@ export function fitHeading(value: string, role: TypographyRole, area: { w: numbe
     }
     return best;
   };
+  // The three-line split whose longest line is shortest.
+  const split3 = (pt: number): string[] | null => {
+    if (words.length < 3) return null;
+    let best: string[] | null = null, bestW = Infinity;
+    for (let a = 1; a < words.length - 1; a++)
+      for (let b = a + 1; b < words.length; b++) {
+        const ls = [words.slice(0, a).join(" "), words.slice(a, b).join(" "), words.slice(b).join(" ")];
+        const w = Math.max(...ls.map((l) => widthAt(l, pt)));
+        if (w < bestW) (bestW = w), (best = ls);
+      }
+    return best;
+  };
   const tryAt = (pt: number, lines: string[], lead: number) => {
     const widthIn = Math.max(...lines.map((l) => widthAt(l, pt)));
     const heightIn = ptToIn(pt * lead) * lines.length;
@@ -322,6 +334,14 @@ export function fitHeading(value: string, role: TypographyRole, area: { w: numbe
     if (two) {
       const t = tryAt(pt, two, multiLead);
       if (t.fitsW && t.fitsH) return { ...t, ok: true, excessIn: 0 };
+    }
+    // Where allowed (a table's taller heading row), three balanced lines before a smaller size.
+    if (maxLines === 3) {
+      const three = split3(pt);
+      if (three) {
+        const t = tryAt(pt, three, multiLead);
+        if (t.fitsW && t.fitsH) return { ...t, ok: true, excessIn: 0 };
+      }
     }
   }
   // Nothing fits: draw at the minimum (the best split if two lines fit the height) and report the excess width.

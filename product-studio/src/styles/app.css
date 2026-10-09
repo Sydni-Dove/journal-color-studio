@@ -1987,3 +1987,35 @@ button.family-card:focus-visible {
   display: grid;
   gap: 2px;
 }
+
+/* Layout suggestions (components/editor/LayoutAssistant.tsx) */
+.layout-findings,
+.layout-outcome {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  display: grid;
+  gap: 2px;
+}
+.layout-alt {
+  border: 1px solid var(--ui-line);
+  border-radius: 8px;
+  padding: 10px;
+  display: grid;
+  gap: 6px;
+}
+.layout-compare {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.layout-compare figure {
+  margin: 0;
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+}
+.layout-compare figcaption {
+  font-size: 12px;
+  color: var(--ui-muted);
+}

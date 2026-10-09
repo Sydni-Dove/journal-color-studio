@@ -106,6 +106,8 @@ export type TableComponent = Base & {
   sizedByContent?: boolean;
   /** Column widths the maker set (inches, by position; null = automatic) — presentation the maker chose deliberately. */
   columnWidths?: (number | null)[];
+  /** Lines a column heading may wrap onto (presentation). */
+  headerLines?: 2 | 3;
   /** Rows numbered across the whole document (a "No." column), as records are. */
   numbering?: { prefix?: string; start?: number; sequence?: string };
 };
