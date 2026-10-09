@@ -100,6 +100,7 @@ export function blockToComponent(b: PromptBlock): DocComponent {
           ...(t.rowSpace !== undefined ? { rowSpace: t.rowSpace } : {}),
           ...(t.columnTypes ? { sizedByContent: true } : {}),
           ...(t.numbering ? { numbering: { ...t.numbering } } : {}),
+          ...(t.columnWidths ? { columnWidths: [...t.columnWidths] } : {}),
         };
       }
       return { ...base, kind: "question", label: b.label, ...prompt, response: b.responseStyle ?? "pattern", space: spaceOf(b) };
@@ -168,6 +169,7 @@ export function componentToBlock(c: DocComponent, p: ComponentPresentation = {})
           // An untyped column was stored as text; only a table sized by content says what its columns hold.
           ...(c.sizedByContent ? { columnTypes: c.columns.map((f) => f.valueType) } : {}),
           ...(c.numbering ? { numbering: { ...c.numbering } } : {}),
+          ...(c.columnWidths ? { columnWidths: [...c.columnWidths] } : {}),
         },
         ...style,
       };

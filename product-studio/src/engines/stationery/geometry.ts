@@ -386,9 +386,34 @@ export type ResolvedColumn = { column: TableColumn; x: number; w: number };
 export function resolveColumns(columns: TableColumn[], x: number, width: number, minWidthOf: (c: TableColumn) => number): { columns: ResolvedColumn[]; scale: number; problems: string[] } {
   const mins = columns.map(minWidthOf);
   const scale = width / columns.reduce((a, c) => a + c.referenceWidthIn, 0);
-  const shared = shareWithMinimums(width, columns.map((c) => c.referenceWidthIn), mins);
-  const widths = shared ?? columns.map((c) => c.referenceWidthIn * scale);
-  const problems = shared ? [] : [`The table's column headings need ${mins.reduce((a, b) => a + b, 0).toFixed(2)}" but the page is ${width.toFixed(2)}" wide.`];
+  const problems: string[] = [];
+  let widths: number[];
+  const fixed = columns.map((c) => (c.fixedIn !== undefined && c.fixedIn > 0 ? c.fixedIn : undefined));
+  if (fixed.some((f) => f !== undefined)) {
+    // A width the maker set is kept exactly; the other columns share what is left (by their proportions, over their minimums).
+    const set = fixed.reduce<number>((a, f) => a + (f ?? 0), 0);
+    const free = columns.map((_, i) => i).filter((i) => fixed[i] === undefined);
+    const room = width - set;
+    const shared = free.length ? shareWithMinimums(Math.max(0, room), free.map((i) => columns[i].referenceWidthIn), free.map((i) => mins[i])) : room >= -1e-6 ? [] : null;
+    if (set > width + 1e-6) {
+      problems.push(`The column widths you set add up to ${set.toFixed(2)}" but the page is ${width.toFixed(2)}" wide.`);
+      // Drawn within the page, in the same proportions, until the widths are changed.
+      widths = columns.map((_, i) => (fixed[i] ?? 0) * (width / set));
+    } else if (!shared) {
+      problems.push(`The column widths you set leave ${room.toFixed(2)}" for the other columns, which need ${free.reduce((a, i) => a + mins[i], 0).toFixed(2)}".`);
+      const k = room / Math.max(1e-6, free.reduce((a, i) => a + columns[i].referenceWidthIn, 0));
+      widths = columns.map((c, i) => fixed[i] ?? Math.max(0, c.referenceWidthIn * k));
+    } else {
+      let j = 0;
+      widths = columns.map((_, i) => fixed[i] ?? shared[j++]);
+    }
+    for (const i of fixed.map((f, i) => (f !== undefined && f + 1e-6 < mins[i] ? i : -1)).filter((i) => i >= 0))
+      problems.push(`Column "${columns[i].label}" is set to ${fixed[i]!.toFixed(2)}", narrower than its heading needs (${mins[i].toFixed(2)}").`);
+  } else {
+    const shared = shareWithMinimums(width, columns.map((c) => c.referenceWidthIn), mins);
+    widths = shared ?? columns.map((c) => c.referenceWidthIn * scale);
+    if (!shared) problems.push(`The table's column headings need ${mins.reduce((a, b) => a + b, 0).toFixed(2)}" but the page is ${width.toFixed(2)}" wide.`);
+  }
   let cx = x;
   const out = columns.map((column, i) => {
     const r = { column, x: cx, w: widths[i] };

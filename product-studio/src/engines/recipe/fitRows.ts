@@ -7,7 +7,8 @@
  * (SolvedPage.fragments) — no separate estimate that could disagree with it.
  */
 import { resolveDocument, solvePage } from "../document/resolve";
-import type { BookNode } from "../../types/recipe";
+import type { BookNode, BookStep } from "../../types/recipe";
+import type { PromptBlock } from "../../types/prompts";
 import type { ProductProject } from "../../types/project";
 
 const PROBE_ROWS = 200;
@@ -45,4 +46,46 @@ export function rowsFillingOnePage(project: ProductProject, blockId: string): nu
 export function fitTableToPage(project: ProductProject, blockId: string): ProductProject {
   const rows = rowsFillingOnePage(project, blockId);
   return rows && project.recipe.structure ? { ...project, recipe: { ...project.recipe, structure: withRows(project.recipe.structure, blockId, Math.max(1, rows)) } } : project;
+}
+
+/** A section whose count follows the page: a numbered table, or a record section, marked to fill the page. */
+export const fillsPage = (b: PromptBlock) => !!b.fillPage && (b.kind === "record" || (b.responseStyle === "table" && !!b.table?.numbering));
+
+function stepsOf(nodes: BookNode[]): BookStep[] {
+  return nodes.flatMap((n) => (n.kind === "group" ? stepsOf(n.children) : [n]));
+}
+
+/** Every page-filling section of a product (by block id, once each). */
+export function pageFillingBlocks(project: ProductProject): string[] {
+  const ids = new Set<string>();
+  for (const s of stepsOf(project.recipe.structure ?? [])) for (const b of s.promptSet?.blocks ?? []) if (fillsPage(b)) ids.add(b.id);
+  return [...ids];
+}
+
+/**
+ * What a page-filling section's count depends on: the page (size, orientation, binding, printer,
+ * margins), the type and spacing, and the other sections on its page — not its own count.
+ */
+export function pageFillKey(project: ProductProject): string {
+  const steps = stepsOf(project.recipe.structure ?? []).filter((s) => s.promptSet?.blocks.some(fillsPage));
+  if (!steps.length) return "";
+  const neutral = (b: PromptBlock): PromptBlock => (fillsPage(b) ? { ...b, lineCount: undefined, recordCount: undefined, ...(b.table ? { table: { ...b.table, rows: 0 } } : {}) } : b);
+  return JSON.stringify([
+    project.dimensions, project.production, project.typography, project.spacing, project.layoutOptions, project.functionalPattern,
+    steps.map((s) => [s.id, s.layoutId, s.title, { ...s.promptSet, blocks: s.promptSet!.blocks.map(neutral) }]),
+  ]);
+}
+
+/** The product with every page-filling section measured to fill its page. */
+export function refitPageFilling(project: ProductProject): ProductProject {
+  return pageFillingBlocks(project).reduce((p, id) => fitTableToPage(p, id), project);
+}
+
+/**
+ * After an edit: refit page-filling sections when what they depend on changed (a quiet, automatic
+ * improvement — the same edit, one undo step). Deliberate counts are not page-filling, so never touched.
+ */
+export function refitAfterEdit(before: ProductProject, after: ProductProject): ProductProject {
+  const key = pageFillKey(after);
+  return key && key !== pageFillKey(before) ? refitPageFilling(after) : after;
 }

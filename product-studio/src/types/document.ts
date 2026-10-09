@@ -104,6 +104,8 @@ export type TableComponent = Base & {
   space: SpaceRequest;
   /** The columns' value types say what each holds, and widths follow from them (otherwise columns are equal and typed as text). */
   sizedByContent?: boolean;
+  /** Column widths the maker set (inches, by position; null = automatic) — presentation the maker chose deliberately. */
+  columnWidths?: (number | null)[];
   /** Rows numbered across the whole document (a "No." column), as records are. */
   numbering?: { prefix?: string; start?: number; sequence?: string };
 };

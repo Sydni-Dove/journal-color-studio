@@ -45,7 +45,8 @@ export type SurfaceKind =
   | "record";
 
 /** A research table column: reference width in inches, scaled by the geometry layer to the page. */
-export type TableColumn = { key: string; label: string; referenceWidthIn: number };
+/** `fixedIn`: a width the maker set for this column — kept exactly; only the other columns share the rest. */
+export type TableColumn = { key: string; label: string; referenceWidthIn: number; fixedIn?: number };
 
 export type TableSpec = {
   columns: TableColumn[];

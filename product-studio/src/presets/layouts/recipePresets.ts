@@ -39,8 +39,6 @@ export type RecipePreset = {
   build: (opts: { count: number; sheets: number; data?: ProjectData }) => ProductRecipe;
   /** A product made from its own content starts with these (empty) lists; its pages are made from them. */
   content?: () => ProjectData;
-  /** A numbered table (or record section) that should fill its page: its rows (records) are measured at the chosen size when the product is made (engines/recipe/fitRows). */
-  fillTable?: string;
   layoutOptions?: Partial<LayoutOptions>;
   /**
    * Set on a complete book (a multi-section recipe that makes the whole
@@ -263,7 +261,7 @@ export function inventoryCountSet(rows = 20): PromptSet {
     blocks: [
       { id: "inv-info", kind: "info", label: "", fields: ["Location", "Date", "Counted by"] },
       {
-        id: "inv-count", label: "", responseStyle: "table", space: "fixed", lineCount: rows,
+        id: "inv-count", label: "", responseStyle: "table", space: "fixed", lineCount: rows, fillPage: true,
         table: { columns: fields.map((f) => f.label), columnTypes: fields.map((f) => f.valueType), rows, showHeader: true, borders: "grid", numbering: { prefix: "No.", sequence: "inventory-items" } },
       },
     ],
@@ -271,7 +269,7 @@ export function inventoryCountSet(rows = 20): PromptSet {
 }
 export function inventoryRecordSet(perPage = 3): PromptSet {
   return {
-    blocks: [{ id: "inv-records", kind: "record", label: "", recordFields: ["Item", "SKU", "Supplier", "Location", "Reorder point", "Unit cost", "Notes"], recordCount: perPage, numbering: { prefix: "Item", sequence: "inventory-records" } }],
+    blocks: [{ id: "inv-records", kind: "record", label: "", fillPage: true, recordFields: ["Item", "SKU", "Supplier", "Location", "Reorder point", "Unit cost", "Notes"], recordCount: perPage, numbering: { prefix: "Item", sequence: "inventory-records" } }],
   };
 }
 export const INVENTORY_PRESETS: RecipePreset[] = [
@@ -281,7 +279,6 @@ export const INVENTORY_PRESETS: RecipePreset[] = [
     productTypes: ["notebook"],
     needsCalendar: false,
     build: ({ count }) => ({ items: [], ordering: "sequential", structure: [step("worksheet", { type: "copies", count: Math.max(1, Math.round(count)) }, { title: "Inventory Count", promptSet: inventoryCountSet() })] }),
-    fillTable: "inv-count",
     layoutOptions: { showPageNumbers: true },
   },
   {
@@ -290,7 +287,6 @@ export const INVENTORY_PRESETS: RecipePreset[] = [
     productTypes: ["notebook"],
     needsCalendar: false,
     build: ({ count }) => ({ items: [], ordering: "sequential", structure: [step("worksheet", { type: "copies", count: Math.max(1, Math.round(count)) }, { title: "Item Records", promptSet: inventoryRecordSet() })] }),
-    fillTable: "inv-records",
     layoutOptions: { showPageNumbers: true },
   },
 ];

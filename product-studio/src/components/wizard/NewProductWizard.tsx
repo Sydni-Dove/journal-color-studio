@@ -31,7 +31,7 @@ import { Field, NumberField } from "../editor/ui";
 import { TechnicalDetails } from "../help/visuals";
 import { layoutAvailability, resolveDocument, type ResolvedDocument } from "../../engines/document/resolve";
 import { BookTemplates } from "./BookTemplates";
-import { fitTableToPage } from "../../engines/recipe/fitRows";
+import { refitPageFilling } from "../../engines/recipe/fitRows";
 
 function Choices<T extends string>({ value, options, onChange }: { value: T; options: { value: T; label: string }[]; onChange: (v: T) => void }) {
   return (
@@ -214,8 +214,8 @@ export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: 
       typography: { fonts: { ...DEFAULT_FONTS, headings: heading, accent: heading }, roleOverrides: {} },
       layoutOptions: recipe.layoutOptions,
     });
-    // A numbered table that fills its page: measured at the chosen size and orientation.
-    const made = recipe.fillTable ? fitTableToPage(project, recipe.fillTable) : project;
+    // Page-filling tables and records: measured at the chosen size and orientation.
+    const made = refitPageFilling(project);
     onCreate(data ? { ...made, data } : made);
   };
 

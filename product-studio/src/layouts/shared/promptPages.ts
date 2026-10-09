@@ -199,7 +199,8 @@ function tableColumns(b: PromptBlock): { key: string; label: string; referenceWi
   const labels = b.table?.columns?.length ? b.table.columns : ["Column 1", "Column 2"];
   const types = b.table?.columnTypes;
   const typed = !!types?.some(Boolean);
-  const cols = labels.map((label, i) => ({ key: `c${i + 1}`, label, referenceWidthIn: typed ? COLUMN_CHARS[types![i] ?? "text"] : 1 }));
+  const set = b.table?.columnWidths;
+  const cols = labels.map((label, i) => ({ key: `c${i + 1}`, label, referenceWidthIn: typed ? COLUMN_CHARS[types![i] ?? "text"] : 1, ...(set?.[i] ? { fixedIn: set[i]! } : {}) }));
   if (!b.table?.numbering) return cols;
   return [{ key: "no", label: b.table.numbering.prefix ?? "No.", referenceWidthIn: typed ? NUMBER_COLUMN_CHARS : 0.5 }, ...cols];
 }

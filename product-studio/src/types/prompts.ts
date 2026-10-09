@@ -34,6 +34,11 @@ export type PromptTable = {
    */
   columnTypes?: (import("./document").ValueType | null)[];
   /**
+   * Widths the maker set, by position, in inches (null = automatic). A set width is deliberate: it is
+   * kept exactly — automatic sizing and layout suggestions only share out the rest of the table.
+   */
+  columnWidths?: (number | null)[];
+  /**
    * Number the rows in a narrow first column ("No."), continuing across the whole product: every copy
    * of the page, and every page the table continues onto, carries on the count. A numbered table prints
    * exactly its chosen number of rows (so the count is known in book order).
@@ -187,6 +192,13 @@ export type PromptBlock = {
   minLines?: number;
   /** Share of the free space for "fill the space" prompts (default 1). */
   weight?: number;
+  /**
+   * A numbered table's rows, or a record section's records, follow the page: they are measured to
+   * fill one page, and measured again whenever something changes the room on it (size, orientation,
+   * binding, type, spacing, the other sections). A count the maker types clears it — a deliberate
+   * count is never changed (engines/recipe/fitRows).
+   */
+  fillPage?: boolean;
 };
 
 /**
@@ -285,6 +297,43 @@ export function canSitBeside(blocks: PromptBlock[], i: number): boolean {
   if (i < 1) return false;
   const a = blocks[i - 1], b = blocks[i];
   return kindOf(a) === "prompt" && kindOf(b) === "prompt" && !a.beside;
+}
+
+/**
+ * A section's name in plain words, for lists and messages — its heading or prompt, otherwise what
+ * it is and what it holds ("Table: Item, SKU, Supplier…", "Records: Item, SKU…", "Writing space").
+ * Never a position ("Section 2"), which changes when sections move.
+ */
+export function sectionName(b: PromptBlock): string {
+  const own = b.label.trim() || (kindOf(b) !== "heading" ? b.prompt?.trim() : "");
+  const few = (xs: string[]) => {
+    const named = xs.map((x) => x.trim()).filter(Boolean);
+    return named.slice(0, 3).join(", ") + (named.length > 3 ? "…" : "");
+  };
+  switch (kindOf(b)) {
+    case "divider":
+      return "Divider line";
+    case "spacer":
+      return "Open space";
+    case "info":
+      return few(b.fields ?? []) || "Info row";
+    case "heading":
+      if (own) return own;
+      if (b.prompt?.trim()) {
+        const words = b.prompt.trim().split(/\s+/);
+        return `Text: ${words.slice(0, 6).join(" ")}${words.length > 6 ? "…" : ""}`;
+      }
+      return b.content?.key ? `Text from “${b.content.key}”` : "Heading";
+    case "list":
+      return own || (b.content?.key ? `List from “${b.content.key}”` : `List (${(b.items ?? []).length} item${(b.items ?? []).length === 1 ? "" : "s"})`);
+    case "record":
+      return own || `Records: ${few(b.recordFields ?? []) || "blank"}`;
+    default:
+      if (own) return own;
+      if (b.responseStyle === "table") return `Table: ${few(b.table?.columns ?? []) || "columns"}`;
+      if (b.responseStyle === "checkboxes") return "Checklist";
+      return "Writing space";
+  }
 }
 
 /** A section's kind (sections saved before the Page Composer are prompts). */

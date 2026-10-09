@@ -20,6 +20,7 @@ import { BookOutlinePanel, BookStructurePanel, ThisPagePanel } from "./BookPanel
 import { PagesBuilder } from "./PagesBuilder";
 import { DataPanel, dataSummary } from "./DataPanel";
 import { withDevotionalStructure } from "../../presets/devotionalStructures";
+import { refitAfterEdit } from "../../engines/recipe/fitRows";
 import { DesignPresetsPanel } from "./DesignPresetsPanel";
 import { AreaList, AreaView, useArea, type AreaId } from "./Areas";
 import { ThisPageHeading, AddToPageHint } from "./ThisPage";
@@ -100,7 +101,8 @@ export function Editor({ project, onChange, onBack, saveStatus, cloudLabel }: Pr
   }
   const update = useCallback(
     (fn: (p: ProductProject) => ProductProject) => {
-      const next = { ...fn(project), updatedAt: new Date().toISOString() };
+      // Page-filling tables and records follow the page: refit in the same edit when the room on their page changed.
+      const next = { ...refitAfterEdit(project, fn(project)), updatedAt: new Date().toISOString() };
       const now = Date.now();
       if (!past.current.length || now - lastChange.current > HISTORY_GROUP_MS) {
         past.current.push(project);

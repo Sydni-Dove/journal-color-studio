@@ -11,6 +11,7 @@
  * get at this page size. The layout engine decides whether the page fits.
  */
 import type { ValueType } from "../../types/document";
+import { sectionName } from "../../types/prompts";
 import { useEffect, useRef, useState } from "react";
 import {
   amountOf, canSitBeside, HEADER_META_CHOICES, TABLE_ROW_SCALE, DEFAULT_MIN_LINES, kindOf, MAX_INFO_FIELDS, newPromptId, PROMPT_STARTERS, spaceOf, WRITING_AMOUNTS,
@@ -285,17 +286,20 @@ function RecordFields({ b, putBlock, rowsForPage }: { b: PromptBlock; putBlock: 
       ))}
       {fields.length < 12 && <button type="button" className="btn" onClick={() => put([...fields, ""])}>+ Add a blank</button>}
       <div className="row">
-        <NumberField label="Records on this page" step={1} min={1} max={60} value={b.recordCount ?? 1} onChange={(n) => putBlock(b.id, { recordCount: Math.max(1, Math.min(60, Math.round(n))) })} />
+        <NumberField label="Records on this page" step={1} min={1} max={60} value={b.recordCount ?? 1} onChange={(n) => putBlock(b.id, { recordCount: Math.max(1, Math.min(60, Math.round(n))), fillPage: undefined })} />
         <Field label="Each record is called">
           <input type="text" value={b.numbering?.prefix ?? "No."} placeholder="No." onChange={(e) => putBlock(b.id, { numbering: { ...b.numbering, prefix: e.target.value } })} />
         </Field>
         <NumberField label="First number" step={1} min={1} value={b.numbering?.start ?? 1} onChange={(n) => putBlock(b.id, { numbering: { ...b.numbering, start: Math.max(1, Math.round(n)) } })} />
       </div>
-      {rowsForPage && (
-        <button type="button" className="btn" onClick={() => { const n = rowsForPage(b.id); if (n) putBlock(b.id, { recordCount: n }); }}>
-          Fit records to one page
-        </button>
-      )}
+      <Check
+        label="Records fill each page (they follow the page size and orientation)"
+        checked={!!b.fillPage}
+        onChange={(on) => {
+          const n = on ? rowsForPage?.(b.id) : null;
+          putBlock(b.id, on ? { fillPage: true, ...(n ? { recordCount: n } : {}) } : { fillPage: undefined });
+        }}
+      />
       <p className="hint">Records are numbered straight through every copy of this page; a record is never split across two pages.</p>
     </div>
   );
@@ -321,14 +325,16 @@ function TableColumns({ b, putBlock }: { b: PromptBlock; putBlock: (id: string, 
   const table = b.table ?? { columns: ["Task", "Due", "Done"], rows: b.lineCount ?? 6 };
   const cols = table.columns.length ? table.columns : ["Column 1"];
   const types = cols.map((_, i) => table.columnTypes?.[i] ?? null);
-  const put = (columns: string[], columnTypes: (ValueType | null)[] = types) =>
-    putBlock(b.id, { table: { ...table, columns, columnTypes: columnTypes.some(Boolean) ? columnTypes : undefined } });
+  const widths = cols.map((_, i) => table.columnWidths?.[i] ?? null);
+  const put = (columns: string[], columnTypes: (ValueType | null)[] = types, columnWidths: (number | null)[] = widths) =>
+    putBlock(b.id, { table: { ...table, columns, columnTypes: columnTypes.some(Boolean) ? columnTypes : undefined, columnWidths: columnWidths.some((w) => w) ? columnWidths : undefined } });
   const move = (i: number, d: -1 | 1) => {
     const j = i + d;
-    const c = [...cols], t = [...types];
+    const c = [...cols], t = [...types], w = [...widths];
     [c[i], c[j]] = [c[j], c[i]];
     [t[i], t[j]] = [t[j], t[i]];
-    put(c, t);
+    [w[i], w[j]] = [w[j], w[i]];
+    put(c, t, w);
   };
   const rows = table.rows ?? b.lineCount ?? 6;
   return (
@@ -343,19 +349,34 @@ function TableColumns({ b, putBlock }: { b: PromptBlock; putBlock: (id: string, 
               {COLUMN_HOLDS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </Field>
+          <Field label="Width">
+            <input
+              type="number"
+              min={0.2}
+              step={0.05}
+              placeholder="Automatic"
+              aria-label={`Column ${i + 1} width in inches (blank = automatic)`}
+              value={widths[i] ?? ""}
+              onChange={(e) => {
+                const v = parseFloat(e.target.value);
+                put(cols, types, widths.map((x, k) => (k === i ? (Number.isFinite(v) && v > 0 ? v : null) : x)));
+              }}
+            />
+          </Field>
           <span className="row">
             <button type="button" className="btn btn--ghost" disabled={i === 0} aria-label={`Move column ${i + 1} left`} onClick={() => move(i, -1)}>←</button>
             <button type="button" className="btn btn--ghost" disabled={i === cols.length - 1} aria-label={`Move column ${i + 1} right`} onClick={() => move(i, 1)}>→</button>
             {cols.length > 1 && (
-              <button type="button" className="btn btn--ghost" aria-label={`Remove column ${i + 1}`} onClick={() => put(cols.filter((_, k) => k !== i), types.filter((_, k) => k !== i))}>Remove</button>
+              <button type="button" className="btn btn--ghost" aria-label={`Remove column ${i + 1}`} onClick={() => put(cols.filter((_, k) => k !== i), types.filter((_, k) => k !== i), widths.filter((_, k) => k !== i))}>Remove</button>
             )}
           </span>
         </div>
       ))}
       {cols.length < MAX_TABLE_COLUMNS && (
-        <button type="button" className="btn" onClick={() => put([...cols, ""], [...types, null])}>+ Add column</button>
+        <button type="button" className="btn" onClick={() => put([...cols, ""], [...types, null], [...widths, null])}>+ Add column</button>
       )}
       {types.some(Boolean) && <p className="hint">Columns are sized to what they hold — a date or amount stays narrow, notes get room — and never narrower than their label.</p>}
+      {widths.some((w) => w) && <p className="hint">A width you set (in inches) is kept exactly; the other columns share the rest. Clear it to go back to automatic.</p>}
       <Check
         label="Number the rows (No. 1, 2, 3… straight through every copy of this page)"
         checked={!!table.numbering}
@@ -524,7 +545,7 @@ export function PromptEditor({
       {blocks.map((b, i) => {
         const mode = spaceOf(b);
         const k = kindOf(b);
-        const name = k === "divider" ? "Divider line" : k === "spacer" ? "Open space" : k === "info" ? (b.fields ?? []).filter((f) => f.trim()).join(" · ") || "Info row" : b.label.trim() || b.prompt?.trim() || `Section ${i + 1}`;
+        const name = k === "info" ? (b.fields ?? []).filter((f) => f.trim()).join(" · ") || "Info row" : sectionName(b);
         const got = fit?.lines?.[b.id];
         const writing = b.responseStyle !== "checkboxes" && b.responseStyle !== "table";
         const amount: WritingAmount | "fill" | "exact" = mode === "fill" ? "fill" : mode === "fixed" ? amountOf(b.lineCount) ?? "exact" : "exact";
@@ -639,17 +660,15 @@ export function PromptEditor({
                     {b.responseStyle === "table" && (
                       <div className="subsection custom-table-controls">
                         <TableColumns b={b} putBlock={putBlock} />
-                        {b.table?.numbering && rowsForPage && (
-                          <button
-                            type="button"
-                            className="btn"
-                            onClick={() => {
-                              const n = rowsForPage(b.id);
-                              if (n) putBlock(b.id, { space: "fixed", lineCount: n, table: { ...(b.table ?? { columns: ["Task", "Due", "Done"] }), rows: n } });
+                        {b.table?.numbering && (
+                          <Check
+                            label="Rows fill each page (they follow the page size and orientation)"
+                            checked={!!b.fillPage}
+                            onChange={(on) => {
+                              const n = on ? rowsForPage?.(b.id) : null;
+                              putBlock(b.id, on ? { fillPage: true, ...(n ? { space: "fixed" as const, lineCount: n, table: { ...(b.table ?? { columns: ["Task", "Due", "Done"] }), rows: n } } : {}) } : { fillPage: undefined });
                             }}
-                          >
-                            Fit rows to one page
-                          </button>
+                          />
                         )}
                         <div className="row">
                           <NumberField
@@ -660,7 +679,8 @@ export function PromptEditor({
                             value={b.table?.rows ?? b.lineCount ?? 6}
                             onChange={(rows) => {
                               const n = Math.max(1, Math.min(200, Math.round(rows)));
-                              putBlock(b.id, { ...(mode === "fill" ? {} : { space: "fixed" as const, lineCount: n }), table: { ...(b.table ?? { columns: ["Task", "Due", "Done"] }), rows: n } });
+                              // A count typed here is deliberate: it no longer follows the page.
+                              putBlock(b.id, { ...(mode === "fill" ? {} : { space: "fixed" as const, lineCount: n }), fillPage: undefined, table: { ...(b.table ?? { columns: ["Task", "Due", "Done"] }), rows: n } });
                             }}
                           />
                           <Select
