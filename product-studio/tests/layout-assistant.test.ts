@@ -120,17 +120,33 @@ describe("alternatives measure better and keep everything", () => {
       if (seqs.has("inv-count") && seqs.has("inv-count-2")) expect(seqs.get("inv-count-2")).toEqual(seqs.get("inv-count")); // the same rows on both pages of the spread
     }
   });
-  it("splitting a wide table puts its halves on facing pages, clearly named", () => {
-    const split = r.alternatives.find((a) => a.id.startsWith("split:"))!;
-    const { pages } = solveAll(split.apply(p));
-    const content = pages.filter(({ pg }) => !pg.filler);
-    for (let k = 0; k + 1 < content.length; k += 2) {
-      expect(content[k].pg.side).toBe("verso");
-      expect(content[k + 1].pg.side).toBe("recto");
-      expect(content[k + 1].pg.pageNumber).toBe(content[k].pg.pageNumber + 1);
+  it("splitting a wide table puts its halves on facing pages — left half, right half, every copy — with the same rows and numbers", () => {
+    for (const q of [crowded({ rows: 12 }), refitPageFilling({ ...crowded(), recipe: { ...crowded().recipe, structure: crowded().recipe.structure!.map((n) => (n.kind === "step" ? { ...n, promptSet: { ...n.promptSet!, blocks: n.promptSet!.blocks.map((b) => (b.id === "inv-count" ? { ...b, fillPage: true } : b)) } } : n)) } })]) {
+      const split = reviewLayout(q).alternatives.find((a) => a.id.startsWith("split:"))!;
+      expect(split).toBeTruthy();
+      const next = split.apply(q);
+      const { pages } = checkSound(next, "split");
+      const content = pages.filter(({ pg }) => !pg.filler);
+      expect(content.length % 2).toBe(0);
+      for (let k = 0; k < content.length; k += 2) {
+        const [l, rr] = [content[k], content[k + 1]];
+        expect([l.pg.side, rr.pg.side]).toEqual(["verso", "recto"]);
+        expect(rr.pg.pageNumber).toBe(l.pg.pageNumber + 1);
+        expect(l.pg.module?.title).toBe("Inventory Count");
+        expect(rr.pg.module?.title).toBe("Inventory Count (continued)");
+        const nums = (x: typeof l) => x.s.nodes.filter((n) => /-n\d+$/.test(n.id)).map((n) => textOf(n));
+        expect(nums(rr)).toEqual(nums(l));
+        // The rows are level across the spread.
+        const ys = (x: typeof l) => x.s.nodes.filter((n) => /-n\d+$/.test(n.id)).map((n) => +n.rect.y.toFixed(4));
+        expect(ys(rr)).toEqual(ys(l));
+        expect(nums(l).length).toBeGreaterThan(0);
+      }
+      const labels = next.recipe.structure!.flatMap((n) => (n.kind === "step" ? n.promptSet?.blocks.map((b) => b.label) ?? [] : []));
+      expect(labels.filter((l) => / of 2: /.test(l))).toEqual(["Table (1 of 2: Item – Quantity on hand)", "Table (2 of 2: Reorder point – Notes)"]);
     }
-    const labels = split.apply(p).recipe.structure!.flatMap((n) => (n.kind === "step" ? n.promptSet?.blocks.map((b) => b.label) ?? [] : []));
-    expect(labels.filter((l) => / of 2: /.test(l))).toEqual(["Table (1 of 2: Item – Quantity on hand)", "Table (2 of 2: Reorder point – Notes)"]);
+  });
+  it("a table whose set rows run past one page is not split (its halves couldn't face each other)", () => {
+    expect(reviewLayout(crowded()).alternatives.some((a) => a.id.startsWith("split:"))).toBe(false);
   });
 });
 

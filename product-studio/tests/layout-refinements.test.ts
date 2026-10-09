@@ -56,6 +56,26 @@ describe("page-filling sections follow the page", () => {
   });
 });
 
+describe("linked page-filling sections print the same count", () => {
+  it("the smallest count that fits each of their pages, and they stay linked when the page changes", () => {
+    const set = inventoryCountSet();
+    const a = { ...set, blocks: set.blocks.map((b) => (b.id === "inv-count" ? { ...b, fillGroup: "g" } : b)) };
+    const b = { ...a, instructions: "Count every shelf, then the back room. Note damaged stock in the last column and tell the manager before closing.", blocks: a.blocks.map((x) => ({ ...x, id: `${x.id}-2` })) };
+    const p = createProject("notebook", {
+      dimensions: { sizePresetId: "8.5x11", orientation: "portrait" },
+      production: { bindingType: "coil" as never, printProfileId: "coil-generic", includeBleed: false, duplex: true },
+      recipe: { items: [], ordering: "sequential", structure: [step("worksheet", { type: "copies", count: 1 }, { title: "A", promptSet: a }), step("worksheet", { type: "copies", count: 1 }, { title: "B", promptSet: b })] },
+    });
+    for (const q of [refitPageFilling(p), refitPageFilling({ ...p, dimensions: { ...p.dimensions, orientation: "landscape" } })]) {
+      const ra = blockOf(q, "inv-count").table!.rows, rb = blockOf(q, "inv-count-2").table!.rows;
+      expect(ra).toBe(rb);
+      const alone = rowsFillingOnePage({ ...q, recipe: { ...q.recipe, structure: [q.recipe.structure![1]] } }, "inv-count-2")!;
+      expect(ra).toBe(Math.min(alone, rowsFillingOnePage({ ...q, recipe: { ...q.recipe, structure: [q.recipe.structure![0]] } }, "inv-count")!));
+      expect(resolveDocument(q).recipe.pages.filter((x) => !x.filler)).toHaveLength(2); // each on one page
+    }
+  });
+});
+
 describe("sections have meaningful names", () => {
   const b = (x: Partial<PromptBlock>): PromptBlock => ({ id: "x", label: "", ...x });
   it.each([

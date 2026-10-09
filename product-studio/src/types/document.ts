@@ -108,6 +108,7 @@ export type TableComponent = Base & {
   columnWidths?: (number | null)[];
   /** Lines a column heading may wrap onto (presentation). */
   headerLines?: 2 | 3;
+  headerFull?: boolean;
   /** Rows numbered across the whole document (a "No." column), as records are. */
   numbering?: { prefix?: string; start?: number; sequence?: string };
 };

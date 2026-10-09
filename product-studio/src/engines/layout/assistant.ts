@@ -194,7 +194,7 @@ export function guessColumnType(label: string): ValueType {
   return "text";
 }
 
-function candidates(p: ProductProject, base: { measures: LayoutMeasures; findings: Finding[] }): Candidate[] {
+function candidates(p: ProductProject, base: { measures: LayoutMeasures; findings: Finding[] }, doc: ResolvedDocument): Candidate[] {
   const out: Candidate[] = [];
   const structure = p.recipe.structure ?? [];
   const steps = stepsOf(structure);
@@ -238,8 +238,10 @@ function candidates(p: ProductProject, base: { measures: LayoutMeasures; finding
         focus: (doc) => firstPageOf(doc, s.id),
       });
     // A wide table split across facing pages: the first columns on the left page, the rest on the right — same rows, same numbers.
-    if (t.columns.length >= 6 && !t.columnWidths?.some((w) => w))
-      out.push({ id: `split:${s.id}:${b.id}`, title: `Split “${name}” across facing pages`, reason: `${t.columns.length} columns are a lot for one page: the first ${Math.ceil(t.columns.length / 2)} go on the left page and the rest on the right, with the same rows${t.numbering ? " and numbers" : ""} on both.`, apply: (q) => splitAcrossSpread(q, s.id, b.id), focus: (doc) => firstPageOf(doc, s.id) });
+    // Only when each half fits on one page (or follows the page): halves that ran onto more pages wouldn't face each other.
+    const onePage = b.fillPage || doc.recipe.pages.filter((x) => x.recipeItemId === s.id).every((x) => (x.flowCount ?? 1) === 1);
+    if (t.columns.length >= 6 && !t.columnWidths?.some((w) => w) && onePage && doc.recipe.pages.some((x) => x.side !== "single"))
+      out.push({ id: `split:${s.id}:${b.id}`, title: `Split “${name}” across facing pages`, reason: `${t.columns.length} columns are a lot for one page: the first ${Math.ceil(t.columns.length / 2)} go on the left page and the rest on the right, with the same rows${t.numbering ? " and numbers" : ""} on both.`, apply: (q) => refitPageFilling(splitAcrossSpread(q, s.id, b.id)), focus: (doc) => firstPageOf(doc, s.id) });
     // Record cards instead of a very wide table (every column becomes a labelled blank).
     if (t.columns.length >= 8 && t.numbering)
       out.push({
@@ -305,27 +307,44 @@ export function splitAcrossSpread(p: ProductProject, stepId: string, blockId: st
         id: n === 1 ? b.id : `${b.id}-2`,
         label: `${b.label.trim() || "Table"} (${n} of 2: ${t.columns[from]} – ${t.columns[to - 1]})`,
         fillPage: b.fillPage,
+        // Both halves print the same rows (the smallest count that fits either page).
+        ...(b.fillPage ? { fillGroup: `${b.id}-spread` } : {}),
         table: {
           ...t,
           columns: t.columns.slice(from, to),
           ...(t.columnTypes ? { columnTypes: t.columnTypes.slice(from, to) } : {}),
           ...(t.columnWidths ? { columnWidths: t.columnWidths.slice(from, to) } : {}),
+          // Both halves keep a full-height heading row, so their rows stay level across the spread.
+          headerFull: true,
           ...(t.numbering ? { numbering: { ...t.numbering, sequence: `${t.numbering.sequence ?? b.id}${n === 2 ? "-2" : ""}` } } : {}),
         },
       });
       const left: BookStep = { ...s, start: "verso", promptSet: { ...s.promptSet!, blocks: blocks.map((x) => (x.id === blockId ? part(0, half, 1) : x)) } };
-      // The facing page: the rest of the columns (the sections around the table stay with the left page).
-      const right: BookStep = { ...s, id: `${s.id}-cols2`, title: `${s.title ?? "Table"} (continued)`, cadence: { type: "after-module", moduleId: s.id }, copies: 1, start: "any", promptSet: { blocks: [part(half, t.columns.length, 2)] } };
+      // The facing page: the rest of the columns, with the same sections around them (a copy of the page's other
+      // sections, e.g. its Location / Date row), so both halves have the same room — the same rows, the same numbers.
+      const right: BookStep = {
+        ...s, id: `${s.id}-cols2`, title: `${s.title ?? "Table"} (continued)`, cadence: { type: "after-module", moduleId: s.id }, copies: 1, start: "any",
+        promptSet: { ...s.promptSet!, blocks: blocks.map((x) => (x.id === blockId ? part(half, t.columns.length, 2) : { ...x, id: `${x.id}-2` })) },
+      };
       return [left, right];
     }),
   );
+}
+
+/** Every copy of a split table: its left half on a left page, its right half on the facing right page, each on one page. */
+function spreadHolds(doc: ResolvedDocument, stepId: string): boolean {
+  const pages = doc.recipe.pages.filter((x) => !x.filler && (x.recipeItemId === stepId || x.recipeItemId === `${stepId}-cols2`));
+  if (pages.some((x) => (x.flowCount ?? 1) > 1) || pages.length % 2) return false;
+  for (let k = 0; k < pages.length; k += 2)
+    if (pages[k].recipeItemId !== stepId || pages[k + 1].recipeItemId !== `${stepId}-cols2` || pages[k].side !== "verso" || pages[k + 1].pageNumber !== pages[k].pageNumber + 1) return false;
+  return true;
 }
 
 /** What changed, measured, in plain words. */
 function outcome(a: LayoutMeasures, b: LayoutMeasures): string[] {
   const out: string[] = [];
   const row = (label: string, x: number, y: number, fmt = (v: number) => String(v)) => x !== y && out.push(`${label}: ${fmt(x)} → ${fmt(y)}`);
-  row("Problems to fix", a.errors, b.errors);
+  row("Layout problems", a.errors, b.errors);
   row("Crowded columns", a.crowdedColumns, b.crowdedColumns);
   if (a.narrowestColumnIn !== null && b.narrowestColumnIn !== null && Math.abs(a.narrowestColumnIn - b.narrowestColumnIn) > 0.01) row("Narrowest column", a.narrowestColumnIn, b.narrowestColumnIn, (v) => `${v.toFixed(2)}"`);
   row("Squeezed headings", a.squeezedHeadings, b.squeezedHeadings);
@@ -352,7 +371,7 @@ export function reviewLayout(project: ProductProject, opts: { max?: number } = {
     findings.push({ kind: "orientation", message: `A table with ${widest} columns on an upright (portrait) page.` });
   const score = layoutScore(base.measures);
   const alts: Alternative[] = [];
-  for (const c of candidates(project, base)) {
+  for (const c of candidates(project, base, doc)) {
     let next: ProductProject;
     try {
       next = c.apply(project);
@@ -361,6 +380,8 @@ export function reviewLayout(project: ProductProject, opts: { max?: number } = {
     }
     const after = measureSample(resolveDocument(next));
     if (layoutScore(after.measures) >= score - 1e-6) continue;
+    // A split table must face itself: every page of both halves on one page, the halves on a left / right pair.
+    if (c.id.startsWith("split:") && !spreadHolds(after.sample.doc, c.id.split(":")[1])) continue;
     const doc2 = after.sample.doc;
     alts.push({
       id: c.id, title: c.title, reason: c.reason, outcome: outcome(base.measures, after.measures),

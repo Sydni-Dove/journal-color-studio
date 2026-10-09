@@ -77,7 +77,7 @@ function tableHead(spec: NonNullable<StationeryZone["table"]>, rect: Pick<Rect, 
   const cols = resolveColumns(spec.columns, rect.x, rect.w, (c) => (spec.numbers && c.key === "no" ? Math.max(columnMinIn(ctx, c.label), numberMin) : columnMinIn(ctx, c.label)));
   const labelLine = lineBoxIn(ctx.typography, "label");
   const heads = cols.columns.map((c) => fitHeading(c.column.label, "label", { w: Math.max(0, c.w - 2 * inset), h: (spec.headerLines ?? 2) * labelLine }, ctx, undefined, spec.headerLines ?? 2));
-  const headerH = spec.showHeader !== false ? Math.max(labelLine, ...heads.map((f) => f.heightIn)) + 2 * inset : 0;
+  const headerH = spec.showHeader !== false ? Math.max(labelLine, ...heads.map((f) => f.heightIn), spec.headerFull ? (spec.headerLines ?? 2) * labelLine : 0) + 2 * inset : 0;
   return { cols, heads, headerH };
 }
 

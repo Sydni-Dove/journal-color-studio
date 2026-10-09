@@ -64,6 +64,8 @@ export type TableSpec = {
   numbers?: { start: number; widest: string };
   /** Lines a column heading may wrap onto before it is set smaller (default 2). */
   headerLines?: 2 | 3;
+  /** The heading row takes its full height whatever the headings need (tables side by side stay level). */
+  headerFull?: boolean;
 };
 
 export type StationeryZone = {

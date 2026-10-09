@@ -22,8 +22,14 @@ function Compare({ project, alt }: { project: ProductProject; alt: Alternative }
         <figcaption>Now · page {alt.previewBefore + 1} of {before.recipe.pageCount}</figcaption>
       </figure>
       <figure>
-        <PageThumb doc={after} index={Math.min(alt.previewAfter, after.recipe.pages.length - 1)} heightPx={220} />
-        <figcaption>With this · page {alt.previewAfter + 1} of {after.recipe.pageCount}</figcaption>
+        <span className="layout-compare__pages">
+          <PageThumb doc={after} index={Math.min(alt.previewAfter, after.recipe.pages.length - 1)} heightPx={220} />
+          {/* A spread (a table split across facing pages): both pages. */}
+          {after.recipe.pages[alt.previewAfter]?.side === "verso" && after.recipe.pages[alt.previewAfter + 1] && !after.recipe.pages[alt.previewAfter + 1].filler && alt.id.startsWith("split:") && (
+            <PageThumb doc={after} index={alt.previewAfter + 1} heightPx={220} />
+          )}
+        </span>
+        <figcaption>With this · page {alt.previewAfter + 1}{alt.id.startsWith("split:") ? `–${alt.previewAfter + 2}` : ""} of {after.recipe.pageCount}</figcaption>
       </figure>
     </div>
   );

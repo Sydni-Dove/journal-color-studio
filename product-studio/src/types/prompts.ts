@@ -40,6 +40,8 @@ export type PromptTable = {
   columnWidths?: (number | null)[];
   /** Lines a column heading may wrap onto before it is set smaller (default 2). */
   headerLines?: 2 | 3;
+  /** The heading row always takes its full height (headerLines), so tables side by side — a spread — keep their rows level. */
+  headerFull?: boolean;
   /**
    * Number the rows in a narrow first column ("No."), continuing across the whole product: every copy
    * of the page, and every page the table continues onto, carries on the count. A numbered table prints
@@ -201,6 +203,11 @@ export type PromptBlock = {
    * count is never changed (engines/recipe/fitRows).
    */
   fillPage?: boolean;
+  /**
+   * Page-filling sections with the same group print the same count — the smallest that fits each of
+   * their pages (the two halves of a table split across facing pages: same rows, same numbers).
+   */
+  fillGroup?: string;
 };
 
 /**

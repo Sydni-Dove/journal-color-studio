@@ -2019,3 +2019,7 @@ button.family-card:focus-visible {
   font-size: 12px;
   color: var(--ui-muted);
 }
+.layout-compare__pages {
+  display: flex;
+  gap: 2px;
+}

@@ -102,6 +102,7 @@ export function blockToComponent(b: PromptBlock): DocComponent {
           ...(t.numbering ? { numbering: { ...t.numbering } } : {}),
           ...(t.columnWidths ? { columnWidths: [...t.columnWidths] } : {}),
           ...(t.headerLines ? { headerLines: t.headerLines } : {}),
+          ...(t.headerFull ? { headerFull: true } : {}),
         };
       }
       return { ...base, kind: "question", label: b.label, ...prompt, response: b.responseStyle ?? "pattern", space: spaceOf(b) };
@@ -172,6 +173,7 @@ export function componentToBlock(c: DocComponent, p: ComponentPresentation = {})
           ...(c.numbering ? { numbering: { ...c.numbering } } : {}),
           ...(c.columnWidths ? { columnWidths: [...c.columnWidths] } : {}),
           ...(c.headerLines ? { headerLines: c.headerLines } : {}),
+          ...(c.headerFull ? { headerFull: true } : {}),
         },
         ...style,
       };

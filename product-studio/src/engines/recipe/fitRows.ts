@@ -76,9 +76,23 @@ export function pageFillKey(project: ProductProject): string {
   ]);
 }
 
-/** The product with every page-filling section measured to fill its page. */
+/** The product with every page-filling section measured to fill its page (linked sections share the smallest count). */
 export function refitPageFilling(project: ProductProject): ProductProject {
-  return pageFillingBlocks(project).reduce((p, id) => fitTableToPage(p, id), project);
+  const ids = pageFillingBlocks(project);
+  if (!ids.length) return project;
+  const fits = new Map(ids.map((id) => [id, rowsFillingOnePage(project, id)]));
+  const blocks = stepsOf(project.recipe.structure ?? []).flatMap((s) => s.promptSet?.blocks ?? []);
+  const groupOf = (id: string) => blocks.find((b) => b.id === id)?.fillGroup;
+  const groupMin = new Map<string, number>();
+  for (const id of ids) {
+    const g = groupOf(id), n = fits.get(id);
+    if (g && n) groupMin.set(g, Math.min(groupMin.get(g) ?? Infinity, n));
+  }
+  return ids.reduce((p, id) => {
+    const g = groupOf(id);
+    const n = g ? groupMin.get(g) : fits.get(id);
+    return n && p.recipe.structure ? { ...p, recipe: { ...p.recipe, structure: withRows(p.recipe.structure, id, Math.max(1, n)) } } : p;
+  }, project);
 }
 
 /**

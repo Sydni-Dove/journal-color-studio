@@ -202,7 +202,26 @@ per product. Order of work:
    Found in real-font PDFs: three-digit numbers overflowed the "No." column
    (the approximate test measurer missed it) — fixed in the shared table.
    Tests: `tests/inventory.test.ts`; PDFs checked number by number.
-7. Layout alternatives and suggestions; 8. AI-generated document structures
+7. **Layout alternatives and suggestions** — done.
+   *Refinements:* page-filling tables and record sections (`fillPage`) are
+   refitted in the same edit whenever the room on their page changes; typed
+   counts are deliberate and never refitted; linked sections (`fillGroup`)
+   share the smallest count that fits. Sections are named by what they are
+   (`sectionName`). Column widths the maker sets are kept exactly.
+   *Smart Layout Assistant* (`engines/layout/assistant.ts`, Print & export →
+   Layout suggestions): deterministic; measures the product's own solved
+   pages (errors, crowded columns, squeezed headings, mostly empty pages,
+   unused space, pages, fillers) and offers alternatives — other
+   orientation, columns sized to what they hold, three-line heading row, a
+   wide table split across facing pages (same rows, numbers and row
+   positions on both), record cards instead of a very wide table, rows /
+   records that fill each page, a devotional's other designs — each
+   measured the same way and kept only when better, with reasons and
+   before → after outcomes, previewed before use. Shared additions:
+   three-line table headings, full-height heading rows. Found in real-font
+   checks: split halves fitted different row counts (heading wrap) — fixed
+   with linked counts and a check that each half faces the other.
+8. AI-generated document structures
    (same components, no coordinates); 9. Requirements Assistant (reserved in the
    model now; not built in these phases).
 
