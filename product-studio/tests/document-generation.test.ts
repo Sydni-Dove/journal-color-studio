@@ -117,6 +117,29 @@ describe("the AI's answer is checked, never trusted", () => {
     expect(c.spec.sections[2].components[0].fromEntryField).toBeNull();
     expect(c.problems.filter((p) => p.level === "adjusted")).toHaveLength(4);
   });
+  it("a count that comes with a once or per-entry section is ignored quietly (only copies have a count)", () => {
+    const s = base();
+    for (const x of s.sections) x.repeat = { mode: "once", count: 0 };
+    expect(checkSpec(s, { description: "plan" }).problems.filter((p) => p.level === "adjusted")).toEqual([]);
+  });
+  it("one page per entry with no entries given (a log to fill in by hand) → blank copies, the entry's fields become places to write", () => {
+    const s: DocSpec = {
+      title: "Garden Journal", summary: "", page: { size: "8.5x11", orientation: "portrait", binding: "spiral", why: "" }, notes: [],
+      entries: { name: "Plants", source: "suggested", records: [], fields: [{ key: "variety", label: "Variety", valueType: "text" }, { key: "planted", label: "Date planted", valueType: "date" }] },
+      sections: [section("plant", "Plant Record {#}: {variety}", [part("heading", { fromEntryField: "variety" }), part("text", { fromEntryField: "planted" }), part("writing", { label: "Notes", lines: 8 })], { repeat: { mode: "per-entry", count: 20 } })],
+    };
+    const c = checkSpec(s, { description: "A garden journal with a page for each plant." });
+    const [sec] = c.spec.sections;
+    expect(sec.repeat).toEqual({ mode: "copies", count: 20 });
+    expect(sec.title).toBe("Plant Record");
+    expect(sec.components.map((x) => [x.kind, x.fields.map((f) => f.label).join(), x.fromEntryField])).toEqual([["fields", "Variety", null], ["fields", "Date planted", null], ["writing", "", null]]);
+    expect(c.spec.entries).toBeNull();
+    expect(c.problems.map((p) => p.message).join(" ")).toMatch(/no entries were given, so it prints 20 blank copies/);
+    const out = buildFromOutline(c.spec, "", c);
+    expect(resolveDocument(out.project).recipe.pageCount).toBeGreaterThanOrEqual(20);
+    // Not a devotional: the assistant doesn't offer devotional designs.
+    expect(out.review.alternatives.filter((a) => a.id.startsWith("devotional:"))).toEqual([]);
+  });
   it("impossible page setup is adjusted and said", () => {
     const s = base() as unknown as { page: Record<string, string> };
     s.page = { size: "11x17", orientation: "diagonal", binding: "glue", why: "" };
@@ -146,6 +169,15 @@ describe("whose words: the maker's are exact, the AI's are suggestions", () => {
     const s2 = clone(r.spec);
     s2.sections[0].components.push(part("text", { text: "Be still and know.", source: "user" }));
     expect(checkSpec(s2, { description: r.description, content: r.content }).spec.sections[0].components.at(-1)!.source).toBe("suggested");
+  });
+  it("with no content of the maker's, AI wording mislabeled as theirs is a suggestion, without a note per part; with content, one note for all", () => {
+    const s = clone(REQUESTS.find((x) => x.id === "workbook")!.spec);
+    for (const x of s.sections) for (const c of x.components) c.source = "user";
+    const quiet = checkSpec(s, { description: "A business planning workbook." });
+    expect(quiet.spec.sections.flatMap((x) => x.components).every((c) => c.source === "suggested")).toBe(true);
+    expect(quiet.problems.filter((p) => /word for word/.test(p.message))).toEqual([]);
+    const said = checkSpec(s, { description: "A business planning workbook.", content: "My business is a bakery." });
+    expect(said.problems.filter((p) => /word for word/.test(p.message))).toHaveLength(1);
   });
   it("the maker's content the outline didn't place is kept word for word on a “Your content” page — nothing dropped, nothing duplicated", () => {
     const content = "Bring a pencil.\nPhones off during class.\nLate arrivals sit at the back.";

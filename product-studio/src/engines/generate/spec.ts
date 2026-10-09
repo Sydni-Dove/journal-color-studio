@@ -80,6 +80,8 @@ export class SpecError extends Error {}
 export const SIZES: PageSize[] = ["5.5x8.5", "6x9", "7x9", "8x10", "8.5x11", "a5", "a4"];
 const KINDS: SpecComponentKind[] = ["heading", "text", "fields", "writing", "checklist", "table", "list", "records", "divider", "spacer"];
 const VALUE_TYPES: SpecValueType[] = ["text", "longText", "number", "currency", "date", "time", "quantity", "boolean", "choice", "signature", "reference"];
+/** Blank copies of a fill-in log the AI described as "one page per entry" but gave no entries for. */
+const BLANK_COPIES = 10;
 export const LIMITS = { sections: 30, components: 40, copies: 500, tableRows: 200, columns: 10, recordFields: 12, records: 60, listItems: 80, entries: 1000, entryFields: 12, lines: 60 };
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
@@ -187,13 +189,24 @@ export function checkSpec(raw: unknown, input: { description: string; content?: 
   const rawSections = r.sections.filter(isObj);
   if (r.sections.length > LIMITS.sections) problems.push({ level: "adjusted", message: `Only the first ${LIMITS.sections} sections were kept.` });
   const sections: SpecSection[] = [];
+  const notVerbatim: string[] = [];
   for (const [si, s] of rawSections.slice(0, LIMITS.sections).entries()) {
-    const title = nonEmpty(s.title) ? str(s.title).trim().slice(0, 120) : `Section ${si + 1}`;
-    const where = `“${title}”`;
     const rep = isObj(s.repeat) ? s.repeat : {};
     let mode: SpecSection["repeat"]["mode"] = rep.mode === "copies" || rep.mode === "per-entry" ? rep.mode : "once";
+    const asked = nonEmpty(s.title) ? str(s.title).trim().slice(0, 120) : `Section ${si + 1}`;
+    // `{field}` in a title reads an entry; without entries to read, the placeholders go.
+    const title = mode === "per-entry" && entries?.records.length ? asked : asked.replace(/\s*\{[^{}]*\}/g, "").replace(/[\s:#–—-]+$/, "").trim() || `Section ${si + 1}`;
+    const where = `“${title}”`;
     let count = int(rep.count, 1, LIMITS.copies, 1);
-    if (typeof rep.count === "number" && (rep.count < 1 || rep.count > LIMITS.copies)) problems.push({ level: "adjusted", message: `${where} asked for ${rep.count} copies; set to ${count} (1–${LIMITS.copies}).` });
+    // The count only means something for copies (a once or per-entry section often comes with 0).
+    if (mode === "copies" && typeof rep.count === "number" && (rep.count < 1 || rep.count > LIMITS.copies)) problems.push({ level: "adjusted", message: `${where} asked for ${rep.count} copies; set to ${count} (1–${LIMITS.copies}).` });
+    // A list with fields but no entries is a log to fill in by hand: blank copies of the page.
+    const blank = mode === "per-entry" && !!entries && !entries.records.length;
+    if (blank) {
+      mode = "copies";
+      count = typeof rep.count === "number" && rep.count >= 1 ? count : BLANK_COPIES;
+      problems.push({ level: "adjusted", message: `${where} was to repeat for each entry, but no entries were given, so it prints ${count} blank cop${count === 1 ? "y" : "ies"} to fill in by hand. Change the number of copies below.` });
+    }
     if (mode === "per-entry" && !entries) {
       problems.push({ level: "adjusted", message: `${where} was to repeat for each entry, but there's no list of entries; it prints once instead.` });
       mode = "once";
@@ -212,6 +225,15 @@ export function checkSpec(raw: unknown, input: { description: string; content?: 
       const fieldsIn = (Array.isArray(c.fields) ? c.fields : []).filter(isObj).filter((f) => nonEmpty(f.label)).map((f) => ({ label: str(f.label).trim().slice(0, 60), valueType: VALUE_TYPES.includes(f.valueType as SpecValueType) ? (f.valueType as SpecValueType) : ("text" as const) }));
       const items = (Array.isArray(c.items) ? c.items : []).filter(nonEmpty).map((x) => str(x)).slice(0, LIMITS.listItems);
       let from = nonEmpty(c.fromEntryField) ? str(c.fromEntryField).trim().toLowerCase() : null;
+      // On a blank copy, a part that was to print an entry's value becomes a place to write it.
+      const blankField = blank && from ? entries!.fields.find((f) => f.key === from) : undefined;
+      if (blankField) {
+        from = null;
+        if (kind !== "fields") {
+          components.push({ id: uid(c.id, `${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 24)}-${ci + 1}`), kind: "fields", label: null, text: null, source: "suggested", fromEntryField: null, fields: [{ label: blankField.label, valueType: blankField.valueType }], rows: null, numbered: false, fillPage: false, lines: null, items: [], marker: null, size: null });
+          continue;
+        }
+      }
       if (from && (mode !== "per-entry" || !entries?.fields.some((f) => f.key === from))) {
         problems.push({ level: "adjusted", message: `${what} was to print the entry field “${from}”, which ${mode !== "per-entry" ? "only works in a section that repeats for each entry" : "isn't one of the entries' fields"}; it prints its own wording instead.` });
         from = null;
@@ -243,12 +265,16 @@ export function checkSpec(raw: unknown, input: { description: string; content?: 
         problems.push({ level: "left-out", message: `${what} (${kind}) had nothing to print, so it was left out.` });
         continue;
       }
+      // A part printing an entry's value prints the entry's words: whose they are is the entries' source.
+      if (from) comp.source = entries!.source;
       // Wording said to be the maker's must be in what they wrote, exactly.
-      if (comp.source === "user") {
-        const words = [comp.text, kind === "heading" ? comp.label : null, ...comp.items].filter((x): x is string => !!x);
-        if (words.some((w) => !isTheirs(w))) {
+      else if (comp.source === "user") {
+        // The wording it prints as its own (a text part's label is a heading over it); a blank part (writing space,
+        // divider) has none to be theirs.
+        const words = [comp.text, kind === "heading" ? comp.label : null, ...comp.items, ...comp.fields.map((f) => f.label)].filter((x): x is string => !!x);
+        if (!words.length || words.some((w) => !isTheirs(w))) {
           comp.source = "suggested";
-          problems.push({ level: "note", message: `${what}: this was marked as your wording, but it isn't word for word what you wrote, so it's shown as a suggestion.` });
+          notVerbatim.push(what);
         }
       }
       const aiText = [comp.label, comp.text, ...comp.items, ...comp.fields.map((f) => f.label)].filter((x): x is string => !!x).join(" \n");
@@ -263,6 +289,10 @@ export function checkSpec(raw: unknown, input: { description: string; content?: 
     flags.push(...flagsIn(title, where, true));
     sections.push({ id: uid(s.id, `section-${si + 1}`), title, purpose: str(s.purpose).slice(0, 300), repeat: { mode, count }, startOnRightPage: !!s.startOnRightPage, components });
   }
+  // One note, not one per part. With nothing of the maker's to quote, "theirs" can only be a mislabel.
+  if (notVerbatim.length && normWords(input.content ?? "")) problems.push({ level: "note", message: `${notVerbatim.length === 1 ? `${notVerbatim[0]} was` : `${notVerbatim.length} parts were`} marked as your wording but ${notVerbatim.length === 1 ? "isn't" : "aren't"} word for word what you wrote, so ${notVerbatim.length === 1 ? "it's shown as a suggestion" : "they're shown as suggestions"}.` });
+  // Entries with no records were only a shape for blank pages (now copies).
+  if (entries && !entries.records.length) entries = null;
   if (!sections.length) throw new SpecError("Nothing in the AI's outline is something the studio can print. Try describing the document again.");
   flags.push(...flagsIn(`${str(r.title)} ${str(r.summary)}`, "the document's title or summary", true));
 

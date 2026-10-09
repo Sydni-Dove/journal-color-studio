@@ -23,7 +23,7 @@
  */
 import { resolveDocument, solvePage, geometryFor, type ResolvedDocument } from "../document/resolve";
 import { refitPageFilling } from "../recipe/fitRows";
-import { DEVOTIONAL_STRUCTURES, withDevotionalStructure } from "../../presets/devotionalStructures";
+import { DEVOTIONAL_STRUCTURES, matchRoles, withDevotionalStructure } from "../../presets/devotionalStructures";
 import { sectionName, type PromptBlock } from "../../types/prompts";
 import type { ValueType } from "../../types/document";
 import type { BookNode, BookStep } from "../../types/recipe";
@@ -272,10 +272,12 @@ function candidates(p: ProductProject, base: { measures: LayoutMeasures; finding
           focus: (doc) => firstPageOf(doc, s.id),
         });
 
-  // A devotional's other designs (the entries are never touched).
+  // A devotional's other designs (the entries are never touched) — only for a list that reads as
+  // devotional days (Scripture, or a teaching with questions or a prayer), not any list of entries.
   const entries = structure.find((n): n is Extract<BookNode, { kind: "group" }> => n.kind === "group" && !!n.entries);
   const list = entries && p.data?.collections.find((c) => c.id === entries.entries!.collectionId);
-  if (list) {
+  const roles = list ? matchRoles(list).map : {};
+  if (list && (roles.scripture || (roles.teaching && (roles.questions || roles.prayer)))) {
     const current = DEVOTIONAL_STRUCTURES.find((d) => JSON.stringify(withDevotionalStructure(structure, d.id, list)) === JSON.stringify(structure))?.id;
     for (const d of DEVOTIONAL_STRUCTURES)
       if (d.id !== current) out.push({ id: `devotional:${d.id}`, title: `Devotional design: ${d.label}`, reason: d.description, apply: (q) => withStructure(q, withDevotionalStructure(q.recipe.structure, d.id, list)) });
