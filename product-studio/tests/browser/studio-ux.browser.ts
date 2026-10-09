@@ -61,7 +61,9 @@ describe("Studio home", () => {
       await expect(page.locator("h1").textContent()).resolves.toBe("Dove Expressions Product Studio");
       await expect(page.getByText("Your studio is ready").count()).resolves.toBe(1);
       // The simplified home: real product categories (the daily planner is a Planner template, reached below).
-      await expect(page.locator("button.family-card").count()).resolves.toBe(8);
+      // Nine since Phase 6 added Inventory & Log Book.
+      await expect(page.locator("button.family-card").count()).resolves.toBe(9);
+      await expect(page.locator("button.family-card", { hasText: "Inventory & Log Book" }).count()).resolves.toBe(1);
       await expect(page.locator("button.family-card", { hasText: /^Planner/ }).count()).resolves.toBe(1);
       await expect(page.getByRole("button", { name: /Start a daily planner/ }).count()).resolves.toBe(1);
       // Families without a foundation are shown, never clickable.
@@ -147,6 +149,8 @@ describe("Studio home", () => {
     await page.waitForSelector("#wizard-build");
     await expect(page.locator('button.choice[aria-pressed="true"]', { hasText: /^Devotional$/ }).count()).resolves.toBe(1);
     await page.locator("label.field", { hasText: "Page size" }).locator("select").selectOption("6x9");
+    // Since Phase 6 a devotional first asks how it is made: written here (the default), or pages to fill in by hand.
+    await page.locator("button.choice", { hasText: /^Pages to fill in by hand$/ }).click();
     await page.locator("button.choice", { hasText: /^SOAP$/ }).click();
     await page.getByRole("button", { name: /^(Start planner|Create )/ }).click();
     await page.waitForSelector(".ps-page--editor");
@@ -180,6 +184,7 @@ describe("Studio home", () => {
     await page.locator("button.family-card", { hasText: "Devotional" }).click();
     await page.waitForSelector("#wizard-build");
     await page.locator("label.field", { hasText: "Page size" }).locator("select").selectOption("5.5x8.5");
+    await page.locator("button.choice", { hasText: /^Pages to fill in by hand$/ }).click();
     const choice = page.locator("button.choice", { hasText: /^Daily Reflection/ });
     await expect(choice.isDisabled()).resolves.toBe(false);
     await choice.click();
@@ -188,6 +193,18 @@ describe("Studio home", () => {
     await openArea(page, "add");
     await expect(page.getByTestId("size-variant-notice").textContent()).resolves.toMatch(/Using the Compact Daily Reflection.*not available at this size.*leaves out Stand Out Verse and Thankful For/);
     await expect(page.locator(".badge--error").count()).resolves.toBe(0);
+    await page.context().close();
+  });
+
+  it("Devotional → Write my devotional here (the default) opens on the content, ready for the days", async () => {
+    const page = await home([], DESKTOP);
+    await page.locator("button.family-card", { hasText: "Devotional" }).click();
+    await page.waitForSelector("#wizard-build");
+    await expect(page.locator('button.choice[aria-pressed="true"]', { hasText: /^Write my devotional here/ }).count()).resolves.toBe(1);
+    await expect(page.locator("button.choice", { hasText: /^SOAP$/ }).count()).resolves.toBe(0);
+    await page.getByRole("button", { name: /^Create / }).click();
+    await page.waitForSelector(".data-panel");
+    await expect(page.getByText("No entries yet").count()).resolves.toBe(1);
     await page.context().close();
   });
 
