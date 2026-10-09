@@ -279,3 +279,41 @@ describe("the Edge Function and the studio use the same answer format", () => {
     }
   });
 });
+
+describe("a maker's own devotional day (from a live run): their words once, typed blanks as writing lines, paragraph space", () => {
+  const content = [
+    "DAY 1 — Turn Aside",
+    "Read: Exodus 3:1-6",
+    "Welcome to Day 1. Today is about awareness.",
+    "In Exodus 3, Moses was not searching for a spiritual experience.",
+    "What I turned aside to look at today: ___",
+    "What I sensed God saying: ___",
+  ].join("\n");
+  const spec: DocSpec = {
+    title: "Drawing Near", summary: "", page: { size: "6x9", orientation: "portrait", binding: "spiral", why: "" }, entries: null, notes: [],
+    sections: [section("day1", "Day 1 — Turn Aside", [
+      part("text", { label: "Read", text: "Exodus 3:1-6", source: "user" }),
+      part("text", { text: "Welcome to Day 1. Today is about awareness.\nIn Exodus 3, Moses was not searching for a spiritual experience.", source: "user" }),
+      part("writing", { label: "Execution Log", text: "What I turned aside to look at today: ___\nWhat I sensed God saying: ___", source: "user", lines: 6 }),
+    ], { repeat: { mode: "copies", count: 30 } })],
+  };
+  const c = checkSpec(spec, { description: "A 30-day devotional from my Day 1.", content });
+  it("a page of the maker's wording isn't printed 30 times — once, and said", () => {
+    expect(c.spec.sections[0].repeat).toEqual({ mode: "once", count: 1 });
+    expect(c.problems.map((p) => p.message).join(" ")).toMatch(/holds your own wording, so it prints once/);
+  });
+  it("“Read: Exodus 3:1-6” placed as a part headed Read is placed (no duplicate on a Your content page)", () => {
+    expect(c.unplaced).toEqual(["DAY 1 — Turn Aside"]);
+  });
+  it("typed blanks (___) become writing lines under the maker's words; paragraphs get space between them", () => {
+    const { pages } = solveAll(projectFromSpec(c));
+    const texts = pages.flatMap(({ s }) => s.nodes.map(textOf)).filter(Boolean);
+    const all = squash(texts.join(" "));
+    expect(all).not.toMatch(/___/);
+    expect(all).toContain("What I turned aside to look at today:");
+    expect(all).toContain("What I sensed God saying:");
+    const blocks = projectFromSpec(c).recipe.structure!.flatMap((n) => (n.kind === "step" ? n.promptSet?.blocks ?? [] : []));
+    expect(blocks.filter((b) => b.prompt?.startsWith("What I")).map((b) => [b.lineCount, b.space])).toEqual([[2, "fixed"], [2, "fixed"]]);
+    expect(blocks.find((b) => b.prompt?.startsWith("Welcome"))!.prompt).toBe("Welcome to Day 1. Today is about awareness.\n\nIn Exodus 3, Moses was not searching for a spiritual experience.");
+  });
+});

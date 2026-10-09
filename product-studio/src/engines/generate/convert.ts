@@ -26,25 +26,48 @@ const BINDING: Record<DocSpec["page"]["binding"], { type: BindingType; product: 
   loose: { type: "none", product: "worksheet" },
 };
 
+/** The maker's lines with paragraph space between them (a single line break prints lines run together). */
+const spaced = (t: string) => t.split("\n").map((l) => l.trim()).filter(Boolean).join("\n\n");
+/** A line with a typed blank ("Saying: ___") is a place to write: its words become a prompt over writing lines. */
+const BLANK = /_{3,}/;
+const unblank = (l: string) => l.replace(/\s*_{3,}\s*/g, " ").trim();
+
+/** Wording that holds typed blanks: each blank line gets writing lines; the lines between print as text. */
+function withBlanks(id: string, label: string | null, text: string): PromptBlock[] {
+  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+  const out: PromptBlock[] = label?.trim() ? [{ id: `${id}-heading`, kind: "heading", label }] : [];
+  lines.forEach((l, i) => {
+    const bid = i ? `${id}-${i + 1}` : id;
+    out.push(BLANK.test(l) ? { id: bid, label: "", prompt: unblank(l), space: "fixed", lineCount: 2, minLines: 1 } : { id: bid, kind: "heading", textStyle: "body", label: "", prompt: l });
+  });
+  return out;
+}
+
 /** One component as page sections (a field row of more than three blanks becomes several rows). */
 function blocksOf(c: SpecComponent, keyOf: (field: string) => string | undefined): PromptBlock[] {
   const id = c.id;
   const bound = c.fromEntryField ? keyOf(c.fromEntryField) : undefined;
   const content = bound ? { content: { mode: "field" as const, key: bound } } : {};
   switch (c.kind) {
-    case "heading":
-      return [{ id, kind: "heading", label: bound ? "" : (c.text ?? c.label ?? ""), ...content }];
+    case "heading": {
+      if (bound) return [{ id, kind: "heading", label: "", ...content }];
+      // A heading of several lines (a title page's lines): the first is the heading, the rest print as lines under it.
+      const [first, ...rest] = (c.text ?? c.label ?? "").split("\n").map((l) => l.trim()).filter(Boolean);
+      return [{ id, kind: "heading", label: first ?? "" }, ...(rest.length ? [{ id: `${id}-lines`, kind: "heading" as const, textStyle: "body" as const, label: "", prompt: rest.join("\n") }] : [])];
+    }
     case "text":
       // Text from an entry: the binding prints its heading and text. Its own text: a heading kept with body text that flows.
       if (bound) return [{ id, kind: "heading", textStyle: "body", label: c.label ?? "", ...content }];
-      return [...(c.label?.trim() ? [{ id: `${id}-heading`, kind: "heading" as const, label: c.label }] : []), { id, kind: "heading", textStyle: "body", label: "", prompt: c.text ?? "" }];
+      if (c.text && BLANK.test(c.text)) return withBlanks(id, c.label, c.text);
+      return [...(c.label?.trim() ? [{ id: `${id}-heading`, kind: "heading" as const, label: c.label }] : []), { id, kind: "heading", textStyle: "body", label: "", prompt: spaced(c.text ?? "") }];
     case "fields": {
       const out: PromptBlock[] = [];
       for (let i = 0; i < c.fields.length; i += 3) out.push({ id: i ? `${id}-${i / 3 + 1}` : id, kind: "info", label: "", fields: c.fields.slice(i, i + 3).map((f) => f.label) });
       return out;
     }
     case "writing":
-      return [{ id, label: c.label ?? "", ...(c.text && !bound ? { prompt: c.text } : {}), ...(c.lines ? { space: "fixed" as const, lineCount: c.lines, minLines: Math.min(2, c.lines) } : { space: "fill" as const, minLines: 3 }), ...content }];
+      if (c.text && !bound && BLANK.test(c.text)) return withBlanks(id, c.label, c.text);
+      return [{ id, label: c.label ?? "", ...(c.text && !bound ? { prompt: spaced(c.text) } : {}), ...(c.lines ? { space: "fixed" as const, lineCount: c.lines, minLines: Math.min(2, c.lines) } : { space: "fill" as const, minLines: 3 }), ...content }];
     case "checklist":
       // Items to print go in a checkbox list; an empty checklist is rows of boxes to fill in.
       return c.items.length
@@ -118,7 +141,7 @@ export function projectFromSpec(checked: CheckedSpec): ProductProject {
   if (checked.unplaced.length)
     structure.push({
       kind: "step", id: "gen-your-content", module: "worksheet", layoutId: "guided-page", cadence: { type: "once" }, title: "Your content",
-      promptSet: { blocks: [{ id: "gen-your-content-text", kind: "heading", textStyle: "body", label: "", prompt: checked.unplaced.join("\n") }] },
+      promptSet: { blocks: [{ id: "gen-your-content-text", kind: "heading", textStyle: "body", label: "", prompt: spaced(checked.unplaced.join("\n")) }] },
     });
   const b = BINDING[spec.page.binding];
   const def = PRODUCT_TYPES[b.product];

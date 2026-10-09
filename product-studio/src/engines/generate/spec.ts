@@ -286,6 +286,12 @@ export function checkSpec(raw: unknown, input: { description: string; content?: 
       problems.push({ level: "left-out", message: `${where} had nothing the studio can print, so it was left out.` });
       continue;
     }
+    // Copies of a page holding the maker's own wording would print their words again on every copy.
+    if (mode === "copies" && count > 1 && components.some((c) => c.source === "user" && (c.text || c.items.length || (c.kind === "heading" && c.label)))) {
+      problems.push({ level: "adjusted", message: `${where} holds your own wording, so it prints once (as ${count} copies it would repeat your words ${count} times). For a page per day, put each day in Your content after creating.` });
+      mode = "once";
+      count = 1;
+    }
     flags.push(...flagsIn(title, where, true));
     sections.push({ id: uid(s.id, `section-${si + 1}`), title, purpose: str(s.purpose).slice(0, 300), repeat: { mode, count }, startOnRightPage: !!s.startOnRightPage, components });
   }
@@ -331,5 +337,12 @@ function placedText(spec: DocSpec): string {
 export function unplacedContent(spec: DocSpec, content: string): string[] {
   if (!content.trim()) return [];
   const placed = placedText(spec);
-  return content.split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !placed.includes(normWords(l)));
+  // "Read: Exodus 3:1-6" placed as a part headed "Read" holding "Exodus 3:1-6" is placed.
+  const labels = new Set(spec.sections.flatMap((s) => s.components.map((c) => normWords(c.label ?? ""))).filter(Boolean));
+  const isPlaced = (l: string) => {
+    if (placed.includes(normWords(l))) return true;
+    const m = /^([^:]{1,60}):\s*(.+)$/.exec(l);
+    return !!m && labels.has(normWords(m[1])) && placed.includes(normWords(m[2]));
+  };
+  return content.split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !isPlaced(l));
 }
