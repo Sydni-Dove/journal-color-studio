@@ -10,9 +10,10 @@ import { describe, expect, it } from "vitest";
 import { resolveDocument, solvePage, geometryFor } from "../src/engines/document/resolve";
 import { rectContains } from "../src/engines/layout/math";
 import { validateProject } from "../src/engines/validation/validate";
-import { heuristicMeasurer } from "../src/engines/typography/textMeasure";
+import { getLayoutMeasurer, heuristicMeasurer, styleForRole } from "../src/engines/typography/textMeasure";
 import { INVENTORY_PRESETS, inventoryCountSet, inventoryRecordSet } from "../src/presets/layouts/recipePresets";
 import { step } from "../src/presets/bookRecipes";
+import { fitTableToPage, rowsFillingOnePage } from "../src/engines/recipe/fitRows";
 import { createProject } from "../src/presets/products/projectFactory";
 import type { LayoutNode, SolvedPage } from "../src/types/layout";
 import type { PromptSet } from "../src/types/prompts";
@@ -85,6 +86,21 @@ describe("inventory count sheets", () => {
     expect(nums).toEqual(Array.from({ length: 100 }, (_, i) => i + 1));
   });
 
+  it("the No. column always holds its widest number (three digits at least), on every copy", () => {
+    const { pages, doc } = solveAll(notebook(inventoryCountSet(20), { copies: 8 }));
+    const label = styleForRole(doc.typography, "label");
+    for (const { s } of pages) {
+      const no = textNodes(s).find((n) => /-h-no$/.test(n.id))!;
+      const nums = textNodes(s).filter((n) => /-n\d+$/.test(n.id));
+      for (const n of nums) expect(getLayoutMeasurer().measure(n.text, label), `"${n.text}"`).toBeLessThanOrEqual(n.rect.w + 1e-6);
+      expect(no.rect.w + 1e-6).toBeGreaterThanOrEqual(getLayoutMeasurer().measure("000", label));
+      expect(s.diagnostics.filter((d) => d.rule === "text-overflow")).toEqual([]);
+    }
+    // Same column widths on every copy (numbers up to 999).
+    const widths = pages.map(({ s }) => JSON.stringify(columnWidths(s)));
+    expect(new Set(widths).size).toBe(1);
+  });
+
   it("a table longer than a page continues: its header repeats and the numbers carry on", () => {
     const { pages, doc } = solveAll(notebook(inventoryCountSet(90), { copies: 2, size: "6x9" }));
     checkPages({ pages, doc }, "90 rows on 6x9");
@@ -133,12 +149,43 @@ describe("inventory count sheets", () => {
   });
 });
 
+describe("a numbered table that fills its page", () => {
+  it("rows are measured at the product's own size and orientation: each copy is exactly one full page, numbers straight through", () => {
+    const rowsAt: Record<string, number> = {};
+    for (const o of [{ size: "8.5x11" }, { size: "8.5x11", orientation: "landscape" as const }, { size: "6x9", binding: "perfect-bound", profile: "kdp" }, { size: "a4", orientation: "landscape" as const }]) {
+      const label = `${o.size} ${o.orientation ?? "portrait"}`;
+      const p = fitTableToPage(notebook(inventoryCountSet(20), { ...o, copies: 6 }), "inv-count");
+      const rows = rowsFillingOnePage(p, "inv-count")!;
+      rowsAt[label] = rows;
+      const r = solveAll(p);
+      checkPages(r, label);
+      expect(r.pages.filter((x) => !x.pg.filler).length, `${label}: one page per copy`).toBe(6);
+      expect(r.pages.flatMap(({ s }) => numbersOn(s, "inv-count")), label).toEqual(Array.from({ length: 6 * rows }, (_, i) => i + 1));
+      // Full: one more row would not fit on the page.
+      expect(rowsFillingOnePage({ ...p }, "inv-count"), label).toBe(rows);
+    }
+    expect(rowsAt["8.5x11 portrait"]).toBeGreaterThan(rowsAt["8.5x11 landscape"]);
+    expect(rowsAt["8.5x11 portrait"]).toBeGreaterThan(rowsAt["6x9 portrait"]);
+  });
+});
+
 describe("item record pages", () => {
   it("repeating blank records are numbered across every copy, whole on their page", () => {
     const { pages, doc } = solveAll(notebook(inventoryRecordSet(3), { copies: 4 }, "Item Records"));
     checkPages({ pages, doc }, "records");
     const nums = pages.flatMap(({ s }) => recordNumbers(s));
     expect(nums).toEqual(Array.from({ length: 12 }, (_, i) => `Item ${i + 1}`));
+  });
+  it("records can fill their page too: measured at the product's size, one page per copy, numbered straight through", () => {
+    for (const o of [{ size: "8.5x11" }, { size: "6x9", binding: "perfect-bound", profile: "kdp" }, { size: "8.5x11", orientation: "landscape" as const }]) {
+      const p = fitTableToPage(notebook(inventoryRecordSet(1), { ...o, copies: 3 }, "Item Records"), "inv-records");
+      const per = rowsFillingOnePage(p, "inv-records")!;
+      expect(per, o.size).toBeGreaterThan(1);
+      const r = solveAll(p);
+      checkPages(r, `records ${o.size}`);
+      expect(r.pages.filter((x) => !x.pg.filler).length, o.size).toBe(3);
+      expect(r.pages.flatMap(({ s }) => recordNumbers(s))).toEqual(Array.from({ length: 3 * per }, (_, i) => `Item ${i + 1}`));
+    }
   });
   it("count sheets and record pages in one notebook keep separate counts", () => {
     const p = notebook(inventoryCountSet(10), { copies: 2 });

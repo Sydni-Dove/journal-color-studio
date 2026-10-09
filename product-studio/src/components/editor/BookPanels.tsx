@@ -16,6 +16,7 @@ import { sectionLineCounts, sectionPages } from "../../layouts/shared/promptPage
 import { promptSetFromList } from "../../types/prompts";
 import { layoutAvailability, solvePage, type ResolvedDocument } from "../../engines/document/resolve";
 import { entryContentIds } from "../../engines/data/bind";
+import { rowsFillingOnePage } from "../../engines/recipe/fitRows";
 import { addNode, bookOutline, duplicateNode, moveNode, newSection, newStep, removeNode, structureFromItems, updateNode } from "../../engines/recipe/bookEdit";
 import { getLayout } from "../../layouts/registry";
 import { BOOK_PRESETS } from "../../presets/bookRecipes";
@@ -211,6 +212,7 @@ export function StepFields({ s, siblings, scope, props, parts }: { s: BookStep; 
             allowHeader
             allowStarters
             fit={stepFit(doc, s.id)}
+            rowsForPage={(blockId) => rowsFillingOnePage(props.project, blockId)}
           />
         );
         return composed ? (

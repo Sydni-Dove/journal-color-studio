@@ -179,8 +179,29 @@ per product. Order of work:
      advice mentions adding days.
    - Still technical, and kept to advanced places: the Order & repeats
      editor (sections, `{title}` in page titles) and the field editor.
-6. Second proof: an inventory notebook (blank repeating records, typed tables,
-   content-aware columns, both orientations) — with no engine changes.
+6. **Second proof: an inventory notebook** — done, with no new pagination or
+   rendering engine and no inventory-specific layout: count sheets and item
+   records are guided pages made of an info row, a table and a record
+   section (`presets/layouts/recipePresets.ts` INVENTORY_PRESETS; New
+   product → Inventory & Log Book). The table's columns are the data
+   engine's "Inventory items" fields. Shared capabilities it needed, now
+   available to every table or record section:
+   - *Columns sized to what they hold* (`PromptTable.columnTypes`): the
+     table solver's existing proportions, set from each column's value type
+     (notes wide, numbers / dates / amounts narrow), never below the
+     heading; untyped tables keep equal columns (snapshots unchanged).
+   - *Numbered rows* (`PromptTable.numbering`): a "No." column counted in book
+     order by the record sequence code, continuing across copies and
+     continued pages, sized for its widest number (three digits at least).
+   - *Fill the page* (`engines/recipe/fitRows.ts`): a numbered table's rows or
+     a record section's records are measured with the shared paginator at
+     the product's size and orientation — on creation, or "Fit rows / records
+     to one page" in the editor.
+   - Editors: what each column holds, reorder columns, number the rows (up
+     to 200 rows); a record editor (blanks, count, label, first number).
+   Found in real-font PDFs: three-digit numbers overflowed the "No." column
+   (the approximate test measurer missed it) — fixed in the shared table.
+   Tests: `tests/inventory.test.ts`; PDFs checked number by number.
 7. Layout alternatives and suggestions; 8. AI-generated document structures
    (same components, no coordinates); 9. Requirements Assistant (reserved in the
    model now; not built in these phases).

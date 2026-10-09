@@ -269,6 +269,38 @@ function InfoFields({ b, putBlock }: { b: PromptBlock; putBlock: (id: string, pa
   );
 }
 
+/** A repeating record: what each record asks for, how many, and how they're numbered. */
+function RecordFields({ b, putBlock, rowsForPage }: { b: PromptBlock; putBlock: (id: string, patch: Partial<PromptBlock>) => void; rowsForPage?: (blockId: string) => number | null }) {
+  const fields = b.recordFields?.length ? b.recordFields : [""];
+  const put = (recordFields: string[]) => putBlock(b.id, { recordFields });
+  return (
+    <div className="table-columns">
+      {fields.map((f, i) => (
+        <div key={i} className="table-column">
+          <Field label={`Blank ${i + 1}`}>
+            <input type="text" value={f} placeholder="e.g. Item" onChange={(e) => put(fields.map((x, k) => (k === i ? e.target.value : x)))} />
+          </Field>
+          {fields.length > 1 && <button type="button" className="btn btn--ghost" aria-label={`Remove blank ${i + 1}`} onClick={() => put(fields.filter((_, k) => k !== i))}>Remove</button>}
+        </div>
+      ))}
+      {fields.length < 12 && <button type="button" className="btn" onClick={() => put([...fields, ""])}>+ Add a blank</button>}
+      <div className="row">
+        <NumberField label="Records on this page" step={1} min={1} max={60} value={b.recordCount ?? 1} onChange={(n) => putBlock(b.id, { recordCount: Math.max(1, Math.min(60, Math.round(n))) })} />
+        <Field label="Each record is called">
+          <input type="text" value={b.numbering?.prefix ?? "No."} placeholder="No." onChange={(e) => putBlock(b.id, { numbering: { ...b.numbering, prefix: e.target.value } })} />
+        </Field>
+        <NumberField label="First number" step={1} min={1} value={b.numbering?.start ?? 1} onChange={(n) => putBlock(b.id, { numbering: { ...b.numbering, start: Math.max(1, Math.round(n)) } })} />
+      </div>
+      {rowsForPage && (
+        <button type="button" className="btn" onClick={() => { const n = rowsForPage(b.id); if (n) putBlock(b.id, { recordCount: n }); }}>
+          Fit records to one page
+        </button>
+      )}
+      <p className="hint">Records are numbered straight through every copy of this page; a record is never split across two pages.</p>
+    </div>
+  );
+}
+
 /** What a column can hold — its width follows from it (narrow numbers and dates, wide notes). */
 const COLUMN_HOLDS: { value: ValueType | ""; label: string }[] = [
   { value: "", label: "Anything (equal width)" },
@@ -346,6 +378,7 @@ export function PromptEditor({
   allowStarters = false,
   composer = false,
   fit,
+  rowsForPage,
 }: {
   set: PromptSet;
   onChange: (next: PromptSet) => void;
@@ -363,6 +396,8 @@ export function PromptEditor({
   composer?: boolean;
   /** How the current sections fit: pages each time, a plain problem when they can't, lines per section. */
   fit?: PromptFit;
+  /** Numbered tables: how many rows of a table fill its page at the product's size (engines/recipe/fitRows). */
+  rowsForPage?: (blockId: string) => number | null;
 }) {
   const blocks = set.blocks;
   const [added, setAdded] = useState<{ id: string; label: string } | null>(null);
@@ -526,6 +561,7 @@ export function PromptEditor({
                   </>
                 )}
                 {k === "info" && <InfoFields b={b} putBlock={putBlock} />}
+                {k === "record" && <RecordFields b={b} putBlock={putBlock} rowsForPage={rowsForPage} />}
                 {k === "divider" && <p className="hint">A thin line across the page between the sections above and below it.</p>}
                 {k === "spacer" && (
                   <Segmented<SpacerSize> label="Open space" value={b.spacer ?? "medium"} options={(["small", "medium", "large"] as const).map((v) => ({ value: v, label: v[0].toUpperCase() + v.slice(1) }))} onChange={(spacer) => putBlock(b.id, { spacer })} />
@@ -603,6 +639,18 @@ export function PromptEditor({
                     {b.responseStyle === "table" && (
                       <div className="subsection custom-table-controls">
                         <TableColumns b={b} putBlock={putBlock} />
+                        {b.table?.numbering && rowsForPage && (
+                          <button
+                            type="button"
+                            className="btn"
+                            onClick={() => {
+                              const n = rowsForPage(b.id);
+                              if (n) putBlock(b.id, { space: "fixed", lineCount: n, table: { ...(b.table ?? { columns: ["Task", "Due", "Done"] }), rows: n } });
+                            }}
+                          >
+                            Fit rows to one page
+                          </button>
+                        )}
                         <div className="row">
                           <NumberField
                             label={mode === "fill" ? "Rows (at least)" : "Rows"}

@@ -39,6 +39,8 @@ export type RecipePreset = {
   build: (opts: { count: number; sheets: number; data?: ProjectData }) => ProductRecipe;
   /** A product made from its own content starts with these (empty) lists; its pages are made from them. */
   content?: () => ProjectData;
+  /** A numbered table (or record section) that should fill its page: its rows (records) are measured at the chosen size when the product is made (engines/recipe/fitRows). */
+  fillTable?: string;
   layoutOptions?: Partial<LayoutOptions>;
   /**
    * Set on a complete book (a multi-section recipe that makes the whole
@@ -279,6 +281,7 @@ export const INVENTORY_PRESETS: RecipePreset[] = [
     productTypes: ["notebook"],
     needsCalendar: false,
     build: ({ count }) => ({ items: [], ordering: "sequential", structure: [step("worksheet", { type: "copies", count: Math.max(1, Math.round(count)) }, { title: "Inventory Count", promptSet: inventoryCountSet() })] }),
+    fillTable: "inv-count",
     layoutOptions: { showPageNumbers: true },
   },
   {
@@ -287,6 +290,7 @@ export const INVENTORY_PRESETS: RecipePreset[] = [
     productTypes: ["notebook"],
     needsCalendar: false,
     build: ({ count }) => ({ items: [], ordering: "sequential", structure: [step("worksheet", { type: "copies", count: Math.max(1, Math.round(count)) }, { title: "Item Records", promptSet: inventoryRecordSet() })] }),
+    fillTable: "inv-records",
     layoutOptions: { showPageNumbers: true },
   },
 ];

@@ -72,7 +72,9 @@ export const columnMinIn = (ctx: LayoutContext, label: string) => {
 function tableHead(spec: NonNullable<StationeryZone["table"]>, rect: Pick<Rect, "x" | "w">, ctx: LayoutContext) {
   const inset = ctx.spacing.labelToBorderInset;
   // Geometry first (column widths from the research proportions), then the headings fitted to those widths.
-  const cols = resolveColumns(spec.columns, rect.x, rect.w, (c) => columnMinIn(ctx, c.label));
+  // A numbered table's "No." column is never narrower than the widest number it prints (drawn in the label role).
+  const numberMin = spec.numbers ? getLayoutMeasurer().measure(spec.numbers.widest, styleForRole(ctx.typography, "label")) + 2 * inset : 0;
+  const cols = resolveColumns(spec.columns, rect.x, rect.w, (c) => (spec.numbers && c.key === "no" ? Math.max(columnMinIn(ctx, c.label), numberMin) : columnMinIn(ctx, c.label)));
   const labelLine = lineBoxIn(ctx.typography, "label");
   const heads = cols.columns.map((c) => fitHeading(c.column.label, "label", { w: Math.max(0, c.w - 2 * inset), h: 2 * labelLine }, ctx));
   const headerH = spec.showHeader !== false ? Math.max(labelLine, ...heads.map((f) => f.heightIn)) + 2 * inset : 0;

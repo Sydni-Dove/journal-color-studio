@@ -31,6 +31,7 @@ import { Field, NumberField } from "../editor/ui";
 import { TechnicalDetails } from "../help/visuals";
 import { layoutAvailability, resolveDocument, type ResolvedDocument } from "../../engines/document/resolve";
 import { BookTemplates } from "./BookTemplates";
+import { fitTableToPage } from "../../engines/recipe/fitRows";
 
 function Choices<T extends string>({ value, options, onChange }: { value: T; options: { value: T; label: string }[]; onChange: (v: T) => void }) {
   return (
@@ -116,11 +117,6 @@ export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: 
     setCount(t === "worksheet" ? 1 : t === "devotional" ? 90 : 120);
   };
 
-  // Inventory pages: a notebook's worth of copies (not the 120 pages a lined notebook starts with).
-  useEffect(() => {
-    if (recipeId.startsWith("inventory-")) setCount(24);
-  }, [recipeId]);
-
   // Arriving from a product family / quick action: apply its type's defaults, its page structure, and scroll to the step.
   useEffect(() => {
     if (start?.type) {
@@ -132,6 +128,12 @@ export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: 
     if (start?.template) return;
     if (target) document.getElementById(target)?.scrollIntoView({ block: "start" });
   }, []);
+
+  // Inventory pages: a notebook's worth of copies (not the 120 pages a lined notebook starts with).
+  // After the start effect above, which applies the product type's own default first.
+  useEffect(() => {
+    if (recipeId.startsWith("inventory-")) setCount(24);
+  }, [recipeId]);
 
   const pickBinding = (id: string) => {
     setBindingChoice(id);
@@ -212,7 +214,9 @@ export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: 
       typography: { fonts: { ...DEFAULT_FONTS, headings: heading, accent: heading }, roleOverrides: {} },
       layoutOptions: recipe.layoutOptions,
     });
-    onCreate(data ? { ...project, data } : project);
+    // A numbered table that fills its page: measured at the chosen size and orientation.
+    const made = recipe.fillTable ? fitTableToPage(project, recipe.fillTable) : project;
+    onCreate(data ? { ...made, data } : made);
   };
 
   return (

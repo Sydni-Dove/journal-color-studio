@@ -160,7 +160,7 @@ function blockZone(set: PromptSet, b: PromptBlock, surfaceOf: (b: PromptBlock) =
           table: {
             columns: tableColumns(b),
             basis: b.table?.columnTypes?.some(Boolean) ? "Custom page table — columns sized to what they hold" : "Custom page table — equal columns",
-            ...(numbered ? { numbers: { start: sequenceStarts?.[b.id] ?? b.table!.numbering!.start ?? 1 } } : {}),
+            ...(numbered ? { numbers: tableNumbers(sequenceStarts?.[b.id] ?? b.table!.numbering!.start ?? 1, lines!) } : {}),
             showHeader: b.table?.showHeader !== false,
             borders: b.table?.borders ?? "grid",
             ...(b.table?.rowSpace && b.table.rowSpace !== "standard" ? { rowScale: TABLE_ROW_SCALE[b.table.rowSpace] } : {}),
@@ -186,6 +186,13 @@ export const COLUMN_CHARS: Record<ValueType, number> = {
 };
 /** Width share of a numbered table's "No." column. */
 const NUMBER_COLUMN_CHARS = 5;
+
+/**
+ * A numbered table's numbers: from `start`, for `rows` rows. Its column is sized for the widest number
+ * it prints, and never for fewer than three digits — so copies of a page keep the same columns until
+ * the count passes 999.
+ */
+const tableNumbers = (start: number, rows: number) => ({ start, widest: String(Math.max(999, start + Math.max(1, rows) - 1)).replace(/\d/g, "0") });
 
 /** A table block's columns: its labels, sized by what each holds (or equal), after a "No." column when numbered. */
 function tableColumns(b: PromptBlock): { key: string; label: string; referenceWidthIn: number }[] {

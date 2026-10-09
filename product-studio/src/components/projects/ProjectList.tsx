@@ -82,6 +82,12 @@ const GLYPH: Partial<Record<ProductFamilyId, ReactNode>> = {
       <path d="M3 12h26M9 12v13M15 12v13M21 12v13" />
     </>
   ),
+  inventory: (
+    <>
+      <rect x="5" y="6" width="22" height="21" rx="1.5" />
+      <path d="M5 11h22M11 11v16M5 16h22M5 21h22M8 14h.1M8 19h.1M8 24h.1" />
+    </>
+  ),
   tracker: (
     <>
       <rect x="5" y="5" width="22" height="22" rx="2" />
