@@ -13,6 +13,11 @@ describe("AI document proposal", () => {
     const source = "User's exact words: do not alter this sentence.";
     const project = projectFromProposal(sample(kind), source);
     expect(project.data?.collections[0].records[0].values.text).toBe(source);
+    const sourceStep = project.recipe.structure?.at(-1);
+    if (sourceStep?.kind === "step") {
+      expect(sourceStep.title).toBe("Provided Content");
+      expect(sourceStep.promptSet?.blocks.filter((b) => b.textStyle === "body").map((b) => b.label).join("")).toBe(source);
+    }
     const step = project.recipe.structure?.[0];
     expect(step?.kind).toBe("step");
     if (step?.kind === "step") expect(step.promptSet?.blocks.map((b) => b.label)).toEqual(["My Heading", "", "My Notes"]);
@@ -28,5 +33,17 @@ describe("AI document proposal", () => {
     p.pages[0].components.pop();
     p.pages[0].components.push({ id: "image-1", kind: "image", assetRef: "remote", alt: "unexpected" });
     expect(() => parseProposal(p)).toThrow(/unsupported/);
+  });
+
+  it("retains long supplied wording across continuation pages", () => {
+    const source = Array.from({ length: 800 }, (_, i) => `Exact-${i}`).join(" ");
+    const project = projectFromProposal(sample("workbook"), source);
+    const sourceStep = project.recipe.structure?.at(-1);
+    if (sourceStep?.kind !== "step") throw new Error("Source page missing");
+    expect(sourceStep.promptSet?.blocks.filter((b) => b.textStyle === "body").map((b) => b.label).join("")).toBe(source);
+    const doc = resolveDocument(project);
+    expect(doc.recipe.pages.length).toBeGreaterThan(2);
+    const printed = doc.recipe.pages.flatMap((_, i) => solvePage(doc, i).nodes.filter((n) => n.type === "text" && n.id.includes("provided-content-")).map((n) => n.type === "text" ? n.text : ""));
+    expect(printed.filter((text) => text.startsWith("Exact-")).join(" ").split(/\s+/)).toEqual(source.split(" "));
   });
 });

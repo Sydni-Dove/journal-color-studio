@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { supabase } from "../../persistence/cloud";
 import { parseProposal, projectFromProposal, type DocumentProposal } from "../../engines/document/generation";
 import type { ProductProject } from "../../types/project";
@@ -12,6 +12,7 @@ export function AiDocumentWizard({ onCreate, onCancel }: { onCreate: (p: Product
   const [sourceContent, setSourceContent] = useState("");
   const [proposal, setProposal] = useState<DocumentProposal | null>(null);
   const [busy, setBusy] = useState(false);
+  const inFlight = useRef(false);
   const [error, setError] = useState("");
   const change = (update: (p: DocumentProposal) => DocumentProposal) => setProposal((p) => p && update(p));
   const updateComponent = (pi: number, ci: number, update: (c: DocComponent) => DocComponent) => change((p) => ({ ...p, pages: p.pages.map((page, i) => i === pi ? { ...page, components: page.components.map((c, j) => j === ci ? update(c) : c) } : page) }));
@@ -21,6 +22,8 @@ export function AiDocumentWizard({ onCreate, onCancel }: { onCreate: (p: Product
     return { ...p, pages };
   });
   const generate = async () => {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setError(""); setBusy(true);
     try {
       const { data, error: invokeError } = await supabase().functions.invoke("generate-document", { body: { description, sourceContent } });
@@ -35,7 +38,7 @@ export function AiDocumentWizard({ onCreate, onCancel }: { onCreate: (p: Product
       if (data?.error) throw new Error(data.error);
       setProposal(parseProposal(data?.proposal));
     } catch (e) { setError(e instanceof Error ? e.message : "Document generation failed."); }
-    finally { setBusy(false); }
+    finally { inFlight.current = false; setBusy(false); }
   };
   const create = () => {
     if (!proposal) return;
@@ -47,7 +50,7 @@ export function AiDocumentWizard({ onCreate, onCancel }: { onCreate: (p: Product
     <p className="lede">Describe the product you want. Review its editable page outline before creating it.</p>
     {!proposal ? <section className="panel" style={{ display: "grid", gap: 16 }}>
       <label>What should this document do?<textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={6} placeholder="For example: an inventory notebook with item details, stock counts and reorder logs" style={{ width: "100%" }} /></label>
-      <label>Your existing wording or notes (optional)<textarea value={sourceContent} onChange={(e) => setSourceContent(e.target.value)} rows={6} placeholder="Paste wording to keep exactly. It is saved verbatim with the product." style={{ width: "100%" }} /></label>
+      <label>Your existing wording or notes (optional)<textarea value={sourceContent} onChange={(e) => setSourceContent(e.target.value)} rows={6} placeholder="Paste wording to keep exactly. It will appear on a separate editable Provided Content page." style={{ width: "100%" }} /></label>
       <button className="btn btn--primary" onClick={() => void generate()} disabled={busy || description.trim().length < 10}>{busy ? "Generating…" : "Generate outline"}</button>
     </section> : <section className="panel" style={{ display: "grid", gap: 16 }}>
       <p className="hint">Review every page and section. You can keep editing the product in the studio after creation.</p>
