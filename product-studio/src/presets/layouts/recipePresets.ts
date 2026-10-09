@@ -1,6 +1,9 @@
 import type { ProductType } from "../../types/product";
 import type { ProductRecipe } from "../../types/recipe";
 import type { LayoutOptions } from "../../types/project";
+import type { ProjectData } from "../../types/document";
+import { addCollection, COLLECTION_STARTERS } from "../../engines/data/data";
+import { withDevotionalStructure } from "../devotionalStructures";
 import { BOOK_PRESETS, dailyPlannerBook, meetingsWithGodBook, section, step, withCovers } from "../bookRecipes";
 import { PROMPT_STARTERS } from "../../types/prompts";
 import { STATIONERY_RECIPES, stationeryLayoutId } from "../stationery/catalog";
@@ -32,8 +35,10 @@ export type RecipePreset = {
   label: string;
   productTypes: ProductType[];
   needsCalendar: boolean;
-  /** Build the recipe; `count` is pages/copies where relevant, `sheets` for pads. */
-  build: (opts: { count: number; sheets: number }) => ProductRecipe;
+  /** Build the recipe; `count` is pages/copies where relevant, `sheets` for pads; `data` = what `content` made. */
+  build: (opts: { count: number; sheets: number; data?: ProjectData }) => ProductRecipe;
+  /** A product made from its own content starts with these (empty) lists; its pages are made from them. */
+  content?: () => ProjectData;
   layoutOptions?: Partial<LayoutOptions>;
   /**
    * Set on a complete book (a multi-section recipe that makes the whole
@@ -226,6 +231,21 @@ export const CUSTOM_PAGE_PRESET: RecipePreset = {
   }),
   layoutOptions: { showPageNumbers: false },
 };
+
+/**
+ * A devotional written in the studio: an empty list of days (title, Scripture, teaching, questions,
+ * prayer, application) and pages made from it, one day per entry. The maker adds or pastes the days.
+ */
+export const DEVOTIONAL_CONTENT_PRESET: RecipePreset = {
+  id: "devotional-content",
+  label: "Write my devotional here",
+  productTypes: ["devotional"],
+  needsCalendar: false,
+  content: () => addCollection(undefined, "Devotional days", COLLECTION_STARTERS.find((x) => x.id === "devotional")!.fields).data,
+  build: ({ data }) => ({ items: [], ordering: "sequential", structure: data?.collections[0] ? withDevotionalStructure(undefined, "flowing", data.collections[0]) : [] }),
+  layoutOptions: { showPageNumbers: true },
+};
+// Not a page type (it makes a whole book from content): the New Product flow offers it as its own first choice.
 
 // After the stationery recipes: a devotional or worksheet still starts on its own designs.
 RECIPE_PRESETS.push(...STATIONERY_PRESETS);

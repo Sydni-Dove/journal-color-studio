@@ -314,10 +314,10 @@ function expandGroup(g: BookGroup, scope: PeriodRef, path: string, order: number
     // Once per entry of a content list, in the list's order; each entry keeps its stable id in its pages' keys.
     const c = ctx.data?.collections.find((x) => x.id === g.entries!.collectionId);
     if (!c) {
-      diags.push({ severity: "error", itemId: g.id, message: `"${g.label ?? "A section"}" repeats for each entry of a list that no longer exists. Choose a list in Content data.` });
+      diags.push({ severity: "error", itemId: g.id, message: `"${g.label ?? "A section"}" repeats for each entry of a list that no longer exists. Choose a list in Your content.` });
       return [];
     }
-    if (!c.records.length) diags.push({ severity: "warning", itemId: g.id, message: `"${c.name}" has no entries yet, so "${g.label ?? "this section"}" has no pages. Add entries in Content data.` });
+    if (!c.records.length) diags.push({ severity: "warning", itemId: g.id, message: `"${c.name}" has no entries yet, so "${g.label ?? "this section"}" has no pages. Add them in Your content.` });
     return [{ leaves: c.records.flatMap((r, index) => expandList(g.children, { kind: "entry", collectionId: c.id, recordId: r.id, index }, `${path}/${g.id}/e:${r.id}`, ctx, diags)), sort: null, order }];
   }
   if (!g.period) return [{ leaves: expandList(g.children, scope, `${path}/${g.id}`, ctx, diags), sort: null, order }];

@@ -18,14 +18,18 @@ import { Check, LabeledNumeric, Segmented } from "../editor/ui";
 import { PrintDocument } from "./PrintDocument";
 
 /** Identical issues on many pages are listed once, with the pages they occur on. */
-function groupIssues(issues: ValidationIssue[]): { issue: ValidationIssue; pages: number[] }[] {
-  const byKey = new Map<string, { issue: ValidationIssue; pages: number[] }>();
+function groupIssues(issues: ValidationIssue[]): { issue: ValidationIssue; pages: number[]; details: string[] }[] {
+  // One row per problem as the maker reads it: two rules that say the same thing in plain words
+  // (a printer's and a binding's page minimum) are one row, with both technical messages kept.
+  const byKey = new Map<string, { issue: ValidationIssue; pages: number[]; details: string[] }>();
   for (const i of issues) {
-    const key = `${i.severity}|${i.rule}|${i.componentId ?? ""}|${i.message}`;
+    const plain = plainIssue(i);
+    const key = `${i.severity}|${i.rule}|${i.componentId ?? ""}|${plain.title}|${plain.advice ?? ""}`;
     const g = byKey.get(key);
     if (g) {
-      if (i.page !== null) g.pages.push(i.page);
-    } else byKey.set(key, { issue: i, pages: i.page !== null ? [i.page] : [] });
+      if (i.page !== null && !g.pages.includes(i.page)) g.pages.push(i.page);
+      if (!g.details.includes(i.message)) g.details.push(i.message);
+    } else byKey.set(key, { issue: i, pages: i.page !== null ? [i.page] : [], details: [i.message] });
   }
   return [...byKey.values()];
 }
@@ -34,7 +38,7 @@ export function IssueList({ issues, onGoTo }: { issues: ValidationIssue[]; onGoT
   if (!issues.length) return <p className="hint">Everything checks out.</p>;
   return (
     <ul className="issues">
-      {groupIssues(issues).map(({ issue: i, pages }, k) => {
+      {groupIssues(issues).map(({ issue: i, pages, details }, k) => {
         const plain = plainIssue(i);
         return (
           <li key={k} className={`issue issue--${i.severity}`} data-rule={i.rule}>
@@ -57,7 +61,7 @@ export function IssueList({ issues, onGoTo }: { issues: ValidationIssue[]; onGoT
             <div className="issue-title">{plain.title}</div>
             {plain.advice && <div className="issue-advice">{plain.advice}</div>}
             <TechnicalDetails label="Show details">
-              <div>{i.message}</div>
+              {details.map((d) => <div key={d}>{d}</div>)}
               {i.measurement && (
                 <div>
                   measured {+i.measurement.actual.toFixed(4)} vs limit {+i.measurement.limit.toFixed(4)} {i.measurement.unit}

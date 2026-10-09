@@ -348,7 +348,7 @@ function GroupCard({ g, scope, props, first, last, edit }: { g: BookGroup; scope
       <legend>{g.label || SECTION_LABEL[g.period ?? "none"]}{g.designId ? ` · ${g.children.length} page${g.children.length === 1 ? "" : "s"} from your page design` : ""}{list ? ` · once per entry of “${list.name}” (${list.records.length})` : ""}</legend>
       {g.entries && (
         <p className="hint">
-          {list ? `These pages repeat for each entry of “${list.name}”, in its order, and print that entry's words. Edit the words in Content data. In a page title, {title} or {day|#} prints that field (# = the entry's place).` : "This section repeats for each entry of a list that no longer exists. Choose a list in Content data."}
+          {list ? `These pages repeat for each entry of “${list.name}”, in its order, and print that entry's words. Edit the words in Your content. In a page title, {title} or {day|#} prints that field (# = the entry's place).` : "This section repeats for each entry of a list that no longer exists. Choose a list in Your content."}
         </p>
       )}
       <NodeList nodes={g.children} scope={inner} parentId={g.id} props={props} />

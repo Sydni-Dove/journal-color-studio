@@ -211,7 +211,9 @@ export function Editor({ project, onChange, onBack, saveStatus, cloudLabel }: Pr
       setPendingPage(null);
     }
   }, [doc, pendingPage]);
-  const [area, setArea] = useArea(project.productType === "custom" ? "add" : undefined);
+  // A product made from its own content opens on that content while it has none yet (add the days first).
+  const awaitingContent = !!project.data?.collections.length && project.data.collections.every((c) => !c.records.length) && !!project.recipe.structure?.some((n) => n.kind === "group" && n.entries);
+  const [area, setArea] = useArea(project.productType === "custom" ? "add" : awaitingContent ? "data" : undefined);
   const currentItemId = doc?.recipe.pages[current]?.recipeItemId;
   const summaries: Partial<Record<AreaId, string>> = doc
     ? {

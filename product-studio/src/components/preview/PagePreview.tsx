@@ -90,7 +90,7 @@ export function PagePreview({ doc, index, onIndex, debug, issueIds }: Props) {
     onIndex(next);
   };
 
-  if (!pages.length) return <div className="preview-caption">This recipe produces no pages yet.</div>;
+  if (!pages.length) return <div className="preview-caption">No pages yet. Add your content (Your content) or pages (Pages), and they appear here.</div>;
   const current = pages[Math.min(index, pages.length - 1)];
   const infos = allPageInfo(doc);
   const info = infos[Math.min(index, pages.length - 1)];

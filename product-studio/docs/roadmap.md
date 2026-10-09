@@ -146,6 +146,39 @@ per product. Order of work:
    `tests/devotional.test.ts` (7 / 40 / 365 days, short and very long entries,
    every structure, several sizes, landscape, perfect-bound and coil); a
    138-page Chrome PDF was checked word by word.
+   **Accepted, with refinements to schedule (not built yet):**
+   - *Paragraph spacing* — a configurable space between paragraphs of body
+     text (a styling choice). Existing templates keep today's default (no
+     extra space, so their snapshots don't move), and the paginator must
+     measure the space it adds — a page break between paragraphs drops it.
+   - *Clear structure switching* — before a devotional structure replaces
+     pages, say which existing pages will be replaced (by name and count),
+     keep compatible custom pages where possible (today only cover / divider /
+     back cover pages are kept), and offer a plain Cancel, not only Undo.
+   - *Several content lists in one book* — e.g. a devotional and a reading
+     plan, or a workbook's lessons and its answer key. Plan how a book names
+     which list each per-entry section reads, how page numbering and
+     contents pages see them, and how the Your content area shows more than
+     one; not implemented yet (one list per book today).
+
+   **Devotional workflow review** (for someone who is not a designer or
+   programmer). The intended path — choose a devotional → add or import the
+   days → choose a design → preview → export — had gaps, now closed:
+   - New product → Devotional asked for a fill-in page type and made 90 blank
+     pages; making a devotional from your own words was only reachable by
+     finding a separate content area. Now "How you'll make it" offers
+     *Write my devotional here* first, which creates the list of days and
+     its pages together and opens on the content.
+   - Wording: "Content data", "fields" and "structure" became *Your
+     content*, *What each entry has* and *Devotional design*; the preview's
+     "This recipe produces no pages yet" now says what to do; the list
+     picker and list settings are out of the way when there is one list; the
+     paste box opens when there are no entries yet.
+   - The export check listed the 24-page minimum twice (printer and binding
+     say the same thing): issues that read the same are one row now, and its
+     advice mentions adding days.
+   - Still technical, and kept to advanced places: the Order & repeats
+     editor (sections, `{title}` in page titles) and the field editor.
 6. Second proof: an inventory notebook (blank repeating records, typed tables,
    content-aware columns, both orientations) — with no engine changes.
 7. Layout alternatives and suggestions; 8. AI-generated document structures

@@ -80,7 +80,7 @@ export function plainIssue(i: ValidationIssue): PlainIssue {
       return { title: "The sidebar is too narrow or too wide for this page.", advice: "Adjust the sidebar width or turn the sidebar off." };
     case "page-count": {
       const need = /at least (\d+)/.exec(m), has = /has (\d+)/.exec(m);
-      if (need && has) return { title: `This printer and binding need at least ${need[1]} pages. Your product has ${has[1]}.`, advice: "Add pages or copies under Pages." };
+      if (need && has) return { title: `This printer and binding need at least ${need[1]} pages. Your product has ${has[1]}.`, advice: "Add pages or copies under Pages — or, for a devotional made from your content, add more days." };
       if (/divisible by (\d+)/.test(m)) return { title: `This printer needs the page count to be a multiple of ${/divisible by (\d+)/.exec(m)![1]}.`, advice: "Add or remove pages under Pages." };
       return { title: "This printer has page-count limits this product doesn't meet.", advice: "Adjust the number of pages under Pages." };
     }

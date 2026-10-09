@@ -28,9 +28,9 @@ function DevotionalBox({ c, book }: { c: DataCollection; book: BookLink }) {
   const fieldLabel = (key: string) => c.fields.find((f) => f.key === key)?.label ?? key;
   const chosen = DEVOTIONAL_STRUCTURES.find((x) => x.id === structure)!;
   return (
-    <Section title={`Print as a devotional${used ? " · in use" : ""}`} open={used}>
-      <p className="hint">{used ? `This product's pages are made from “${c.name}”: one day per entry, in this list's order. Choose another structure any time — the entries stay as they are.` : `Make this product's pages from “${c.name}”: one day per entry, in this list's order. The entries are never changed; page size, binding and style still come from the product.`}</p>
-      <Field label="Structure">
+    <Section title={`Devotional design${used ? " · in use" : ""}`} open={used}>
+      <p className="hint">{used ? `Your pages are made from “${c.name}”: one day per entry, in order. Try another design any time — your words stay exactly as they are.` : `Make this product's pages from “${c.name}”: one day per entry, in order. Your words are never changed; the page size, binding and colors still come from the product.`}</p>
+      <Field label="Design">
         <select value={structure} aria-label="Devotional structure" onChange={(e) => { setStructure(e.target.value); setDone(null); }}>
           {DEVOTIONAL_STRUCTURES.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}
         </select>
@@ -38,18 +38,18 @@ function DevotionalBox({ c, book }: { c: DataCollection; book: BookLink }) {
       <p className="hint">{chosen.description}</p>
       <ul className="data-roles">
         {roles.map((r) => (
-          <li key={r}>{ROLE_LABEL[r]}: {map[r] ? <strong>{fieldLabel(map[r]!)}</strong> : <span className="hint">no field — not printed</span>}</li>
+          <li key={r}>{ROLE_LABEL[r]}: {map[r] ? <strong>{fieldLabel(map[r]!)}</strong> : <span className="hint">not in your entries — left out</span>}</li>
         ))}
       </ul>
-      {unused.length > 0 && <p className="data-issue" role="note">Not printed by this structure: {unused.map((f) => `“${f.label}”`).join(", ")}. Rename a field to one of the parts above to print it.</p>}
+      {unused.length > 0 && <p className="data-issue" role="note">Not printed by this design: {unused.map((f) => `“${f.label}”`).join(", ")}. To print it, rename it (under “What each entry has”) to one of the names above.</p>}
       <div className="row">
         <button
           type="button"
           className="btn btn--primary"
           disabled={!map.teaching && !map.title && !map.scripture}
-          onClick={() => { book.use(structure, c.id); setDone(`The pages now follow “${chosen.label}”. Any cover, divider and back cover pages were kept; Undo restores the previous pages.`); }}
+          onClick={() => { book.use(structure, c.id); setDone(`Your pages now use “${chosen.label}” — see the preview. Any cover, divider and back cover pages were kept; Undo goes back.`); }}
         >
-          {used ? "Switch to this structure" : "Make the pages from this list"}
+          {used ? "Use this design" : "Make my devotional pages"}
         </button>
       </div>
       {done && <p className="hint" role="status">{done}</p>}
@@ -132,7 +132,7 @@ function recordTitle(c: DataCollection, r: DataRecord, n: number): string {
 function FieldsEditor({ c, set }: { c: DataCollection; set: (fn: (d: ProjectData | undefined) => ProjectData) => void }) {
   const [label, setLabel] = useState("");
   return (
-    <Section title={`Fields · ${c.fields.length}`}>
+    <Section title={`What each entry has · ${c.fields.length}`}>
       <p className="hint">Each entry is filled in with these fields. Changing a field's type keeps what was typed; anything the new type can't read is flagged, not deleted.</p>
       {c.fields.map((f, i) => (
         <div key={f.key} className="data-field-row" data-field={f.key}>
@@ -179,7 +179,7 @@ function ImportBox({ c, set }: { c: DataCollection; set: (fn: (d: ProjectData | 
   const withIssues = plan ? plan.rows.filter((r) => r.issues.length).length : 0;
   const cols = plan ? plan.mapping.length : 0;
   return (
-    <Section title="Paste or import entries">
+    <Section title="Paste or import entries" open={!c.records.length}>
       <p className="hint">Paste rows from a spreadsheet, or choose a .csv file. Nothing is added until you confirm.</p>
       <textarea className="data-textarea" rows={5} aria-label="Pasted rows" value={text} placeholder={c.fields.map((f) => f.label).join("\t")} onChange={(e) => reset(e.target.value)} />
       <input
@@ -329,22 +329,27 @@ export function DataPanel({ data, onChange, book }: { data: ProjectData | undefi
   };
   return (
     <div className="data-panel">
-      <p className="hint">They save, undo and sync with the product. A list prints only when the pages are made from it (Print as a devotional).</p>
+      {!(c && usesCollection(book?.structure, c.id)) && <p className="hint">Your entries save and undo with the product. They print once your pages are made from them (Devotional design).</p>}
       {cs.length > 0 && c && (
         <>
-          <Field label="List">
-            <select value={c.id} aria-label="List" onChange={(e) => setSelected(e.target.value)}>
-              {cs.map((x) => <option key={x.id} value={x.id}>{x.name} ({x.records.length})</option>)}
-            </select>
-          </Field>
-          <div className="row">
-            <Field label="List name"><DraftInput label="List name" value={c.name} onCommit={(v) => onChange((d) => renameCollection(d, c.id, v.trim() || c.name))} /></Field>
-            <button type="button" className="btn btn--ghost" onClick={() => onChange((d) => removeCollection(d, c.id))}>Delete list</button>
-          </div>
+          {cs.length > 1 && (
+            <Field label="List">
+              <select value={c.id} aria-label="List" onChange={(e) => setSelected(e.target.value)}>
+                {cs.map((x) => <option key={x.id} value={x.id}>{x.name} ({x.records.length})</option>)}
+              </select>
+            </Field>
+          )}
           <RecordsEditor key={`r-${c.id}`} c={c} set={onChange} />
           <ImportBox key={`i-${c.id}`} c={c} set={onChange} />
-          <FieldsEditor key={`f-${c.id}`} c={c} set={onChange} />
           {book && <DevotionalBox key={`d-${c.id}`} c={c} book={book} />}
+          <FieldsEditor key={`f-${c.id}`} c={c} set={onChange} />
+          <Section title="Rename or delete this list">
+            <div className="row">
+              <Field label="List name"><DraftInput label="List name" value={c.name} onCommit={(v) => onChange((d) => renameCollection(d, c.id, v.trim() || c.name))} /></Field>
+              <button type="button" className="btn btn--ghost" onClick={() => onChange((d) => removeCollection(d, c.id))}>Delete list</button>
+            </div>
+            <p className="hint">Undo brings a deleted list back.</p>
+          </Section>
         </>
       )}
       <Section title="New list" open={cs.length === 0}>

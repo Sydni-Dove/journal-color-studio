@@ -148,7 +148,8 @@ describe("Content data panel", () => {
     let d: ProjectData = addRecord(data, id, { item: "Pens", n: 3 }).data;
     d = addRecord(d, id, { n: "many" }).data;
     const html = renderToStaticMarkup(<DataPanel data={d} onChange={() => {}} />);
-    expect(html).toContain("Stock (2)");
+    expect(html).toContain('value="Stock"'); // one list: no list picker, its name under "Rename or delete this list"
+    expect(html).not.toContain("Stock (2)");
     expect(html).toContain("1. Pens");
     expect(html).toContain("Entries · 2 · 1 to check");
     expect(html).toContain("Paste or import entries");

@@ -16,7 +16,7 @@ import { PRINT_PROFILES } from "../../presets/printProfiles/printProfiles";
 import { PRODUCT_TYPES } from "../../presets/products/productTypes";
 import { createProject } from "../../presets/products/projectFactory";
 import { TEST_PRODUCTS } from "../../presets/products/testProducts";
-import { recipePresetsFor } from "../../presets/layouts/recipePresets";
+import { DEVOTIONAL_CONTENT_PRESET, recipePresetsFor } from "../../presets/layouts/recipePresets";
 import { CUSTOM_SIZE_ID, sizePresetsFor } from "../../presets/sizes/sizePresets";
 import { SPACING_LABELS } from "../../presets/spacing/spacingPresets";
 import { STUDIO_PAD } from "../../presets/studioDefaults";
@@ -84,7 +84,9 @@ export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: 
   const [profileId, setProfileId] = useState(def.defaultPrintProfile);
   const recipes = recipePresetsFor(type);
   const [recipeId, setRecipeId] = useState(start?.recipeId && recipes.some((r) => r.id === start.recipeId) ? start.recipeId : recipes[0].id);
-  const recipe = recipes.find((r) => r.id === recipeId) ?? recipes[0];
+  // A devotional: written here (pages made from its days) or pages to fill in by hand (the page types).
+  const [fromContent, setFromContent] = useState(true);
+  const recipe = type === "devotional" && fromContent ? DEVOTIONAL_CONTENT_PRESET : recipes.find((r) => r.id === recipeId) ?? recipes[0];
   const [density, setDensity] = useState<SpacingDensity>("balanced");
   const [paletteId, setPaletteId] = useState(PALETTES[0].id);
   const [heading, setHeading] = useState(DEFAULT_FONTS.headings);
@@ -185,8 +187,9 @@ export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: 
   const generate = () => {
     const sizeLabel = sizeId === CUSTOM_SIZE_ID ? `${custom.width}×${custom.height}${custom.unit}` : sizes.find((s) => s.id === sizeId)?.label ?? sizeId;
     const b = getBindingProfile(binding.bindingType);
+    const data = recipe.content?.();
     const project = createProject(type, {
-      name: name.trim() || `${sizeLabel} ${recipe.label} ${def.label}`,
+      name: name.trim() || (data ? `${sizeLabel} ${def.label}` : `${sizeLabel} ${recipe.label} ${def.label}`),
       dimensions: { sizePresetId: sizeId, custom: sizeId === CUSTOM_SIZE_ID ? custom : undefined, orientation },
       production: {
         bindingType: binding.bindingType,
@@ -196,14 +199,14 @@ export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: 
         duplex: b.boundEdgeMode === "book-spine",
         sheetsPerPad: isPad ? sheets : undefined,
       },
-      recipe: recipe.build({ count: needsCount ? (recipe.id === "planner-monthly-weekly" ? 10 : count) : count, sheets }),
+      recipe: recipe.build({ count: needsCount ? (recipe.id === "planner-monthly-weekly" ? 10 : count) : count, sheets, data }),
       calendar: recipe.needsCalendar ? { startDate: `${year}-01-01`, endDate: `${year}-12-31`, weekStart, sixRowMonths: true } : undefined,
       spacing: { density, overrides: {} },
       colors: { paletteId, overrides: {} },
       typography: { fonts: { ...DEFAULT_FONTS, headings: heading, accent: heading }, roleOverrides: {} },
       layoutOptions: recipe.layoutOptions,
     });
-    onCreate(project);
+    onCreate(data ? { ...project, data } : project);
   };
 
   return (
@@ -276,7 +279,7 @@ export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: 
         </section>
 
         <section className="step">
-          <h3>4 · {type === "planner" ? "Start with a planner page" : "Page"}</h3>
+          <h3>4 · {type === "planner" ? "Start with a planner page" : type === "devotional" ? "How you'll make it" : "Page"}</h3>
           {type === "planner" ? (
             <div className="planner-start" data-testid="planner-start">
               {!changingStart ? (
@@ -323,6 +326,18 @@ export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: 
               )}
             </div>
           ) : (
+            <>
+            {type === "devotional" && (
+              <Choices
+                value={fromContent ? "content" : "pages"}
+                options={[
+                  { value: "content", label: "Write my devotional here (one day per entry)" },
+                  { value: "pages", label: "Pages to fill in by hand" },
+                ]}
+                onChange={(v) => setFromContent(v === "content")}
+              />
+            )}
+            {!(type === "devotional" && fromContent) && (
             <div className="choice-row" role="group">
               {recipes.map((r) => {
                 const problem = recipeFit(r);
@@ -334,6 +349,8 @@ export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: 
                 );
               })}
             </div>
+            )}
+            </>
           )}
           {recipeProblem && (
             <div className="issue issue--error">
@@ -353,6 +370,7 @@ export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: 
               </Field>
             </div>
           )}
+          {recipe.content && <p className="hint">After you create it: add your days (type them, or paste them from a spreadsheet), choose a design, check the preview, then export. You can change the size, design or binding any time without retyping anything.</p>}
           {recipe.id === "guided-lined" && <p className="hint">Choose how many prompt sections each page has and how many writing lines each gets after you create it (Pages & Layouts → the page → Sections).</p>}
           {(recipe.id === "journal-lined" || recipe.id === "guided-lined" || stationery) && <NumberField label="Pages" step={1} min={1} value={count} onChange={(c) => setCount(Math.max(1, Math.round(c)))} />}
           {stationery && <p className="hint">Margins, section sizes, writing lines and table columns are worked out for this page size — nothing to measure.</p>}
