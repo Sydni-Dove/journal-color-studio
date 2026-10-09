@@ -576,6 +576,72 @@ exports[`existing templates print exactly as before > guided-lined @ 8.5x11 1`] 
 }
 `;
 
+exports[`existing templates print exactly as before > inventory-count @ 5.5x8.5 1`] = `
+{
+  "groups": [
+    "1-2:6652fc9f4043",
+  ],
+  "pageCount": 2,
+  "plan": "fc8d3eaed458",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > inventory-count @ 7x9 1`] = `
+{
+  "groups": [
+    "1-2:ef7cd3cc7acf",
+  ],
+  "pageCount": 2,
+  "plan": "fc8d3eaed458",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > inventory-count @ 8.5x11 1`] = `
+{
+  "groups": [
+    "1-1:65f3aba830b0",
+  ],
+  "pageCount": 1,
+  "plan": "23c94ff6d29e",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > inventory-records @ 5.5x8.5 1`] = `
+{
+  "groups": [
+    "1-2:33dec7156775",
+  ],
+  "pageCount": 2,
+  "plan": "fc8d3eaed458",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > inventory-records @ 7x9 1`] = `
+{
+  "groups": [
+    "1-1:226557da2d82",
+  ],
+  "pageCount": 1,
+  "plan": "23c94ff6d29e",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > inventory-records @ 8.5x11 1`] = `
+{
+  "groups": [
+    "1-1:9ae80800787a",
+  ],
+  "pageCount": 1,
+  "plan": "23c94ff6d29e",
+  "recipeDiagnostics": [],
+}
+`;
+
 exports[`existing templates print exactly as before > journal-lined @ 5.5x8.5 1`] = `
 {
   "groups": [

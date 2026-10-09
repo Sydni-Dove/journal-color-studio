@@ -27,6 +27,18 @@ export type PromptTable = {
   borders?: "grid" | "horizontal" | "minimal" | "none";
   /** Row height in plain words (default standard); "Fill remaining space" is the block's `fill` space. */
   rowSpace?: TableRowSpace;
+  /**
+   * What each column holds, by position (a value type of the data model). When set, column widths
+   * follow from it — narrow for numbers, dates and amounts, wide for names and notes — within the
+   * same rule every table keeps (no column narrower than its heading). Absent: equal columns.
+   */
+  columnTypes?: (import("./document").ValueType | null)[];
+  /**
+   * Number the rows in a narrow first column ("No."), continuing across the whole product: every copy
+   * of the page, and every page the table continues onto, carries on the count. A numbered table prints
+   * exactly its chosen number of rows (so the count is known in book order).
+   */
+  numbering?: RecordNumbering;
 };
 
 /** Table row heights, as a share of the studio's list-row token. */

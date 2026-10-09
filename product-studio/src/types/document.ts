@@ -102,6 +102,10 @@ export type TableComponent = Base & {
   showHeader?: boolean;
   rowSpace?: "compact" | "standard" | "spacious";
   space: SpaceRequest;
+  /** The columns' value types say what each holds, and widths follow from them (otherwise columns are equal and typed as text). */
+  sizedByContent?: boolean;
+  /** Rows numbered across the whole document (a "No." column), as records are. */
+  numbering?: { prefix?: string; start?: number; sequence?: string };
 };
 /** A printed list: items with nesting levels, marked by bullets, numbers (per level, across pages) or checkboxes. */
 export type ListComponent = Base & {

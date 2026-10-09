@@ -22,6 +22,7 @@ import type { LayoutDiagnostic, LayoutMetric, LayoutNode, PageFragment, SolvedPa
 import { minZoneHeight } from "../../engines/stationery/geometry";
 import { canSitBeside, frameOf as sectionFrameOf, isComposedHeader, kindOf, requestedLines, TABLE_ROW_SCALE, spaceOf, SPACER_HEIGHTS, SPACING_FACTOR, type GuidedHeader, type PromptBlock, type PromptSet, type ResponseStyle, type SectionFrame } from "../../types/prompts";
 import type { StationeryZone, SurfaceKind } from "../../types/stationery";
+import type { ValueType } from "../../types/document";
 import type { ColorToken, TypographyRole } from "../../types/tokens";
 import { fillInIn, fillInRows, isFixedSurface, SURFACES, tableHeaderIn } from "../stationery/surfaces";
 import { measureList, recordHeightIn } from "../stationery/flowSurfaces";
@@ -138,7 +139,9 @@ function blockZone(set: PromptSet, b: PromptBlock, surfaceOf: (b: PromptBlock) =
       };
   }
   const own = surfaceOf(b);
-  const lines = requestedLines(set, b);
+  // A numbered table prints exactly its chosen rows: the recipe counts them in book order.
+  const numbered = b.responseStyle === "table" && !!b.table?.numbering;
+  const lines = numbered ? Math.max(1, Math.round(b.table?.rows ?? b.lineCount ?? 6)) : requestedLines(set, b);
   return {
     key: b.id,
     label: b.label,
@@ -155,8 +158,9 @@ function blockZone(set: PromptSet, b: PromptBlock, surfaceOf: (b: PromptBlock) =
     ...(b.responseStyle === "table"
       ? {
           table: {
-            columns: (b.table?.columns?.length ? b.table.columns : ["Column 1", "Column 2"]).map((label, i) => ({ key: `c${i + 1}`, label, referenceWidthIn: 1 })),
-            basis: "Custom page table — equal columns",
+            columns: tableColumns(b),
+            basis: b.table?.columnTypes?.some(Boolean) ? "Custom page table — columns sized to what they hold" : "Custom page table — equal columns",
+            ...(numbered ? { numbers: { start: sequenceStarts?.[b.id] ?? b.table!.numbering!.start ?? 1 } } : {}),
             showHeader: b.table?.showHeader !== false,
             borders: b.table?.borders ?? "grid",
             ...(b.table?.rowSpace && b.table.rowSpace !== "standard" ? { rowScale: TABLE_ROW_SCALE[b.table.rowSpace] } : {}),
@@ -170,6 +174,27 @@ function blockZone(set: PromptSet, b: PromptBlock, surfaceOf: (b: PromptBlock) =
     ...(lines !== undefined ? { lines: Math.max(0, Math.round(lines)) } : {}),
     ...(b.minLines !== undefined ? { minLines: b.minLines } : {}),
   };
+}
+
+/**
+ * Typical width of what a column holds, in characters — its share of the table's width. Only the
+ * proportions matter: the table solver scales them to the page and never lets a column get narrower
+ * than its heading (engines/stationery/geometry resolveColumns).
+ */
+export const COLUMN_CHARS: Record<ValueType, number> = {
+  text: 16, longText: 30, reference: 14, signature: 18, choice: 10, date: 10, currency: 9, quantity: 7, time: 7, number: 6, computed: 8, boolean: 4,
+};
+/** Width share of a numbered table's "No." column. */
+const NUMBER_COLUMN_CHARS = 5;
+
+/** A table block's columns: its labels, sized by what each holds (or equal), after a "No." column when numbered. */
+function tableColumns(b: PromptBlock): { key: string; label: string; referenceWidthIn: number }[] {
+  const labels = b.table?.columns?.length ? b.table.columns : ["Column 1", "Column 2"];
+  const types = b.table?.columnTypes;
+  const typed = !!types?.some(Boolean);
+  const cols = labels.map((label, i) => ({ key: `c${i + 1}`, label, referenceWidthIn: typed ? COLUMN_CHARS[types![i] ?? "text"] : 1 }));
+  if (!b.table?.numbering) return cols;
+  return [{ key: "no", label: b.table.numbering.prefix ?? "No.", referenceWidthIn: typed ? NUMBER_COLUMN_CHARS : 0.5 }, ...cols];
 }
 
 /** Section gap for a prompt set's spacing choice. */

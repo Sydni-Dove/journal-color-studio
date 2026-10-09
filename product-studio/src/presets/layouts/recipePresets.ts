@@ -5,7 +5,7 @@ import type { ProjectData } from "../../types/document";
 import { addCollection, COLLECTION_STARTERS } from "../../engines/data/data";
 import { withDevotionalStructure } from "../devotionalStructures";
 import { BOOK_PRESETS, dailyPlannerBook, meetingsWithGodBook, section, step, withCovers } from "../bookRecipes";
-import { PROMPT_STARTERS } from "../../types/prompts";
+import { PROMPT_STARTERS, type PromptSet } from "../../types/prompts";
 import { STATIONERY_RECIPES, stationeryLayoutId } from "../stationery/catalog";
 import type { StationeryRecipe } from "../../types/stationery";
 
@@ -247,10 +247,55 @@ export const DEVOTIONAL_CONTENT_PRESET: RecipePreset = {
 };
 // Not a page type (it makes a whole book from content): the New Product flow offers it as its own first choice.
 
+/**
+ * INVENTORY NOTEBOOK — two page types built only from shared parts (a guided page's info row, table and
+ * record sections; no inventory-specific layout). The count sheet's columns are the data engine's
+ * "Inventory items" fields, so each column is sized to what it holds; its rows are numbered across the
+ * whole notebook. Item records are numbered blank records. Portrait or landscape both work: the table
+ * solver shares out the width either way.
+ */
+const INVENTORY_FIELDS = () => COLLECTION_STARTERS.find((x) => x.id === "inventory")!.fields.filter((f) => f.key !== "location" && f.key !== "counted");
+export function inventoryCountSet(rows = 20): PromptSet {
+  const fields = [...INVENTORY_FIELDS(), { key: "notes", label: "Notes", valueType: "longText" as const }];
+  return {
+    blocks: [
+      { id: "inv-info", kind: "info", label: "", fields: ["Location", "Date", "Counted by"] },
+      {
+        id: "inv-count", label: "", responseStyle: "table", space: "fixed", lineCount: rows,
+        table: { columns: fields.map((f) => f.label), columnTypes: fields.map((f) => f.valueType), rows, showHeader: true, borders: "grid", numbering: { prefix: "No.", sequence: "inventory-items" } },
+      },
+    ],
+  };
+}
+export function inventoryRecordSet(perPage = 3): PromptSet {
+  return {
+    blocks: [{ id: "inv-records", kind: "record", label: "", recordFields: ["Item", "SKU", "Supplier", "Location", "Reorder point", "Unit cost", "Notes"], recordCount: perPage, numbering: { prefix: "Item", sequence: "inventory-records" } }],
+  };
+}
+export const INVENTORY_PRESETS: RecipePreset[] = [
+  {
+    id: "inventory-count",
+    label: "Inventory count sheets (numbered rows)",
+    productTypes: ["notebook"],
+    needsCalendar: false,
+    build: ({ count }) => ({ items: [], ordering: "sequential", structure: [step("worksheet", { type: "copies", count: Math.max(1, Math.round(count)) }, { title: "Inventory Count", promptSet: inventoryCountSet() })] }),
+    layoutOptions: { showPageNumbers: true },
+  },
+  {
+    id: "inventory-records",
+    label: "Item record pages (numbered)",
+    productTypes: ["notebook"],
+    needsCalendar: false,
+    build: ({ count }) => ({ items: [], ordering: "sequential", structure: [step("worksheet", { type: "copies", count: Math.max(1, Math.round(count)) }, { title: "Item Records", promptSet: inventoryRecordSet() })] }),
+    layoutOptions: { showPageNumbers: true },
+  },
+];
+
 // After the stationery recipes: a devotional or worksheet still starts on its own designs.
 RECIPE_PRESETS.push(...STATIONERY_PRESETS);
 RECIPE_PRESETS.push(CUSTOM_PAGE_PRESET);
 RECIPE_PRESETS.push(GUIDED_LINED_PRESET);
+RECIPE_PRESETS.push(...INVENTORY_PRESETS);
 
 /** Page types for a product: single page layouts only — complete books are templates (below). */
 export function recipePresetsFor(t: ProductType): RecipePreset[] {

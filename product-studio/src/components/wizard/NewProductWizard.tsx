@@ -116,6 +116,11 @@ export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: 
     setCount(t === "worksheet" ? 1 : t === "devotional" ? 90 : 120);
   };
 
+  // Inventory pages: a notebook's worth of copies (not the 120 pages a lined notebook starts with).
+  useEffect(() => {
+    if (recipeId.startsWith("inventory-")) setCount(24);
+  }, [recipeId]);
+
   // Arriving from a product family / quick action: apply its type's defaults, its page structure, and scroll to the step.
   useEffect(() => {
     if (start?.type) {
@@ -182,7 +187,8 @@ export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: 
     }
   };
   const stationery = recipe.id.startsWith("stationery:");
-  const needsCount = recipe.id === "journal-lined" || recipe.id === "guided-lined" || recipe.id === "planner-monthly-weekly" || stationery;
+  const inventory = recipe.id.startsWith("inventory-");
+  const needsCount = recipe.id === "journal-lined" || recipe.id === "guided-lined" || recipe.id === "planner-monthly-weekly" || stationery || inventory;
 
   const generate = () => {
     const sizeLabel = sizeId === CUSTOM_SIZE_ID ? `${custom.width}×${custom.height}${custom.unit}` : sizes.find((s) => s.id === sizeId)?.label ?? sizeId;
@@ -372,7 +378,8 @@ export function NewProductWizard({ onCreate, onCancel, start }: { onCreate: (p: 
           )}
           {recipe.content && <p className="hint">After you create it: add your days (type them, or paste them from a spreadsheet), choose a design, check the preview, then export. You can change the size, design or binding any time without retyping anything.</p>}
           {recipe.id === "guided-lined" && <p className="hint">Choose how many prompt sections each page has and how many writing lines each gets after you create it (Pages & Layouts → the page → Sections).</p>}
-          {(recipe.id === "journal-lined" || recipe.id === "guided-lined" || stationery) && <NumberField label="Pages" step={1} min={1} value={count} onChange={(c) => setCount(Math.max(1, Math.round(c)))} />}
+          {(recipe.id === "journal-lined" || recipe.id === "guided-lined" || stationery || inventory) && <NumberField label={inventory ? "Copies of this page" : "Pages"} step={1} min={1} value={count} onChange={(c) => setCount(Math.max(1, Math.round(c)))} />}
+          {inventory && <p className="hint">Rows and records are numbered straight through every copy. Change the columns, rows or numbering after you create it (the page → Add to page); landscape gives the table more room.</p>}
           {stationery && <p className="hint">Margins, section sizes, writing lines and table columns are worked out for this page size — nothing to measure.</p>}
           {isPad && (
             <Field label="Sheets per pad">

@@ -127,6 +127,15 @@ function table(id: string, rect: Rect, zone: StationeryZone, ctx: LayoutContext)
       nodes.push(rule(`${id}-r${i}`, t.x, y, t.x + t.w, y, { strokePt: stroke, component: "Grid" }));
     }
   }
+  // Numbered rows: the first column counts on from this instance's start (a continued piece from its first row).
+  const numberCol = spec.numbers ? cols.columns.find((c) => c.column.key === "no") : undefined;
+  if (spec.numbers && numberCol) {
+    const first = spec.numbers.start + (zone.range?.from ?? 0);
+    for (let i = 0; i < rows; i++) {
+      const y = t.y + headerH + i * rowH;
+      nodes.push(text(`${id}-n${first + i}`, { x: numberCol.x + inset, y, w: Math.max(0, numberCol.w - 2 * inset), h: rowH }, String(first + i), "label", { component: "Text", vAlign: "middle", align: "center" }));
+    }
+  }
   const diagnostics: LayoutDiagnostic[] = cols.problems.map((message) => ({ severity: "error", rule: "stationery-fit", componentId: id, message }));
   if (rows < 1) diagnostics.push({ severity: "error", rule: "stationery-fit", componentId: id, message: "No room for a single table row." });
   const metrics: LayoutMetric[] = [

@@ -8,7 +8,7 @@
  */
 import type { ProductType } from "../../types/product";
 
-export type ProductFamilyId = "planner" | "daily-planner" | "journal" | "planner-journal" | "devotional" | "workbook" | "worksheet" | "notepad" | "deskpad" | "tracker" | "custom";
+export type ProductFamilyId = "planner" | "daily-planner" | "journal" | "planner-journal" | "devotional" | "workbook" | "worksheet" | "notepad" | "deskpad" | "tracker" | "inventory" | "custom";
 
 /** `template` opens that full planner / book template (Full planners & books) instead of a page type. */
 export type WizardStart = { type?: ProductType; recipeId?: string; template?: string; section?: "templates" | "books" | "build" };
@@ -30,6 +30,7 @@ export const PRODUCT_FAMILIES: ProductFamily[] = [
   { id: "devotional", label: "Devotional", blurb: "Scripture, teaching, reflection and prayer pages.", status: "ready", start: { type: "devotional", section: "build" } },
   { id: "workbook", label: "Workbook", blurb: "Lessons with guided exercises and response space.", status: "next", nextNote: "Template system next" },
   { id: "worksheet", label: "Worksheet", blurb: "Single or multi-section worksheets with prompts, tables and response areas.", status: "ready", start: { type: "worksheet", section: "build" } },
+  { id: "inventory", label: "Inventory & Log Book", blurb: "Numbered count sheets and item records — columns sized to what they hold, portrait or landscape.", status: "ready", start: { type: "notebook", recipeId: "inventory-count", section: "build" } },
   { id: "tracker", label: "Tracker", blurb: "Habit, prayer, reading, progress and custom tracking pages.", status: "ready", start: { type: "tracker", section: "build" } },
   { id: "notepad", label: "Notepad", blurb: "Tear-off to-do, list, note and custom pads.", status: "ready", start: { type: "notepad", section: "build" } },
   { id: "deskpad", label: "Desk Pad", blurb: "Large-format planning and writing pads.", status: "ready", start: { type: "deskpad", section: "build" } },

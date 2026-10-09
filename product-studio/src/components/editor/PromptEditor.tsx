@@ -10,6 +10,7 @@
  * show what was asked for, sections that share the space show the lines they
  * get at this page size. The layout engine decides whether the page fits.
  */
+import type { ValueType } from "../../types/document";
 import { useEffect, useRef, useState } from "react";
 import {
   amountOf, canSitBeside, HEADER_META_CHOICES, TABLE_ROW_SCALE, DEFAULT_MIN_LINES, kindOf, MAX_INFO_FIELDS, newPromptId, PROMPT_STARTERS, spaceOf, WRITING_AMOUNTS,
@@ -268,11 +269,36 @@ function InfoFields({ b, putBlock }: { b: PromptBlock; putBlock: (id: string, pa
   );
 }
 
-/** A table's column labels, one box each; add or remove columns. */
+/** What a column can hold — its width follows from it (narrow numbers and dates, wide notes). */
+const COLUMN_HOLDS: { value: ValueType | ""; label: string }[] = [
+  { value: "", label: "Anything (equal width)" },
+  { value: "text", label: "Words (a name, an item)" },
+  { value: "longText", label: "Notes (longer writing)" },
+  { value: "number", label: "Number" },
+  { value: "quantity", label: "Quantity" },
+  { value: "currency", label: "Amount ($)" },
+  { value: "date", label: "Date" },
+  { value: "time", label: "Time" },
+  { value: "boolean", label: "Check mark (yes / no)" },
+  { value: "reference", label: "Reference (Scripture, code)" },
+  { value: "signature", label: "Signature" },
+];
+
+/** A table's columns: each one's label and what it holds; add, remove or reorder columns; number the rows. */
 function TableColumns({ b, putBlock }: { b: PromptBlock; putBlock: (id: string, patch: Partial<PromptBlock>) => void }) {
   const table = b.table ?? { columns: ["Task", "Due", "Done"], rows: b.lineCount ?? 6 };
   const cols = table.columns.length ? table.columns : ["Column 1"];
-  const put = (columns: string[]) => putBlock(b.id, { table: { ...table, columns } });
+  const types = cols.map((_, i) => table.columnTypes?.[i] ?? null);
+  const put = (columns: string[], columnTypes: (ValueType | null)[] = types) =>
+    putBlock(b.id, { table: { ...table, columns, columnTypes: columnTypes.some(Boolean) ? columnTypes : undefined } });
+  const move = (i: number, d: -1 | 1) => {
+    const j = i + d;
+    const c = [...cols], t = [...types];
+    [c[i], c[j]] = [c[j], c[i]];
+    [t[i], t[j]] = [t[j], t[i]];
+    put(c, t);
+  };
+  const rows = table.rows ?? b.lineCount ?? 6;
   return (
     <div className="table-columns" data-testid="table-columns">
       {cols.map((c, i) => (
@@ -280,18 +306,36 @@ function TableColumns({ b, putBlock }: { b: PromptBlock; putBlock: (id: string, 
           <Field label={`Column ${i + 1}`}>
             <input type="text" value={c} placeholder={`Column ${i + 1}`} onChange={(e) => put(cols.map((x, k) => (k === i ? e.target.value : x)))} />
           </Field>
-          {cols.length > 1 && (
-            <button type="button" className="btn btn--ghost" aria-label={`Remove column ${i + 1}`} onClick={() => put(cols.filter((_, k) => k !== i))}>Remove</button>
-          )}
+          <Field label="Holds">
+            <select value={types[i] ?? ""} aria-label={`Column ${i + 1} holds`} onChange={(e) => put(cols, types.map((x, k) => (k === i ? ((e.target.value || null) as ValueType | null) : x)))}>
+              {COLUMN_HOLDS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </Field>
+          <span className="row">
+            <button type="button" className="btn btn--ghost" disabled={i === 0} aria-label={`Move column ${i + 1} left`} onClick={() => move(i, -1)}>←</button>
+            <button type="button" className="btn btn--ghost" disabled={i === cols.length - 1} aria-label={`Move column ${i + 1} right`} onClick={() => move(i, 1)}>→</button>
+            {cols.length > 1 && (
+              <button type="button" className="btn btn--ghost" aria-label={`Remove column ${i + 1}`} onClick={() => put(cols.filter((_, k) => k !== i), types.filter((_, k) => k !== i))}>Remove</button>
+            )}
+          </span>
         </div>
       ))}
       {cols.length < MAX_TABLE_COLUMNS && (
-        <button type="button" className="btn" onClick={() => put([...cols, ""])}>+ Add column</button>
+        <button type="button" className="btn" onClick={() => put([...cols, ""], [...types, null])}>+ Add column</button>
       )}
+      {types.some(Boolean) && <p className="hint">Columns are sized to what they hold — a date or amount stays narrow, notes get room — and never narrower than their label.</p>}
+      <Check
+        label="Number the rows (No. 1, 2, 3… straight through every copy of this page)"
+        checked={!!table.numbering}
+        onChange={(on) =>
+          putBlock(b.id, on ? { space: "fixed", lineCount: rows, table: { ...table, columns: cols, rows, numbering: { prefix: "No." } } } : { table: { ...table, numbering: undefined } })
+        }
+      />
+      {table.numbering && <p className="hint">A numbered table prints exactly its rows; a long one continues on the next page, and the numbers carry on.</p>}
     </div>
   );
 }
-const MAX_TABLE_COLUMNS = 8;
+const MAX_TABLE_COLUMNS = 10;
 
 export function PromptEditor({
   set,
@@ -564,10 +608,10 @@ export function PromptEditor({
                             label={mode === "fill" ? "Rows (at least)" : "Rows"}
                             step={1}
                             min={1}
-                            max={30}
+                            max={200}
                             value={b.table?.rows ?? b.lineCount ?? 6}
                             onChange={(rows) => {
-                              const n = Math.max(1, Math.min(30, Math.round(rows)));
+                              const n = Math.max(1, Math.min(200, Math.round(rows)));
                               putBlock(b.id, { ...(mode === "fill" ? {} : { space: "fixed" as const, lineCount: n }), table: { ...(b.table ?? { columns: ["Task", "Due", "Done"] }), rows: n } });
                             }}
                           />

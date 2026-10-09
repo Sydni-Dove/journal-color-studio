@@ -95,9 +95,11 @@ export function blockToComponent(b: PromptBlock): DocComponent {
         const t = b.table ?? { columns: [], rows: 0 };
         return {
           ...base, kind: "table", label: b.label, ...prompt, space: spaceOf(b),
-          columns: t.columns.map((label, i) => textField(`${b.id}.c${i}`, label)), rows: t.rows,
+          columns: t.columns.map((label, i) => ({ ...textField(`${b.id}.c${i}`, label), ...(t.columnTypes?.[i] ? { valueType: t.columnTypes[i]! } : {}) })), rows: t.rows,
           ...(t.showHeader !== undefined ? { showHeader: t.showHeader } : {}),
           ...(t.rowSpace !== undefined ? { rowSpace: t.rowSpace } : {}),
+          ...(t.columnTypes ? { sizedByContent: true } : {}),
+          ...(t.numbering ? { numbering: { ...t.numbering } } : {}),
         };
       }
       return { ...base, kind: "question", label: b.label, ...prompt, response: b.responseStyle ?? "pattern", space: spaceOf(b) };
@@ -161,7 +163,12 @@ export function componentToBlock(c: DocComponent, p: ComponentPresentation = {})
     case "table":
       return {
         id: c.id, label: c.label, ...(c.prompt !== undefined ? { prompt: c.prompt } : {}), responseStyle: "table", ...spaceToBlock(c.space),
-        table: { columns: c.columns.map((f) => f.label), rows: c.rows, ...(c.showHeader !== undefined ? { showHeader: c.showHeader } : {}), ...(c.rowSpace !== undefined ? { rowSpace: c.rowSpace } : {}), ...(p.tableBorders !== undefined ? { borders: p.tableBorders } : {}) },
+        table: {
+          columns: c.columns.map((f) => f.label), rows: c.rows, ...(c.showHeader !== undefined ? { showHeader: c.showHeader } : {}), ...(c.rowSpace !== undefined ? { rowSpace: c.rowSpace } : {}), ...(p.tableBorders !== undefined ? { borders: p.tableBorders } : {}),
+          // An untyped column was stored as text; only a table sized by content says what its columns hold.
+          ...(c.sizedByContent ? { columnTypes: c.columns.map((f) => f.valueType) } : {}),
+          ...(c.numbering ? { numbering: { ...c.numbering } } : {}),
+        },
         ...style,
       };
     case "question":

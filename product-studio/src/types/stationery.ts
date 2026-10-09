@@ -59,6 +59,8 @@ export type TableSpec = {
   rowScale?: number;
   /** Filling the space: at least this many rows, stretched evenly (TABLE_MAX_STRETCH). */
   minRows?: number;
+  /** Numbered rows: the first column (key "no") prints this instance's numbers, from `start` (a continued piece adds its row offset). */
+  numbers?: { start: number };
 };
 
 export type StationeryZone = {
