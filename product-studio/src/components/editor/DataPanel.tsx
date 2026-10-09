@@ -9,7 +9,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { DataCollection, DataRecord, FieldDef, ProjectData, ValueType } from "../../types/document";
 import {
   addCollection, addField, addRecord, applyImport, COLLECTION_STARTERS, displayValue, duplicateRecord, EDITABLE_TYPES, moveField, moveRecord,
-  parseDelimited, planImport, recordIssues, removeCollection, removeField, removeRecord, renameCollection, setValue, updateField, VALUE_TYPE_LABEL,
+  notImportableText, parseDelimited, planImport, recordIssues, removeCollection, removeField, removeRecord, renameCollection, setValue, updateField, VALUE_TYPE_LABEL,
 } from "../../engines/data/data";
 import { Check, Field, Section } from "./ui";
 import { DEVOTIONAL_STRUCTURES, matchRoles, ROLE_LABEL, usesCollection, type DevotionalRole } from "../../presets/devotionalStructures";
@@ -188,8 +188,16 @@ function ImportBox({ c, set }: { c: DataCollection; set: (fn: (d: ProjectData | 
         aria-label="CSV file"
         onChange={(e) => {
           const file = e.target.files?.[0];
-          if (file) file.text().then(reset);
           e.target.value = "";
+          if (!file) return;
+          // Only text (CSV / TSV / plain text) can be read as rows: a PDF or Word file read as text is binary noise.
+          file.text().then((t) => {
+            const why = notImportableText(file.name, file.type, t);
+            if (why) {
+              reset("");
+              setDone(why);
+            } else reset(t);
+          });
         }}
       />
       {done && <p className="hint" role="status">{done}</p>}

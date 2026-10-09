@@ -270,6 +270,29 @@ export function parseDelimited(text: string): string[][] {
   return rows;
 }
 
+/**
+ * Why a file can't be imported as rows, or null when it is plain text (CSV / TSV / text).
+ * A PDF, Word file, spreadsheet workbook or image is not text: read as text it is binary noise,
+ * and importing that would fill the list with garbage rows.
+ */
+export function notImportableText(name: string, type: string, head: string): string | null {
+  const ext = /\.([a-z0-9]+)$/i.exec(name)?.[1]?.toLowerCase() ?? "";
+  const kind = head.startsWith("%PDF") || ext === "pdf" || type === "application/pdf" ? "a PDF"
+    : head.startsWith("PK") || ["docx", "xlsx", "pptx", "pages", "numbers", "key", "zip"].includes(ext) ? (ext === "xlsx" || ext === "numbers" ? "a spreadsheet workbook" : ext === "docx" || ext === "pages" ? "a Word or Pages document" : "a packaged file")
+    : ["doc", "xls", "rtf"].includes(ext) ? "a document file"
+    : type.startsWith("image/") || ["png", "jpg", "jpeg", "gif", "webp", "heic"].includes(ext) ? "an image"
+    : null;
+  // Anything else is judged by its content: control characters or many unreadable characters mean binary.
+  const sample = head.slice(0, 4000);
+  const bad = (sample.match(/[\u0000-\u0008\u000E-\u001F\uFFFD]/g) ?? []).length;
+  if (!kind && (!sample.length || bad <= sample.length * 0.01)) return null;
+  const what = kind ?? "not a text file";
+  return `“${name}” is ${what}, not rows of text, so it can't be imported here. ${
+    kind === "a spreadsheet workbook" ? "In your spreadsheet app, choose File → Export (or Save As) → CSV, then choose that file — or copy the rows and paste them in the box above."
+    : "Open it, copy the text, and paste it in the box above — one entry per row, with columns separated by commas or tabs (or pasted straight from a spreadsheet)."
+  }`;
+}
+
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
 
 export type ImportPlan = {

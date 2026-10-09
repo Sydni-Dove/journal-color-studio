@@ -9,7 +9,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import {
   addCollection, addField, addRecord, applyImport, COLLECTION_STARTERS, displayValue, duplicateRecord, moveField, moveRecord, normalizeData,
-  parseDelimited, planImport, readValue, recordIssues, removeField, removeRecord, setValue, updateField,
+  notImportableText, parseDelimited, planImport, readValue, recordIssues, removeField, removeRecord, setValue, updateField,
 } from "../src/engines/data/data";
 import { migrate } from "../src/persistence/projectStore";
 import { createProject } from "../src/presets/products/projectFactory";
@@ -112,6 +112,27 @@ describe("paste / CSV import", () => {
     expect(d.collections[0].records.map((r) => r.values.item)).toEqual(["Pens", "Tape"]);
     expect(new Set(d.collections[0].records.map((r) => r.id)).size).toBe(2);
   });
+});
+
+describe("only text files are imported as rows", () => {
+  const pdf = "%PDF-1.3\n%\uFFFD\uFFFD\uFFFD\uFFFD\n3 0 obj\n<< /Filter /FlateDecode /Length 2000 >>\nstream\nx\uFFFDZ\uFFFDn\u0001\u0002";
+  it.each([
+    ["devotional.pdf", "application/pdf", pdf, /is a PDF/],
+    ["download", "", pdf, /is a PDF/],
+    ["days.docx", "", "PK\u0003\u0004[Content_Types].xml", /Word or Pages document/],
+    ["stock.xlsx", "", "PK\u0003\u0004", /spreadsheet workbook.*Export.*CSV/],
+    ["photo.jpg", "image/jpeg", "\uFFFD\uFFFD\uFFFD\uFFFDJFIF", /an image/],
+    ["mystery.bin", "", "\u0000\u0001\u0002\u0003".repeat(50), /not a text file/],
+  ])("%s is refused with what to do instead", (name, type, head, why) => {
+    const msg = notImportableText(name, type, head)!;
+    expect(msg).toMatch(why);
+    expect(msg).toMatch(/paste|Export/);
+  });
+  it.each([
+    ["days.csv", "text/csv", "Day,Title,Scripture\n1,Morning Light,\"Lamentations 3:22–23\"\n"],
+    ["days.txt", "text/plain", "Día\tTítulo\n1\t“Café” con fe — ¡sí!\n"],
+    ["export", "", "Item,Qty\nPens,12\n"],
+  ])("%s is text and imports", (name, type, head) => expect(notImportableText(name, type, head)).toBeNull());
 });
 
 describe("stored with the product", () => {
