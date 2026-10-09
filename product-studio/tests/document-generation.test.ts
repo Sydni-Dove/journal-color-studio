@@ -8,7 +8,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { checkSpec, SpecError, unplacedContent, type DocSpec } from "../src/engines/generate/spec";
 import { projectFromSpec } from "../src/engines/generate/convert";
-import { buildFromOutline } from "../src/engines/generate/pipeline";
+import { buildFromOutline, printLimits } from "../src/engines/generate/pipeline";
 import { resolveDocument, solvePage, geometryFor } from "../src/engines/document/resolve";
 import { rectContains } from "../src/engines/layout/math";
 import { migrate } from "../src/persistence/projectStore";
@@ -201,6 +201,33 @@ describe("the generated document is an ordinary, editable product", () => {
       const next = a.apply(out.project);
       const errs = solveAll(next).pages.flatMap(({ s: sp }) => sp.diagnostics.filter((d) => d.severity === "error"));
       expect(errs, a.id).toEqual([]);
+    }
+  });
+});
+
+describe("text with its own heading", () => {
+  it("prints the heading as a section heading kept with its text (not as a line of body text)", () => {
+    const { project } = build("intake");
+    const step = project.recipe.structure!.find((n) => n.kind === "step")!;
+    const blocks = step.kind === "step" ? step.promptSet!.blocks : [];
+    const i = blocks.findIndex((b) => b.label === "Consent");
+    expect(blocks[i]).toMatchObject({ kind: "heading", label: "Consent" });
+    expect(blocks[i].textStyle).toBeUndefined();
+    expect(blocks[i + 1]).toMatchObject({ kind: "heading", textStyle: "body", label: "", prompt: expect.stringMatching(/^This form is HIPAA/) });
+  });
+});
+
+describe("printer limits are shown before creating, with bindings that work", () => {
+  it("a 3-day devotional as a bound book is too short for perfect binding: said plainly; spiral and loose pages are offered, and print", () => {
+    const { checked } = build("devotional");
+    const out = buildFromOutline(checked.spec, DEVOTIONAL_CONTENT, checked);
+    expect(out.limits.join(" ")).toMatch(/needs at least 24 pages; this document has \d+/);
+    expect(out.bindings).toContain("spiral");
+    expect(out.bindings).toContain("loose");
+    for (const b of out.bindings) {
+      const next = buildFromOutline({ ...checked.spec, page: { ...checked.spec.page, binding: b } }, DEVOTIONAL_CONTENT, checked);
+      expect(next.limits, b).toEqual([]);
+      expect(printLimits(next.project)).toEqual([]);
     }
   });
 });

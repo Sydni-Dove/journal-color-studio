@@ -221,7 +221,18 @@ per product. Order of work:
    three-line table headings, full-height heading rows. Found in real-font
    checks: split halves fitted different row counts (heading wrap) — fixed
    with linked counts and a check that each half faces the other.
-8. AI-generated document structures
+8. **AI-generated documents** — built on `claude/phase8-ai-generation` (from
+   Codex's start), not yet live. Describe → the `generate-document` Edge
+   Function (OpenAI structured outputs against `engines/generate/
+   docSpecSchema.json`; key server-side, signed-in users, daily limit) →
+   `checkSpec` (unsupported parts left out and said, repetition / page setup
+   adjusted and said, the maker's wording verified word for word, unplaced
+   wording kept on a "Your content" page, unverified references and
+   compliance claims flagged) → review and edit the outline → `projectFromSpec`
+   (guided pages that print their titles, universal sections, copies or once
+   per entry, page filling) → Smart Layout Assistant and printer limits →
+   editor. Live generation awaits a working OpenAI key.
+9. (was 8) AI-generated document structures
    (same components, no coordinates); 9. Requirements Assistant (reserved in the
    model now; not built in these phases).
 

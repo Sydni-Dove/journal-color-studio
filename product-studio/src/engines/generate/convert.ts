@@ -35,7 +35,9 @@ function blocksOf(c: SpecComponent, keyOf: (field: string) => string | undefined
     case "heading":
       return [{ id, kind: "heading", label: bound ? "" : (c.text ?? c.label ?? ""), ...content }];
     case "text":
-      return [{ id, kind: "heading", textStyle: "body", label: c.label ?? "", ...(bound ? {} : { prompt: c.text ?? "" }), ...content }];
+      // Text from an entry: the binding prints its heading and text. Its own text: a heading kept with body text that flows.
+      if (bound) return [{ id, kind: "heading", textStyle: "body", label: c.label ?? "", ...content }];
+      return [...(c.label?.trim() ? [{ id: `${id}-heading`, kind: "heading" as const, label: c.label }] : []), { id, kind: "heading", textStyle: "body", label: "", prompt: c.text ?? "" }];
     case "fields": {
       const out: PromptBlock[] = [];
       for (let i = 0; i < c.fields.length; i += 3) out.push({ id: i ? `${id}-${i / 3 + 1}` : id, kind: "info", label: "", fields: c.fields.slice(i, i + 3).map((f) => f.label) });

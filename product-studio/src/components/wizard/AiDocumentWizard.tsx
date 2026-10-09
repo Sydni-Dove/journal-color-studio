@@ -273,6 +273,20 @@ export function AiDocumentWizard({ onCreate, onCancel }: { onCreate: (p: Product
             <>
               <p className="hint" data-testid="ai-pages">{doc.recipe.pageCount} page{doc.recipe.pageCount === 1 ? "" : "s"} · {SIZE_LABEL[spec.page.size]} {spec.page.orientation === "landscape" ? "sideways" : "upright"} · {BINDING_LABEL[spec.page.binding].toLowerCase()}</p>
               {doc.recipe.pages.length > 0 && <PageThumb doc={doc} index={Math.max(0, doc.recipe.pages.findIndex((p) => !p.filler))} heightPx={260} />}
+              {built.limits.length > 0 && (
+                <div className="ai-limits" data-testid="ai-limits">
+                  {built.limits.map((m) => <p key={m} className="data-issue">{m}</p>)}
+                  {built.bindings.length > 0 ? (
+                    <div className="row">
+                      {built.bindings.map((b) => (
+                        <button key={b} type="button" className="btn" onClick={() => setSpec({ ...spec, page: { ...spec.page, binding: b } })}>Use {BINDING_LABEL[b].toLowerCase()}</button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="hint">Add pages (more copies or entries), or create it and add pages in the editor.</p>
+                  )}
+                </div>
+              )}
               {built.review.findings.length ? (
                 <ul className="layout-findings">{built.review.findings.slice(0, 4).map((f, i) => <li key={i}>{f.message}</li>)}</ul>
               ) : (
