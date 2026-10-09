@@ -5,13 +5,14 @@ import { ProjectList, type ProjectMeta } from "../components/projects/ProjectLis
 import { resolveDocument } from "../engines/document/resolve";
 import type { WizardStart } from "../presets/products/productFamilies";
 import { NewProductWizard } from "../components/wizard/NewProductWizard";
+import { AiDocumentWizard } from "../components/wizard/AiDocumentWizard";
 import { resolveColors } from "../presets/themes/palettes";
 import { addVariantFromCurrent, duplicateProject, localProjectStore, projectKey, saveGuarded, type ProjectSummary } from "../persistence/projectStore";
 import type { ProductProject } from "../types/project";
 import { useCloud } from "./useCloud";
 import { CloudAccount, cloudLabel } from "../components/projects/CloudAccount";
 
-type View = { kind: "list" } | { kind: "new"; start?: WizardStart } | { kind: "edit"; project: ProductProject };
+type View = { kind: "list" } | { kind: "new"; start?: WizardStart } | { kind: "ai" } | { kind: "edit"; project: ProductProject };
 
 /** Page count / pad sheets / book flag for the home screen (expansion only — no page is solved). */
 function projectMeta(id: string): ProjectMeta {
@@ -175,6 +176,7 @@ export function App() {
   const banner = stale ? <UpdateBanner onReload={reload} /> : null;
   const noticeBanner = notice ? <div className="update-banner" role="alert"><span>{notice}</span><button type="button" className="btn" onClick={() => setNotice(null)}>OK</button></div> : null;
   if (view.kind === "new") return <>{banner}<NewProductWizard start={view.start} onCreate={open} onCancel={() => setView({ kind: "list" })} /></>;
+  if (view.kind === "ai") return <>{banner}<AiDocumentWizard onCreate={open} onCancel={() => setView({ kind: "list" })} /></>;
   if (view.kind === "edit") {
     return (
       <>
@@ -203,6 +205,7 @@ export function App() {
       projects={projects}
       meta={projectMeta}
       onStart={(start) => setView({ kind: "new", start })}
+      onGenerate={() => setView({ kind: "ai" })}
       onOpen={(id) => {
         const p = store.load(id);
         if (p) openLoaded(p);
