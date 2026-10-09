@@ -13,6 +13,20 @@ const values: ValueType[] = ["text", "longText", "number", "currency", "date", "
 const string = (v: unknown, max = 300) => typeof v === "string" && v.trim().length > 0 && v.length <= max;
 const field = (v: unknown): v is FieldDef => !!v && typeof v === "object" && string((v as FieldDef).key, 80) && string((v as FieldDef).label, 120) && values.includes((v as FieldDef).valueType);
 
+function sourceChunks(source: string): string[] {
+  const out: string[] = [];
+  for (let start = 0; start < source.length;) {
+    let end = Math.min(source.length, start + 1800);
+    if (end < source.length) {
+      const breakAt = source.slice(start, end).search(/\s+\S*$/);
+      if (breakAt > 0) end = start + breakAt + 1;
+    }
+    out.push(source.slice(start, end));
+    start = end;
+  }
+  return out;
+}
+
 /** The model is untrusted. Accept only drawable components, never page coordinates or assets. */
 export function parseProposal(raw: unknown): DocumentProposal {
   if (!raw || typeof raw !== "object") throw new Error("The proposal is not a document.");
@@ -44,7 +58,16 @@ export function parseProposal(raw: unknown): DocumentProposal {
 /** One proposal pipeline for every product: universal components → existing prompt pages. */
 export function projectFromProposal(proposal: DocumentProposal, sourceContent = ""): ProductProject {
   const p = parseProposal(proposal);
-  const steps: BookStep[] = p.pages.map((page) => {
+  const pages: ProposedPage[] = [...p.pages];
+  if (sourceContent) {
+    // The original is a separate, editable page. AI may use it as context but
+    // cannot silently paraphrase or omit it from the printed product.
+    pages.push({ id: "provided-content", title: "Provided Content", copies: 1, components: [
+      { id: "provided-content-heading", kind: "heading", text: "Provided Content", level: "heading" },
+      ...sourceChunks(sourceContent).map((text, i) => ({ id: `provided-content-${i}`, kind: "text" as const, text })),
+    ] });
+  }
+  const steps: BookStep[] = pages.map((page) => {
     const structure: DocumentStructure = { components: page.components, whenFull: "continue" };
     const { set, notDrawable } = documentToPromptSet({ structure, presentation: {}, page: {} });
     if (notDrawable.length) throw new Error(`Unsupported sections: ${notDrawable.join(", ")}`);

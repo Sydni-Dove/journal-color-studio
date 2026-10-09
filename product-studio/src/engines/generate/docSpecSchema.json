@@ -1,0 +1,359 @@
+{
+ "type": "object",
+ "additionalProperties": false,
+ "required": [
+  "title",
+  "summary",
+  "page",
+  "entries",
+  "sections",
+  "notes"
+ ],
+ "properties": {
+  "title": {
+   "type": "string"
+  },
+  "summary": {
+   "type": "string"
+  },
+  "page": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "size",
+    "orientation",
+    "binding",
+    "why"
+   ],
+   "properties": {
+    "size": {
+     "type": "string",
+     "enum": [
+      "5.5x8.5",
+      "6x9",
+      "7x9",
+      "8x10",
+      "8.5x11",
+      "a5",
+      "a4"
+     ]
+    },
+    "orientation": {
+     "type": "string",
+     "enum": [
+      "portrait",
+      "landscape"
+     ]
+    },
+    "binding": {
+     "type": "string",
+     "enum": [
+      "book",
+      "spiral",
+      "stapled",
+      "loose"
+     ]
+    },
+    "why": {
+     "type": "string"
+    }
+   }
+  },
+  "entries": {
+   "type": [
+    "object",
+    "null"
+   ],
+   "additionalProperties": false,
+   "required": [
+    "name",
+    "fields",
+    "records",
+    "source"
+   ],
+   "properties": {
+    "name": {
+     "type": "string"
+    },
+    "fields": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+       "key",
+       "label",
+       "valueType"
+      ],
+      "properties": {
+       "key": {
+        "type": "string"
+       },
+       "label": {
+        "type": "string"
+       },
+       "valueType": {
+        "type": "string",
+        "enum": [
+         "text",
+         "longText",
+         "number",
+         "currency",
+         "date",
+         "time",
+         "quantity",
+         "boolean",
+         "choice",
+         "signature",
+         "reference"
+        ]
+       }
+      }
+     }
+    },
+    "records": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+       "values"
+      ],
+      "properties": {
+       "values": {
+        "type": "array",
+        "items": {
+         "type": "object",
+         "additionalProperties": false,
+         "required": [
+          "key",
+          "value"
+         ],
+         "properties": {
+          "key": {
+           "type": "string"
+          },
+          "value": {
+           "type": "string"
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    "source": {
+     "type": "string",
+     "enum": [
+      "user",
+      "suggested"
+     ]
+    }
+   }
+  },
+  "sections": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "id",
+     "title",
+     "purpose",
+     "repeat",
+     "startOnRightPage",
+     "components"
+    ],
+    "properties": {
+     "id": {
+      "type": "string"
+     },
+     "title": {
+      "type": "string"
+     },
+     "purpose": {
+      "type": "string"
+     },
+     "repeat": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+       "mode",
+       "count"
+      ],
+      "properties": {
+       "mode": {
+        "type": "string",
+        "enum": [
+         "once",
+         "copies",
+         "per-entry"
+        ]
+       },
+       "count": {
+        "type": "integer"
+       }
+      }
+     },
+     "startOnRightPage": {
+      "type": "boolean"
+     },
+     "components": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "additionalProperties": false,
+       "required": [
+        "id",
+        "kind",
+        "label",
+        "text",
+        "source",
+        "fromEntryField",
+        "fields",
+        "rows",
+        "numbered",
+        "fillPage",
+        "lines",
+        "items",
+        "marker",
+        "size"
+       ],
+       "properties": {
+        "id": {
+         "type": "string"
+        },
+        "kind": {
+         "type": "string",
+         "enum": [
+          "heading",
+          "text",
+          "fields",
+          "writing",
+          "checklist",
+          "table",
+          "list",
+          "records",
+          "divider",
+          "spacer"
+         ]
+        },
+        "label": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "text": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "source": {
+         "type": "string",
+         "enum": [
+          "user",
+          "suggested"
+         ]
+        },
+        "fromEntryField": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "fields": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+           "label",
+           "valueType"
+          ],
+          "properties": {
+           "label": {
+            "type": "string"
+           },
+           "valueType": {
+            "type": "string",
+            "enum": [
+             "text",
+             "longText",
+             "number",
+             "currency",
+             "date",
+             "time",
+             "quantity",
+             "boolean",
+             "choice",
+             "signature",
+             "reference"
+            ]
+           }
+          }
+         }
+        },
+        "rows": {
+         "type": [
+          "integer",
+          "null"
+         ]
+        },
+        "numbered": {
+         "type": "boolean"
+        },
+        "fillPage": {
+         "type": "boolean"
+        },
+        "lines": {
+         "type": [
+          "integer",
+          "null"
+         ]
+        },
+        "items": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        },
+        "marker": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "enum": [
+          "bullet",
+          "number",
+          "checkbox",
+          null
+         ]
+        },
+        "size": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "enum": [
+          "small",
+          "medium",
+          "large",
+          null
+         ]
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "notes": {
+   "type": "array",
+   "items": {
+    "type": "string"
+   }
+  }
+ }
+}
