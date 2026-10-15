@@ -1,7 +1,9 @@
 /**
  * generate-document — Product Studio's AI document proposal (Phase 8).
  *
- * Signed-in users only (Supabase auth), with a daily limit (edge_usage_logs). The OpenAI key is a
+ * Signed-in users only (Supabase auth), with a daily limit per plan (edge_usage_logs): free accounts 5 a day;
+ * paid accounts (app_metadata.plan === "paid", set only by the server / dashboard, never by the user) get
+ * PAID_DAILY_CAP (env, default 50) — the paid tier itself isn't built yet. The OpenAI key is a
  * server secret (OPENAI_API_KEY) and never leaves this function. The model must answer with the
  * studio's document specification (schema.json, the same file as
  * product-studio/src/engines/generate/docSpecSchema.json) through structured outputs; the studio
@@ -15,10 +17,13 @@ import schema from "./schema.json" with { type: "json" };
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
-const DAILY_REQUEST_CAP = 30;
+const FREE_DAILY_CAP = 5;
+const PAID_DAILY_CAP = Number(Deno.env.get("PAID_DAILY_CAP")) || 50;
+/** The plan comes from app_metadata, which only the server can write (user_metadata is user-editable: never trust it here). */
+const isPaid = (user: { app_metadata?: Record<string, unknown> }) => user.app_metadata?.plan === "paid";
 const FUNCTION_NAME = "generate-document";
 const MODELS = ["gpt-4.1-mini", "gpt-4o-mini"];
-const VERSION = "generate-document-2026-10-09-spec-v4";
+const VERSION = "generate-document-2026-10-15-spec-v4-plans";
 
 const SYSTEM = `You design printable documents for Product Studio, a studio for print-ready journals, workbooks, logs, forms, planners and similar products. You return a document specification (the JSON schema given); the studio lays out, paginates and prints it with its own engines. Never think in coordinates or pixels.
 
@@ -92,7 +97,9 @@ Deno.serve(async (req) => {
   const day = new Date(); day.setUTCHours(0, 0, 0, 0);
   const { count, error: countError } = await auth.client.from("edge_usage_logs").select("id", { count: "exact", head: true }).eq("user_id", auth.user.id).eq("function_name", FUNCTION_NAME).gte("created_at", day.toISOString());
   if (countError) return reply({ error: "Usage limit check failed." }, 500);
-  if ((count ?? 0) >= DAILY_REQUEST_CAP) return reply({ error: `The daily limit of ${DAILY_REQUEST_CAP} document proposals is reached. Try again tomorrow.` }, 429);
+  const paid = isPaid(auth.user), cap = paid ? PAID_DAILY_CAP : FREE_DAILY_CAP;
+  if ((count ?? 0) >= cap)
+    return reply({ error: paid ? `You've used today's ${cap} document proposals. Try again tomorrow.` : `Free accounts can make ${cap} document proposals a day, and today's are used. Try again tomorrow.` }, 429);
   // Counted before the provider call: a failed or timed-out call can still be billed.
   const { error: logError } = await auth.client.from("edge_usage_logs").insert({ user_id: auth.user.id, function_name: FUNCTION_NAME, units: 1 });
   if (logError) return reply({ error: "Usage logging failed; no AI request was sent." }, 500);

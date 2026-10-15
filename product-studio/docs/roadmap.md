@@ -224,8 +224,9 @@ per product. Order of work:
 8. **AI-generated documents** — built on `claude/phase8-ai-generation` (from
    Codex's start), reviewed 2026-10-15, awaiting approval to merge. Describe →
    the `generate-document` Edge Function (OpenAI structured outputs against
-   `engines/generate/docSpecSchema.json`; key server-side, signed-in users only,
-   30 proposals per person per day) → `checkSpec` (unsupported parts left out
+   `engines/generate/docSpecSchema.json`; key server-side, signed-in users only;
+   free accounts 5 proposals a day, paid accounts more once a paid tier exists —
+   the plan read from server-controlled `app_metadata`; deployed v7 still allows 30) → `checkSpec` (unsupported parts left out
    and said, repetition / page setup adjusted and said, the maker's wording
    verified word for word, unplaced wording kept on a "Your content" page,
    unverified references and compliance claims flagged) → review and edit the

@@ -53,15 +53,24 @@ styles", not "recipes"). **10 Requirements Assistant** — reserved.
 - Browser tests 146/157 in the cloud sandbox: the 11 failures need web fonts, which never load there (export is
   correctly blocked until fonts load); 10 of them fail identically on `main`. Run them on a normal machine.
 - Edge Function `generate-document` (Supabase project `jnlvvlkwskidloripvtp`): deployed v7 = branch code;
-  sign-in required (signed-out call → 401); OpenAI key server-side only; 30/day per user, usage rows insert/read
-  own only (cap can't be reset); 19 live proposals ran 2026-10-09.
+  sign-in required (signed-out call → 401); OpenAI key server-side only; usage rows insert/read own only (cap can't
+  be reset); 19 live proposals ran 2026-10-09. Deployed cap is 30/day for everyone; the branch sets **free 5/day**
+  and a paid hook (`app_metadata.plan === "paid"` → `PAID_DAILY_CAP`, default 50) — takes effect when the
+  function is redeployed (needs approval).
 - Fixed in review: a continued page could start or end on the blank paragraph-space line; stray
   `supabase/.DS_Store` removed (root `.gitignore` added).
 - Open decisions: (1) paragraph space is always on — saved text with blank lines now prints an empty line between
   paragraphs (keep, or make it a setting); (2) "Generate with AI" shows when signed out (the message comes only
   after describing); (3) no cap on total pages (30 sections × 500 copies possible); (4) review screen shows
-  `{day}`-style placeholders and is cramped on phones; (5) whether sign-ups are open (anyone signed in can use
-  30 proposals a day — cost).
+  `{day}`-style placeholders and is cramped on phones; (5) whether sign-ups are open (each free account can use
+  5 proposals a day once redeployed — cost).
+
+## Business direction
+
+- AI generation will become a paid feature. Free accounts keep a small allowance (about 5 proposals a day or
+  fewer); paid accounts get more. Not built yet: billing, how a paid plan is granted (Stripe or manual), the paid
+  daily number, and showing remaining uses in the app. The plan must be server-controlled (`app_metadata`), never
+  `user_metadata`.
 
 ## Testing
 
