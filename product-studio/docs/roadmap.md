@@ -222,19 +222,77 @@ per product. Order of work:
    checks: split halves fitted different row counts (heading wrap) — fixed
    with linked counts and a check that each half faces the other.
 8. **AI-generated documents** — built on `claude/phase8-ai-generation` (from
-   Codex's start), not yet live. Describe → the `generate-document` Edge
-   Function (OpenAI structured outputs against `engines/generate/
-   docSpecSchema.json`; key server-side, signed-in users, daily limit) →
-   `checkSpec` (unsupported parts left out and said, repetition / page setup
-   adjusted and said, the maker's wording verified word for word, unplaced
-   wording kept on a "Your content" page, unverified references and
-   compliance claims flagged) → review and edit the outline → `projectFromSpec`
-   (guided pages that print their titles, universal sections, copies or once
-   per entry, page filling) → Smart Layout Assistant and printer limits →
-   editor. Live generation awaits a working OpenAI key.
-9. (was 8) AI-generated document structures
-   (same components, no coordinates); 9. Requirements Assistant (reserved in the
-   model now; not built in these phases).
+   Codex's start), reviewed 2026-10-15, awaiting approval to merge. Describe →
+   the `generate-document` Edge Function (OpenAI structured outputs against
+   `engines/generate/docSpecSchema.json`; key server-side, signed-in users only,
+   30 proposals per person per day) → `checkSpec` (unsupported parts left out
+   and said, repetition / page setup adjusted and said, the maker's wording
+   verified word for word, unplaced wording kept on a "Your content" page,
+   unverified references and compliance claims flagged) → review and edit the
+   outline → `projectFromSpec` (guided pages that print their titles,
+   universal sections, copies or once per entry, page filling) → Smart Layout
+   Assistant and printer limits → editor. The function is deployed (v7) and
+   was run live (19 proposals on 2026-10-09).
+   *Paragraph space* (from Phase 5's refinements) arrives with it: a blank line
+   between paragraphs prints as one empty line, dropped where a page breaks
+   (fixed in review). It is always on, so a saved product whose text has blank
+   lines prints that space too — keep, or make it a setting (open decision).
+9. **Guided Design Builder & Custom Cover Artwork** — planned; starts only after
+   Phase 8 is merged and stable. A guided way through what the studio already
+   does, not a second builder: every choice maps onto existing settings, and the
+   normal editor stays one tap away. Stages, each testable on its own:
+   1. *Audit and guided product setup.* Product type, format, size and
+      orientation, title and subtitle, audience, purpose, timeframe, topic and
+      sections, offered only where they apply to the chosen product, and
+      skippable. Extends `NewProductWizard` / `BookTemplates` and the product
+      families (and sits beside Phase 8's Generate with AI); selections stay in
+      the project, so moving between guided and manual editing loses nothing.
+   2. *Guided page design.* Layout style, page composition, writing space,
+      decorative density, graphic placement and size, card / header / box
+      style, type, palette and mood, shown with small previews and mapped to
+      existing pieces: design presets (`presets/designPresets.ts`), spacing
+      tokens, decoration roles and placements, the Style browser, typography
+      and palettes. A choice that would change nothing is not offered.
+   3. *Cover library and AI artwork prompts.* **One cover library, already
+      shared:** Journal Color Studio stays the design laboratory and Product
+      Studio the product builder; approved JCS covers and artwork reach Product
+      Studio through the versioned design-library snapshot
+      (`design-library/library.ts`, `SNAPSHOT.md`, `coverSurfaces.ts`; see
+      `design-library-architecture.md` and `cover-divider-pages.md`). The guided
+      cover picker shows those shared JCS covers beside Product Studio's native
+      designs (Luxe, solid, plain) — no second library, no copied artwork.
+      Browse, filter by aesthetic, preview with the product's title, apply,
+      customize, or start blank, on `CoverDividerControls`; a new design is a
+      data entry, not new code. *Limitation:* a newly approved JCS design
+      appears in Product Studio only after a deliberate snapshot refresh (copy
+      the approved files byte for byte, record their SHA-1s in `SNAPSHOT.md` and
+      `library.ts`, rebuild thumbnails / occupancy, add the cover entry); there
+      is no live link, by design, so saved products never change underneath
+      their makers. A shared versioned package remains the open alternative and
+      needs its own architectural review. *Custom artwork:* a client-side prompt
+      builder (purpose, size and aspect ratio, aesthetic, custom palette,
+      medium, subject, composition, mood, density, include / exclude, free
+      text), in two modes: artwork only (the default, no lettering, a
+      title-safe area left clear) and a complete cover concept (lettering may
+      need correcting). The prompt is shown, editable and copyable; it never
+      claims print-ready size or bleed. **Gap:** the studio has no image upload
+      yet, so this stage adds one: validate the file type and size, place the
+      image as cover artwork that can be cropped and positioned, and keep it
+      out of the project JSON sent to `product_studio_projects` (store it in
+      Supabase Storage or locally, referenced by id).
+   4. *Saved design styles.* Save a look (aesthetic, palette, type, layout and
+      decoration preferences, spacing, cover style) and apply it to a matching
+      notebook, planner, workbook or prayer journal. Versioned, with
+      compatibility checks; rename, duplicate, delete; saved with the existing
+      persistence and Supabase sync. Named *design styles* in code and UI: a
+      "recipe" in this studio is already the book structure (`BookRecipe`).
+   Acceptance: guided setup makes an editable product; skipping it leaves
+   today's flow; every choice visibly changes the preview; switching layouts
+   or themes keeps the maker's words; saved products open; prompts carry the
+   selections, and artwork-only prompts carry no lettering; uploads fill the
+   cover and crop predictably; margins, binding and export unchanged
+   (`tests/golden-templates.test.ts` stays green); phone and desktop.
+10. **Requirements Assistant** — reserved in the model; not built.
 
 Rules: the collection owns words, the recipe owns order, pagination owns page
 breaks, solvers own geometry, and preview and print draw the same pages.

@@ -272,3 +272,25 @@ describe("font safety", () => {
     expect(!r.ready && r.reason).toContain("Playfair Display");
   });
 });
+
+describe("paragraph space at a page break", () => {
+  // Found in the Phase 8 review: with a blank line between paragraphs, a continued page could start on the
+  // empty line (the text a line lower than on other pages). The space is dropped where the page breaks.
+  for (const o of SIZES) {
+    it(`${label(o)}: no page starts or ends on the blank line between paragraphs; every word once`, () => {
+      const value = prose(40).split("\n").join("\n\n");
+      const r = solve([bodyText("t1", value)], o);
+      checkPages(r, label(o));
+      expect(r.guided.length, "it continues across pages").toBeGreaterThan(1);
+      for (const { s } of r.guided) {
+        const nodes = ofSection(s, "t1", /-prompt$/);
+        const lines = nodes.flatMap((n) => (n.type === "text" ? n.fit?.lines ?? [n.text] : []));
+        if (!lines.length) continue;
+        expect(lines[0], label(o)).not.toBe("");
+        expect(lines.at(-1), label(o)).not.toBe("");
+      }
+      const printed = r.guided.flatMap(({ s }) => ofSection(s, "t1", /-prompt$/).map(textOf)).join(" ");
+      expect(words(printed)).toEqual(words(value));
+    });
+  }
+});

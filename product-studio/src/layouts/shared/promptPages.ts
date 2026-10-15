@@ -383,8 +383,12 @@ function splitOf(m: Measured, req: ZoneRequest, ctx: LayoutContext, width: numbe
       unit: "line", count: lines.length, minFirst: 2, minLast: 2, policy: "flow",
       breakQuality: (i) => (ends[i] ? 2 : sentence(i) ? 1 : 0),
       piece: (from, to) => {
-        const promptH = (to - from) * line;
-        const zone = register({ ...z, range: rangeOf(from, to, lines.length) }, { ...m, promptLines: lines.slice(from, to), promptH, promptText: promptH, overhead: promptH + ctx.spacing.headingToContentGap });
+        // A paragraph space (an empty line) where a page breaks is dropped: a page never starts or ends on one.
+        let a = from, b = to;
+        while (a < b && lines[a] === "") a++;
+        while (b > a && lines[b - 1] === "") b--;
+        const promptH = (b - a) * line;
+        const zone = register({ ...z, range: rangeOf(from, to, lines.length) }, { ...m, promptLines: lines.slice(a, b), promptH, promptText: promptH, overhead: promptH + ctx.spacing.headingToContentGap });
         return { zone, overheadIn: promptH + ctx.spacing.headingToContentGap + pad, promptTextIn: promptH, lines: 0 };
       },
     };
