@@ -42,7 +42,9 @@ that needs its own review.
 ## Phases (details: `product-studio/docs/roadmap.md`)
 
 0–8 done (foundation, measurement, pagination, data layer, devotional, inventory, layout assistant, AI-generated
-documents). **8.1 Develop original content** — approved, planning on its own branch (no external research).
+documents). **8.1 Develop original content** — approved, plan written (`product-studio/docs/phase-8.1-plan.md` on
+`claude/phase8.1-develop-content`); waiting on Sydni's 4 decisions (daily units, max entries, Scripture policy,
+free/paid) before building. No external research; Edge Function v9 needs approval before deploy.
 **9 Guided Design Builder & Custom Cover Artwork** — after 8.1 (4 stages; reuses the shared cover snapshot; adds
 image upload; "design styles", not "recipes"). **10 Research and develop content** — future, paid tier.
 **11 Requirements Assistant** — reserved. Technical improvements (any time, not blocking a phase): self-hosted
