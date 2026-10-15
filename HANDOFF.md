@@ -101,10 +101,19 @@ fonts (see Testing).
 - **Live checks done**: no token → 401; public key only (signed out) → 401 "Sign in to generate a document.";
   forged token → 401; CORS preflight → 204. Production site: signed out, Generate with AI shows the sign-in card,
   no description box, no request sent. Production bundle contains the new wording.
-- **Live checks that need a real signed-in account (Sydni):** (1) sign in, generate a document → outline appears;
-  (2) a 6th proposal the same day (UTC) → "Free accounts can make 5 document proposals a day…"; (3) ask for "a daily
-  log, 900 copies" → the 800-page message (server or review). Usage can be confirmed afterwards in
-  `edge_usage_logs` (rows per user per day).
+- **Signed-in live checks — all passed (2026-10-15, approved temporary test account
+  `ps-livecheck-20261015@example.com`, created by SQL, no email sent):**
+  (1) "A 7-day prayer journal…" → 200, gpt-4.1-mini, v8; the proposal ran through `checkProposal` +
+  `buildFromOutline` → 15 pages, 0 errors (only the expected "perfect bound needs 24 pages" note).
+  (2) "A daily log, 900 copies" → 422 "That proposal would have at least 900 pages; a document can have at most 800…"
+  (counted as 1 of the 5: the model was called).
+  (3) Requests 3–5 → 200; the 6th → 429 "Free accounts can make 5 document proposals a day, and today's are used."
+  `edge_usage_logs` held exactly 5 rows (units 1) — refused requests are not counted. The account's own REST
+  DELETE and PATCH on its rows changed 0 rows, and it stayed blocked afterwards (the cap can't be reset by the user).
+- **Cleanup still open:** the test account was signed out everywhere (no live refresh tokens), but deleting it
+  timed out through the Supabase MCP tool (deletes don't run from the cloud session; reads/inserts do). Delete it in
+  the Supabase dashboard → Authentication → Users → `ps-livecheck-20261015@example.com`; its 5 usage rows go with it
+  (`edge_usage_logs_user_id_fkey` is ON DELETE CASCADE). Expected afterwards: 11 users, 40 usage rows.
 
 ## AI content: research and creative development (assessed 2026-10-15, not built)
 
