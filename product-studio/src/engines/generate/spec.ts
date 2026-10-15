@@ -206,7 +206,8 @@ export function splitToFit(spec: DocSpec, pages = minimumPages(spec)): DocSpec[]
   return [spec];
 }
 
-export const LIMITS = { sections: 30, components: 40, copies: 500, tableRows: 200, columns: 10, recordFields: 12, records: 60, listItems: 80, entries: 1000, entryFields: 12, lines: 60 };
+/** copies: a sanity bound only — counts past the page limit stay as asked, and the maker chooses (reduce or split). */
+export const LIMITS = { sections: 30, components: 40, copies: 20000, tableRows: 200, columns: 10, recordFields: 12, records: 60, listItems: 80, entries: 1000, entryFields: 12, lines: 60 };
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
 const str = (v: unknown) => (typeof v === "string" ? v : "");

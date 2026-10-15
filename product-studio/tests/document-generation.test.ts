@@ -110,10 +110,10 @@ describe("the AI's answer is checked, never trusted", () => {
     const s = base();
     s.sections[0].repeat = { mode: "per-entry", count: 1 };
     s.sections[1].repeat = { mode: "copies", count: 0 };
-    s.sections[4].repeat = { mode: "copies", count: 9999 };
+    s.sections[4].repeat = { mode: "copies", count: 99999 };
     s.sections[2].components[0].fromEntryField = "nope";
     const c = checkSpec(s, { description: "plan" });
-    expect(c.spec.sections.map((x) => x.repeat)).toEqual([{ mode: "once", count: 1 }, { mode: "copies", count: 1 }, { mode: "once", count: 1 }, { mode: "once", count: 1 }, { mode: "copies", count: 500 }]);
+    expect(c.spec.sections.map((x) => x.repeat)).toEqual([{ mode: "once", count: 1 }, { mode: "copies", count: 1 }, { mode: "once", count: 1 }, { mode: "once", count: 1 }, { mode: "copies", count: 20000 }]);
     expect(c.spec.sections[2].components[0].fromEntryField).toBeNull();
     expect(c.problems.filter((p) => p.level === "adjusted")).toHaveLength(4);
   });

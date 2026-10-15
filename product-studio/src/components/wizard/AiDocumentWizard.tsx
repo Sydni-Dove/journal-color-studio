@@ -117,7 +117,7 @@ function OutlineSection({ s, i, n, spec, set, remove, shift, develop }: { s: Spe
         {mode === "copies" && (
           <label className="field">
             <span>Copies</span>
-            <input type="number" inputMode="numeric" min={1} max={500} value={s.repeat.count} aria-label={`Page ${i + 1} copies`} onChange={(e) => set({ ...s, repeat: { mode, count: Math.max(1, Math.min(500, Math.round(Number(e.target.value) || 1))) } })} />
+            <input type="number" inputMode="numeric" min={1} max={MAX_DOCUMENT_PAGES} value={s.repeat.count} aria-label={`Page ${i + 1} copies`} onChange={(e) => set({ ...s, repeat: { mode, count: Math.max(1, Math.min(Math.max(MAX_DOCUMENT_PAGES, s.repeat.count), Math.round(Number(e.target.value) || 1))) } })} />
           </label>
         )}
       </div>

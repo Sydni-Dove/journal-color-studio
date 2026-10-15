@@ -330,6 +330,13 @@ describe("the 800-page limit: explained, never silently reduced — the maker ch
     expect(err).toBeInstanceOf(PageLimitError);
     expect((err as PageLimitError).pages).toBe(901);
   });
+  it("a proposal asking for 1,095 copies keeps 1,095 (never cut silently) — the build stops and the choices are offered (live: a 3-year daily journal)", () => {
+    const c = checkSpec(JSON.stringify(log(1095)), { description: "A daily food journal for three years" });
+    expect(c.spec.sections[1].repeat.count).toBe(1095);
+    expect(c.problems.filter((p) => /copies/.test(p.message))).toEqual([]);
+    expect(() => buildFromOutline(c.spec, "", c)).toThrow(PageLimitError);
+    expect(splitToFit(c.spec).map((p) => p.sections[1].repeat.count)).toEqual([548, 547]);
+  });
   it("Reduce to fit: every change spelled out; the result fits", () => {
     const r = reduceToFit(log(900, 300));
     expect(minimumPages(r.spec)).toBeLessThanOrEqual(MAX_DOCUMENT_PAGES);
