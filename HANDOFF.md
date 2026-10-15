@@ -13,7 +13,7 @@
 Read this first when picking up the work (any assistant or developer). Keep it current: update it in the same
 commit as any change to state, branches, rules or open decisions.
 
-_Last updated: 2026-10-15 (8.1 story-length investigation added; model comparison blocked on an API key — see below). Phase 8 is merged to `main` (89f054b) and live. Phase 8.1's server side is live (cost table + `generate-document` with develop mode and page-limit handling) and live-tested; the studio side is on `claude/phase8.1-develop-content`, **not merged** (awaiting approval)._
+_Last updated: 2026-10-15 (8.1 final model comparison done — recommend gpt-4.1 for Develop only, ship prompt, 6 per request; Codex branch must be pushed to coordinate; model comparison blocked on an API key — see below). Phase 8 is merged to `main` (89f054b) and live. Phase 8.1's server side is live (cost table + `generate-document` with develop mode and page-limit handling) and live-tested; the studio side is on `claude/phase8.1-develop-content`, **not merged** (awaiting approval)._
 
 ## The two apps
 
@@ -323,6 +323,199 @@ Her additions:
   afterwards).
 
 (a) touches nothing in production.
+
+### Comparison results (cloud session, 2026-10-15) — run on this branch's harness
+
+**How it ran:** no key was needed in the sandbox. The cloud environment's network proxy injects the OpenAI credential
+for `api.openai.com`, but only for clients that go through the proxy and send **no** `Authorization` header. Node's
+`fetch` ignores the proxy by default, so the harness now has an `OPENAI_VIA_PROXY=1` switch (no header) and is run as:
+`cd product-studio && NODE_USE_ENV_PROXY=1 NODE_EXTRA_CA_CERTS=/root/.ccr/ca-bundle.crt OPENAI_VIA_PROXY=1 node tests/live/develop-model-eval.mjs`.
+Nothing was deployed, merged or changed in the live Edge Function. No key was printed, pasted or committed.
+The Mac-terminal key file Codex proposed is **not needed** if the run happens in this cloud environment.
+
+**Actual cost this session:** first run (6 variants, 13 calls) **$0.1343**; one follow-up variant (`mini-sent`, 2 calls)
+**$0.0106**; a second follow-up call (`mini-sent-3`) failed mid-answer and was billed but not recorded (a few tenths of a
+cent). About **$0.15** in total from this session, separate from whatever was spent earlier from Sydni's side.
+
+**Story words per lesson (batch 1 | batch 2), 6 lessons per request unless noted; target 100–180:**
+
+| Variant | Batch 1 | Batch 2 | In range | Cost (2 calls) | Time |
+|---|---|---|---|---|---|
+| mini-live (gpt-4.1-mini, live prompt) | 52 37 36 32 23 25 | 69 58 62 54 51 45 | 0/12 | $0.0090 | 32 s |
+| 4.1-live (gpt-4.1) | 49 44 46 43 41 39 | 70 64 65 60 60 56 | 0/12 | $0.0467 | 27 s |
+| 4o-live (gpt-4o) | 32 28 24 19 25 13 | 53 34 49 29 43 33 | 0/12 | $0.0502 | 31 s |
+| mini-userlen (length asked in request, words) | 77 67 69 62 60 52 | 68 66 60 68 63 59 | 0/12 | $0.0095 | 32 s |
+| mini-3 (3 lessons/request) | 55 37 42 | 82 62 58 | 0/6 | $0.0082 | 26 s |
+| mini-1 (see note) | 48 42 40 44 | 78 · 72 | 0/6 | $0.0107 | 31 s |
+| **mini-sent (length asked in request, in sentences)** | 111 116 113 110 106 102 | 107 100 95 90 84 88 | **8/12** | $0.0106 | 36 s |
+
+`mini-sent` appended: "the story field must be a full mini-story of 8 to 10 sentences (about 140 words): name a child, set the scene, show
+what tempts or troubles them, the choice, what happens next, how it ends, tied to the verse. Never fewer than 8
+sentences." (`SENT` in the harness.) `mini-sent-3` and `4.1-sent` were added but **not completed** (see "Not tested").
+Note on `mini-1`: the first request returned **4** lessons, not 1, so it is not a clean one-per-request test; the two
+single-lesson follow-up requests gave 78 and 72 words, longer than that model's usual 40–60.
+
+**Read-through of the saved lessons (quality, not just counts):**
+- **gpt-4.1-mini, live prompt.** Many "stories" are one-to-three-sentence anecdotes or plain definitions (Respect, Gratitude,
+  Friendliness, and in `mini-1` "Imagine you see a friend…" with no story at all). Questions are generic ("Why is it
+  important to be honest?") and rarely name the character. The "no synonym repeats" rule was broken (Thankfulness after
+  Gratitude), and verses repeat across batches (Ephesians 4:32 for Kindness and Forgiveness; Galatians 5:22-23 twice).
+- **gpt-4.1.** Clearly better craft at the same length: every story has a named child, a situation, a choice and a
+  resolution; questions refer to the character ("How did Sophie show kindness in the story?"); themes and verses are
+  distinct (Colossians 3:13 for Forgiveness, Proverbs 25:28 for Self-Control, Galatians 6:9 for Perseverance), no
+  synonym repeats. Still 39–70 words — better stories, not longer ones — at about **5× the cost**.
+- **gpt-4o.** The weakest and thinnest (13–32 words in batch 1), merges both questions into one field, and costs as much as
+  gpt-4.1. Not worth considering.
+- **mini-userlen.** Same cost as mini. Every story now has a scene, a decision and an ending, and several name the Scripture
+  idea in the story. About 52–77 words; still short, and a few questions are generic. Verse repeat (Ephesians 4:32) persists.
+- **mini-3 / mini-1.** Smaller batches help a little (best single stories ~80–100 words, e.g. the seed-planting Patience
+  story) but not reliably, and cost more calls.
+- **mini-sent.** The only variant that reached the target: 102–116 words in batch 1 and 84–107 in batch 2, 0 repeated titles,
+  same price as the live prompt. Spot-read lessons (Kindness, Honesty) are complete mini-stories with a choice and an
+  ending and the verse worked into the narrative. **Caveat:** that run's raw output was lost (the run crashed on the
+  follow-up variant before the results file was written), so only part of it was read; verse accuracy, question quality
+  and age fit for `mini-sent` still need a full read.
+
+**Findings and recommendation (quality per cost):**
+1. **Model: keep gpt-4.1-mini.** gpt-4.1 gives nicer writing and better question-to-story links but not more length, at
+   about 5× the cost; gpt-4o is worse and costs the same. A model upgrade is not the lever for the length problem.
+2. **The lever is the request, and the unit is sentences, not words.** "100–180 words" (in the rules or in the request)
+   moved the median by 0–25 words; "8 to 10 sentences, about 140 words, with these story beats" in the per-request ask moved it
+   from ~40 to ~105 words with no extra cost or time. Put the length and the story beats in the user message next to the
+   per-lesson ask, not only in the long system prompt.
+3. **Batch size: keep 6 per request** with the sentence instruction (cheapest, fewest calls). Whether 3 per request adds
+   anything on top of the sentence instruction is untested; the old data says smaller batches help only slightly.
+4. **Still validate on the server.** Even `mini-sent` missed the 100-word floor in 4 of 12 stories (84–95 words) — the
+   Codex validation of the *story field* (not the whole lesson) plus one targeted retry is the right backstop, and with
+   the sentence instruction the retry should rarely trigger. Codex's candidate E (expand only the failing narratives) is a
+   sensible fallback and should be built only if the retry rate stays high.
+5. **Quality gaps no length fix addresses** (mini): repeated verses across batches, questions that don't name the
+   character, occasional synonym theme repeats. Cheap mitigation: pass the list of used verses as well as titles into the
+   next-batch request, and add "at least one reflection question must refer to the main character by name".
+
+**Not tested (budget left; the guard is $0.90 and total spend is well under $1):**
+- `4.1-sent` (does the stronger model write richer stories with the same instruction?) and `mini-sent-3` — the harness
+  has both; the last attempt hit a connection reset / truncated answer. The harness now reports an unparseable answer with
+  its finish reason instead of crashing. Run: `… node tests/live/develop-model-eval.mjs 1 mini-sent,mini-sent-3,4.1-sent`
+  (est. under $0.15). Re-run `mini-sent` once more as well, so its raw lessons are saved for a complete read.
+
+**Relationship to Codex's branch (`codex/phase8-1-story-quality`):** not touched or merged here. Its server-side story-length
+and lesson-part validation, retry and incomplete-content warning are the right complement; the prompt change above
+(sentences + story beats in the request) should be added there and verified with the harness. Nothing is ready to merge
+until a sentence-instruction run is read in full.
+
+### Final comparison (cloud session, 2026-10-15) — the version we'd ship, all 30 lessons read
+
+**Approved by Sydni:** three variants within the remaining budget.
+
+**The tested prompt ("ship"):**
+- the per-request instruction for an 8–10 sentence story (about 140 words) with story beats;
+- at least one reflection question must name the story's main character;
+- the activity must practise the same trait;
+- next batches also list the Scripture references already used.
+
+Run with `… node tests/live/develop-model-eval.mjs 1 mini-ship,mini-ship-3,4.1-ship` (proxy mode; see above). Raw
+lessons: `product-studio/docs/research/develop-model-comparison-2026-10-15.json`. Every lesson was read, not a sample.
+Nothing was deployed, merged, or changed in the live function.
+
+| Variant | Calls | Lessons | Story words | In 100–180 | Tokens in/out | Time | Cost | Per lesson |
+|---|---|---|---|---|---|---|---|---|
+| mini-ship (gpt-4.1-mini, 6 per request) | 2 | 12 | 94 84 75 77 66 70 · 106 98 104 103 95 90 | 3/12 | 5,900 / 4,936 | 34 s | $0.0103 | $0.0009 |
+| mini-ship-3 (gpt-4.1-mini, 3 per request) | 2 | 6 | 105 87 88 · 93 77 80 | 1/6 | 5,847 / 3,733 | 27 s | $0.0083 | $0.0014 |
+| **4.1-ship (gpt-4.1, 6 per request)** | 2 | 12 | 126 122 119 112 106 106 · 134 125 118 117 106 106 | **12/12** | 5,901 / 5,400 | 35 s | $0.0550 | $0.0046 |
+
+**Read-through against Sydni's criteria.**
+
+- **Story arc (beginning → situation → decision → consequence)**
+  - **gpt-4.1:** all 12 have a real arc with a temptation and a costly choice, for example:
+    - Eli breaks the window and confesses;
+    - Maya gives up winning the race to help Alex;
+    - Ella gives away her pencils;
+    - Noah stops the game when the timer beeps;
+    - Sophie tries out and *doesn't* get the part, but is proud she was brave.
+  - **mini, 6 per request:** arcs are present but thin in batch 1 (66–94 words); several resolve in one line.
+  - **mini, 3 per request:** similar to mini at 6.
+- **Trait shown through actions**
+  - **gpt-4.1:** yes, in every lesson.
+  - **mini:** mostly. Some lessons tell rather than show: Gratitude is Jack *thinking*, and Respect is mostly *sharing*, a repeat of Generosity.
+- **Language and age fit:** all three are suitable for ages 6–9.
+  - **mini:** formulaic ("X remembered that God… X learned that…").
+  - **mini, 3 per request:** adds redundant citations inside the story, such as "(Ephesians 4:32)".
+  - **gpt-4.1:** reads more naturally, though it still ends most stories with a "learned that…" sentence.
+- **Questions and activity tied to the story**
+  - **All variants:** the named-character rule worked; question 1 names the child in all 30 lessons.
+  - **gpt-4.1:** activities mirror the story's action ("let someone else go first", "help while you wait").
+  - **mini:** activities are relevant but more generic. One exception is excellent: mini, 3 per request, Patience — plant a seed and wait.
+- **Scripture: accuracy and fit**
+  - **All references are real and fit their trait**, including:
+    - Proverbs 12:22 (honesty);
+    - Joshua 1:9 (courage);
+    - Colossians 3:13 (forgiveness);
+    - Proverbs 25:28 (self-control);
+    - Luke 16:10 (responsibility);
+    - Philippians 2:3 (humility);
+    - 2 Corinthians 9:7 (generosity);
+    - Proverbs 12:10 (kindness to animals);
+    - Psalm 24:1 (creation).
+  - **The used-verse list worked across batches:** no reference repeats between batch 1 and batch 2 in any variant.
+  - **One repeat within a single answer:** mini at 6 per request used Ephesians 4:32 for both Kindness and Forgiveness.
+  - **Verse text:** none was quoted; references only, as the policy requires.
+- **No repeated themes, situations or lessons**
+  - **gpt-4.1:** 12 distinct traits and situations.
+  - **mini, 6 per request:** near-repeats despite the rule — "Kindness to Animals" after Kindness, "Thankfulness for Creation" after Gratitude, and a Respect lesson that repeats Generosity's sharing-a-toy situation.
+  - **mini, 3 per request:** a repeated situation (a broken toy or doll in both Honesty and Forgiveness).
+  - **All models:** reuse first names across lessons (Lily, Tommy, Maya, Noah). This is minor and can be fixed with one instruction.
+- **Depth without filler**
+  - **gpt-4.1:** the extra length is story detail, not padding.
+  - **mini:** the moral is restated two or three times.
+  - **Prayers:** short and generic in every variant (acceptable for this age).
+
+**Recommendation.**
+
+1. **Model: gpt-4.1 for Develop original content only.** Structure Only stays on gpt-4.1-mini, unchanged.
+   - Same prompt, same time (about 35 s for two requests).
+   - Every story met the length target (12/12, vs 3/12 for mini).
+   - Clearly better story craft, and no repeated themes or verses.
+   - Cost: about **$0.028 per 6-lesson request vs about $0.005** (≈ $0.0046 vs $0.0009 per lesson).
+   - Worst case at today's free allowance (5 develop requests per user per day) is about $0.14 per user per day.
+   - Mini with retries would still repeat themes, which a length retry can't fix.
+   - Fallback when gpt-4.1 fails: gpt-4.1-mini.
+2. **Prompt format: the ship prompt.** Put sentences plus story beats in the per-request message, alongside:
+   - the named-character question rule;
+   - the activity-matches-trait rule;
+   - the used-verse list in next batches.
+
+   Two small additions are suggested:
+   - "use a different child's name in each lesson, and not one already used";
+   - "no reference written inside the story (it has its own field)".
+3. **Batch size: 6 per request.** 3 per request was no better on mini and costs more per lesson; one per request was
+   not clean (the earlier run returned 4) and multiplies calls. 6 per request with gpt-4.1 met every criterion.
+4. **Keep Codex's story-length and lesson-part validation and its single retry as the backstop** (with gpt-4.1 it
+   should rarely fire). Codex's candidate E, expanding only the failing stories, isn't needed now; revisit only if the
+   retry rate is high in use.
+
+**Actual API cost.** Estimated from recorded tokens at list prices (gpt-4.1-mini $0.40 / $1.60 and gpt-4.1 $2 / $8 per
+1M tokens); check OpenAI's usage page for the billed total.
+- This run: 6 calls, **$0.0736**.
+- Earlier cloud comparison: about $0.15.
+- Comparison total so far: about **$0.22**.
+- The earlier live function testing ($0.074, in `ai_generation_costs`) is separate.
+- Codex reported "$0.27 spent" from Sydni's side; both totals are well under $1.
+
+**Coordination with Codex (`codex/phase8-1-story-quality`).** The branch is **not on GitHub**; it exists only in Codex's
+local worktree on Sydni's Mac. Its server story-length and lesson-part validation, retry, and review warning (Create
+waits until the maker acknowledges it) overlap this branch's `developGap` and its "incomplete" note. To avoid
+overwriting or duplicating, the plan is:
+
+1. **Codex pushes its branch.**
+2. **Merge it into this branch.** Codex's validation replaces this branch's thinner `developGap` checks (entries
+   present, thin, repeats — keep the repeat check if Codex doesn't have one), and Codex's acknowledgment-gated warning
+   replaces the "ai-no-entries" note.
+3. **Then add the ship prompt and the develop-only gpt-4.1 setting.** These are new and don't overlap.
+4. **Tests:** re-run unit and browser tests.
+5. **Report before any deploy or merge.**
+
+Codex's request for a key file is not needed: this cloud environment already reaches OpenAI (see above).
 
 ## AI content: research and creative development (assessed 2026-10-15, not built)
 
