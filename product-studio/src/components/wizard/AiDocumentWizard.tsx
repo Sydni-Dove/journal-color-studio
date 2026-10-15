@@ -89,8 +89,8 @@ function OutlineSection({ s, i, n, spec, set, remove, shift }: { s: SpecSection;
   const mode = s.repeat.mode;
   return (
     <div className="ai-section" data-section={s.id}>
-      <div className="row">
-        <label className="field" style={{ flex: 1 }}>
+      <div className="ai-section-head">
+        <label className="field ai-section-title">
           <span>Page {i + 1}</span>
           <input type="text" value={s.title} aria-label={`Page ${i + 1} title`} onChange={(e) => set({ ...s, title: e.target.value })} />
         </label>
@@ -105,7 +105,7 @@ function OutlineSection({ s, i, n, spec, set, remove, shift }: { s: SpecSection;
         {mode === "copies" && (
           <label className="field">
             <span>Copies</span>
-            <input type="number" min={1} max={500} value={s.repeat.count} onChange={(e) => set({ ...s, repeat: { mode, count: Math.max(1, Math.min(500, Math.round(Number(e.target.value) || 1))) } })} />
+            <input type="number" inputMode="numeric" min={1} max={500} value={s.repeat.count} aria-label={`Page ${i + 1} copies`} onChange={(e) => set({ ...s, repeat: { mode, count: Math.max(1, Math.min(500, Math.round(Number(e.target.value) || 1))) } })} />
           </label>
         )}
       </div>

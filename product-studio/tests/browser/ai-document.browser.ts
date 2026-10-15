@@ -130,4 +130,35 @@ describe("Generate with AI", () => {
     await expect(page.getByRole("button", { name: "Create the document" }).isDisabled()).resolves.toBe(true);
     await page.context().close();
   }, 60_000);
+
+  for (const width of [390, 430])
+    it(`iPhone ${width}px: the review never runs past the screen; fields are full-width, 16px (no Safari zoom), 44px targets`, async () => {
+      const r = req("devotional");
+      const ctx = await browser.newContext({ viewport: { width, height: 844 }, isMobile: true, hasTouch: true });
+      const page = await ctx.newPage();
+      await page.addInitScript((s) => localStorage.setItem("dove-product-studio:auth", JSON.stringify(s)), SESSION);
+      await page.route("**/rest/v1/**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+      const spec = { ...r.spec, sections: r.spec.sections.concat([{ ...r.spec.sections[0], id: "log", title: "Reading Session", repeat: { mode: "copies", count: 30 } }]) };
+      await page.route("**/functions/v1/generate-document", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ spec: JSON.stringify(spec) }) }));
+      await page.goto(server.resolvedUrls!.local[0]);
+      await page.getByRole("button", { name: "Generate with AI" }).click();
+      await page.getByLabel("Describe your document").fill(r.description);
+      await page.getByRole("button", { name: "Propose an outline" }).click();
+      await page.getByRole("heading", { name: "Review the outline" }).waitFor();
+      const found = await page.evaluate(() => {
+        const W = window.innerWidth, bad: string[] = [];
+        for (const el of document.querySelectorAll<HTMLElement>(".ai-wizard input, .ai-wizard select, .ai-wizard textarea, .ai-wizard button")) {
+          const b = el.getBoundingClientRect(), font = parseFloat(getComputedStyle(el).fontSize), name = el.getAttribute("aria-label") ?? el.textContent ?? el.tagName;
+          if (b.left < -0.5 || b.right > W + 0.5) bad.push(`${name} past the edge`);
+          if (el.tagName !== "BUTTON" && font < 16) bad.push(`${name} ${font}px text (Safari zooms)`);
+          if (b.height < 43.5) bad.push(`${name} ${Math.round(b.height)}px tall`);
+        }
+        const titles = [...document.querySelectorAll<HTMLElement>("input[aria-label$=' title']")].map((e) => Math.round(e.getBoundingClientRect().width));
+        return { bad, titles, scroll: document.documentElement.scrollWidth - W, W };
+      });
+      expect(found.bad).toEqual([]);
+      expect(found.scroll).toBeLessThanOrEqual(0);
+      for (const w of found.titles) expect(w, "page titles get the full width").toBeGreaterThan(found.W * 0.75);
+      await ctx.close();
+    }, 60_000);
 });

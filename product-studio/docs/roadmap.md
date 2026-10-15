@@ -238,6 +238,10 @@ per product. Order of work:
    between paragraphs prints as one empty line, dropped where a page breaks
    (fixed in review). It is always on, so a saved product whose text has blank
    lines prints that space too — keep, or make it a setting (open decision).
+   **8.1 Develop original content** (proposed, small): a mode choice in Generate
+   with AI — *structure only* (today) or *develop original content* (the AI
+   writes entries and prompts, all marked suggested) — same call, schema and
+   engines. Details and the research assessment: `HANDOFF.md`.
 9. **Guided Design Builder & Custom Cover Artwork** — planned; starts only after
    Phase 8 is merged and stable. A guided way through what the studio already
    does, not a second builder: every choice maps onto existing settings, and the
@@ -293,7 +297,11 @@ per product. Order of work:
    selections, and artwork-only prompts carry no lettering; uploads fill the
    cover and crop predictably; margins, binding and export unchanged
    (`tests/golden-templates.test.ts` stays green); phone and desktop.
-10. **Requirements Assistant** — reserved in the model; not built.
+10. **Research and develop content** (proposed): grounded research with sources
+   (context questions → search with citations → a reviewable content proposal,
+   verified vs suggested, no claimed curriculum alignment, no proprietary text)
+   before the outline; paid-tier feature. See `HANDOFF.md`.
+11. **Requirements Assistant** — reserved in the model; not built.
 
 Rules: the collection owns words, the recipe owns order, pagination owns page
 breaks, solvers own geometry, and preview and print draw the same pages.

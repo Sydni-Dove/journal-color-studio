@@ -3,7 +3,7 @@
 Read this first when picking up the work (any assistant or developer). Keep it current: update it in the same
 commit as any change to state, branches, rules or open decisions.
 
-_Last updated: 2026-10-15 — Phase 8 reviewed (on `claude/phase8-ai-generation`, not merged)._
+_Last updated: 2026-10-15 — Phase 8 reviewed and fixed (on `claude/phase8-ai-generation`), waiting for merge approval._
 
 ## The two apps
 
@@ -50,20 +50,78 @@ styles", not "recipes"). **10 Requirements Assistant** — reserved.
 - Merges cleanly with `main`. TypeScript clean. Unit tests 1519/1519. Print snapshots: every existing template
   prints exactly as before (only 3 obsolete snapshot entries removed); 30 more products the snapshots don't cover
   (inventory, guided, custom, stationery) also print identically.
-- Browser tests 146/157 in the cloud sandbox: the 11 failures need web fonts, which never load there (export is
+- Browser tests (now 151/162 with the new ones) in the cloud sandbox: the 11 failures need web fonts, which never load there (export is
   correctly blocked until fonts load); 10 of them fail identically on `main`. Run them on a normal machine.
 - Edge Function `generate-document` (Supabase project `jnlvvlkwskidloripvtp`): deployed v7 = branch code;
   sign-in required (signed-out call → 401); OpenAI key server-side only; usage rows insert/read own only (cap can't
   be reset); 19 live proposals ran 2026-10-09. Deployed cap is 30/day for everyone; the branch sets **free 5/day**
   and a paid hook (`app_metadata.plan === "paid"` → `PAID_DAILY_CAP`, default 50) — takes effect when the
   function is redeployed (needs approval).
-- Fixed in review: a continued page could start or end on the blank paragraph-space line; stray
-  `supabase/.DS_Store` removed (root `.gitignore` added).
-- Open decisions: (1) paragraph space is always on — saved text with blank lines now prints an empty line between
-  paragraphs (keep, or make it a setting); (2) "Generate with AI" shows when signed out (the message comes only
-  after describing); (3) no cap on total pages (30 sections × 500 copies possible); (4) review screen shows
-  `{day}`-style placeholders and is cramped on phones; (5) whether sign-ups are open (each free account can use
-  5 proposals a day once redeployed — cost).
+- Done after review (2026-10-15, on the branch):
+  - **Space between paragraphs**: on by default; Page layout → Spacing → "Space between paragraphs" turns it off
+    (`layoutOptions.paragraphSpace`). In the page and pagination cache keys, so preview, continued pages and
+    print follow it. A blank line at a page break is dropped. Tests: on/off pagination, browser switch + reload.
+  - **Free AI allowance 5/day**, enforced in the Edge Function (server), with a paid hook (`app_metadata.plan ===
+    "paid"` → `PAID_DAILY_CAP`, default 50). No paid tier, billing or plan-granting yet.
+  - **800-page limit**: the outline's fewest pages are counted before anything is built and the real count after
+    expansion (review shows a plain message; Create stays off). The Edge Function rejects a proposal past 800
+    before returning it.
+  - **Signed out**: Generate with AI shows the sign-in card first; no description box until signed in.
+  - **iPhone review screen** (Sydni's report: fields clipped left/right, "Page 1" title showing "Re"). Root causes:
+    (1) every form field inherited the studio's 15px text; iPhone Safari zooms into any field under 16px and
+    stays zoomed, so the page ran past both screen edges; (2) the page-title field had an inline `flex: 1`
+    (zero basis) beside menus sized by their longest option, squeezing it to 37px. Fix (UI only): fields use
+    16px on phones / touch screens (desktop keeps 15px), the Page / Repeats / Copies row is a grid that becomes one
+    column under 600px, fields 44px tall. Tests at 390 and 430px (fail on the old layout).
+  - Stray `supabase/.DS_Store` removed (root `.gitignore`).
+- **Edge Function changes waiting for approval to deploy** (live v7 still allows 30/day and has no page limit):
+  free cap 30 → 5 with the paid hook above; reject proposals past 800 pages (`MAX_DOCUMENT_PAGES`); new error
+  wording; `VERSION` `generate-document-2026-10-15-spec-v4-plans`. No schema or prompt change. Deploy =
+  redeploy `supabase/functions/generate-document` (index.ts + schema.json) to project `jnlvvlkwskidloripvtp`.
+- Remaining refinements (not blocking): the review screen shows `{day}`-style placeholders in page titles (show
+  them as friendly chips); whether sign-ups are open (each free account = 5 proposals/day of OpenAI cost);
+  home-page "Generate with AI" could say "sign in required" before the click; self-host fonts (see Testing).
+
+## AI content: research and creative development (assessed 2026-10-15, not built)
+
+Sydni's test: "A homeschool reading log for kids: book, pages read, a favourite part, and a parent check-off",
+with "Bible scriptures, character building, the Abeka curriculum for subjects". Phase 8 built the log and put
+those words into an intro note: it is built to keep the maker's wording and *not* invent content ("Do not invent
+content entries unless they ask you to write content"), and it has no way to look anything up.
+
+**Today's architecture:** one Edge Function call → one structured-output answer (`docSpecSchema.json`: sections,
+components, entries; every piece `source: "user" | "suggested"`) → `checkSpec` → review → `projectFromSpec` →
+existing engines. Content already has a home: `entries` (one record per day / lesson / book) printed by per-entry
+sections, and component text. So content generation needs no layout or pagination change.
+
+**Three modes, smallest extension:**
+1. *Structure only* — today's behaviour (default).
+2. *Develop original content* — same call and schema; a `mode` field selects a system-prompt variant that writes
+   entries and prompts (reflections, Scripture connections, character prompts, activities), all
+   `source: "suggested"` and shown as such in review; the maker's own wording still verbatim. Needs: mode picker in
+   the describe step, prompt variant, higher output allowance, the existing Scripture / citation flags. Small.
+3. *Research and develop* — a separate step *before* the outline: ask for context (grade, subject, tradition /
+   translation), search grounded sources (provider web search with citations, e.g. OpenAI Responses API
+   `web_search`, or a search API), return a **content proposal**: topics / findings each with its source URL
+   (*verified*) or marked *AI suggestion*; the maker reviews, removes, edits, then the outline is built from the
+   approved proposal with the same schema plus an optional `sources` list and a per-item `basis`
+   (`user | suggested | sourced` + source ids) — backward compatible. Rules: never claim official curriculum
+   alignment or endorsement without evidence (say "inspired by publicly available descriptions of …"); no
+   reproduction of proprietary curriculum text (topics and summaries only, short attributed quotes at most);
+   Scripture as references, with text only from public-domain translations (e.g. KJV) or the maker's own;
+   research results kept separate from layout. Medium–large: new review screen, sources UI, schema addition,
+   multi-step server flow (may need an async job pattern if it runs longer than the function's time limit),
+   tests with recorded research answers.
+
+**Cost:** structure ≈ today's per-request tokens; develop content several times more output; research adds search
+calls (per-call fees plus the pages read) and usually a second model call — several times a structure request.
+Count research as more than one unit of the daily allowance, and treat it as a paid-tier feature.
+
+**Where it belongs (recommendation):** mode 2 as a small **Phase 8.1** right after Phase 8 merges (same pipeline,
+no new dependency; about a short focused round of work). Mode 3 as its own phase **after Phase 9**, alongside the
+paid tier (research costs money; needs entitlements, a search provider decision, and the sources review UI).
+Phase 9 (Guided Design Builder) is unaffected if mode 3 waits; doing mode 3 first would push Phase 9 back by the
+whole research phase. Requirements Assistant moves after research.
 
 ## Business direction
 

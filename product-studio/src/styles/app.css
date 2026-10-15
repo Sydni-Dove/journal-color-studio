@@ -2037,3 +2037,24 @@ button.family-card:focus-visible {
 .ai-checks { display: grid; gap: 4px; }
 .ai-alt { align-items: flex-start; }
 .badge--neutral { background: #f1ece8; color: #6a5a52; }
+
+/* Page title, Repeats and Copies: the title gets real room (it held 37px on a phone, squeezed by the menus'
+   longest option); on a phone each takes the full width, one under the other. */
+.ai-section-head { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1.3fr) minmax(0, 0.7fr); gap: 8px; align-items: end; }
+.ai-section-head > .field { min-width: 0; }
+.ai-section-head select, .ai-section-head input { width: 100%; min-width: 0; box-sizing: border-box; }
+.ai-wizard select { max-width: 100%; text-overflow: ellipsis; }
+.ai-wizard .ai-part .row { flex-wrap: wrap; }
+.ai-wizard .ai-part .row > strong, .ai-wizard .ai-part .hint { overflow-wrap: anywhere; }
+.ai-wizard input, .ai-wizard textarea, .ai-wizard select { min-height: 44px; }
+@media (max-width: 600px) {
+  .ai-section-head { grid-template-columns: minmax(0, 1fr); }
+  .ai-review .row { flex-wrap: wrap; }
+}
+
+/* iPhone Safari zooms into any field with text under 16px, and stays zoomed: the page then runs past both
+   edges of the screen (fields cut off left and right). The studio's 15px text is fine on desktop; on phones
+   and touch screens form fields use 16px. */
+@media (max-width: 860px), (pointer: coarse) {
+  input, select, textarea, textarea.data-textarea { font-size: 16px; }
+}
