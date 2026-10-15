@@ -5,7 +5,7 @@
  * product with its own engines and opens the editor. One path for every kind
  * of document (engines/generate/pipeline.ts).
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { buildFromOutline, checkProposal, requestSpec } from "../../engines/generate/pipeline";
 import { SIZES, type CheckedSpec, type DocSpec, type PageSize, type SpecComponent, type SpecSection } from "../../engines/generate/spec";
 import type { ProductProject } from "../../types/project";
@@ -146,7 +146,11 @@ const tidy = (spec: DocSpec): DocSpec => ({
   sections: spec.sections.map((s) => ({ ...s, components: s.components.map((c) => ({ ...c, fields: c.fields.filter((f) => f.label.trim()), items: c.items.filter((x) => x.trim()) })) })),
 });
 
-export function AiDocumentWizard({ onCreate, onCancel }: { onCreate: (p: ProductProject) => void; onCancel: () => void }) {
+/**
+ * signedIn: generation runs on the server for signed-in accounts only (free accounts: a few proposals a day), so a
+ * signed-out maker is asked to sign in before writing a description, not after. account: the sign-in card.
+ */
+export function AiDocumentWizard({ onCreate, onCancel, signedIn = true, account }: { onCreate: (p: ProductProject) => void; onCancel: () => void; signedIn?: boolean; account?: ReactNode }) {
   const [description, setDescription] = useState("");
   const [content, setContent] = useState("");
   const [busy, setBusy] = useState(false);
@@ -198,6 +202,13 @@ export function AiDocumentWizard({ onCreate, onCancel }: { onCreate: (p: Product
       <div className="page-shell ai-wizard">
         <div className="row"><h1 style={{ flex: 1 }}>Describe your document</h1><button className="btn" onClick={onCancel}>Cancel</button></div>
         <p className="lede">Say what you want to print — a journal, log, form, workbook, planner page… Product Studio proposes an outline you can change before anything is made.</p>
+        {!signedIn ? (
+          <div className="card ai-signin" data-testid="ai-signin">
+            <p><strong>Sign in first.</strong> Generate with AI works with a free Dove Expressions account (a few proposals a day), so your description is never written for nothing. After you sign in, describe your document here.</p>
+            {account}
+          </div>
+        ) : (
+          <>
         <label className="field">
           <span>What should it be?</span>
           <textarea className="data-textarea" rows={5} value={description} aria-label="Describe your document" placeholder={EXAMPLES[0]} onChange={(e) => setDescription(e.target.value)} />
@@ -214,6 +225,8 @@ export function AiDocumentWizard({ onCreate, onCancel }: { onCreate: (p: Product
           <button className="btn btn--primary" disabled={busy || description.trim().length < 10} onClick={() => void generate()}>{busy ? "Proposing an outline…" : "Propose an outline"}</button>
         </div>
         {error && <p className="data-issue" role="alert">{error}</p>}
+          </>
+        )}
       </div>
     );
 

@@ -176,7 +176,29 @@ export function App() {
   const banner = stale ? <UpdateBanner onReload={reload} /> : null;
   const noticeBanner = notice ? <div className="update-banner" role="alert"><span>{notice}</span><button type="button" className="btn" onClick={() => setNotice(null)}>OK</button></div> : null;
   if (view.kind === "new") return <>{banner}<NewProductWizard start={view.start} onCreate={open} onCancel={() => setView({ kind: "list" })} /></>;
-  if (view.kind === "ai") return <>{banner}<AiDocumentWizard onCreate={open} onCancel={() => setView({ kind: "list" })} /></>;
+  if (view.kind === "ai")
+    return (
+      <>
+        {banner}
+        <AiDocumentWizard
+          signedIn={!!cloud.session}
+          account={
+            <CloudAccount
+              email={cloud.session?.user.email ?? null}
+              status={cloud.status}
+              error={cloud.error}
+              onSignIn={cloud.signIn}
+              onSignOut={() => void cloud.signOut()}
+              onRetry={() => void cloud.sync()}
+              intro={<p>Use the same Dove Expressions account as for online saving.</p>}
+              signInLabel="Sign in to use Generate with AI"
+            />
+          }
+          onCreate={open}
+          onCancel={() => setView({ kind: "list" })}
+        />
+      </>
+    );
   if (view.kind === "edit") {
     return (
       <>

@@ -6,7 +6,7 @@
  */
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { checkSpec, SpecError, unplacedContent, type DocSpec } from "../src/engines/generate/spec";
+import { checkSpec, MAX_DOCUMENT_PAGES, minimumPages, SpecError, unplacedContent, type DocSpec } from "../src/engines/generate/spec";
 import { projectFromSpec } from "../src/engines/generate/convert";
 import { buildFromOutline, printLimits } from "../src/engines/generate/pipeline";
 import { resolveDocument, solvePage, geometryFor } from "../src/engines/document/resolve";
@@ -315,5 +315,36 @@ describe("a maker's own devotional day (from a live run): their words once, type
     const blocks = projectFromSpec(c).recipe.structure!.flatMap((n) => (n.kind === "step" ? n.promptSet?.blocks ?? [] : []));
     expect(blocks.filter((b) => b.prompt?.startsWith("What I")).map((b) => [b.lineCount, b.space])).toEqual([[2, "fixed"], [2, "fixed"]]);
     expect(blocks.find((b) => b.prompt?.startsWith("Welcome"))!.prompt).toBe("Welcome to Day 1. Today is about awareness.\n\nIn Exodus 3, Moses was not searching for a spiritual experience.");
+  });
+});
+
+describe("page limit and server rules (Phase 8 review)", () => {
+  const fn = readFileSync("../supabase/functions/generate-document/index.ts", "utf8");
+  const big = (copies: number[]): DocSpec => ({
+    title: "Big", summary: "", page: { size: "8.5x11", orientation: "portrait", binding: "loose", why: "" }, entries: null, notes: [],
+    sections: copies.map((n, i) => section(`s${i}`, `Log ${i}`, [part("fields", { fields: [{ label: "Date", valueType: "date" }] }), part("writing", { lines: 6 })], { repeat: { mode: "copies", count: n } })),
+  });
+  it("counts the fewest pages an outline makes: copies, once, one per entry", () => {
+    expect(minimumPages(big([3, 1, 10]))).toBe(14);
+    expect(minimumPages({ sections: [section("a", "Day {#}", [], { repeat: { mode: "per-entry", count: 1 } }), section("b", "Intro", [])], entries: { name: "Days", fields: [], records: Array.from({ length: 40 }, () => ({ values: [] })), source: "user" } })).toBe(41);
+  });
+  it("an outline past the limit is stopped before anything is built, with a plain message", () => {
+    const spec = big([500, 500]);
+    const t0 = Date.now();
+    expect(() => buildFromOutline(spec, "", { problems: [], flags: [] })).toThrow(/at least 1,000 pages; a document can have at most 800/);
+    expect(Date.now() - t0, "rejected without laying out 1,000 pages").toBeLessThan(500);
+  });
+  it("an outline within the limit builds", () => {
+    expect(buildFromOutline(big([20, 1]), "", { problems: [], flags: [] }).project.name).toBe("Big");
+  });
+  it("the server guards the same page limit and the free allowance", () => {
+    expect(fn).toMatch(new RegExp(`const MAX_DOCUMENT_PAGES = ${MAX_DOCUMENT_PAGES};`));
+    expect(fn).toMatch(/if \(pages > MAX_DOCUMENT_PAGES\)/);
+    expect(fn).toMatch(/const FREE_DAILY_CAP = 5;/);
+    // The plan is read from app_metadata (server-controlled), never user_metadata (the user can edit it).
+    expect(fn).toMatch(/app_metadata\?\.plan === "paid"/);
+    expect(fn).not.toMatch(/\.user_metadata/);
+    // Counted and limited before the provider is called.
+    expect(fn.indexOf("edge_usage_logs\").insert")).toBeLessThan(fn.indexOf("api.openai.com/v1/chat/completions"));
   });
 });

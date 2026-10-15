@@ -20,10 +20,16 @@ afterAll(async () => {
   await new Promise<void>((r) => server?.httpServer.close(() => r()));
 });
 
-/** A fresh studio whose generate-document call answers with `body` (status `status`). */
-async function studio(body: unknown, status = 200): Promise<Page> {
+/** A signed-in session as supabase-js stores it (far-future expiry: no refresh call). Generation needs one. */
+const SESSION = { access_token: "test-token", refresh_token: "test-refresh", token_type: "bearer", expires_in: 3600, expires_at: 4102444800, user: { id: "00000000-0000-0000-0000-000000000001", aud: "authenticated", email: "maker@example.com", app_metadata: {}, user_metadata: {} } };
+
+/** A fresh studio whose generate-document call answers with `body` (status `status`); signed in unless said. */
+async function studio(body: unknown, status = 200, signedIn = true): Promise<Page> {
   const page = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
   await page.addInitScript(() => { window.print = () => {}; });
+  if (signedIn) await page.addInitScript((s) => localStorage.setItem("dove-product-studio:auth", JSON.stringify(s)), SESSION);
+  // Online saving would sync with the test account: answer it with an empty list.
+  await page.route("**/rest/v1/**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
   await page.route("**/functions/v1/generate-document", (route) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) }));
   await page.goto(server.resolvedUrls!.local[0]);
   await page.getByRole("button", { name: "Generate with AI" }).click();
@@ -99,5 +105,29 @@ describe("Generate with AI", () => {
       expect(await saved(page)).toEqual([]);
       await page.context().close();
     }
+  }, 60_000);
+
+  it("signed out: asked to sign in first — no description box until then, nothing sent", async () => {
+    let calls = 0;
+    const page = await studio({ spec: "{}" }, 200, false);
+    await page.route("**/functions/v1/generate-document", (route) => { calls++; return route.fulfill({ status: 401, body: "{}" }); });
+    await page.getByTestId("ai-signin").waitFor();
+    await expect(page.getByTestId("ai-signin").textContent()).resolves.toMatch(/Sign in first/);
+    await expect(page.getByLabel("Describe your document").count()).resolves.toBe(0);
+    await expect(page.getByTestId("ai-signin").getByRole("button").count()).resolves.toBeGreaterThan(0);
+    expect(calls).toBe(0);
+    await page.context().close();
+  });
+
+  it("an outline past 800 pages: a plain message, and nothing can be created until it's smaller", async () => {
+    const r = req("intake");
+    const spec = { ...r.spec, sections: r.spec.sections.map((x, i) => (i === 0 ? { ...x, repeat: { mode: "copies", count: 500 } } : x)).concat(r.spec.sections.map((x) => ({ ...x, id: `${x.id}-b`, repeat: { mode: "copies", count: 500 } }))) };
+    const page = await studio({ spec: JSON.stringify(spec) });
+    await page.getByLabel("Describe your document").fill(r.description);
+    await page.getByRole("button", { name: "Propose an outline" }).click();
+    await page.getByRole("heading", { name: "Review the outline" }).waitFor();
+    await expect.poll(() => page.locator(".data-issue", { hasText: "a document can have at most 800" }).count(), { timeout: 10_000 }).toBeGreaterThan(0);
+    await expect(page.getByRole("button", { name: "Create the document" }).isDisabled()).resolves.toBe(true);
+    await page.context().close();
   }, 60_000);
 });

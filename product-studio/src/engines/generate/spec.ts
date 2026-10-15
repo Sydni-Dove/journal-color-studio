@@ -82,6 +82,22 @@ const KINDS: SpecComponentKind[] = ["heading", "text", "fields", "writing", "che
 const VALUE_TYPES: SpecValueType[] = ["text", "longText", "number", "currency", "date", "time", "quantity", "boolean", "choice", "signature", "reference"];
 /** Blank copies of a fill-in log the AI described as "one page per entry" but gave no entries for. */
 const BLANK_COPIES = 10;
+/**
+ * The most pages a generated document may have — about what a print-on-demand paperback allows (KDP: 828).
+ * The same number guards the server: supabase/functions/generate-document/index.ts (MAX_DOCUMENT_PAGES).
+ */
+export const MAX_DOCUMENT_PAGES = 800;
+
+/** The fewest pages an outline can make: every section prints at least one page per repetition (continued pages only add). */
+export function minimumPages(spec: Pick<DocSpec, "sections" | "entries">): number {
+  const perEntry = Math.max(1, spec.entries?.records.length ?? 0);
+  return spec.sections.reduce((n, s) => n + (s.repeat.mode === "per-entry" ? perEntry : s.repeat.mode === "copies" ? Math.max(1, s.repeat.count) : 1), 0);
+}
+
+/** The message when an outline would pass the page limit (counted before anything is built). */
+export const tooManyPages = (n: number, exact = false) =>
+  `This document would have ${exact ? "" : "at least "}${n.toLocaleString("en-US")} pages; a document can have at most ${MAX_DOCUMENT_PAGES}. Lower the number of copies or entries, or split it into more than one document.`;
+
 export const LIMITS = { sections: 30, components: 40, copies: 500, tableRows: 200, columns: 10, recordFields: 12, records: 60, listItems: 80, entries: 1000, entryFields: 12, lines: 60 };
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);

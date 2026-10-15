@@ -17,6 +17,13 @@ import schema from "./schema.json" with { type: "json" };
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
+/** The most pages a proposal may make (same number as MAX_DOCUMENT_PAGES in product-studio/src/engines/generate/spec.ts). */
+const MAX_DOCUMENT_PAGES = 800;
+/** The fewest pages a proposal makes: every section prints at least one page per repetition. */
+function minimumPages(spec: { sections?: { repeat?: { mode?: string; count?: number } }[]; entries?: { records?: unknown[] } | null }): number {
+  const perEntry = Math.max(1, spec.entries?.records?.length ?? 0);
+  return (spec.sections ?? []).reduce((n, s) => n + (s.repeat?.mode === "per-entry" ? perEntry : s.repeat?.mode === "copies" ? Math.max(1, Math.round(Number(s.repeat?.count) || 1)) : 1), 0);
+}
 const FREE_DAILY_CAP = 5;
 const PAID_DAILY_CAP = Number(Deno.env.get("PAID_DAILY_CAP")) || 50;
 /** The plan comes from app_metadata, which only the server can write (user_metadata is user-editable: never trust it here). */
@@ -124,6 +131,11 @@ Deno.serve(async (req) => {
       const message = result?.choices?.[0]?.message;
       if (message?.refusal) return reply({ error: `The AI declined: ${message.refusal}` }, 422);
       if (typeof message?.content !== "string") { lastError = "no content"; continue; }
+      // Checked here, not only in the studio: a proposal past the page limit is never handed back.
+      let pages = 0;
+      try { pages = minimumPages(JSON.parse(message.content)); } catch { /* not JSON: the studio reports it */ }
+      if (pages > MAX_DOCUMENT_PAGES)
+        return reply({ error: `That proposal would have at least ${pages.toLocaleString("en-US")} pages; a document can have at most ${MAX_DOCUMENT_PAGES}. Ask for fewer copies, days or pages, or split it into more than one document.`, version: VERSION }, 422);
       return reply({ spec: message.content, model, version: VERSION });
     } catch (e) {
       lastError = e instanceof Error ? e.message : String(e);

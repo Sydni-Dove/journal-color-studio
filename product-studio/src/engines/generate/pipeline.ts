@@ -10,7 +10,7 @@ import { supabase } from "../../persistence/cloud";
 import { reviewLayout, type LayoutReview } from "../layout/assistant";
 import { resolveDocument } from "../document/resolve";
 import { projectFromSpec } from "./convert";
-import { checkSpec, unplacedContent, type CheckedSpec, type DocSpec } from "./spec";
+import { checkSpec, MAX_DOCUMENT_PAGES, minimumPages, tooManyPages, unplacedContent, type CheckedSpec, type DocSpec } from "./spec";
 import type { ProductProject } from "../../types/project";
 
 /** Ask the Edge Function for a proposal (raw: the studio checks it next). */
@@ -32,8 +32,14 @@ export const checkProposal = (raw: unknown, description: string, content: string
 /** The product an (edited) outline makes, and how its real pages measure. */
 export function buildFromOutline(spec: DocSpec, content: string, base: Pick<CheckedSpec, "problems" | "flags">): { checked: CheckedSpec; project: ProductProject; review: LayoutReview; limits: string[]; bindings: DocSpec["page"]["binding"][] } {
   // The maker may have removed or edited parts since the check: what of their content is unplaced now.
+  // Counted before anything is built: an outline past the page limit is never laid out.
+  const least = minimumPages(spec);
+  if (least > MAX_DOCUMENT_PAGES) throw new Error(tooManyPages(least));
   const checked: CheckedSpec = { spec, problems: base.problems, flags: base.flags, unplaced: unplacedContent(spec, content) };
   const project = projectFromSpec(checked);
+  // Then the real count (continued pages, fillers) once the pages are expanded.
+  const pages = resolveDocument(project).recipe.pageCount;
+  if (pages > MAX_DOCUMENT_PAGES) throw new Error(tooManyPages(pages, true));
   const limits = printLimits(project);
   return { checked, project, review: reviewLayout(project, { max: 4 }), limits, bindings: limits.length ? bindingsThatPrint(spec, content, base) : [] };
 }
