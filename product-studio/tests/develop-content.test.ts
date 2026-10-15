@@ -5,13 +5,13 @@
  */
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
-import { appendBatch, batchRequest, checkSpec, MAX_DEVELOPED_ENTRIES, MAX_DEVELOPED_TEXT, type DocSpec, type SpecEntries } from "../src/engines/generate/spec";
+import { appendBatch, batchRequest, checkSpec, MAX_DEVELOPED_ENTRIES, MAX_DEVELOPED_TEXT, MAX_DOCUMENT_PAGES, minimumPages, PageLimitError, quantityChoices, reduceToFit, requestedOverLimit, splitToFit, type DocSpec, type SpecEntries } from "../src/engines/generate/spec";
 import { projectFromSpec } from "../src/engines/generate/convert";
 import { buildFromOutline } from "../src/engines/generate/pipeline";
 import { resolveDocument, solvePage } from "../src/engines/document/resolve";
 import { duplicateRecord, markReviewed, toReview } from "../src/engines/data/data";
 import { migrate } from "../src/persistence/projectStore";
-import { REQUESTS } from "./fixtures/aiSpecs";
+import { REQUESTS, part, section } from "./fixtures/aiSpecs";
 import { day, DESCRIPTION, developed, MAKER } from "./fixtures/developSpecs";
 import type { LayoutNode } from "../src/types/layout";
 import type { ProductProject } from "../src/types/project";
@@ -235,5 +235,59 @@ describe("entries the maker wrote stay theirs in develop mode", () => {
     const c = check(spec, "develop");
     expect(c.spec.entries!.source).toBe("suggested");
     expect(records(projectFromSpec(c, AT)).every((r) => r.origin)).toBe(true);
+  });
+});
+
+describe("the 800-page limit: explained, never silently reduced — the maker chooses", () => {
+  const fn = readFileSync("../supabase/functions/generate-document/index.ts", "utf8");
+  it("a quantity clearly past the limit is found before anything is sent (free)", () => {
+    expect(requestedOverLimit("A daily log, 900 copies. One page per day.")).toMatchObject({ n: 900, unit: "copies" });
+    expect(requestedOverLimit("A 1,000-day gratitude journal")).toMatchObject({ n: 1000, unit: "day" });
+    expect(requestedOverLimit("A 365-day devotional and 52 weeks of goals")).toBeNull();
+    expect(requestedOverLimit("An 800 page notebook")).toBeNull();
+    expect(requestedOverLimit("A 2000-word essay page")).toBeNull();
+  });
+  it("the choices rewrite only the quantity, and only when chosen", () => {
+    const d = "A daily log, 900 copies. One page per day.";
+    const c = quantityChoices(d, requestedOverLimit(d)!);
+    expect(c.reduce).toEqual({ label: "Reduce to 790 copies", description: "A daily log, 790 copies. One page per day." });
+    expect(c.split).toEqual({ label: "Split into 2 documents of 450 copies", description: "A daily log, 450 copies. One page per day.", parts: 2 });
+  });
+  const log = (copies: number, entries = 0): DocSpec => ({
+    title: "Log", summary: "", page: { size: "8.5x11", orientation: "portrait", binding: "loose", why: "" }, notes: [],
+    entries: entries ? { name: "Days", fields: [{ key: "title", label: "Title", valueType: "text" }], records: Array.from({ length: entries }, (_, i) => ({ values: [{ key: "title", value: `Day ${i + 1}` }] })), source: "suggested" } : null,
+    sections: [
+      section("intro", "Introduction", [part("text", { text: "How to use this log." })]),
+      section("log", "Daily Log", [part("fields", { fields: [{ label: "Date", valueType: "date" }] })], { repeat: { mode: "copies", count: copies } }),
+      ...(entries ? [section("day", "{title}", [part("text", { fromEntryField: "title" })], { repeat: { mode: "per-entry", count: 1 } })] : []),
+    ],
+  });
+  it("a built outline past the limit stops with its page count (the review then offers the choices)", () => {
+    let err: unknown;
+    try { buildFromOutline(log(900), "", { problems: [], flags: [] }); } catch (e) { err = e; }
+    expect(err).toBeInstanceOf(PageLimitError);
+    expect((err as PageLimitError).pages).toBe(901);
+  });
+  it("Reduce to fit: every change spelled out; the result fits", () => {
+    const r = reduceToFit(log(900, 300));
+    expect(minimumPages(r.spec)).toBeLessThanOrEqual(MAX_DOCUMENT_PAGES);
+    expect(r.changes.join(" | ")).toMatch(/“Daily Log”: 900 → \d+ copies \| Days: the first \d+ of 300 entries kept/);
+    expect(buildFromOutline(r.spec, "", { problems: [], flags: [] }).project).toBeTruthy();
+  });
+  it("Split: parts within the limit, copies shared out, entries in order, the introduction in each", () => {
+    const parts = splitToFit(log(900, 300));
+    expect(parts.length).toBe(2);
+    for (const p of parts) expect(minimumPages(p)).toBeLessThanOrEqual(MAX_DOCUMENT_PAGES);
+    expect(parts.map((p) => p.sections[1].repeat.count)).toEqual([450, 450]);
+    expect(parts.flatMap((p) => p.entries!.records.map((r) => r.values[0].value))).toEqual(Array.from({ length: 300 }, (_, i) => `Day ${i + 1}`));
+    expect(parts.every((p) => p.sections[0].title === "Introduction")).toBe(true);
+    expect(parts.map((p) => p.title)).toEqual(["Log — Part 1 of 2", "Log — Part 2 of 2"]);
+  });
+  it("the server: the same free pre-check before counting; the AI is told the limit and not to lower quantities; an over-limit proposal comes back with the limit, not discarded", () => {
+    expect(fn.indexOf("const tooMany = requestedOverLimit(description);")).toBeGreaterThan(0);
+    expect(fn.indexOf("const tooMany = requestedOverLimit(description);")).toBeLessThan(fn.indexOf('edge_usage_logs").insert'));
+    expect(fn).toMatch(/code: "page-limit"/);
+    expect(/const SYSTEM = `([\s\S]*?)`;/.exec(fn)![1]).toMatch(/at most 800 pages in all\. Never lower a quantity the maker asked for/);
+    expect(fn).toMatch(/pageLimit: \{ pages, max: MAX_DOCUMENT_PAGES \}/);
   });
 });

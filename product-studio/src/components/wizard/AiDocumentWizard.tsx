@@ -7,7 +7,7 @@
  */
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { buildFromOutline, checkProposal, requestSpec } from "../../engines/generate/pipeline";
-import { appendBatch, batchRequest, MAX_DEVELOPED_ENTRIES, SIZES, type CheckedSpec, type DocSpec, type Flag, type GenerationMode, type PageSize, type SpecComponent, type SpecEntries, type SpecSection } from "../../engines/generate/spec";
+import { appendBatch, batchRequest, MAX_DEVELOPED_ENTRIES, MAX_DOCUMENT_PAGES, PageLimitError, quantityChoices, reduceToFit, requestedOverLimit, SIZES, splitToFit, type CheckedSpec, type DocSpec, type Flag, type GenerationMode, type PageSize, type SpecComponent, type SpecEntries, type SpecSection } from "../../engines/generate/spec";
 import type { ProductProject } from "../../types/project";
 import { PageThumb } from "../preview/PageThumb";
 import { resolveDocument } from "../../engines/document/resolve";
@@ -219,8 +219,13 @@ const tidy = (spec: DocSpec): DocSpec => ({
  * signedIn: generation runs on the server for signed-in accounts only (free accounts: a few proposals a day), so a
  * signed-out maker is asked to sign in before writing a description, not after. account: the sign-in card.
  */
-export function AiDocumentWizard({ onCreate, onCancel, signedIn = true, account }: { onCreate: (p: ProductProject) => void; onCancel: () => void; signedIn?: boolean; account?: ReactNode }) {
-  const [description, setDescription] = useState("");
+export function AiDocumentWizard({ onCreate, onCreateMany, onCancel, signedIn = true, account }: { onCreate: (p: ProductProject) => void; onCreateMany?: (ps: ProductProject[]) => void; onCancel: () => void; signedIn?: boolean; account?: ReactNode }) {
+  const [description, setDescriptionRaw] = useState("");
+  // A quantity past the page limit, found before anything is sent; and how many documents the maker chose to split into.
+  const [over, setOver] = useState<ReturnType<typeof requestedOverLimit>>(null);
+  const [splitInto, setSplitInto] = useState(1);
+  const [limitNote, setLimitNote] = useState("");
+  const setDescription = (d: string) => { setDescriptionRaw(d); setOver(null); setSplitInto(1); setLimitNote(""); };
   const [content, setContent] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -237,6 +242,12 @@ export function AiDocumentWizard({ onCreate, onCancel, signedIn = true, account 
   const generate = async () => {
     if (busy) return; // one request at a time
     setError("");
+    // A quantity that can't fit one document: the maker chooses what to do — nothing sent, no proposal used.
+    const tooMany = requestedOverLimit(description);
+    if (tooMany) {
+      setOver(tooMany);
+      return;
+    }
     setBusy(true);
     setBatchMessage("");
     try {
@@ -256,15 +267,20 @@ export function AiDocumentWizard({ onCreate, onCancel, signedIn = true, account 
   // The product the outline makes, measured with the studio's own engines (after edits settle).
   const [built, setBuilt] = useState<ReturnType<typeof buildFromOutline> | null>(null);
   const [buildError, setBuildError] = useState("");
+  // An outline past the page limit: its page count, and the parts if the maker chose to split it.
+  const [overPages, setOverPages] = useState(0);
+  const [parts, setParts] = useState<DocSpec[] | null>(null);
   useEffect(() => {
     if (!spec || !checked) return;
     const t = window.setTimeout(() => {
       try {
         setBuilt(buildFromOutline(tidy(spec), content, checked));
         setBuildError("");
+        setOverPages(0);
       } catch (e) {
         setBuilt(null);
         setBuildError(e instanceof Error ? e.message : "This outline can't be built yet.");
+        setOverPages(e instanceof PageLimitError ? e.pages : 0);
       }
     }, 300);
     return () => window.clearTimeout(t);
@@ -273,6 +289,22 @@ export function AiDocumentWizard({ onCreate, onCancel, signedIn = true, account 
   const finalProject = useMemo(() => (built ? (chosen ? chosen.apply(built.project) : built.project) : null), [built, chosen]);
   const doc = useMemo(() => (finalProject ? resolveDocument(finalProject) : null), [finalProject]);
   const setSection = (i: number, s: SpecSection) => setSpec((x) => x && { ...x, sections: x.sections.map((y, j) => (j === i ? s : y)) });
+  // Editing the outline after choosing to split it starts the choice again.
+  useEffect(() => setParts(null), [spec]);
+  /** The documents to create: one, or the parts the maker chose (each built and checked on its own). */
+  const create = () => {
+    if (!spec || !checked) return;
+    try {
+      // Split before proposing: the outline already holds one part's quantity — the same outline, once per part.
+      const many = parts ?? (splitInto > 1 && !spec.entries ? Array.from({ length: splitInto }, (_, i) => ({ ...spec, title: `${spec.title} — Part ${i + 1} of ${splitInto}` })) : null);
+      if (many && onCreateMany) return onCreateMany(many.map((p) => buildFromOutline(tidy(p), content, checked).project));
+      if (finalProject) onCreate(finalProject);
+    } catch (e) {
+      setBuildError(e instanceof Error ? e.message : "This outline can't be built.");
+    }
+  };
+  const reduce = spec && overPages ? reduceToFit(tidy(spec), overPages) : null;
+  const split = spec && overPages ? splitToFit(tidy(spec), overPages) : null;
   /** The next entries of the list the AI is writing, added to the end (one of the day's proposals). */
   const nextBatch = async (count: number) => {
     if (!spec || !checked || batchBusy) return;
@@ -342,6 +374,20 @@ export function AiDocumentWizard({ onCreate, onCancel, signedIn = true, account 
         <div className="row">
           <button className="btn btn--primary" disabled={busy || description.trim().length < 10} onClick={() => void generate()}>{busy ? (develop ? "Writing the content… (up to two minutes)" : "Proposing an outline…") : develop ? "Propose and write the content" : "Propose an outline"}</button>
         </div>
+        {over && (() => {
+          const c = quantityChoices(description, over);
+          return (
+            <div className="card ai-limit" data-testid="ai-page-limit" role="alert">
+              <p><strong>“{over.text}” is more than one document can hold.</strong> A document can have at most {MAX_DOCUMENT_PAGES} pages. Nothing was sent and none of today's proposals was used. How would you like to continue?</p>
+              <div className="row">
+                <button type="button" className="btn" onClick={() => { setDescription(c.reduce.description); setLimitNote(`Changed to ${c.reduce.label.replace(/^Reduce to /, "")}. Press “Propose” when you're ready.`); }}>{c.reduce.label}</button>
+                <button type="button" className="btn" onClick={() => { setDescription(c.split.description); setSplitInto(c.split.parts); setLimitNote(`Each document will have ${c.split.label.replace(/^Split into \d+ documents of /, "")}; ${c.split.parts} documents are created from one proposal. Press “Propose” when you're ready.`); }}>{c.split.label}</button>
+                <button type="button" className="btn btn--ghost" onClick={() => setOver(null)}>I'll change it myself</button>
+              </div>
+            </div>
+          );
+        })()}
+        {limitNote && <p className="hint" role="status" data-testid="ai-limit-note">{limitNote}</p>}
         {error && <p className="data-issue" role="alert">{error}</p>}
           </>
         )}
@@ -399,6 +445,29 @@ export function AiDocumentWizard({ onCreate, onCancel, signedIn = true, account 
         <aside className="ai-fit">
           <strong>How it prints</strong>
           {buildError && <p className="data-issue">{buildError}</p>}
+          {overPages > 0 && reduce && split && (
+            <div className="ai-limit" data-testid="ai-limit-choices">
+              <p className="hint">Nothing is changed until you choose:</p>
+              {reduce.changes.length > 0 && (
+                <>
+                  <button type="button" className="btn" onClick={() => setSpec(reduce.spec)}>Reduce to fit one document</button>
+                  <ul className="layout-findings">{reduce.changes.map((c) => <li key={c}>{c}</li>)}</ul>
+                </>
+              )}
+              {split.length > 1 && (
+                <>
+                  <button type="button" className="btn" onClick={() => setParts(split)}>Split into {split.length} documents</button>
+                  <p className="hint">The same pages shared between {split.length} documents{spec.entries ? " (entries in order: part 1 gets the first ones)" : ""}; pages that print once (a title, an introduction) are in each.</p>
+                </>
+              )}
+            </div>
+          )}
+          {parts && (
+            <p className="hint" role="status" data-testid="ai-parts">Creates {parts.length} documents: {parts.map((p) => p.title).join("; ")}.</p>
+          )}
+          {splitInto > 1 && !parts && !spec.entries && (
+            <p className="hint" role="status" data-testid="ai-parts">Creates {splitInto} documents from this outline, “Part 1 of {splitInto}” to “Part {splitInto} of {splitInto}”.</p>
+          )}
           {built && doc && (
             <>
               <p className="hint" data-testid="ai-pages">{doc.recipe.pageCount} page{doc.recipe.pageCount === 1 ? "" : "s"} · {SIZE_LABEL[spec.page.size]} {spec.page.orientation === "landscape" ? "sideways" : "upright"} · {BINDING_LABEL[spec.page.binding].toLowerCase()}</p>
@@ -436,7 +505,10 @@ export function AiDocumentWizard({ onCreate, onCancel, signedIn = true, account 
               )}
             </>
           )}
-          <button className="btn btn--primary" disabled={!finalProject || !spec.sections.length} onClick={() => finalProject && onCreate(finalProject)}>Create the document</button>
+          {(() => {
+            const n = parts?.length ?? (splitInto > 1 && !spec.entries ? splitInto : 1);
+            return <button className="btn btn--primary" disabled={!spec.sections.length || (n === 1 && !finalProject) || (n > 1 && !onCreateMany)} onClick={create}>{n > 1 ? `Create ${n} documents` : "Create the document"}</button>;
+          })()}
           <p className="hint">It opens in the editor, where everything can still be changed.</p>
         </aside>
       </div>

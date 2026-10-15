@@ -2053,6 +2053,10 @@ button.family-card:focus-visible {
 .ai-entry[data-source="user"] { border-left-color: var(--ui-ok); }
 .ai-entry > summary { cursor: pointer; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-height: 44px; overflow-wrap: anywhere; }
 .ai-entry .field { display: grid; }
+/* Past the page limit: the maker's choices (reduce or split), applied only when chosen. */
+.ai-limit { display: grid; gap: 8px; border-left: 3px solid var(--ui-warn); padding: 8px 10px; }
+.ai-limit .row { flex-wrap: wrap; gap: 8px; }
+.ai-limit .btn { min-height: 44px; white-space: normal; text-align: left; }
 .ai-batch { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; margin-top: 8px; }
 .ai-batch .field { width: 120px; }
 

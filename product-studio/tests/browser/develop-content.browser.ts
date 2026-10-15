@@ -120,6 +120,46 @@ describe("Develop original content", () => {
     await page.context().close();
   });
 
+  it("900 copies: explained before anything is sent; the maker's choice rewrites the quantity; split creates both parts", async () => {
+    const half = { title: "Daily Log", summary: "", page: { size: "8.5x11", orientation: "portrait", binding: "loose", why: "" }, entries: null, notes: [],
+      sections: [{ id: "log", title: "Daily Log", purpose: "", repeat: { mode: "copies", count: 450 }, startOnRightPage: false, components: [{ id: "d", kind: "fields", label: null, text: null, source: "suggested", fromEntryField: null, fields: [{ label: "Date", valueType: "date" }], rows: null, numbered: false, fillPage: false, lines: null, items: [], marker: null, size: null }] }] };
+    const { page, bodies } = await studio([{ spec: JSON.stringify(half) }]);
+    await page.getByLabel("Describe your document").fill("A daily log, 900 copies. One page per day with the date.");
+    await page.getByRole("button", { name: "Propose an outline" }).click();
+    await page.getByTestId("ai-page-limit").waitFor();
+    expect(bodies).toHaveLength(0);
+    await expect(page.getByTestId("ai-page-limit").textContent()).resolves.toMatch(/at most 800 pages.*none of today's proposals was used/);
+    // Nothing changes until a choice is made.
+    await expect(page.getByLabel("Describe your document").inputValue()).resolves.toMatch(/900 copies/);
+    await page.getByRole("button", { name: "Split into 2 documents of 450 copies" }).click();
+    await expect(page.getByLabel("Describe your document").inputValue()).resolves.toMatch(/450 copies/);
+    await page.getByRole("button", { name: "Propose an outline" }).click();
+    await page.getByRole("heading", { name: "Review the outline" }).waitFor();
+    expect(bodies).toHaveLength(1);
+    await expect(page.getByTestId("ai-parts").textContent()).resolves.toMatch(/Creates 2 documents/);
+    await page.getByRole("button", { name: "Create 2 documents" }).click();
+    await page.waitForSelector(".ps-page--editor");
+    const names = (await saved(page)).map((p: { name: string }) => p.name).sort();
+    expect(names).toEqual(["Daily Log — Part 1 of 2", "Daily Log — Part 2 of 2"]);
+    await page.context().close();
+  });
+
+  it("a proposal that comes back past the limit: the maker chooses to reduce or split; nothing changes until then", async () => {
+    const big = { title: "Garden Log", summary: "", page: { size: "8.5x11", orientation: "portrait", binding: "loose", why: "" }, entries: null, notes: [],
+      sections: [{ id: "log", title: "Plant Page", purpose: "", repeat: { mode: "copies", count: 500 }, startOnRightPage: false, components: [{ id: "d", kind: "fields", label: null, text: null, source: "suggested", fromEntryField: null, fields: [{ label: "Plant", valueType: "text" }], rows: null, numbered: false, fillPage: false, lines: null, items: [], marker: null, size: null }] },
+        { id: "log2", title: "Harvest Page", purpose: "", repeat: { mode: "copies", count: 500 }, startOnRightPage: false, components: [{ id: "e", kind: "fields", label: null, text: null, source: "suggested", fromEntryField: null, fields: [{ label: "Harvest", valueType: "text" }], rows: null, numbered: false, fillPage: false, lines: null, items: [], marker: null, size: null }] }] };
+    const { page } = await studio([{ spec: JSON.stringify(big), pageLimit: { pages: 1000, max: 800 } }]);
+    await page.getByLabel("Describe your document").fill("A garden log with a plant page and a harvest page for each plant.");
+    await page.getByRole("button", { name: "Propose an outline" }).click();
+    await page.getByTestId("ai-limit-choices").waitFor({ timeout: 10_000 });
+    await expect(page.getByLabel("Page 1 copies").inputValue()).resolves.toBe("500");
+    await expect(page.getByTestId("ai-limit-choices").textContent()).resolves.toMatch(/“Plant Page”: 500 → \d+ copies.*Split into 2 documents/);
+    await page.getByRole("button", { name: "Reduce to fit one document" }).click();
+    await expect.poll(() => page.getByLabel("Page 1 copies").inputValue()).toBe("395");
+    await expect.poll(() => page.getByTestId("ai-pages").textContent(), { timeout: 10_000 }).toMatch(/790 pages/);
+    await page.context().close();
+  });
+
   for (const width of [390, 430]) {
     it(`iPhone ${width}px: the choice of mode and the AI-written days fit, nothing cut off`, async () => {
       const { page } = await studio([{ spec: JSON.stringify(developed(3)) }], { width, height: 844 }, true);

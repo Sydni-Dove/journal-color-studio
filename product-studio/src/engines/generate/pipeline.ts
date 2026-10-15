@@ -10,7 +10,7 @@ import { supabase } from "../../persistence/cloud";
 import { reviewLayout, type LayoutReview } from "../layout/assistant";
 import { resolveDocument } from "../document/resolve";
 import { projectFromSpec } from "./convert";
-import { checkSpec, MAX_DOCUMENT_PAGES, minimumPages, tooManyPages, unplacedContent, type BatchRequest, type CheckedSpec, type DocSpec, type GenerationMode } from "./spec";
+import { checkSpec, MAX_DOCUMENT_PAGES, minimumPages, PageLimitError, unplacedContent, type BatchRequest, type CheckedSpec, type DocSpec, type GenerationMode } from "./spec";
 import type { ProductProject } from "../../types/project";
 
 /**
@@ -42,12 +42,12 @@ export function buildFromOutline(spec: DocSpec, content: string, base: Pick<Chec
   // The maker may have removed or edited parts since the check: what of their content is unplaced now.
   // Counted before anything is built: an outline past the page limit is never laid out.
   const least = minimumPages(spec);
-  if (least > MAX_DOCUMENT_PAGES) throw new Error(tooManyPages(least));
+  if (least > MAX_DOCUMENT_PAGES) throw new PageLimitError(least);
   const checked: CheckedSpec = { spec, problems: base.problems, flags: base.flags, unplaced: unplacedContent(spec, content), ...(base.mode ? { mode: base.mode } : {}) };
   const project = projectFromSpec(checked);
   // Then the real count (continued pages, fillers) once the pages are expanded.
   const pages = resolveDocument(project).recipe.pageCount;
-  if (pages > MAX_DOCUMENT_PAGES) throw new Error(tooManyPages(pages, true));
+  if (pages > MAX_DOCUMENT_PAGES) throw new PageLimitError(pages, true);
   const limits = printLimits(project);
   return { checked, project, review: reviewLayout(project, { max: 4 }), limits, bindings: limits.length ? bindingsThatPrint(spec, content, base) : [] };
 }

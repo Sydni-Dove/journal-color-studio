@@ -32,6 +32,16 @@ function minimumPages(spec: { sections?: { repeat?: { mode?: string; count?: num
   const perEntry = Math.max(1, spec.entries?.records?.length ?? 0);
   return (spec.sections ?? []).reduce((n, s) => n + (s.repeat?.mode === "per-entry" ? perEntry : s.repeat?.mode === "copies" ? Math.max(1, Math.round(Number(s.repeat?.count) || 1)) : 1), 0);
 }
+/** A quantity the description asks for that alone passes the page limit (same rule as requestedOverLimit in spec.ts). */
+const QUANTITY = /\b(\d{1,3}(?:,\d{3})+|\d+)\s*(?:-\s*)?(copies|copy|pages|page|days|day|entries|entry|sheets|sheet|lessons|lesson|sessions|session|worksheets|worksheet|weeks|week|logs|log|forms|form)\b/gi;
+function requestedOverLimit(description: string): { n: number; text: string } | null {
+  let best: { n: number; text: string } | null = null;
+  for (const m of description.matchAll(QUANTITY)) {
+    const n = Number(m[1].replace(/,/g, ""));
+    if (n > MAX_DOCUMENT_PAGES && (!best || n > best.n)) best = { n, text: m[0] };
+  }
+  return best;
+}
 const FREE_DAILY_CAP = 5;
 const PAID_DAILY_CAP = Number(Deno.env.get("PAID_DAILY_CAP")) || 50;
 /** The plan comes from app_metadata, which only the server can write (user_metadata is user-editable: never trust it here). */
@@ -80,6 +90,8 @@ The maker's wording is theirs:
 Accuracy and safety:
 - Never claim the document is legally, regulatorily or professionally compliant or approved, and never say it satisfies any law or standard.
 - Never invent citations, Scripture references, statistics, laws, regulations or quotations. If a record must meet legal or regulatory requirements, provide the labelled blanks they asked for and add a note that the requirements must be verified for their jurisdiction.
+
+Page limit: a document can have at most 800 pages in all. Never lower a quantity the maker asked for (copies, days, entries, pages) to stay under it: build what they asked. If it would pass the limit, say so in notes — the studio explains the limit and lets the maker choose to reduce the quantity or split the document.
 
 Page: choose page.size, orientation and binding for how it will be used (a wide table suits landscape; a bound book suits a journal; loose pages suit forms) and explain the choice in page.why.
 notes: list your assumptions, and any conflicting instructions and how you resolved them.
@@ -166,6 +178,11 @@ Deno.serve(async (req) => {
   const content = typeof body.content === "string" ? body.content : "";
   if (description.trim().length < 10 || description.length > 6000 || content.length > 60000)
     return reply({ error: "Describe the document in 10–6,000 characters; your own content must be under 60,000 characters." }, 400);
+  // A quantity that clearly can't fit one document: answered before anything is counted or sent (free), so the
+  // maker can choose to reduce it or split the document.
+  const tooMany = requestedOverLimit(description);
+  if (tooMany)
+    return reply({ error: `“${tooMany.text}” is more than one document can hold: a document can have at most ${MAX_DOCUMENT_PAGES} pages. Reduce the quantity, or split it into more than one document. None of today's proposals was used.`, code: "page-limit", requested: tooMany.n, max: MAX_DOCUMENT_PAGES, version: VERSION }, 422);
   // Mode: absent = Structure only (Phase 8's request). Anything else is checked before any usage is counted.
   if (body.mode !== undefined && body.mode !== "structure" && body.mode !== "develop") return reply({ error: "Unknown generation mode." }, 400);
   const develop = body.mode === "develop";
@@ -219,12 +236,14 @@ Deno.serve(async (req) => {
         return reply({ error: `That was more than one request can write. Ask for fewer entries (for example 10), then write the rest with “Write the next batch”.`, version: VERSION }, 422);
       }
       if (typeof message?.content !== "string") { lastError = "no content"; continue; }
-      // Checked here, not only in the studio: a proposal past the page limit is never handed back.
+      // Counted here, not only in the studio, so a proposal past the limit is recorded and comes back marked.
       let pages = 0;
       try { pages = minimumPages(JSON.parse(message.content)); } catch { /* not JSON: the studio reports it */ }
       await cost(pages > MAX_DOCUMENT_PAGES ? "too-many-pages" : "ok");
-      if (pages > MAX_DOCUMENT_PAGES)
-        return reply({ error: `That proposal would have at least ${pages.toLocaleString("en-US")} pages; a document can have at most ${MAX_DOCUMENT_PAGES}. Ask for fewer copies, days or pages, or split it into more than one document.`, version: VERSION }, 422);
+      // Past the limit after the AI answered (the proposal was paid for and counted): handed back with the limit, so
+      // the studio can offer the maker's choices (reduce or split) instead of losing it. The studio never builds an
+      // outline past the limit (buildFromOutline checks before laying anything out).
+      if (pages > MAX_DOCUMENT_PAGES) return reply({ spec: message.content, model, version: VERSION, pageLimit: { pages, max: MAX_DOCUMENT_PAGES } });
       return reply({ spec: message.content, model, version: VERSION });
     } catch (e) {
       lastError = e instanceof Error ? e.message : String(e);

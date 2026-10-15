@@ -195,6 +195,8 @@ export function App() {
             />
           }
           onCreate={open}
+          // Several documents (a split): every part is saved; the first opens.
+          onCreateMany={(ps) => { ps.slice(1).forEach((p) => persist(p)); open(ps[0]); }}
           onCancel={() => setView({ kind: "list" })}
         />
       </>

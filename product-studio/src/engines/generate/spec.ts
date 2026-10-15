@@ -114,6 +114,98 @@ export function minimumPages(spec: Pick<DocSpec, "sections" | "entries">): numbe
 export const tooManyPages = (n: number, exact = false) =>
   `This document would have ${exact ? "" : "at least "}${n.toLocaleString("en-US")} pages; a document can have at most ${MAX_DOCUMENT_PAGES}. Lower the number of copies or entries, or split it into more than one document.`;
 
+/** An outline past the page limit: the build stops with this, and the review offers the maker's choices (reduce or split). */
+export class PageLimitError extends Error {
+  constructor(public pages: number, exact = false) {
+    super(tooManyPages(pages, exact));
+  }
+}
+
+// ─── Page limit: the maker's choices (nothing is reduced unless they choose it) ──────────────────────────────
+
+/** Pages kept free for a title page or introduction when a quantity is reduced to fit. */
+const ROOM = 10;
+/** Quantities a description can ask for that each make (at least) a page. */
+const QUANTITY = /\b(\d{1,3}(?:,\d{3})+|\d+)\s*(?:-\s*)?(copies|copy|pages|page|days|day|entries|entry|sheets|sheet|lessons|lesson|sessions|session|worksheets|worksheet|weeks|week|logs|log|forms|form)\b/gi;
+/**
+ * A quantity the maker asked for that alone passes the page limit ("900 copies", "1,000 days") — found before
+ * anything is sent, so it costs nothing. Only clear, explicit numbers count; everything else is the AI's to read.
+ */
+export function requestedOverLimit(description: string): { n: number; unit: string; text: string } | null {
+  let best: { n: number; unit: string; text: string } | null = null;
+  for (const m of description.matchAll(QUANTITY)) {
+    const n = Number(m[1].replace(/,/g, ""));
+    if (n > MAX_DOCUMENT_PAGES && (!best || n > best.n)) best = { n, unit: m[2].toLowerCase(), text: m[0] };
+  }
+  return best;
+}
+/** The maker's two choices for a quantity past the limit, as rewritten descriptions (applied only if chosen). */
+export function quantityChoices(description: string, over: { n: number; unit: string; text: string }) {
+  const fit = MAX_DOCUMENT_PAGES - ROOM;
+  const parts = Math.ceil(over.n / fit);
+  const per = Math.ceil(over.n / parts);
+  const swap = (k: number) => description.replace(over.text, over.text.replace(/\d{1,3}(?:,\d{3})+|\d+/, String(k)));
+  return {
+    reduce: { label: `Reduce to ${fit} ${over.unit}`, description: swap(fit) },
+    split: { label: `Split into ${parts} documents of ${per} ${over.unit}`, description: swap(per), parts },
+  };
+}
+
+/** What can shrink: copies sections, and the entries per-entry sections print. */
+const scalable = (spec: DocSpec) => {
+  const perEntry = spec.sections.filter((s) => s.repeat.mode === "per-entry").length;
+  const fixed = spec.sections.filter((s) => s.repeat.mode === "once").length;
+  return { perEntry, fixed };
+};
+
+/**
+ * "Reduce to fit": the copies (and the entries pages repeat for) lowered in proportion until the document fits —
+ * offered with every change spelled out, applied only if the maker chooses it. `pages`: the count known to be over
+ * (the exact count after building, else the fewest possible).
+ */
+export function reduceToFit(spec: DocSpec, pages = minimumPages(spec)): { spec: DocSpec; changes: string[] } {
+  const target = MAX_DOCUMENT_PAGES - ROOM;
+  let f = Math.min(1, target / Math.max(1, pages));
+  const { perEntry } = scalable(spec);
+  for (let tries = 0; tries < 50; tries++) {
+    const sections = spec.sections.map((s) => (s.repeat.mode === "copies" ? { ...s, repeat: { ...s.repeat, count: Math.max(1, Math.floor(s.repeat.count * f)) } } : s));
+    const keep = spec.entries && perEntry ? Math.max(1, Math.floor(spec.entries.records.length * f)) : spec.entries?.records.length ?? 0;
+    const next: DocSpec = { ...spec, sections, entries: spec.entries ? { ...spec.entries, records: spec.entries.records.slice(0, keep) } : null };
+    if (minimumPages(next) <= target || f <= 0.01) {
+      const changes = [
+        ...spec.sections.flatMap((s, i) => (s.repeat.mode === "copies" && sections[i].repeat.count !== s.repeat.count ? [`“${s.title}”: ${s.repeat.count} → ${sections[i].repeat.count} copies`] : [])),
+        ...(spec.entries && keep < spec.entries.records.length ? [`${spec.entries.name}: the first ${keep} of ${spec.entries.records.length} entries kept (the rest left out)`] : []),
+      ];
+      return { spec: next, changes };
+    }
+    f *= 0.97;
+  }
+  return { spec, changes: [] };
+}
+
+/**
+ * "Split into documents": the same outline as several documents, each within the limit — copies shared out, the
+ * entries in order (part 1 gets the first ones); pages that print once (a title, an introduction) are in every
+ * part. Applied only if the maker chooses it. `pages`: as for reduceToFit.
+ */
+export function splitToFit(spec: DocSpec, pages = minimumPages(spec)): DocSpec[] {
+  for (let parts = Math.max(2, Math.ceil(pages / (MAX_DOCUMENT_PAGES - ROOM))); parts <= 50; parts++) {
+    const share = (n: number, i: number) => Math.floor(n / parts) + (i < n % parts ? 1 : 0);
+    const out = Array.from({ length: parts }, (_, i): DocSpec => {
+      const records = spec.entries?.records ?? [];
+      const start = Array.from({ length: i }, (_, j) => share(records.length, j)).reduce((a, b) => a + b, 0);
+      return {
+        ...spec,
+        title: `${spec.title} — Part ${i + 1} of ${parts}`,
+        sections: spec.sections.map((s) => (s.repeat.mode === "copies" ? { ...s, repeat: { ...s.repeat, count: Math.max(1, share(s.repeat.count, i)) } } : s)),
+        entries: spec.entries ? { ...spec.entries, records: records.slice(start, start + share(records.length, i)) } : null,
+      };
+    });
+    if (out.every((p) => minimumPages(p) <= MAX_DOCUMENT_PAGES - ROOM)) return out;
+  }
+  return [spec];
+}
+
 export const LIMITS = { sections: 30, components: 40, copies: 500, tableRows: 200, columns: 10, recordFields: 12, records: 60, listItems: 80, entries: 1000, entryFields: 12, lines: 60 };
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
