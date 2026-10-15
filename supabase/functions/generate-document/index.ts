@@ -54,7 +54,7 @@ const PAID_DAILY_CAP = Number(Deno.env.get("PAID_DAILY_CAP")) || 50;
 const isPaid = (user: { app_metadata?: Record<string, unknown> }) => user.app_metadata?.plan === "paid";
 const FUNCTION_NAME = "generate-document";
 const MODELS = ["gpt-4.1-mini", "gpt-4o-mini"];
-const VERSION = "generate-document-2026-10-15-spec-v9-develop-shape";
+const VERSION = "generate-document-2026-10-15-spec-v10-develop-batches";
 /** The most entries one "develop" request writes (same as MAX_DEVELOPED_ENTRIES in product-studio/src/engines/generate/spec.ts). */
 const MAX_DEVELOPED_ENTRIES = 30;
 /**
@@ -125,7 +125,8 @@ THIS REQUEST CONTINUES A LIST ALREADY WRITTEN: "${batch.name}". Write entries ${
  * (headings only). Returns what's missing, to ask the AI once more; null when it's complete. (Entries with no page
  * printing them are kept: the studio adds that page itself — the content isn't thrown away.)
  */
-function developGap(raw: string, wanted: number): string | null {
+const norm = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+function developGap(raw: string, wanted: number, previous: string[] = []): string | null {
   let spec: { entries?: { records?: { values?: { value?: string }[] }[] } | null; sections?: { repeat?: { mode?: string }; components?: { fromEntryField?: string | null }[] }[] };
   try { spec = JSON.parse(raw); } catch { return null; }
   const records = spec.entries?.records ?? [];
@@ -133,6 +134,10 @@ function developGap(raw: string, wanted: number): string | null {
   const need = Math.min(wanted, 3);
   if (records.length < need) return `only ${records.length} of the ${wanted} entries were written. Write at least ${need}, each complete.`;
   const thin = records.filter((r) => (r.values ?? []).reduce((n, v) => n + (v.value ?? "").trim().length, 0) < 250).length;
+  // A next batch that repeats what's already written (the first value of each entry is its name).
+  const before = new Set(previous.map(norm));
+  const repeats = records.map((r) => (r.values ?? [])[0]?.value ?? "").filter((t) => before.has(norm(t)));
+  if (repeats.length && repeats.length >= records.length / 2) return `${repeats.length} of the ${records.length} entries repeat ones already written (${repeats.join(", ")}). Write NEW entries on different themes, continuing the series.`;
   if (thin > records.length / 2) return `${thin} of the ${records.length} entries are only headings or a few words. Write each entry's parts in full (the teaching, activity, questions and prayer as real sentences).`;
   return null;
 }
@@ -230,7 +235,7 @@ Deno.serve(async (req) => {
 
   const system = develop ? SYSTEM.replace(NO_CONTENT, developRules(entryCount, batch)) : SYSTEM;
   const mode = develop ? "develop" : "structure";
-  const user = `What the maker wants:\n${description.trim()}${content.trim() ? `\n\nThe maker's own content — use it exactly as written, placed where it belongs:\n<<<\n${content}\n>>>` : ""}`;
+  const user = `What the maker wants:\n${description.trim()}${content.trim() ? `\n\nThe maker's own content — use it exactly as written, placed where it belongs:\n<<<\n${content}\n>>>` : ""}${batch ? `\n\nTHIS IS A NEXT BATCH. Entries 1–${batch.from - 1} of "${batch.name}" are already written:\n${batch.previous.map((p, i) => `${batch.from - batch.previous.length + i}. ${p}`).join("\n")}\nWrite entries ${batch.from}–${batch.from + batch.count - 1} only: ${batch.count} NEW entries on themes not covered above (any examples in the description above are already used). Never repeat a title or theme from the list.` : ""}`;
   let lastError = "";
   const started = Date.now();
   // Develop: one more attempt when the answer didn't actually write the content (same proposal; counted once).
@@ -266,7 +271,7 @@ Deno.serve(async (req) => {
         return reply({ error: `That was more than one request can write. Ask for fewer entries (for example 10), then write the rest with “Write the next batch”.`, version: VERSION }, 422);
       }
       if (typeof message?.content !== "string") { lastError = "no content"; continue; }
-      const gap = develop ? developGap(message.content, wanted) : null;
+      const gap = develop ? developGap(message.content, wanted, batch?.previous ?? []) : null;
       // An incomplete answer comes back fast (it wrote little): retried only while there's time for a full one.
       if (gap && !retry.length && Date.now() - started < 45_000) {
         await cost("incomplete-retried");

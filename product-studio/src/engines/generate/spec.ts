@@ -482,14 +482,21 @@ export function appendBatch(spec: DocSpec, batch: CheckedSpec): { spec: DocSpec;
   if (!list) return { spec, added: 0, message: "This outline has no list of entries to continue." };
   if (!more?.records.length) return { spec, added: 0, message: "The AI didn't write any new entries. Try again, or add them in Your content after creating." };
   const keys = new Set(list.fields.map((f) => f.key));
-  const records = more.records.map((r) => ({ values: r.values.filter((v) => keys.has(v.key)) })).filter((r) => r.values.some((v) => v.value.trim()));
+  // An entry's name: its first field's value. A batch entry with the name of one already written is a repeat.
+  const first = list.fields[0]?.key;
+  const name = (r: { values: { key: string; value: string }[] }) => normWords(r.values.find((v) => v.key === first)?.value ?? "").toLowerCase();
+  const seen = new Set(list.records.map(name).filter(Boolean));
+  const fitting = more.records.map((r) => ({ values: r.values.filter((v) => keys.has(v.key)) })).filter((r) => r.values.some((v) => v.value.trim()));
+  const fresh = fitting.filter((r) => { const n = name(r); if (n && seen.has(n)) return false; seen.add(n); return true; });
+  const repeats = fitting.length - fresh.length;
   const room = LIMITS.entries - list.records.length;
-  const take = records.slice(0, Math.max(0, room));
+  const take = fresh.slice(0, Math.max(0, room));
+  const said = repeats ? ` ${repeats} repeated ${repeats === 1 ? "an entry" : "entries"} already written, so ${repeats === 1 ? "it was" : "they were"} left out — write the next batch again for more.` : "";
   return {
     // Anything the AI wrote is a suggestion, whatever the list held before.
     spec: { ...spec, entries: { ...list, records: [...list.records, ...take], source: "suggested" } },
     added: take.length,
-    message: take.length ? `Added ${take.length} entr${take.length === 1 ? "y" : "ies"} (now ${list.records.length + take.length}).` : "The new entries didn't match this list's fields, so nothing was added.",
+    message: take.length ? `Added ${take.length} entr${take.length === 1 ? "y" : "ies"} (now ${list.records.length + take.length}).${said}` : repeats ? `The AI repeated entries already written, so nothing was added. Write the next batch again.` : "The new entries didn't match this list's fields, so nothing was added.",
   };
 }
 
@@ -497,14 +504,13 @@ export function appendBatch(spec: DocSpec, batch: CheckedSpec): { spec: DocSpec;
 export function batchRequest(spec: DocSpec, count: number): BatchRequest | null {
   const e = spec.entries;
   if (!e) return null;
-  const first = e.fields.find((f) => f.valueType === "text") ?? e.fields[0];
   return {
     name: e.name,
     fields: e.fields,
     from: e.records.length + 1,
     count: Math.max(1, Math.min(MAX_DEVELOPED_ENTRIES, Math.round(count) || 1)),
     // The last entries' names, so the next batch continues rather than repeats.
-    previous: e.records.slice(-40).map((r) => (r.values.find((v) => v.key === first.key)?.value ?? "").replace(/\s+/g, " ").trim().slice(0, 100)).filter(Boolean),
+    previous: e.records.slice(-40).map((r) => (r.values.find((v) => v.key === e.fields[0].key)?.value ?? "").replace(/\s+/g, " ").trim().slice(0, 100)).filter(Boolean),
   };
 }
 

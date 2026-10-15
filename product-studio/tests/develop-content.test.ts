@@ -171,6 +171,17 @@ describe("at most 30 complete entries per request; longer series continue in bat
     expect(records(p).every((x) => x.origin)).toBe(true);
     expect(appendBatch(first.spec, { ...more, spec: { ...more.spec, entries: null } }).added).toBe(0);
   });
+  it("a batch that repeats entries already written: the repeats are left out and said (live: batch 1 repeated lessons 1–6)", () => {
+    const first = check(developed(6), "develop");
+    const again = check(developed(6, (n) => day(n <= 4 ? n : n + 6)), "develop");
+    const r = appendBatch(first.spec, again);
+    expect(r.added).toBe(2);
+    expect(r.spec.entries!.records.map((x) => x.values[0].value).slice(-2)).toEqual(["Day 11: Drawing Near", "Day 12: Drawing Near"]);
+    expect(r.message).toMatch(/Added 2 entries \(now 8\)\. 4 repeated entries already written, so they were left out/);
+    const all = appendBatch(first.spec, first);
+    expect(all.added).toBe(0);
+    expect(all.message).toMatch(/repeated entries already written, so nothing was added/);
+  });
 });
 
 describe("Scripture: references and quotations the AI writes are listed to check", () => {
@@ -225,14 +236,17 @@ describe("the server: develop mode, limits and cost records (Edge Function v9 �
     expect(fn).toMatch(/No outside research/);
   });
   it("a developed answer without the content (no entries, nothing printing them, headings only) gets one retry within the same proposal, then a clear message", () => {
-    expect(fn).toMatch(/function developGap\(raw: string, wanted: number\)/);
+    expect(fn).toMatch(/function developGap\(raw: string, wanted: number, previous: string\[\] = \[\]\)/);
     expect(fn).not.toMatch(/so the entries would never print/);
-    expect(fn).toMatch(/const gap = develop \? developGap\(message\.content, wanted\) : null;/);
     expect(fn).toMatch(/if \(gap && !retry\.length && Date\.now\(\) - started < 45_000\)/);
     expect(fn).toMatch(/await cost\("incomplete-retried"\)/);
     // Still incomplete after the retry: handed back with what's missing — a paid answer is never thrown away.
     expect(fn).toMatch(/return reply\(\{ spec: message\.content, model, version: VERSION, incomplete: gap \}\)/);
     expect(fn).toMatch(/Each lesson \/ day \/ session is ONE record in entries\.records/);
+    // Next batches: every name already written goes in the request itself, and repeats trigger the retry.
+    expect(fn).toMatch(/THIS IS A NEXT BATCH\. Entries 1–\$\{batch\.from - 1\}/);
+    expect(fn).toMatch(/repeat ones already written/);
+    expect(fn).toMatch(/developGap\(message\.content, wanted, batch\?\.previous \?\? \[\]\)/);
     expect(fn.match(/edge_usage_logs"\)\.insert\(/g)).toHaveLength(1);
   });
   it("develop answers use the same format with the list of entries required (never null); Structure only keeps the shared schema", () => {
