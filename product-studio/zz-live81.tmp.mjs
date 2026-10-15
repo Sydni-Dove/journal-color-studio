@@ -59,7 +59,7 @@ try {
       const before = await page.locator(".ai-entry").count();
       await page.getByLabel("How many more entries").fill(String(count));
       t = Date.now(); await page.getByRole("button", { name: "Write the next batch" }).click();
-      await page.waitForFunction((b) => document.querySelectorAll(".ai-entry").length > b || /couldn't|more than one request|declined|failed|didn't/i.test(document.querySelector(".ai-batch [role=status]")?.textContent ?? ""), before, { timeout: 160_000 });
+      await page.waitForFunction((b) => document.querySelectorAll(".ai-entry").length > b || /couldn.t|more than one request|declined|failed|didn.t|Free accounts|today.s/i.test(document.querySelector(".ai-batch [role=status]")?.textContent ?? ""), before, { timeout: 160_000 });
       log("batch after", Date.now() - t, "ms; entries:", await page.locator(".ai-entry").count(), "status:", await page.locator(".ai-batch [role=status]").textContent().catch(() => ""));
     }
     log("entry names:", await page.locator(".ai-entry > summary").allTextContents());

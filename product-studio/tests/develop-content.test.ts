@@ -349,7 +349,7 @@ describe("the 800-page limit: explained, never silently reduced — the maker ch
     expect(fn.indexOf("const tooMany = requestedOverLimit(description);")).toBeGreaterThan(0);
     expect(fn.indexOf("const tooMany = requestedOverLimit(description);")).toBeLessThan(fn.indexOf('edge_usage_logs").insert'));
     expect(fn).toMatch(/code: "page-limit"/);
-    expect(/const SYSTEM = `([\s\S]*?)`;/.exec(fn)![1]).toMatch(/at most 800 pages in all\. Never lower a quantity the maker asked for/);
+    expect(/const SYSTEM = `([\s\S]*?)`;/.exec(fn)![1]).toMatch(/at most 800 pages in all\. That is the studio's to handle, not yours: always build every section the maker asked for at the full quantity they asked for/);
     expect(fn).toMatch(/pageLimit: \{ pages, max: MAX_DOCUMENT_PAGES \}/);
   });
 });

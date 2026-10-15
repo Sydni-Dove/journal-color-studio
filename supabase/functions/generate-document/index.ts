@@ -54,7 +54,7 @@ const PAID_DAILY_CAP = Number(Deno.env.get("PAID_DAILY_CAP")) || 50;
 const isPaid = (user: { app_metadata?: Record<string, unknown> }) => user.app_metadata?.plan === "paid";
 const FUNCTION_NAME = "generate-document";
 const MODELS = ["gpt-4.1-mini", "gpt-4o-mini"];
-const VERSION = "generate-document-2026-10-15-spec-v11-develop-form";
+const VERSION = "generate-document-2026-10-15-spec-v12-page-limit-build";
 /** The most entries one "develop" request writes (same as MAX_DEVELOPED_ENTRIES in product-studio/src/engines/generate/spec.ts). */
 const MAX_DEVELOPED_ENTRIES = 30;
 /**
@@ -97,7 +97,7 @@ Accuracy and safety:
 - Never claim the document is legally, regulatorily or professionally compliant or approved, and never say it satisfies any law or standard.
 - Never invent citations, Scripture references, statistics, laws, regulations or quotations. If a record must meet legal or regulatory requirements, provide the labelled blanks they asked for and add a note that the requirements must be verified for their jurisdiction.
 
-Page limit: a document can have at most 800 pages in all. Never lower a quantity the maker asked for (copies, days, entries, pages) to stay under it: build what they asked. If it would pass the limit, say so in notes — the studio explains the limit and lets the maker choose to reduce the quantity or split the document.
+Page limit: a document can have at most 800 pages in all. That is the studio's to handle, not yours: always build every section the maker asked for at the full quantity they asked for (for example a daily page for three years is a section with "copies" and count 1095). Never lower a quantity, leave a section out, or describe pages in notes instead of building them to stay under the limit. The studio explains the limit and lets the maker choose to reduce the quantity or split the document.
 
 Page: choose page.size, orientation and binding for how it will be used (a wide table suits landscape; a bound book suits a journal; loose pages suit forms) and explain the choice in page.why.
 notes: list your assumptions, and any conflicting instructions and how you resolved them.
