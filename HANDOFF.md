@@ -314,6 +314,86 @@ Her additions:
 
 (a) touches nothing in production.
 
+### Comparison results (cloud session, 2026-10-15) — run on this branch's harness
+
+**How it ran:** no key was needed in the sandbox. The cloud environment's network proxy injects the OpenAI credential
+for `api.openai.com`, but only for clients that go through the proxy and send **no** `Authorization` header. Node's
+`fetch` ignores the proxy by default, so the harness now has an `OPENAI_VIA_PROXY=1` switch (no header) and is run as:
+`cd product-studio && NODE_USE_ENV_PROXY=1 NODE_EXTRA_CA_CERTS=/root/.ccr/ca-bundle.crt OPENAI_VIA_PROXY=1 node tests/live/develop-model-eval.mjs`.
+Nothing was deployed, merged or changed in the live Edge Function. No key was printed, pasted or committed.
+The Mac-terminal key file Codex proposed is **not needed** if the run happens in this cloud environment.
+
+**Actual cost this session:** first run (6 variants, 13 calls) **$0.1343**; one follow-up variant (`mini-sent`, 2 calls)
+**$0.0106**; a second follow-up call (`mini-sent-3`) failed mid-answer and was billed but not recorded (a few tenths of a
+cent). About **$0.15** in total from this session, separate from whatever was spent earlier from Sydni's side.
+
+**Story words per lesson (batch 1 | batch 2), 6 lessons per request unless noted; target 100–180:**
+
+| Variant | Batch 1 | Batch 2 | In range | Cost (2 calls) | Time |
+|---|---|---|---|---|---|
+| mini-live (gpt-4.1-mini, live prompt) | 52 37 36 32 23 25 | 69 58 62 54 51 45 | 0/12 | $0.0090 | 32 s |
+| 4.1-live (gpt-4.1) | 49 44 46 43 41 39 | 70 64 65 60 60 56 | 0/12 | $0.0467 | 27 s |
+| 4o-live (gpt-4o) | 32 28 24 19 25 13 | 53 34 49 29 43 33 | 0/12 | $0.0502 | 31 s |
+| mini-userlen (length asked in request, words) | 77 67 69 62 60 52 | 68 66 60 68 63 59 | 0/12 | $0.0095 | 32 s |
+| mini-3 (3 lessons/request) | 55 37 42 | 82 62 58 | 0/6 | $0.0082 | 26 s |
+| mini-1 (see note) | 48 42 40 44 | 78 · 72 | 0/6 | $0.0107 | 31 s |
+| **mini-sent (length asked in request, in sentences)** | 111 116 113 110 106 102 | 107 100 95 90 84 88 | **8/12** | $0.0106 | 36 s |
+
+`mini-sent` appended: "the story field must be a full mini-story of 8 to 10 sentences (about 140 words): name a child, set the scene, show
+what tempts or troubles them, the choice, what happens next, how it ends, tied to the verse. Never fewer than 8
+sentences." (`SENT` in the harness.) `mini-sent-3` and `4.1-sent` were added but **not completed** (see "Not tested").
+Note on `mini-1`: the first request returned **4** lessons, not 1, so it is not a clean one-per-request test; the two
+single-lesson follow-up requests gave 78 and 72 words, longer than that model's usual 40–60.
+
+**Read-through of the saved lessons (quality, not just counts):**
+- **gpt-4.1-mini, live prompt.** Many "stories" are one-to-three-sentence anecdotes or plain definitions (Respect, Gratitude,
+  Friendliness, and in `mini-1` "Imagine you see a friend…" with no story at all). Questions are generic ("Why is it
+  important to be honest?") and rarely name the character. The "no synonym repeats" rule was broken (Thankfulness after
+  Gratitude), and verses repeat across batches (Ephesians 4:32 for Kindness and Forgiveness; Galatians 5:22-23 twice).
+- **gpt-4.1.** Clearly better craft at the same length: every story has a named child, a situation, a choice and a
+  resolution; questions refer to the character ("How did Sophie show kindness in the story?"); themes and verses are
+  distinct (Colossians 3:13 for Forgiveness, Proverbs 25:28 for Self-Control, Galatians 6:9 for Perseverance), no
+  synonym repeats. Still 39–70 words — better stories, not longer ones — at about **5× the cost**.
+- **gpt-4o.** The weakest and thinnest (13–32 words in batch 1), merges both questions into one field, and costs as much as
+  gpt-4.1. Not worth considering.
+- **mini-userlen.** Same cost as mini. Every story now has a scene, a decision and an ending, and several name the Scripture
+  idea in the story. About 52–77 words; still short, and a few questions are generic. Verse repeat (Ephesians 4:32) persists.
+- **mini-3 / mini-1.** Smaller batches help a little (best single stories ~80–100 words, e.g. the seed-planting Patience
+  story) but not reliably, and cost more calls.
+- **mini-sent.** The only variant that reached the target: 102–116 words in batch 1 and 84–107 in batch 2, 0 repeated titles,
+  same price as the live prompt. Spot-read lessons (Kindness, Honesty) are complete mini-stories with a choice and an
+  ending and the verse worked into the narrative. **Caveat:** that run's raw output was lost (the run crashed on the
+  follow-up variant before the results file was written), so only part of it was read; verse accuracy, question quality
+  and age fit for `mini-sent` still need a full read.
+
+**Findings and recommendation (quality per cost):**
+1. **Model: keep gpt-4.1-mini.** gpt-4.1 gives nicer writing and better question-to-story links but not more length, at
+   about 5× the cost; gpt-4o is worse and costs the same. A model upgrade is not the lever for the length problem.
+2. **The lever is the request, and the unit is sentences, not words.** "100–180 words" (in the rules or in the request)
+   moved the median by 0–25 words; "8 to 10 sentences, about 140 words, with these story beats" in the per-request ask moved it
+   from ~40 to ~105 words with no extra cost or time. Put the length and the story beats in the user message next to the
+   per-lesson ask, not only in the long system prompt.
+3. **Batch size: keep 6 per request** with the sentence instruction (cheapest, fewest calls). Whether 3 per request adds
+   anything on top of the sentence instruction is untested; the old data says smaller batches help only slightly.
+4. **Still validate on the server.** Even `mini-sent` missed the 100-word floor in 4 of 12 stories (84–95 words) — the
+   Codex validation of the *story field* (not the whole lesson) plus one targeted retry is the right backstop, and with
+   the sentence instruction the retry should rarely trigger. Codex's candidate E (expand only the failing narratives) is a
+   sensible fallback and should be built only if the retry rate stays high.
+5. **Quality gaps no length fix addresses** (mini): repeated verses across batches, questions that don't name the
+   character, occasional synonym theme repeats. Cheap mitigation: pass the list of used verses as well as titles into the
+   next-batch request, and add "at least one reflection question must refer to the main character by name".
+
+**Not tested (budget left; the guard is $0.90 and total spend is well under $1):**
+- `4.1-sent` (does the stronger model write richer stories with the same instruction?) and `mini-sent-3` — the harness
+  has both; the last attempt hit a connection reset / truncated answer. The harness now reports an unparseable answer with
+  its finish reason instead of crashing. Run: `… node tests/live/develop-model-eval.mjs 1 mini-sent,mini-sent-3,4.1-sent`
+  (est. under $0.15). Re-run `mini-sent` once more as well, so its raw lessons are saved for a complete read.
+
+**Relationship to Codex's branch (`codex/phase8-1-story-quality`):** not touched or merged here. Its server-side story-length
+and lesson-part validation, retry and incomplete-content warning are the right complement; the prompt change above
+(sentences + story beats in the request) should be added there and verified with the harness. Nothing is ready to merge
+until a sentence-instruction run is read in full.
+
 ## AI content: research and creative development (assessed 2026-10-15, not built)
 
 Sydni's test: "A homeschool reading log for kids: book, pages read, a favourite part, and a parent check-off",
