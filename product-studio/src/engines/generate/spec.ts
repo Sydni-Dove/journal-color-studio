@@ -442,8 +442,26 @@ export function checkSpec(raw: unknown, input: { description: string; content?: 
   }
   // One note, not one per part. With nothing of the maker's to quote, "theirs" can only be a mislabel.
   if (notVerbatim.length && normWords(input.content ?? "")) problems.push({ level: "note", message: `${notVerbatim.length === 1 ? `${notVerbatim[0]} was` : `${notVerbatim.length} parts were`} marked as your wording but ${notVerbatim.length === 1 ? "isn't" : "aren't"} word for word what you wrote, so ${notVerbatim.length === 1 ? "it's shown as a suggestion" : "they're shown as suggestions"}.` });
+  const where = (sec: SpecSection) => `“${sec.title.replace(/\s*\{[^{}]*\}/g, "").replace(/[\s:#–—-]+$/, "").trim() || "Each entry's page"}”`;
   // Entries with no records were only a shape for blank pages (now copies).
   if (entries && !entries.records.length) entries = null;
+  // Written entries whose page leaves some of what was written unprinted (live: the AI wrote two reflection questions
+  // per lesson, and its page gave blank lines instead): each missing part is added to the page, before its first
+  // blank / writing space — every word written is printed — and said.
+  if (develop && entries?.records.length) {
+    const e = entries;
+    for (const sec of sections.filter((x) => x.repeat.mode === "per-entry")) {
+      const printed = new Set(sec.components.map((c) => c.fromEntryField).filter(Boolean));
+      if (!printed.size) continue;
+      const titled = new Set([...sec.title.matchAll(/\{([^{}#]+)\}/g)].map((m) => m[1].trim().toLowerCase()));
+      const missing = e.fields.filter((f) => !printed.has(f.key) && !titled.has(f.key) && e.records.some((r) => r.values.some((v) => v.key === f.key && v.value.trim())));
+      if (!missing.length) continue;
+      const at = Math.max(0, sec.components.findIndex((c) => c.kind === "writing" || c.kind === "fields" || c.kind === "checklist"));
+      const add: SpecComponent[] = missing.map((f) => ({ id: uid(`${sec.id}-${f.key}`, `${sec.id}-${f.key}`), kind: "text", label: f.label, text: null, source: e.source, fromEntryField: f.key, fields: [], rows: null, numbered: false, fillPage: false, lines: null, items: [], marker: null, size: null }));
+      sec.components.splice(at === -1 ? sec.components.length : at, 0, ...add);
+      problems.push({ level: "adjusted", message: `${where(sec)}: the AI wrote ${missing.map((f) => `“${f.label}”`).join(", ")} for each entry but didn't print ${missing.length === 1 ? "it" : "them"}, so ${missing.length === 1 ? "it was" : "they were"} added to the page. Move or remove ${missing.length === 1 ? "it" : "them"} below.` });
+    }
+  }
   // Written entries with no page that prints them (the AI wrote the content but not its page): a page per entry
   // that prints every field is added, so nothing written is lost — and said.
   if (develop && entries?.records.length && !sections.some((s) => s.repeat.mode === "per-entry" && s.components.some((c) => c.fromEntryField))) {

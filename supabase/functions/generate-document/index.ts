@@ -54,7 +54,7 @@ const PAID_DAILY_CAP = Number(Deno.env.get("PAID_DAILY_CAP")) || 50;
 const isPaid = (user: { app_metadata?: Record<string, unknown> }) => user.app_metadata?.plan === "paid";
 const FUNCTION_NAME = "generate-document";
 const MODELS = ["gpt-4.1-mini", "gpt-4o-mini"];
-const VERSION = "generate-document-2026-10-15-spec-v10-develop-batches";
+const VERSION = "generate-document-2026-10-15-spec-v11-develop-form";
 /** The most entries one "develop" request writes (same as MAX_DEVELOPED_ENTRIES in product-studio/src/engines/generate/spec.ts). */
 const MAX_DEVELOPED_ENTRIES = 30;
 /**
@@ -111,7 +111,7 @@ function developRules(entryCount: number | null, batch: Batch | null): string {
 "entries": {"name": "Lessons", "fields": [{"key": "title", "label": "Title", "valueType": "text"}, {"key": "verse", "label": "Bible verse", "valueType": "reference"}, {"key": "teaching", "label": "Teaching", "valueType": "longText"}], "records": [{"values": [{"key": "title", "value": "…the lesson's title…"}, {"key": "verse", "value": "…reference…"}, {"key": "teaching", "value": "…the full teaching, in sentences…"}]}, …one record per lesson…], "source": "suggested"}
 and one section with repeat.mode "per-entry" whose components print each field (fromEntryField "title", "verse", "teaching"…) plus any writing space.
 - Write at most ${MAX_DEVELOPED_ENTRIES} entries in this answer${asked ? `; the maker asked for ${asked}` : ""}. If the request needs more (for example a 40-day study), write the first ones, and say in notes how many remain and that they can be written as the next batch. Never shorten or cut off an entry to fit more: fewer complete entries are better than more partial ones.
-- Keep each part complete but proportionate: a teaching passage of about 120–250 words; questions, prompts and prayers of one to three sentences — unless the maker asks otherwise. Keep the whole answer under about 7,000 words: if the entries asked for wouldn't fit complete, write fewer and say in notes how many remain for the next batch.
+- Write each part in the form the maker asks for: a "story" is a short story with a named character and something that happens (about 100–180 words for young children), not a definition; an "activity" is something to actually do, with what to use and how; for children, use words they read themselves. Unless the maker says otherwise: a teaching passage of about 120–250 words; questions, prompts and prayers of one to three sentences — unless the maker asks otherwise. Keep the whole answer under about 7,000 words: if the entries asked for wouldn't fit complete, write fewer and say in notes how many remain for the next batch.
 - Everything you write is original. Do not reproduce existing devotionals, curricula, books, sermons or song lyrics.
 - The maker's own wording still comes first: use it exactly (source "user"), never rewrite, merge into or "improve" it, and build your content around it.
 - Scripture: connect content to Scripture by reference (Book chapter:verse) only when you are confident the reference exists and fits; if unsure, give the theme without a reference. Quote verse text only from a public-domain translation (KJV or WEB), keep quotations short, and name the translation after the quotation, e.g. "In the beginning God created the heaven and the earth." (Genesis 1:1, KJV). Never quote a copyrighted translation (NIV, ESV, NLT, NKJV, NASB, CSB, AMP, MSG, TPT and others): give the reference only. Never invent or paraphrase a verse and present it as a quotation.
@@ -235,7 +235,7 @@ Deno.serve(async (req) => {
 
   const system = develop ? SYSTEM.replace(NO_CONTENT, developRules(entryCount, batch)) : SYSTEM;
   const mode = develop ? "develop" : "structure";
-  const user = `What the maker wants:\n${description.trim()}${content.trim() ? `\n\nThe maker's own content — use it exactly as written, placed where it belongs:\n<<<\n${content}\n>>>` : ""}${batch ? `\n\nTHIS IS A NEXT BATCH. Entries 1–${batch.from - 1} of "${batch.name}" are already written:\n${batch.previous.map((p, i) => `${batch.from - batch.previous.length + i}. ${p}`).join("\n")}\nWrite entries ${batch.from}–${batch.from + batch.count - 1} only: ${batch.count} NEW entries on themes not covered above (any examples in the description above are already used). Never repeat a title or theme from the list.` : ""}`;
+  const user = `What the maker wants:\n${description.trim()}${content.trim() ? `\n\nThe maker's own content — use it exactly as written, placed where it belongs:\n<<<\n${content}\n>>>` : ""}${batch ? `\n\nTHIS IS A NEXT BATCH. Entries 1–${batch.from - 1} of "${batch.name}" are already written:\n${batch.previous.map((p, i) => `${batch.from - batch.previous.length + i}. ${p}`).join("\n")}\nWrite entries ${batch.from}–${batch.from + batch.count - 1} only: ${batch.count} NEW entries on themes not covered above (any examples in the description above are already used). Never repeat a title or theme from the list — nor a close synonym of one (for example Truthfulness after Honesty, Thankfulness after Gratitude) — and use Scripture references not used in the entries above.` : ""}`;
   let lastError = "";
   const started = Date.now();
   // Develop: one more attempt when the answer didn't actually write the content (same proposal; counted once).

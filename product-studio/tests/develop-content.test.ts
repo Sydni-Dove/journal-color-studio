@@ -184,6 +184,25 @@ describe("at most 30 complete entries per request; longer series continue in bat
   });
 });
 
+describe("live answer (2026-10-15, children's character journal): every word written is printed", () => {
+  const live = JSON.parse(readFileSync("tests/fixtures/live/develop-children-2026-10-15.json", "utf8"));
+  const req = JSON.parse(readFileSync("tests/fixtures/live/develop-children-2026-10-15.request.json", "utf8"));
+  const c = checkSpec(live.spec, { description: req.description, content: req.content, mode: "develop" });
+  const p = projectFromSpec(c, AT);
+  const text = allText(p);
+  it("six real lessons — trait, verse, story, activity, two questions, prayer — all AI-written", () => {
+    expect(c.spec.entries!.records).toHaveLength(6);
+    expect(records(p).every((r) => r.origin)).toBe(true);
+  });
+  it("the two reflection questions the AI wrote but left off its page are added and print, and that's said", () => {
+    expect(c.problems.map((x) => x.message).join(" ")).toMatch(/wrote “Reflection Question 1”, “Reflection Question 2” for each entry but didn't print them/);
+    for (const v of c.spec.entries!.records.flatMap((r) => r.values)) expect(text, v.key).toContain(squash(v.value).slice(0, 40));
+  });
+  it("Structure only leaves the AI's page as it is (nothing added it wasn't asked for)", () => {
+    expect(checkSpec(live.spec, { description: req.description, content: req.content }).problems.some((x) => /didn't print/.test(x.message))).toBe(false);
+  });
+});
+
 describe("Scripture: references and quotations the AI writes are listed to check", () => {
   const withScripture = (teaching: string) => check(developed(1, (n) => day(n, { teaching })), "develop").flags.filter((f) => f.where === "Entry 1");
   it("a reference alone → a reference to check", () => {
