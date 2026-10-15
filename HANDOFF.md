@@ -289,6 +289,16 @@ Her additions:
   relevance, whether questions truly connect to the story), not by word counts alone;
 - no deploy, no merge, and no change to the live Edge Function.
 
+**Session 2026-10-15 (local Claude Code, Mac) — comparison NOT yet run; no key reachable.**
+- Found this branch on `origin` (it was not checked out locally); worktree: `GitHub/product-studio-phase8.1`.
+- `npm ci` done in `product-studio/` (esbuild present, so the harness can bundle the live function's prompts).
+- No `OPENAI_API_KEY` exists in this machine's environment, shell profiles or any `.env`. Sydni said to use her key but
+  has not set it where Claude can read it. Do NOT paste the key into chat or commit it.
+- To run (Sydni in her own terminal, or Codex/Claude once the variable is set):
+  `cd product-studio && OPENAI_API_KEY=… node tests/live/develop-model-eval.mjs`
+  (6 variants, 13 calls, about $0.20–0.30, guard stops at $0.90). Results land in `tests/live/out/` (git-ignored).
+- Nothing deployed, merged or changed in the live Edge Function. Remaining steps are unchanged from the plan below.
+
 **Next session — run it:** from `product-studio/`, run `node tests/live/develop-model-eval.mjs`.
 - That is 1 run of each of the 6 variants, 13 calls in all, estimated at about $0.20–0.30.
 - A spend guard stops it at $0.90.
