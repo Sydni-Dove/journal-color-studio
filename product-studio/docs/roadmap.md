@@ -221,9 +221,55 @@ per product. Order of work:
    three-line table headings, full-height heading rows. Found in real-font
    checks: split halves fitted different row counts (heading wrap) — fixed
    with linked counts and a check that each half faces the other.
-8. AI-generated document structures
-   (same components, no coordinates); 9. Requirements Assistant (reserved in the
-   model now; not built in these phases).
+8. **AI-generated document structures** — built, in review, not merged: the
+   proposal flow, document specification, checker, converter, structured-output
+   Edge Function and review-and-edit outline are on `claude/phase8-ai-generation`
+   (it includes Codex's `codex/product-studio-phase8` work and its uncommitted
+   backup). Same components, no coordinates. Merge it before Phase 9, which
+   builds on the same New product flow.
+9. **Guided Design Builder & Custom Cover Artwork** — planned. A guided way
+   through what the studio already does, not a second builder: every choice
+   maps onto existing settings, and the normal editor stays one tap away.
+   Stages, each testable on its own:
+   1. *Audit and guided product setup.* Product type, format, size and
+      orientation, title and subtitle, audience, purpose, timeframe, topic and
+      sections, offered only where they apply to the chosen product, and
+      skippable. Extends `NewProductWizard` / `BookTemplates` and the product
+      families; selections stay in the project, so moving between guided and
+      manual editing loses nothing.
+   2. *Guided page design.* Layout style, page composition, writing space,
+      decorative density, graphic placement and size, card / header / box
+      style, type, palette and mood, shown with small previews and mapped to
+      existing pieces: design presets (`presets/designPresets.ts`), spacing
+      tokens, decoration roles and placements, the Style browser, typography
+      and palettes. A choice that would change nothing is not offered.
+   3. *Cover library and AI artwork prompts.* Browse, filter and preview built-in
+      covers with the product's title, apply, customize, or start blank, built on
+      the cover / divider surfaces and `CoverDividerControls`, with covers
+      described as data so new designs need no code. *Custom artwork:* a
+      client-side prompt builder (purpose, size and aspect ratio, aesthetic,
+      custom palette, medium, subject, composition, mood, density, include /
+      exclude, free text), in two modes: artwork only (the default, no lettering,
+      a title-safe area left clear) and a complete cover concept (lettering may
+      need correcting). The prompt is shown, editable and copyable; it never
+      claims print-ready size or bleed. **Gap:** the studio has no image upload
+      yet, so this stage adds one: validate the file type and size, place the
+      image as cover artwork that can be cropped and positioned, and keep it
+      out of the project JSON sent to `product_studio_projects` (store it in
+      Supabase Storage or locally, referenced by id).
+   4. *Saved design styles.* Save a look (aesthetic, palette, type, layout and
+      decoration preferences, spacing, cover style) and apply it to a matching
+      notebook, planner, workbook or prayer journal. Versioned, with
+      compatibility checks; rename, duplicate, delete; saved with the existing
+      persistence and Supabase sync. Named *design styles* in code and UI: a
+      "recipe" in this studio is already the book structure (`BookRecipe`).
+   Acceptance: guided setup makes an editable product; skipping it leaves
+   today's flow; every choice visibly changes the preview; switching layouts
+   or themes keeps the maker's words; saved products open; prompts carry the
+   selections, and artwork-only prompts carry no lettering; uploads fill the
+   cover and crop predictably; margins, binding and export unchanged
+   (`tests/golden-templates.test.ts` stays green); phone and desktop.
+10. **Requirements Assistant** — reserved in the model; not built.
 
 Rules: the collection owns words, the recipe owns order, pagination owns page
 breaks, solvers own geometry, and preview and print draw the same pages.
