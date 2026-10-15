@@ -3,7 +3,7 @@
 Read this first when picking up the work (any assistant or developer). Keep it current: update it in the same
 commit as any change to state, branches, rules or open decisions.
 
-_Last updated: 2026-10-15. Phase 8 is merged to `main` (89f054b) and live. Phase 8.1's server side is live (cost table + `generate-document` with develop mode and page-limit handling) and live-tested; the studio side is on `claude/phase8.1-develop-content`, **not merged** (awaiting approval)._
+_Last updated: 2026-10-15 (8.1 story-length investigation added; model comparison blocked on an API key — see below). Phase 8 is merged to `main` (89f054b) and live. Phase 8.1's server side is live (cost table + `generate-document` with develop mode and page-limit handling) and live-tested; the studio side is on `claude/phase8.1-develop-content`, **not merged** (awaiting approval)._
 
 ## The two apps
 
@@ -208,6 +208,83 @@ The current code is `VERSION generate-document-2026-10-15-spec-v12-page-limit-bu
 - `ps-livecheck81c-20261015@example.com`
 
 All are signed out everywhere. Their usage rows go with them; their cost rows stay with `user_id` null.
+
+## Phase 8.1 — story length and model comparison (2026-10-15; investigation, nothing deployed)
+
+Sydni's request: before merging, compare the current model with a stronger one for Develop only, using identical
+prompts and measuring:
+- story length;
+- story development;
+- whether activities and questions relate to the story;
+- Scripture accuracy;
+- distinct lessons across batches;
+- age fit and depth;
+- tokens, cost and time.
+
+Recommend on quality per cost, not newness. Also find out whether short stories come from token limits, the answer
+format or the instructions. Structure Only stays unchanged. No merge or deploy until reported.
+
+**Status: the comparison itself is blocked.** The OpenAI key exists only as a secret inside the live Edge Function.
+This cloud sandbox has none (the API returns 401 here), and calling another model through the server would mean
+deploying, which is on hold. Everything that doesn't need new AI calls is done:
+
+**Root-cause findings (from the 48 live stories recorded on 2026-10-15, gpt-4.1-mini, 8 answers × 6 lessons):**
+
+| Prompt version | Story words (median per answer) | In 100–180 |
+|---|---|---|
+| v9 (no story rule) | 32.5 / 34 / 33.5 | 0 of 18 |
+| v10 (no story rule) | 40 / 47 / 23 | 0 of 18 |
+| v11 ("a story … about 100–180 words") | 39.5 / 39.5 | 0 of 12 |
+
+1. **Not the output-token ceiling.**
+   - Successful develop answers used about 1,860–2,260 completion tokens of the 12,000 allowed (15–19%).
+   - Every one ended normally ("stop"); none hit the ceiling, which would have been recorded as "too-long".
+   - Sydni's own develop request produced 4,359 tokens, so the model can write more in one answer.
+2. **Not fixed by instructions alone.**
+   - Adding the 100–180-word rule moved the median by about zero words.
+   - The rule sits in a long system prompt among many others, and the maker's own wording says "a *simple*
+     story-style teaching" and "a *short* Bible verse", which pulls toward brevity.
+   - The page-limit and "under about 7,000 words" guards are far above about 1,100 words for 6 stories, so they
+     don't explain it.
+3. **Likely partly the answer format.**
+   - All six lessons × seven fields come back in one structured JSON answer, each field a short string inside
+     key/value pairs. Models tend to compress many parallel string fields.
+   - The strict structured-output format can't require a minimum length per field, so length can't be enforced
+     through the format; it has to be measured after the answer.
+4. **Model capability: unknown until tested.** That is what the comparison is for. The variants below separate
+   model from prompt from batch size.
+
+**Ready to run: `product-studio/tests/live/develop-model-eval.mjs`** (manual; not part of `npm test`).
+- **Identical prompts:** it bundles the live function's own SYSTEM prompt, develop rules and develop schema from
+  `index.ts` at run time. A dry run confirmed the extraction: system prompt 8,913 characters, with the develop rules,
+  the story rule and the required-entries format.
+- **Requests:** the children's journal request, then one next batch, per run.
+- **Variants:**
+  - gpt-4.1-mini (current);
+  - gpt-4.1;
+  - gpt-4o;
+  - gpt-4.1-mini with the story length restated in the request itself;
+  - gpt-4.1-mini with 3 lessons per request.
+- **Measures:**
+  - story words and how many fall within 100–180;
+  - named characters;
+  - whether questions refer to the story's character;
+  - repeated titles across the batch;
+  - verses (for manual accuracy review);
+  - time, tokens and cost.
+- **Output:** raw answers are saved to `tests/live/out/` (git-ignored) for reading every lesson. Story structure
+  (situation, decision, resolution), age fit and verse accuracy are judged by reading them, not only by counters.
+- **Estimated cost of a full run** (5 variants × 2 runs × 2 requests): about $0.25–0.45 at list prices
+  (gpt-4.1 about $0.03–0.05 per request; mini about $0.005). The prices in the script should be checked against
+  OpenAI's pricing page.
+
+**To unblock (Sydni's choice):**
+- (a) Add an OpenAI key as a secret in this cloud environment (environment settings → Edit), named
+  `OPENAI_API_KEY`. A dedicated key with a low spending limit is best. Nothing is deployed; delete the key after.
+- (b) Approve a temporary, separate evaluation function (not `generate-document`, test accounts only, deleted
+  afterwards).
+
+(a) touches nothing in production.
 
 ## AI content: research and creative development (assessed 2026-10-15, not built)
 

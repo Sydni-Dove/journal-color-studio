@@ -1,0 +1,91 @@
+/**
+ * MODEL COMPARISON for "Develop original content" — run by hand, never by `npm test`. Nothing is deployed.
+ *
+ *   OPENAI_API_KEY=… node tests/live/develop-model-eval.mjs [runs-per-variant=2]
+ *
+ * Uses the live Edge Function's own instructions and answer format, byte for byte: the SYSTEM prompt, the develop
+ * rules and the develop schema are taken from supabase/functions/generate-document/index.ts at run time (bundled
+ * with esbuild, Deno stubbed), so every model gets identical prompts. For each variant it makes the first request
+ * (6 lessons) and one next batch (6 more), and records time, tokens, cost and the measurements below. Results:
+ * tests/live/out/develop-model-eval-<time>.json (raw answers included, for reading every lesson).
+ */
+import { build } from "esbuild";
+import fs from "node:fs";
+import path from "node:path";
+
+const KEY = process.env.OPENAI_API_KEY;
+if (!KEY) { console.error("Set OPENAI_API_KEY (read from the environment; never pasted into chat)."); process.exit(1); }
+const RUNS = Number(process.argv[2] ?? 2);
+const ROOT = path.resolve(import.meta.dirname, "../../..");
+const FN = path.join(ROOT, "supabase/functions/generate-document/index.ts");
+
+// The function's own prompt pieces, unchanged.
+const src = fs.readFileSync(FN, "utf8").replace(/^import "jsr:.*$/m, "").replace(/^import \{ createClient \}.*$/m, "const createClient = () => { throw new Error('unused'); };");
+const out = await build({ stdin: { contents: src + "\nexport { SYSTEM, NO_CONTENT, developRules, developSchema, MAX_DEVELOPED_ENTRIES, DEVELOP_MAX_TOKENS };", resolveDir: path.dirname(FN), loader: "ts" }, bundle: true, format: "esm", write: false, platform: "node", banner: { js: "globalThis.Deno = { env: { get: () => undefined }, serve: () => {} };" } });
+const mod = await import("data:text/javascript;base64," + Buffer.from(out.outputFiles[0].text).toString("base64"));
+
+// $ per 1M tokens (input, output) — list prices to verify against OpenAI's pricing page before relying on them.
+const PRICES = { "gpt-4.1-mini": [0.4, 1.6], "gpt-4.1": [2, 8], "gpt-4o": [2.5, 10], "gpt-4o-mini": [0.15, 0.6] };
+const DESCRIPTION = "A Scripture-based character-building journal for children ages 6 to 9. Each lesson teaches one character trait (such as kindness, honesty, courage, patience) with a short Bible verse, a simple story-style teaching a child can understand, an activity the child can do that day, two reflection questions, and a short prayer. Leave space for the child to draw or write.";
+/** Variants: models with the live prompt, plus prompt-only changes on the current model (to separate prompt from model). */
+const VARIANTS = [
+  { id: "mini-live", model: "gpt-4.1-mini" },
+  { id: "4.1-live", model: "gpt-4.1" },
+  { id: "4o-live", model: "gpt-4o" },
+  // Same model, the length asked for in the request itself (where the per-lesson ask is), not only in the rules.
+  { id: "mini-userlen", model: "gpt-4.1-mini", userExtra: "\n\nFor every lesson, the story is 100–180 words: a named child, a real situation, a choice they make, and how it turns out. Count the words." },
+  // Same model, 3 lessons per request: is the length a per-answer budget habit?
+  { id: "mini-3", model: "gpt-4.1-mini", entryCount: 3 },
+];
+
+const words = (t) => (t.trim() ? t.trim().split(/\s+/).length : 0);
+const norm = (t) => t.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+async function call(model, system, user, schema) {
+  const t0 = Date.now();
+  const r = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST", headers: { Authorization: `Bearer ${KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ model, temperature: 0.5, max_tokens: mod.DEVELOP_MAX_TOKENS, response_format: { type: "json_schema", json_schema: { name: "document_spec", strict: true, schema } }, messages: [{ role: "system", content: system }, { role: "user", content: user }] }),
+  });
+  const j = await r.json();
+  if (!r.ok) throw new Error(`${model}: ${j?.error?.message ?? r.status}`);
+  const [pi, po] = PRICES[model] ?? [0, 0];
+  const u = j.usage ?? {};
+  return { ms: Date.now() - t0, finish: j.choices?.[0]?.finish_reason, usage: u, usd: ((u.prompt_tokens ?? 0) * pi + (u.completion_tokens ?? 0) * po) / 1e6, spec: JSON.parse(j.choices[0].message.content) };
+}
+function measure(spec) {
+  const e = spec.entries ?? { fields: [], records: [] };
+  const key = (re) => e.fields.find((f) => re.test(`${f.key} ${f.label}`))?.key;
+  const kStory = key(/story|teach/i), kAct = key(/activ/i), kVerse = key(/verse|scripture/i), kQs = e.fields.filter((f) => /quest|reflect/i.test(`${f.key} ${f.label}`)).map((f) => f.key);
+  const lessons = e.records.map((r) => Object.fromEntries(r.values.map((v) => [v.key, v.value])));
+  const story = lessons.map((l) => words(l[kStory] ?? ""));
+  // A named character: a capitalised word that isn't sentence-initial, God/Jesus, or a weekday — rough, read the raw text.
+  const nameOf = (t) => (t.match(/(?<=[a-z,;] )[A-Z][a-z]{2,}/g) ?? []).filter((n) => !/^(God|Jesus|Lord|Bible|Holy|Spirit|He|His|Him|Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday)$/.test(n))[0];
+  const named = lessons.map((l) => nameOf(l[kStory] ?? ""));
+  const qsTieToStory = lessons.map((l, i) => kQs.some((k) => named[i] && (l[k] ?? "").includes(named[i])));
+  return {
+    lessons: lessons.length, titles: lessons.map((l) => l[e.fields[0]?.key]), verses: lessons.map((l) => l[kVerse]),
+    storyWords: story, inRange: story.filter((w) => w >= 100 && w <= 180).length, medianStory: story.slice().sort((a, b) => a - b)[Math.floor(story.length / 2)],
+    activityWords: lessons.map((l) => words(l[kAct] ?? "")), namedCharacter: named, questionsNameTheCharacter: qsTieToStory.filter(Boolean).length,
+  };
+}
+
+const results = [];
+for (const v of VARIANTS) for (let run = 1; run <= RUNS; run++) {
+  const n = v.entryCount ?? 6;
+  const system = mod.SYSTEM.replace(mod.NO_CONTENT, mod.developRules(n, null));
+  const first = await call(v.model, system, `What the maker wants:\n${DESCRIPTION}${v.userExtra ?? ""}`, mod.developSchema);
+  const m1 = measure(first.spec);
+  const e = first.spec.entries;
+  const batch = { name: e.name, fields: e.fields, from: m1.lessons + 1, count: n, previous: m1.titles };
+  const user2 = `What the maker wants:\n${DESCRIPTION}${v.userExtra ?? ""}\n\nTHIS IS A NEXT BATCH. Entries 1–${batch.from - 1} of "${batch.name}" are already written:\n${batch.previous.map((p, i) => `${i + 1}. ${p}`).join("\n")}\nWrite entries ${batch.from}–${batch.from + n - 1} only: ${n} NEW entries on themes not covered above (any examples in the description above are already used). Never repeat a title or theme from the list — nor a close synonym of one (for example Truthfulness after Honesty, Thankfulness after Gratitude) — and use Scripture references not used in the entries above.`;
+  const second = await call(v.model, mod.SYSTEM.replace(mod.NO_CONTENT, mod.developRules(null, batch)), user2, mod.developSchema);
+  const m2 = measure(second.spec);
+  const all = [...m1.titles, ...m2.titles].map(norm);
+  const row = { variant: v.id, model: v.model, run, first: { ms: first.ms, finish: first.finish, usage: first.usage, usd: first.usd, ...m1 }, batch: { ms: second.ms, finish: second.finish, usage: second.usage, usd: second.usd, ...m2 }, repeatedTitles: all.length - new Set(all).size, raw: [first.spec, second.spec] };
+  results.push(row);
+  console.log(`${v.id} #${run}: stories ${m1.storyWords.join("/")} | ${m2.storyWords.join("/")} · in 100–180: ${m1.inRange + m2.inRange}/${m1.lessons + m2.lessons} · repeats ${row.repeatedTitles} · ${(first.ms / 1000).toFixed(0)}s+${(second.ms / 1000).toFixed(0)}s · $${(first.usd + second.usd).toFixed(4)}`);
+}
+fs.mkdirSync(path.join(import.meta.dirname, "out"), { recursive: true });
+const file = path.join(import.meta.dirname, "out", `develop-model-eval-${Date.now()}.json`);
+fs.writeFileSync(file, JSON.stringify(results, null, 1));
+console.log("saved", file);
