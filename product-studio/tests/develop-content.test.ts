@@ -210,6 +210,13 @@ describe("the server: develop mode, limits and cost records (Edge Function v9 â€
     expect(fn).toMatch(/Never invent or paraphrase a verse and present it as a quotation/);
     expect(fn).toMatch(/No outside research/);
   });
+  it("a developed answer without the content (no entries, nothing printing them, headings only) gets one retry within the same proposal, then a clear message", () => {
+    expect(fn).toMatch(/function developGap\(raw: string, wanted: number\)/);
+    expect(fn).toMatch(/const gap = develop \? developGap\(message\.content, wanted\) : null;/);
+    expect(fn).toMatch(/if \(gap && !retry\.length && Date\.now\(\) - started < 45_000\)/);
+    expect(fn).toMatch(/await cost\("incomplete-retried"\)/);
+    expect(fn.match(/edge_usage_logs"\)\.insert\(/g)).toHaveLength(1);
+  });
   it("a cut-off answer is never handed back half-written", () => {
     expect(fn).toMatch(/finish_reason === "length"/);
   });

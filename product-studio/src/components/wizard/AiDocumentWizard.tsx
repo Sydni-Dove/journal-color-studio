@@ -432,6 +432,9 @@ export function AiDocumentWizard({ onCreate, onCreateMany, onCancel, signedIn = 
             <label className="field"><span>Binding</span><select aria-label="Binding" value={spec.page.binding} onChange={(e) => setSpec({ ...spec, page: { ...spec.page, binding: e.target.value as DocSpec["page"]["binding"] } })}>{(Object.keys(BINDING_LABEL) as DocSpec["page"]["binding"][]).map((b) => <option key={b} value={b}>{BINDING_LABEL[b]}</option>)}</select></label>
           </div>
           {spec.page.why && <p className="hint">{spec.page.why}</p>}
+          {checked.mode === "develop" && !spec.entries?.records.length && (
+            <p className="data-issue" role="note" data-testid="ai-no-entries">The AI didn't write any entries this time — only the outline. Change the description and propose again, or create it and add entries in Your content.</p>
+          )}
           {spec.entries && <EntriesReview e={spec.entries} develop={checked.mode === "develop"} set={(e) => setSpec({ ...spec, entries: e })} onBatch={(n) => void nextBatch(n)} busy={batchBusy} message={batchMessage} />}
           {spec.sections.map((s, i) => (
             <OutlineSection key={s.id} develop={checked.mode === "develop"} s={s} i={i} n={spec.sections.length} spec={spec} set={(x) => setSection(i, x)} remove={() => setSpec({ ...spec, sections: spec.sections.filter((_, j) => j !== i) })} shift={(d) => setSpec({ ...spec, sections: move(spec.sections, i, d) })} />

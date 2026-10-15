@@ -48,7 +48,7 @@ const PAID_DAILY_CAP = Number(Deno.env.get("PAID_DAILY_CAP")) || 50;
 const isPaid = (user: { app_metadata?: Record<string, unknown> }) => user.app_metadata?.plan === "paid";
 const FUNCTION_NAME = "generate-document";
 const MODELS = ["gpt-4.1-mini", "gpt-4o-mini"];
-const VERSION = "generate-document-2026-10-15-spec-v5-develop";
+const VERSION = "generate-document-2026-10-15-spec-v6-develop-check";
 /** The most entries one "develop" request writes (same as MAX_DEVELOPED_ENTRIES in product-studio/src/engines/generate/spec.ts). */
 const MAX_DEVELOPED_ENTRIES = 30;
 /**
@@ -101,7 +101,7 @@ Give every section and component a short unique id. Fill every property: use nul
 const NO_CONTENT = "- Do not invent content entries (days, lessons, readings) unless they ask you to write content; prefer labelled blanks and writing space they will fill in.";
 function developRules(entryCount: number | null, batch: Batch | null): string {
   const asked = batch ? batch.count : entryCount;
-  return `- The maker asked you to DEVELOP ORIGINAL CONTENT: write the content itself, not only the structure. Put the series (days, lessons, sessions, exercises, activities) in entries with source "suggested" — one entry each, with a field for each part (for example title, scripture, teaching, reflection question, activity, prayer) — and a per-entry section that prints the fields with fromEntryField. A one-off passage you write (an introduction, instructions) is a text component with source "suggested".
+  return `- The maker asked you to DEVELOP ORIGINAL CONTENT: write the content itself, not only the structure. Put the series (days, lessons, sessions, exercises, activities) in entries with source "suggested" — one entry each, with a field for each part (for example title, scripture, teaching, reflection question, activity, prayer) — and a per-entry section that prints the fields with fromEntryField. A one-off passage you write (an introduction, instructions) is a text component with source "suggested". In this mode "entries" is never null: it holds every entry you write, and each value is the finished wording itself (whole sentences a reader will read), not a heading or a description of what should go there. Notes describe what you wrote; they never replace writing it.
 - Write at most ${MAX_DEVELOPED_ENTRIES} entries in this answer${asked ? `; the maker asked for ${asked}` : ""}. If the request needs more (for example a 40-day study), write the first ones, and say in notes how many remain and that they can be written as the next batch. Never shorten or cut off an entry to fit more: fewer complete entries are better than more partial ones.
 - Keep each part complete but proportionate: a teaching passage of about 120–250 words; questions, prompts and prayers of one to three sentences — unless the maker asks otherwise. Keep the whole answer under about 7,000 words: if the entries asked for wouldn't fit complete, write fewer and say in notes how many remain for the next batch.
 - Everything you write is original. Do not reproduce existing devotionals, curricula, books, sermons or song lyrics.
@@ -110,6 +110,24 @@ function developRules(entryCount: number | null, batch: Batch | null): string {
 - No outside research: no statistics, historical or scientific claims, quotations of people, or citations of books, articles or websites. Write from Scripture and general knowledge only, and never claim alignment with any curriculum, standard or denomination.${batch ? `
 
 THIS REQUEST CONTINUES A LIST ALREADY WRITTEN: "${batch.name}". Write entries ${batch.from} to ${batch.from + batch.count - 1} (${batch.count} entries) of that list, in entries, with exactly these fields (same keys): ${batch.fields.map((f) => `${f.key} (${f.label})`).join(", ")}. Continue the series in order; do not repeat what is already written${batch.previous.length ? ` (recent entries: ${batch.previous.map((p) => `"${p}"`).join("; ")})` : ""}. Keep the same sections as a per-entry page that prints these fields.` : ""}`;
+}
+
+/**
+ * A developed answer that didn't develop anything: no entries, no page that prints them, or entries too thin to be
+ * real content (headings only). Returns what's missing, to ask the AI once more; null when it's complete.
+ */
+function developGap(raw: string, wanted: number): string | null {
+  let spec: { entries?: { records?: { values?: { value?: string }[] }[] } | null; sections?: { repeat?: { mode?: string }; components?: { fromEntryField?: string | null }[] }[] };
+  try { spec = JSON.parse(raw); } catch { return null; }
+  const records = spec.entries?.records ?? [];
+  if (!records.length) return `"entries" is ${spec.entries ? "empty" : "null"}: none of the ${wanted} entries were written. Write every entry in full in "entries".`;
+  if (!(spec.sections ?? []).some((s) => s.repeat?.mode === "per-entry" && (s.components ?? []).some((c) => c.fromEntryField)))
+    return `no section repeats "per-entry" with components that print the entries' fields (fromEntryField), so the entries would never print. Add that section.`;
+  const need = Math.min(wanted, 3);
+  if (records.length < need) return `only ${records.length} of the ${wanted} entries were written. Write at least ${need}, each complete.`;
+  const thin = records.filter((r) => (r.values ?? []).reduce((n, v) => n + (v.value ?? "").trim().length, 0) < 250).length;
+  if (thin > records.length / 2) return `${thin} of the ${records.length} entries are only headings or a few words. Write each entry's parts in full (the teaching, activity, questions and prayer as real sentences).`;
+  return null;
 }
 
 type Batch = { name: string; fields: { key: string; label: string; valueType: string }[]; from: number; count: number; previous: string[] };
@@ -208,21 +226,26 @@ Deno.serve(async (req) => {
   const user = `What the maker wants:\n${description.trim()}${content.trim() ? `\n\nThe maker's own content — use it exactly as written, placed where it belongs:\n<<<\n${content}\n>>>` : ""}`;
   let lastError = "";
   const started = Date.now();
-  for (const model of MODELS) {
+  // Develop: one more attempt when the answer didn't actually write the content (same proposal; counted once).
+  let retry: { role: "assistant" | "user"; content: string }[] = [];
+  const wanted = batch?.count ?? entryCount ?? 6;
+  for (let i = 0, models = [...MODELS]; i < models.length; i++) {
+    const model = models[i];
     // A slow failure leaves no time for a second full call before the function's own limit: report it instead.
-    if (model !== MODELS[0] && Date.now() - started > RETRY_WITHIN_MS) break;
+    if (i > 0 && !retry.length && Date.now() - started > RETRY_WITHIN_MS) break;
     try {
       const r = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        signal: AbortSignal.timeout(develop ? DEVELOP_TIMEOUT_MS : 90_000),
+        // A develop call (or its retry) gets only the time left before the function's own ~150 s limit.
+        signal: AbortSignal.timeout(develop ? Math.max(10_000, Math.min(DEVELOP_TIMEOUT_MS, 140_000 - (Date.now() - started))) : 90_000),
         body: JSON.stringify({
           model,
           // Develop writes prose: a little more varied wording, and a fixed output ceiling.
           temperature: develop ? 0.5 : 0.2,
           ...(develop ? { max_tokens: DEVELOP_MAX_TOKENS } : {}),
           response_format: { type: "json_schema", json_schema: { name: "document_spec", strict: true, schema } },
-          messages: [{ role: "system", content: system }, { role: "user", content: user }],
+          messages: [{ role: "system", content: system }, { role: "user", content: user }, ...retry],
         }),
       });
       const result = await r.json().catch(() => null);
@@ -236,6 +259,18 @@ Deno.serve(async (req) => {
         return reply({ error: `That was more than one request can write. Ask for fewer entries (for example 10), then write the rest with “Write the next batch”.`, version: VERSION }, 422);
       }
       if (typeof message?.content !== "string") { lastError = "no content"; continue; }
+      const gap = develop ? developGap(message.content, wanted) : null;
+      // An incomplete answer comes back fast (it wrote little): retried only while there's time for a full one.
+      if (gap && !retry.length && Date.now() - started < 45_000) {
+        await cost("incomplete-retried");
+        retry = [{ role: "assistant", content: message.content }, { role: "user", content: `Your answer is incomplete: ${gap} Return the complete document specification again.` }];
+        models.splice(i + 1, 0, model);
+        continue;
+      }
+      if (gap) {
+        await cost("incomplete");
+        return reply({ error: "The AI didn't write the content this time (it returned an outline without the lessons). Please try again — or ask for fewer entries.", version: VERSION }, 422);
+      }
       // Counted here, not only in the studio, so a proposal past the limit is recorded and comes back marked.
       let pages = 0;
       try { pages = minimumPages(JSON.parse(message.content)); } catch { /* not JSON: the studio reports it */ }
