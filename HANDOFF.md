@@ -4,7 +4,7 @@
 
 Approved by Sydni: **gpt-4.1 for Develop original content only, six lessons per request; Structure Only stays on gpt-4.1-mini.**
 - **Codex's work recovered.** The local checkout (`~/.codex/worktrees/e4f6/.../product-studio-phase8.1-codex`, branch `codex/phase8-1-story-quality`) was accessible. Its uncommitted changes were committed (d706cad), checked (8 files, no credentials; `/private/tmp/dove-ps-openai-key` is outside the repo and not in any commit), pushed to GitHub as `codex/phase8-1-story-quality` (not merged to main) and merged into this branch together with the cloud session's comparison. Its story-length/lesson-completeness validation (`quality.ts`), single bounded retry and incomplete-content review warning (Create stays disabled until acknowledged) are kept as the safeguard. One conflict, in `tests/live/develop-model-eval.mjs`, resolved by keeping both (Codex's checkpointing + the cloud run's used-verse carry-forward).
-- **Server (`supabase/functions/generate-document/index.ts`, v13, not deployed).** Develop uses `DEVELOP_MODELS = [gpt-4.1, gpt-4.1-mini]`; Structure Only keeps `MODELS`. The backup runs only when gpt-4.1 fails on availability (404/408/429/5xx, network or timeout); a bad request breaks instead of falling back. The weak-content retry repeats the same model (gpt-4.1). A backup answer carries `fallback: {from, to, reason}`. The story ask (8–10 sentences with beats, a different child's name per lesson, no Scripture reference inside the story, a question naming the main character, activity practises the trait) is added to the request message when the description wants stories. Next batches also carry `usedVerses` and `usedNames`. Limit and default: 6 entries. `gpt-4.1` added to the cost table. `quality.ts` also flags a Scripture reference written inside a story.
+- **Server (`supabase/functions/generate-document/index.ts`, v13, not deployed; the cloud session's version of this file was kept in the merge — same design as the local one, plus: no-content answers don't fall back, fallback cost rows are tagged).** Develop uses `DEVELOP_MODELS = [gpt-4.1, gpt-4.1-mini]`; Structure Only keeps `MODELS`. The backup runs only when gpt-4.1 fails on availability (404/408/429/5xx, network or timeout); a bad request breaks instead of falling back. The weak-content retry repeats the same model (gpt-4.1). A backup answer carries `fallback: {from, to, reason}`. The story ask (8–10 sentences with beats, a different child's name per lesson, no Scripture reference inside the story, a question naming the main character, activity practises the trait) is added to the request message when the description wants stories. Next batches also carry `verses` and `names`. Limit and default: 6 entries. `gpt-4.1` added to the cost table. `quality.ts` also flags a Scripture reference written inside a story.
 - **Studio.** `MAX_DEVELOPED_ENTRIES = DEFAULT_DEVELOPED_ENTRIES = 6`; blank count sends 6; `batchRequest` sends used references and children's names (names = the capitalised word a story repeats most — a heuristic); the wizard shows a visible note (`ai-fallback-note`) when the backup wrote the lessons, for first requests and next batches; next batches that come back incomplete are not appended.
 - **Tests.** 30-lesson expectations changed to 6; new tests for the model lists, availability-only fallback, same-model retry, fallback marker and carried-forward references/names. Results: `vitest` 1583/1583 (print snapshots included), `tsc` clean, `npm run build` OK, `npm run test:mobile` (browser, incl. preview/print parity and the Develop tests) 169/169. Structure Only, AI-written markers, saving, pagination and printing tests unchanged and passing.
 - **Not done / needs Sydni.** Deploy of the Edge Function (v13) and merge to main await approval. No live gpt-4.1 call was made with the final wizard path (the comparison used the same prompt). The per-name heuristic is untested on real data. The `4.1-ship` run is the only real-model evidence.
@@ -525,6 +525,60 @@ overwriting or duplicating, the plan is:
 5. **Report before any deploy or merge.**
 
 Codex's request for a key file is not needed: this cloud environment already reaches OpenAI (see above).
+
+## Phase 8.1 — GPT-4.1 integration (in progress; handed to a local session 2026-10-15)
+
+Sydni approved gpt-4.1 for **Develop Original Content only**, 6 lessons per request. Structure Only stays on
+gpt-4.1-mini. Nothing below is deployed or merged.
+
+**Codex's branch.** `codex/phase8-1-story-quality` is local to Sydni's Mac. It is not on the remote and could not be
+reached from the cloud session. The local session should integrate it from there, and push it only after checking
+for credentials and temp files (e.g. the key file at `/private/tmp/dove-ps-openai-key` must never be committed).
+
+**Done (cloud session; committed here; NOT deployed).** Changes to `supabase/functions/generate-document/index.ts`:
+
+- **Models.** Develop uses `DEVELOP_MODELS = ["gpt-4.1", "gpt-4.1-mini"]`. Structure `MODELS` is unchanged.
+- **Fallback.** It falls back to gpt-4.1-mini only when gpt-4.1 is unavailable: 404, 408, 409, 429, 5xx, timeout or
+  network error. A 400/401/403, an empty answer or inadequate content does not fall back (it `break`s).
+- **Visible fallback.** Replies carry `fallback: {from, to, reason}`, and the cost row outcome gets a ` (fallback)`
+  suffix.
+- **Size.** `MAX_DEVELOPED_ENTRIES = 6`. The price table now includes gpt-4.1 ($2 / $8 per 1M tokens).
+- **Develop rules.** Each story is 8–10 sentences (about 140 words) with a named child, a real situation, a meaningful
+  decision and its consequence. Every story uses a different child's name. No Scripture reference appears inside a
+  story. Reflection questions are about that story, and at least one names its main character. The activity
+  practises the same trait.
+- **Prompt.** The mini-story ask is appended to the develop user message.
+- **Batches.** A batch accepts `verses[]` (up to 60) and `names[]` (up to 60), and adds them to the prompt as "already
+  used — do not repeat".
+- **Version.** `VERSION` is `generate-document-2026-10-15-spec-v13-develop-gpt41`. The esbuild syntax check passes.
+
+**Still to do (local session).**
+
+1. **Merge Codex's branch first.** Keep its story-length and lesson-completeness validation, its bounded retry and its
+   acknowledged incomplete warning. Where it overlaps the cloud work, Codex's version replaces the cloud's
+   `developGap` retry and the `ai-no-entries` note. The retry must stay on the same model: a quality failure never
+   triggers the gpt-4.1-mini fallback.
+2. **Studio changes** in `product-studio/src/engines/generate/spec.ts`:
+   - Set `MAX_DEVELOPED_ENTRIES = 6`.
+   - Add `verses` and `names` to `BatchRequest`, and fill them in `batchRequest()`:
+     - **verses** come from the field matching /verse|scripture|reference/ or with valueType `reference`;
+     - **names** are each record's main character name.
+3. **Fallback note.** `pipeline.ts` `requestSpec` exposes `fallback`. `AiDocumentWizard.tsx` shows "Written with the
+   backup model (gpt-4.1-mini) because gpt-4.1 was unavailable".
+4. **Defaults.** The entry count and the next batch default to 6, and the "Up to 30" hint text changes to 6.
+5. **Tests.**
+   - Update the 30-cap tests to 6.
+   - Add static server checks:
+     - `DEVELOP_MODELS`;
+     - the availability-only fallback;
+     - quality failures don't fall back;
+     - the story ask;
+     - the verses and names lines;
+     - Structure `MODELS` is unchanged.
+   - Add a browser test for the fallback note.
+6. **Run everything:** tsc, the unit tests (golden and print snapshots), the build, and the full browser suite.
+   Confirm that Structure Only, provenance markers, saving, pagination and printing are unchanged.
+7. **Report to Sydni.** Deploying the function and merging to main both need her approval.
 
 ## AI content: research and creative development (assessed 2026-10-15, not built)
 

@@ -260,7 +260,7 @@ describe("the server: develop mode, limits and cost records (Edge Function v9 �
     expect(fn).toMatch(/if \(gap && !retry\.length && Date\.now\(\) - started < 45_000\)/);
     expect(fn).toMatch(/await cost\("incomplete-retried"\)/);
     // Still incomplete after the retry: handed back with what's missing — a paid answer is never thrown away.
-    expect(fn).toMatch(/return reply\(\{ spec: message\.content, model, version: VERSION, incomplete: gap, \.\.\.fallbackNote\(model\) \}\)/);
+    expect(fn).toMatch(/return reply\(\{ spec: message\.content, model, version: VERSION, incomplete: gap, \.\.\.\(fallback \? \{ fallback \} : \{\}\) \}\)/);
     expect(fn).toMatch(/Each lesson \/ day \/ session is ONE record in entries\.records/);
     // Next batches: every name already written goes in the request itself, and repeats trigger the retry.
     expect(fn).toMatch(/THIS IS A NEXT BATCH\. Entries 1–\$\{batch\.from - 1\}/);
@@ -369,14 +369,14 @@ describe("Phase 8.1: gpt-4.1 for Develop, carried-forward references and names, 
   it("Develop uses gpt-4.1 with gpt-4.1-mini only for availability failures; Structure Only keeps its models", () => {
     expect(fn).toMatch(/const DEVELOP_MODELS = \["gpt-4\.1", "gpt-4\.1-mini"\];/);
     expect(fn).toMatch(/const MODELS = \["gpt-4\.1-mini", "gpt-4o-mini"\];/);
-    expect(fn).toMatch(/const models = develop \? \[\.\.\.DEVELOP_MODELS\] : \[\.\.\.MODELS\];/);
-    expect(fn).toMatch(/if \(develop && !isAvailabilityFailure\(r\.status\)\) break;/);
+    expect(fn).toMatch(/models = \[\.\.\.\(develop \? DEVELOP_MODELS : MODELS\)\]/);
+    expect(fn).toMatch(/if \(develop && !unavailable\(r\.status\)\) break;/);
     // The quality retry repeats the same model — never the backup.
     expect(fn).toMatch(/models\.splice\(i \+ 1, 0, model\);/);
   });
   it("a backup-model answer is marked so the studio can say so", () => {
-    expect(fn).toMatch(/fallback: \{ from: primary, to: model/);
-    expect(fn.match(/\.\.\.fallbackNote\(model\)/g)!.length).toBeGreaterThanOrEqual(3);
+    expect(fn).toMatch(/fallback = \{ from: models\[0\], to: model/);
+    expect(fn.match(/\.\.\.\(fallback \? \{ fallback \} : \{\}\)/g)!.length).toBeGreaterThanOrEqual(3);
   });
   it("next batches carry used references and children's names", () => {
     const spec = developed(6);
@@ -384,9 +384,9 @@ describe("Phase 8.1: gpt-4.1 for Develop, carried-forward references and names, 
     const kids = ["Anna", "Ben", "Cara", "Dev", "Eli", "Fay"];
     spec.entries!.records.forEach((r, i) => r.values.push({ key: "story", value: `One morning ${kids[i]} woke up. Later ${kids[i]} saw a friend smile. Then ${kids[i]} left.` }));
     const req = batchRequest(check(spec, "develop").spec, 6)!;
-    expect(req.usedNames).toEqual(expect.arrayContaining(["Anna", "Fay"]));
-    expect(Array.isArray(req.usedVerses)).toBe(true);
-    expect(fn).toMatch(/Scripture references already used/);
-    expect(fn).toMatch(/Children's names already used/);
+    expect(req.names).toEqual(expect.arrayContaining(["Anna", "Fay"]));
+    expect(Array.isArray(req.verses)).toBe(true);
+    expect(fn).toMatch(/verses: list\(b\.verses/);
+    expect(fn).toMatch(/names: list\(b\.names/);
   });
 });

@@ -77,7 +77,7 @@ export const DEFAULT_DEVELOPED_ENTRIES = 6;
 /** Safety limit on the AI-written wording one proposal may hold (characters, all entries together). */
 export const MAX_DEVELOPED_TEXT = 150_000;
 /** What a "write the next batch" request tells the server about the list it continues. */
-export type BatchRequest = { name: string; fields: { key: string; label: string; valueType: SpecValueType }[]; from: number; count: number; previous: string[]; usedVerses: string[]; usedNames: string[] };
+export type BatchRequest = { name: string; fields: { key: string; label: string; valueType: SpecValueType }[]; from: number; count: number; previous: string[]; verses: string[]; names: string[] };
 
 /** Something the check changed or wants the maker to know, in plain words. */
 export type Problem = { level: "left-out" | "adjusted" | "note"; message: string };
@@ -533,8 +533,8 @@ export function batchRequest(spec: DocSpec, count: number): BatchRequest | null 
     // The last entries' names, so the next batch continues rather than repeats.
     previous: e.records.slice(-40).map((r) => (r.values.find((v) => v.key === e.fields[0].key)?.value ?? "").replace(/\s+/g, " ").trim().slice(0, 100)).filter(Boolean),
     // Scripture references and children's names already used, so the next batch doesn't repeat them.
-    usedVerses: usedVerses(e),
-    usedNames: usedNames(e),
+    verses: usedVerses(e),
+    names: usedNames(e),
   };
 }
 
