@@ -22,6 +22,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import schema from "./schema.json" with { type: "json" };
+import { lessonQualityGap } from "./quality.ts";
 
 /**
  * Develop mode's answer format: the same schema, except the list of entries is required (not nullable) — live
@@ -131,7 +132,7 @@ function developGap(raw: string, wanted: number, previous: string[] = []): strin
   try { spec = JSON.parse(raw); } catch { return null; }
   const records = spec.entries?.records ?? [];
   if (!records.length) return `"entries" is ${spec.entries ? "empty" : "null"}: none of the ${wanted} entries were written. Write every entry in full in "entries".`;
-  const need = Math.min(wanted, 3);
+  const need = wanted;
   if (records.length < need) return `only ${records.length} of the ${wanted} entries were written. Write at least ${need}, each complete.`;
   const thin = records.filter((r) => (r.values ?? []).reduce((n, v) => n + (v.value ?? "").trim().length, 0) < 250).length;
   // A next batch that repeats what's already written (the first value of each entry is its name).
@@ -271,7 +272,8 @@ Deno.serve(async (req) => {
         return reply({ error: `That was more than one request can write. Ask for fewer entries (for example 10), then write the rest with “Write the next batch”.`, version: VERSION }, 422);
       }
       if (typeof message?.content !== "string") { lastError = "no content"; continue; }
-      const gap = develop ? developGap(message.content, wanted, batch?.previous ?? []) : null;
+      const gaps = develop ? [developGap(message.content, wanted, batch?.previous ?? []), lessonQualityGap(message.content, description)].filter((x): x is string => !!x) : [];
+      const gap = gaps.length ? gaps.join(" ") : null;
       // An incomplete answer comes back fast (it wrote little): retried only while there's time for a full one.
       if (gap && !retry.length && Date.now() - started < 45_000) {
         await cost("incomplete-retried");

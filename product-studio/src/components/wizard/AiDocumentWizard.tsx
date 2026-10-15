@@ -6,7 +6,7 @@
  * of document (engines/generate/pipeline.ts).
  */
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { buildFromOutline, checkProposal, requestSpec } from "../../engines/generate/pipeline";
+import { buildFromOutline, checkProposal, requestProposal, requestSpec } from "../../engines/generate/pipeline";
 import { appendBatch, batchRequest, MAX_DEVELOPED_ENTRIES, MAX_DOCUMENT_PAGES, PageLimitError, quantityChoices, reduceToFit, requestedOverLimit, SIZES, splitToFit, type CheckedSpec, type DocSpec, type Flag, type GenerationMode, type PageSize, type SpecComponent, type SpecEntries, type SpecSection } from "../../engines/generate/spec";
 import type { ProductProject } from "../../types/project";
 import { PageThumb } from "../preview/PageThumb";
@@ -238,6 +238,8 @@ export function AiDocumentWizard({ onCreate, onCreateMany, onCancel, signedIn = 
   const develop = mode === "develop";
   const [batchBusy, setBatchBusy] = useState(false);
   const [batchMessage, setBatchMessage] = useState("");
+  const [qualityWarning, setQualityWarning] = useState("");
+  const [acknowledgedIncomplete, setAcknowledgedIncomplete] = useState(false);
 
   const generate = async () => {
     if (busy) return; // one request at a time
@@ -252,10 +254,12 @@ export function AiDocumentWizard({ onCreate, onCreateMany, onCancel, signedIn = 
     setBatchMessage("");
     try {
       const n = Math.round(Number(entryCount));
-      const raw = await requestSpec(description, content, develop ? { mode, ...(n >= 1 ? { entryCount: Math.min(MAX_DEVELOPED_ENTRIES, n) } : {}) } : {});
-      const c = checkProposal(raw, description, content, mode);
+      const result = await requestProposal(description, content, develop ? { mode, ...(n >= 1 ? { entryCount: Math.min(MAX_DEVELOPED_ENTRIES, n) } : {}) } : {});
+      const c = checkProposal(result.spec, description, content, mode);
       setChecked(c);
       setSpec(c.spec);
+      setQualityWarning(result.incomplete ?? "");
+      setAcknowledgedIncomplete(false);
       setAlt(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Document generation failed.");
@@ -294,6 +298,7 @@ export function AiDocumentWizard({ onCreate, onCreateMany, onCancel, signedIn = 
   /** The documents to create: one, or the parts the maker chose (each built and checked on its own). */
   const create = () => {
     if (!spec || !checked) return;
+    if (qualityWarning && !acknowledgedIncomplete) return;
     try {
       // Split before proposing: the outline already holds one part's quantity — the same outline, once per part.
       const many = parts ?? (splitInto > 1 && !spec.entries ? Array.from({ length: splitInto }, (_, i) => ({ ...spec, title: `${spec.title} — Part ${i + 1} of ${splitInto}` })) : null);
@@ -404,6 +409,10 @@ export function AiDocumentWizard({ onCreate, onCreateMany, onCancel, signedIn = 
       </div>
       <div className="ai-review">
         <div className="ai-outline">
+          {qualityWarning && <div className="ai-checks" role="alert" data-testid="ai-depth-warning">
+            <p className="data-issue"><strong>Some content needs more work.</strong> {qualityWarning} This proposal counted toward today's allowance. Review and edit the lessons before creating the document.</p>
+            <label className="check"><input type="checkbox" checked={acknowledgedIncomplete} onChange={(e) => setAcknowledgedIncomplete(e.target.checked)} /> I reviewed the incomplete content and want to continue</label>
+          </div>}
           <label className="field"><span>Title</span><input type="text" value={spec.title} aria-label="Document title" onChange={(e) => setSpec({ ...spec, title: e.target.value })} /></label>
           {spec.summary && <p className="hint">{spec.summary}</p>}
           {spec.notes.length > 0 && (
@@ -510,7 +519,7 @@ export function AiDocumentWizard({ onCreate, onCreateMany, onCancel, signedIn = 
           )}
           {(() => {
             const n = parts?.length ?? (splitInto > 1 && !spec.entries ? splitInto : 1);
-            return <button className="btn btn--primary" disabled={!spec.sections.length || (n === 1 && !finalProject) || (n > 1 && !onCreateMany)} onClick={create}>{n > 1 ? `Create ${n} documents` : "Create the document"}</button>;
+            return <button className="btn btn--primary" disabled={!spec.sections.length || (qualityWarning !== "" && !acknowledgedIncomplete) || (n === 1 && !finalProject) || (n > 1 && !onCreateMany)} onClick={create}>{n > 1 ? `Create ${n} documents` : "Create the document"}</button>;
           })()}
           <p className="hint">It opens in the editor, where everything can still be changed.</p>
         </aside>

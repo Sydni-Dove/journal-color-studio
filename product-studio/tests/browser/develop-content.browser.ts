@@ -48,6 +48,17 @@ const overflow = (page: Page) => page.evaluate(() => {
 });
 
 describe("Develop original content", () => {
+  it("shows a failed depth check and requires conscious review before Create", async () => {
+    const { page } = await studio([{ spec: JSON.stringify(developed(3)), incomplete: "Lesson 1 has a 40-word story; the requested range is 100–180 words." }]);
+    await page.getByLabel("Describe your document").fill("A children's story journal with 100–180 word stories");
+    await page.getByRole("radio", { name: /Develop original content/ }).check();
+    await page.getByRole("button", { name: "Propose and write the content" }).click();
+    await page.getByTestId("ai-depth-warning").getByText(/40-word story/).waitFor();
+    await expect(page.getByRole("button", { name: "Create the document" }).isDisabled()).resolves.toBe(true);
+    await page.getByRole("checkbox", { name: /I reviewed the incomplete content/ }).check();
+    await expect.poll(() => page.getByRole("button", { name: "Create the document" }).isEnabled()).toBe(true);
+    await page.context().close();
+  });
   it("Structure only is the default: the request is exactly Phase 8's", async () => {
     const { page, bodies } = await studio([{ spec: JSON.stringify(developed(3)) }]);
     await expect(page.getByRole("radio", { name: /Structure only/ }).isChecked()).resolves.toBe(true);

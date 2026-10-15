@@ -20,7 +20,9 @@ const KEY = process.env.OPENAI_API_KEY;
 if (!KEY) { console.error("Set OPENAI_API_KEY (read from the environment; never pasted into chat)."); process.exit(1); }
 const RUNS = Number(process.argv[2] ?? 1);
 const ONLY = process.argv[3] ? new Set(process.argv[3].split(",")) : null;
-const BUDGET_USD = 0.9;
+// Sydni reported $0.27 already spent from the $1 evaluation allowance. Stop this run at $0.55,
+// leaving headroom for the last in-flight call (max 12,000 output tokens) and pricing differences.
+const BUDGET_USD = 0.55;
 let spent = 0;
 const ROOT = path.resolve(import.meta.dirname, "../../..");
 const FN = path.join(ROOT, "supabase/functions/generate-document/index.ts");
@@ -80,12 +82,17 @@ function measure(spec) {
 }
 
 const results = [];
+const outputDir = path.join(import.meta.dirname, "out");
+fs.mkdirSync(outputDir, { recursive: true });
+const file = path.join(outputDir, `develop-model-eval-${Date.now()}.json`);
 const batchUser = (extra, b, n) => `What the maker wants:\n${DESCRIPTION}${extra ?? ""}\n\nTHIS IS A NEXT BATCH. Entries 1–${b.from - 1} of "${b.name}" are already written:\n${b.previous.map((p, i) => `${i + 1}. ${p}`).join("\n")}\nWrite entries ${b.from}–${b.from + n - 1} only: ${n} NEW entries on themes not covered above (any examples in the description above are already used). Never repeat a title or theme from the list — nor a close synonym of one (for example Truthfulness after Honesty, Thankfulness after Gratitude) — and use Scripture references not used in the entries above.`;
 for (const v of VARIANTS) {
   if (ONLY && !ONLY.has(v.id)) continue;
   for (let run = 1; run <= RUNS; run++) {
     const n = v.entryCount ?? 6, requests = v.requests ?? 2;
-    const calls = [];
+    const row = { variant: v.id, model: v.model, run, calls: [], lessons: 0, repeatedTitles: 0, usd: 0, seconds: 0 };
+    results.push(row);
+    const calls = row.calls;
     let fields, name, titles = [];
     for (let k = 0; k < requests; k++) {
       if (spent >= BUDGET_USD) { console.log(`budget guard: stopping at $${spent.toFixed(4)}`); break; }
@@ -98,15 +105,16 @@ for (const v of VARIANTS) {
       if (k === 0) { fields = c.spec.entries?.fields ?? []; name = c.spec.entries?.name ?? "Lessons"; }
       titles = [...titles, ...m.titles];
       calls.push({ ms: c.ms, finish: c.finish, usage: c.usage, usd: c.usd, ...m, raw: c.spec });
+      row.lessons = calls.flatMap((x) => x.storyWords).length;
+      row.repeatedTitles = titles.length - new Set(titles.map(norm)).size;
+      row.usd = calls.reduce((a, x) => a + x.usd, 0);
+      row.seconds = calls.reduce((a, x) => a + x.ms, 0) / 1000;
+      // Keep completed calls even if the next provider request fails or the session disconnects.
+      fs.writeFileSync(file, JSON.stringify(results, null, 1));
     }
-    const all = titles.map(norm);
     const story = calls.flatMap((c) => c.storyWords);
-    const row = { variant: v.id, model: v.model, run, calls, lessons: story.length, repeatedTitles: all.length - new Set(all).size, usd: calls.reduce((a, c) => a + c.usd, 0), seconds: calls.reduce((a, c) => a + c.ms, 0) / 1000 };
-    results.push(row);
     console.log(`${v.id} #${run}: stories ${calls.map((c) => c.storyWords.join("/")).join(" | ")} · in 100–180: ${story.filter((w) => w >= 100 && w <= 180).length}/${story.length} · repeats ${row.repeatedTitles} · ${row.seconds.toFixed(0)}s · $${row.usd.toFixed(4)} (total $${spent.toFixed(4)})`);
   }
 }
-fs.mkdirSync(path.join(import.meta.dirname, "out"), { recursive: true });
-const file = path.join(import.meta.dirname, "out", `develop-model-eval-${Date.now()}.json`);
 fs.writeFileSync(file, JSON.stringify(results, null, 1));
 console.log("saved", file, "| total spent $" + spent.toFixed(4));

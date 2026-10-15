@@ -20,7 +20,7 @@ import type { ProductProject } from "../../types/project";
 export type RequestOptions = { mode?: GenerationMode; entryCount?: number; batch?: BatchRequest };
 
 /** Ask the Edge Function for a proposal (raw: the studio checks it next). */
-export async function requestSpec(description: string, content: string, opts: RequestOptions = {}): Promise<string> {
+export async function requestProposal(description: string, content: string, opts: RequestOptions = {}): Promise<{ spec: string; incomplete: string | null }> {
   const develop = opts.mode === "develop";
   const body = develop ? { description, content, mode: "develop", ...(opts.entryCount ? { entryCount: opts.entryCount } : {}), ...(opts.batch ? { batch: opts.batch } : {}) } : { description, content };
   const { data, error } = await supabase().functions.invoke("generate-document", { body });
@@ -31,7 +31,14 @@ export async function requestSpec(description: string, content: string, opts: Re
   }
   if (typeof data?.error === "string") throw new Error(data.error);
   if (typeof data?.spec !== "string") throw new Error("The AI didn't return a document outline. Try again.");
-  return data.spec;
+  return { spec: data.spec, incomplete: develop && typeof data?.incomplete === "string" ? data.incomplete : null };
+}
+
+/** Existing callers that only need the specification. An incomplete batch is not appended silently. */
+export async function requestSpec(description: string, content: string, opts: RequestOptions = {}): Promise<string> {
+  const result = await requestProposal(description, content, opts);
+  if (result.incomplete) throw new Error(`The AI response did not meet your requested content depth: ${result.incomplete} This proposal counted toward today's allowance. Try fewer lessons in the next request.`);
+  return result.spec;
 }
 
 /** The checked proposal for the maker's request (throws SpecError when the answer isn't a document). */
