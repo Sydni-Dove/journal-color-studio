@@ -9,6 +9,14 @@
  * product-studio/src/engines/generate/docSpecSchema.json) through structured outputs; the studio
  * checks it again before anything is built. No coordinates, no rendering: structure and wording only.
  *
+ * Two modes (Phase 8.1). "structure" (default; a request without `mode` is exactly Phase 8's): pages, blanks and the
+ * maker's own wording, no written content. "develop": the AI also writes original content (at most
+ * MAX_DEVELOPED_ENTRIES entries a request; a longer series continues in batches), with the same rule that the maker's
+ * wording is used exactly. Both count as one of the day's proposals.
+ *
+ * Every model call's real token use and estimated cost is recorded in ai_generation_costs (written with the service
+ * role only; users can't read or change it) so pricing can be judged later. It never blocks a request.
+ *
  * { check: true } answers whether the key is configured and accepted, without generating anything.
  */
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -30,7 +38,19 @@ const PAID_DAILY_CAP = Number(Deno.env.get("PAID_DAILY_CAP")) || 50;
 const isPaid = (user: { app_metadata?: Record<string, unknown> }) => user.app_metadata?.plan === "paid";
 const FUNCTION_NAME = "generate-document";
 const MODELS = ["gpt-4.1-mini", "gpt-4o-mini"];
-const VERSION = "generate-document-2026-10-15-spec-v4-plans";
+const VERSION = "generate-document-2026-10-15-spec-v5-develop";
+/** The most entries one "develop" request writes (same as MAX_DEVELOPED_ENTRIES in product-studio/src/engines/generate/spec.ts). */
+const MAX_DEVELOPED_ENTRIES = 30;
+/**
+ * Output ceiling for a develop request (tokens): about 8,000 words — never an open-ended bill, and short enough to
+ * finish inside the Edge Function's ~150 s limit. Structure only is unchanged.
+ */
+const DEVELOP_MAX_TOKENS = 12_000;
+/** Time one develop call may take (structure: 90 s as before), and how long a failed first call may have taken for the backup model to still be tried. */
+const DEVELOP_TIMEOUT_MS = 135_000;
+const RETRY_WITHIN_MS = 30_000;
+/** Estimated USD per 1M tokens (input, output) — for the cost record only; tokens are the source of truth. Prices as of 2026-10. */
+const PRICES: Record<string, [number, number]> = { "gpt-4.1-mini": [0.4, 1.6], "gpt-4o-mini": [0.15, 0.6] };
 
 const SYSTEM = `You design printable documents for Product Studio, a studio for print-ready journals, workbooks, logs, forms, planners and similar products. You return a document specification (the JSON schema given); the studio lays out, paginates and prints it with its own engines. Never think in coordinates or pixels.
 
@@ -65,6 +85,53 @@ Page: choose page.size, orientation and binding for how it will be used (a wide 
 notes: list your assumptions, and any conflicting instructions and how you resolved them.
 Give every section and component a short unique id. Fill every property: use null, [] or false when a property doesn't apply.`;
 
+/** "Develop original content": replaces the one line that says not to write content, and adds how to write it. */
+const NO_CONTENT = "- Do not invent content entries (days, lessons, readings) unless they ask you to write content; prefer labelled blanks and writing space they will fill in.";
+function developRules(entryCount: number | null, batch: Batch | null): string {
+  const asked = batch ? batch.count : entryCount;
+  return `- The maker asked you to DEVELOP ORIGINAL CONTENT: write the content itself, not only the structure. Put the series (days, lessons, sessions, exercises, activities) in entries with source "suggested" — one entry each, with a field for each part (for example title, scripture, teaching, reflection question, activity, prayer) — and a per-entry section that prints the fields with fromEntryField. A one-off passage you write (an introduction, instructions) is a text component with source "suggested".
+- Write at most ${MAX_DEVELOPED_ENTRIES} entries in this answer${asked ? `; the maker asked for ${asked}` : ""}. If the request needs more (for example a 40-day study), write the first ones, and say in notes how many remain and that they can be written as the next batch. Never shorten or cut off an entry to fit more: fewer complete entries are better than more partial ones.
+- Keep each part complete but proportionate: a teaching passage of about 120–250 words; questions, prompts and prayers of one to three sentences — unless the maker asks otherwise. Keep the whole answer under about 7,000 words: if the entries asked for wouldn't fit complete, write fewer and say in notes how many remain for the next batch.
+- Everything you write is original. Do not reproduce existing devotionals, curricula, books, sermons or song lyrics.
+- The maker's own wording still comes first: use it exactly (source "user"), never rewrite, merge into or "improve" it, and build your content around it.
+- Scripture: connect content to Scripture by reference (Book chapter:verse) only when you are confident the reference exists and fits; if unsure, give the theme without a reference. Quote verse text only from a public-domain translation (KJV or WEB), keep quotations short, and name the translation after the quotation, e.g. "In the beginning God created the heaven and the earth." (Genesis 1:1, KJV). Never quote a copyrighted translation (NIV, ESV, NLT, NKJV, NASB, CSB, AMP, MSG, TPT and others): give the reference only. Never invent or paraphrase a verse and present it as a quotation.
+- No outside research: no statistics, historical or scientific claims, quotations of people, or citations of books, articles or websites. Write from Scripture and general knowledge only, and never claim alignment with any curriculum, standard or denomination.${batch ? `
+
+THIS REQUEST CONTINUES A LIST ALREADY WRITTEN: "${batch.name}". Write entries ${batch.from} to ${batch.from + batch.count - 1} (${batch.count} entries) of that list, in entries, with exactly these fields (same keys): ${batch.fields.map((f) => `${f.key} (${f.label})`).join(", ")}. Continue the series in order; do not repeat what is already written${batch.previous.length ? ` (recent entries: ${batch.previous.map((p) => `"${p}"`).join("; ")})` : ""}. Keep the same sections as a per-entry page that prints these fields.` : ""}`;
+}
+
+type Batch = { name: string; fields: { key: string; label: string; valueType: string }[]; from: number; count: number; previous: string[] };
+const clean = (v: unknown, max: number) => (typeof v === "string" ? v.replace(/[\u0000-\u001f"`<>]/g, " ").replace(/\s+/g, " ").trim().slice(0, max) : "");
+/** A batch request, checked: only short, plain names and keys reach the prompt. null = not a valid batch. */
+function readBatch(v: unknown): Batch | null {
+  if (!v || typeof v !== "object") return null;
+  const b = v as Record<string, unknown>;
+  const from = Number(b.from), count = Number(b.count);
+  if (!Number.isInteger(from) || from < 1 || from > 1000 || !Number.isInteger(count) || count < 1 || count > MAX_DEVELOPED_ENTRIES) return null;
+  const fields = (Array.isArray(b.fields) ? b.fields : []).slice(0, 12).flatMap((f) => {
+    const x = (f ?? {}) as Record<string, unknown>;
+    const key = typeof x.key === "string" && /^[a-z0-9_]{1,40}$/.test(x.key) ? x.key : "";
+    const label = clean(x.label, 60);
+    return key && label ? [{ key, label, valueType: clean(x.valueType, 20) || "text" }] : [];
+  });
+  const name = clean(b.name, 80);
+  if (!fields.length || !name) return null;
+  return { name, fields, from, count, previous: (Array.isArray(b.previous) ? b.previous : []).slice(-40).map((p) => clean(p, 100)).filter(Boolean) };
+}
+
+/** Records a model call's real usage and estimated cost (service role; best effort — never blocks or fails a request). */
+async function recordCost(row: { user_id: string; mode: string; model: string; usage: { prompt_tokens?: number; completion_tokens?: number } | undefined; outcome: string }) {
+  const url = Deno.env.get("SUPABASE_URL"), service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !service || !row.usage) return;
+  const input = row.usage.prompt_tokens ?? 0, output = row.usage.completion_tokens ?? 0;
+  const [pi, po] = PRICES[row.model] ?? [0, 0];
+  const { error } = await createClient(url, service).from("ai_generation_costs").insert({
+    user_id: row.user_id, function_name: FUNCTION_NAME, mode: row.mode, model: row.model,
+    prompt_tokens: input, completion_tokens: output, estimated_cost_usd: Number(((input * pi + output * po) / 1e6).toFixed(6)), outcome: row.outcome,
+  });
+  if (error) console.error("cost record failed", error.message);
+}
+
 async function authenticate(req: Request) {
   const header = req.headers.get("Authorization") || "";
   if (!header.startsWith("Bearer ")) return null;
@@ -80,7 +147,7 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return reply({ error: "Method not allowed" }, 405);
   const auth = await authenticate(req);
   if (!auth) return reply({ error: "Sign in to generate a document." }, 401);
-  let body: { description?: unknown; content?: unknown; check?: unknown };
+  let body: { description?: unknown; content?: unknown; check?: unknown; mode?: unknown; entryCount?: unknown; batch?: unknown };
   try { body = await req.json(); } catch { return reply({ error: "Invalid request." }, 400); }
   const raw = Deno.env.get("OPENAI_API_KEY");
   // A pasted secret can carry spaces, quotes or a line break: never part of a real key.
@@ -99,6 +166,14 @@ Deno.serve(async (req) => {
   const content = typeof body.content === "string" ? body.content : "";
   if (description.trim().length < 10 || description.length > 6000 || content.length > 60000)
     return reply({ error: "Describe the document in 10–6,000 characters; your own content must be under 60,000 characters." }, 400);
+  // Mode: absent = Structure only (Phase 8's request). Anything else is checked before any usage is counted.
+  if (body.mode !== undefined && body.mode !== "structure" && body.mode !== "develop") return reply({ error: "Unknown generation mode." }, 400);
+  const develop = body.mode === "develop";
+  const entryCount = body.entryCount === undefined || body.entryCount === null ? null : Number(body.entryCount);
+  if (entryCount !== null && (!develop || !Number.isInteger(entryCount) || entryCount < 1 || entryCount > MAX_DEVELOPED_ENTRIES))
+    return reply({ error: `Ask for 1–${MAX_DEVELOPED_ENTRIES} entries at a time; longer series are written in batches.` }, 400);
+  const batch = body.batch === undefined ? null : readBatch(body.batch);
+  if (body.batch !== undefined && (!develop || !batch)) return reply({ error: "That next-batch request couldn't be read." }, 400);
   if (!key) return reply({ error: "Document generation isn't set up yet (the OpenAI key is missing)." }, 503);
 
   const day = new Date(); day.setUTCHours(0, 0, 0, 0);
@@ -111,29 +186,43 @@ Deno.serve(async (req) => {
   const { error: logError } = await auth.client.from("edge_usage_logs").insert({ user_id: auth.user.id, function_name: FUNCTION_NAME, units: 1 });
   if (logError) return reply({ error: "Usage logging failed; no AI request was sent." }, 500);
 
+  const system = develop ? SYSTEM.replace(NO_CONTENT, developRules(entryCount, batch)) : SYSTEM;
+  const mode = develop ? "develop" : "structure";
   const user = `What the maker wants:\n${description.trim()}${content.trim() ? `\n\nThe maker's own content — use it exactly as written, placed where it belongs:\n<<<\n${content}\n>>>` : ""}`;
   let lastError = "";
+  const started = Date.now();
   for (const model of MODELS) {
+    // A slow failure leaves no time for a second full call before the function's own limit: report it instead.
+    if (model !== MODELS[0] && Date.now() - started > RETRY_WITHIN_MS) break;
     try {
       const r = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        signal: AbortSignal.timeout(90_000),
+        signal: AbortSignal.timeout(develop ? DEVELOP_TIMEOUT_MS : 90_000),
         body: JSON.stringify({
           model,
-          temperature: 0.2,
+          // Develop writes prose: a little more varied wording, and a fixed output ceiling.
+          temperature: develop ? 0.5 : 0.2,
+          ...(develop ? { max_tokens: DEVELOP_MAX_TOKENS } : {}),
           response_format: { type: "json_schema", json_schema: { name: "document_spec", strict: true, schema } },
-          messages: [{ role: "system", content: SYSTEM }, { role: "user", content: user }],
+          messages: [{ role: "system", content: system }, { role: "user", content: user }],
         }),
       });
       const result = await r.json().catch(() => null);
       if (!r.ok) { lastError = result?.error?.message ?? `HTTP ${r.status}`; continue; }
       const message = result?.choices?.[0]?.message;
-      if (message?.refusal) return reply({ error: `The AI declined: ${message.refusal}` }, 422);
+      const cost = (outcome: string) => recordCost({ user_id: auth.user.id, mode, model, usage: result?.usage, outcome });
+      if (message?.refusal) { await cost("refused"); return reply({ error: `The AI declined: ${message.refusal}` }, 422); }
+      // Cut off at the output ceiling: the outline isn't complete, so it isn't handed back half-written.
+      if (result?.choices?.[0]?.finish_reason === "length") {
+        await cost("too-long");
+        return reply({ error: `That was more than one request can write. Ask for fewer entries (for example 10), then write the rest with “Write the next batch”.`, version: VERSION }, 422);
+      }
       if (typeof message?.content !== "string") { lastError = "no content"; continue; }
       // Checked here, not only in the studio: a proposal past the page limit is never handed back.
       let pages = 0;
       try { pages = minimumPages(JSON.parse(message.content)); } catch { /* not JSON: the studio reports it */ }
+      await cost(pages > MAX_DOCUMENT_PAGES ? "too-many-pages" : "ok");
       if (pages > MAX_DOCUMENT_PAGES)
         return reply({ error: `That proposal would have at least ${pages.toLocaleString("en-US")} pages; a document can have at most ${MAX_DOCUMENT_PAGES}. Ask for fewer copies, days or pages, or split it into more than one document.`, version: VERSION }, 422);
       return reply({ spec: message.content, model, version: VERSION });

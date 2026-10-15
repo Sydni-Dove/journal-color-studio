@@ -2037,6 +2037,24 @@ button.family-card:focus-visible {
 .ai-checks { display: grid; gap: 4px; }
 .ai-alt { align-items: flex-start; }
 .badge--neutral { background: #f1ece8; color: #6a5a52; }
+/* AI-written content (Phase 8.1): a distinct violet, never confused with "Your words" (green) or warnings. Editor only — never printed. */
+.badge--ai { background: #eee8fb; color: #5b3fa6; white-space: nowrap; }
+.ai-review-row { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; justify-content: space-between; background: #f7f4fd; border-left: 3px solid #8b6fd6; padding: 6px 10px; border-radius: 4px; margin: 4px 0 8px; }
+.ai-review-row .hint { margin: 0; flex: 1 1 220px; }
+.ai-review-row .btn { min-height: 44px; }
+
+/* Structure only / Develop original content: two cards, side by side on a wide screen, stacked on a phone. */
+.ai-mode { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; border: 0; padding: 0; margin: 4px 0 8px; }
+.ai-mode legend { font-weight: 600; margin-bottom: 4px; }
+.ai-mode-option { display: flex; gap: 8px; align-items: flex-start; border: 1px solid var(--ui-line); border-radius: 6px; padding: 10px; cursor: pointer; min-height: 44px; }
+.ai-mode-option:has(input:checked) { border-color: #8b6fd6; background: #f7f4fd; }
+.ai-mode-option input { margin-top: 3px; min-height: 0; }
+.ai-entry { border-left: 3px solid #8b6fd6; padding: 4px 0 4px 10px; margin: 6px 0; }
+.ai-entry[data-source="user"] { border-left-color: var(--ui-ok); }
+.ai-entry > summary { cursor: pointer; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-height: 44px; overflow-wrap: anywhere; }
+.ai-entry .field { display: grid; }
+.ai-batch { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; margin-top: 8px; }
+.ai-batch .field { width: 120px; }
 
 /* Page title, Repeats and Copies: the title gets real room (it held 37px on a phone, squeezed by the menus'
    longest option); on a phone each takes the full width, one under the other. */
@@ -2049,6 +2067,7 @@ button.family-card:focus-visible {
 .ai-wizard input, .ai-wizard textarea, .ai-wizard select { min-height: 44px; }
 @media (max-width: 600px) {
   .ai-section-head { grid-template-columns: minmax(0, 1fr); }
+  .ai-mode { grid-template-columns: minmax(0, 1fr); }
   .ai-review .row { flex-wrap: wrap; }
 }
 

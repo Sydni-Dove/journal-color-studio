@@ -7,7 +7,7 @@
  */
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { buildFromOutline, checkProposal, requestSpec } from "../../engines/generate/pipeline";
-import { SIZES, type CheckedSpec, type DocSpec, type PageSize, type SpecComponent, type SpecSection } from "../../engines/generate/spec";
+import { appendBatch, batchRequest, MAX_DEVELOPED_ENTRIES, SIZES, type CheckedSpec, type DocSpec, type Flag, type GenerationMode, type PageSize, type SpecComponent, type SpecEntries, type SpecSection } from "../../engines/generate/spec";
 import type { ProductProject } from "../../types/project";
 import { PageThumb } from "../preview/PageThumb";
 import { resolveDocument } from "../../engines/document/resolve";
@@ -33,13 +33,25 @@ const move = <T,>(xs: T[], i: number, d: -1 | 1) => {
   return out;
 };
 
-function Part({ c, i, n, set, remove, shift }: { c: SpecComponent; i: number; n: number; set: (c: SpecComponent) => void; remove: () => void; shift: (d: -1 | 1) => void }) {
+/** Who wrote a part, as the review shows it: the maker's own words; in a developed document, AI-written content; otherwise a suggestion. */
+const sourceBadge = (source: SpecComponent["source"], develop: boolean) =>
+  source === "user"
+    ? <span className="badge badge--ok" title="Your own wording, used exactly as you wrote it">Your words</span>
+    : develop
+      ? <span className="badge badge--ai" title="Written by the AI — read it and edit it before creating">AI-written</span>
+      : <span className="badge badge--neutral" title="Written by the AI — check it">Suggested</span>;
+
+/** A part whose wording the AI wrote (marked AI-written once created) — not blanks, tables, rules or a plain writing space. */
+const writesWording = (c: SpecComponent) =>
+  !c.fromEntryField && (c.kind === "heading" ? !!(c.text || c.label) : c.kind === "text" || c.kind === "writing" ? !!c.text?.trim() : c.kind === "list" || c.kind === "checklist" ? c.items.length > 0 : false);
+
+function Part({ c, i, n, set, remove, shift, develop }: { c: SpecComponent; i: number; n: number; set: (c: SpecComponent) => void; remove: () => void; shift: (d: -1 | 1) => void; develop: boolean }) {
   const hasColumns = c.kind === "table" || c.kind === "fields" || c.kind === "records";
   return (
     <li className="ai-part" data-part={c.id}>
       <div className="row">
         <strong>{KIND_LABEL[c.kind]}</strong>
-        <span className={`badge ${c.source === "user" ? "badge--ok" : "badge--neutral"}`} title={c.source === "user" ? "Your own wording, used exactly as you wrote it" : "Written by the AI — check it"}>{c.source === "user" ? "Your words" : "Suggested"}</span>
+        {sourceBadge(c.source, develop && writesWording(c))}
         {c.fromEntryField && <span className="hint">prints each entry's “{c.fromEntryField}”</span>}
         <span className="spacer" />
         <button type="button" className="btn btn--ghost" disabled={i === 0} aria-label="Move part up" onClick={() => shift(-1)}>↑</button>
@@ -85,7 +97,7 @@ function Part({ c, i, n, set, remove, shift }: { c: SpecComponent; i: number; n:
   );
 }
 
-function OutlineSection({ s, i, n, spec, set, remove, shift }: { s: SpecSection; i: number; n: number; spec: DocSpec; set: (s: SpecSection) => void; remove: () => void; shift: (d: -1 | 1) => void }) {
+function OutlineSection({ s, i, n, spec, set, remove, shift, develop }: { s: SpecSection; i: number; n: number; spec: DocSpec; set: (s: SpecSection) => void; remove: () => void; shift: (d: -1 | 1) => void; develop: boolean }) {
   const mode = s.repeat.mode;
   return (
     <div className="ai-section" data-section={s.id}>
@@ -115,6 +127,7 @@ function OutlineSection({ s, i, n, spec, set, remove, shift }: { s: SpecSection;
           <Part
             key={c.id}
             c={c}
+            develop={develop}
             i={k}
             n={s.components.length}
             set={(next) => set({ ...s, components: s.components.map((x, j) => (j === k ? next : x)) })}
@@ -140,6 +153,62 @@ function OutlineSection({ s, i, n, spec, set, remove, shift }: { s: SpecSection;
   );
 }
 
+/** An entry's one-line name: its first filled value. */
+const entryName = (e: SpecEntries, r: SpecEntries["records"][number], i: number) => {
+  const v = e.fields.map((f) => r.values.find((x) => x.key === f.key)?.value?.trim()).find(Boolean) ?? "(empty)";
+  return `${i + 1}. ${v.length > 60 ? `${v.slice(0, 59)}…` : v}`;
+};
+
+/**
+ * The entries the AI wrote, each open to read and edit before anything is created (the maker's own entries are
+ * listed, not edited here: they're used exactly as written). Long series continue with "Write the next batch".
+ */
+function EntriesReview({ e, set, develop, onBatch, busy, message }: { e: SpecEntries; set: (e: SpecEntries) => void; develop: boolean; onBatch: (count: number) => void; busy: boolean; message: string }) {
+  const [count, setCount] = useState(10);
+  const ai = e.source === "suggested";
+  const setValue = (ri: number, key: string, value: string) =>
+    set({ ...e, records: e.records.map((r, j) => (j !== ri ? r : { values: r.values.some((v) => v.key === key) ? r.values.map((v) => (v.key === key ? { key, value } : v)) : [...r.values, { key, value }] })) });
+  return (
+    <div className="ai-entries" data-testid="ai-entries">
+      <strong>{e.name}</strong> {sourceBadge(e.source, develop)}
+      <p className="hint">{e.records.length} entr{e.records.length === 1 ? "y" : "ies"} · each has {e.fields.map((f) => f.label).join(", ")}.{ai ? " Written by the AI: read each one and change anything you like. After creating they stay marked “AI-written — review” in Your content until you mark them reviewed." : " Add, edit or paste entries in Your content after creating."}</p>
+      {ai && e.records.map((r, ri) => (
+        <details key={ri} className="ai-entry" data-entry={ri + 1} data-source="suggested">
+          <summary>{entryName(e, r, ri)} <span className="badge badge--ai">AI-written</span></summary>
+          {e.fields.map((f) => {
+            const v = r.values.find((x) => x.key === f.key)?.value ?? "";
+            return (
+              <label key={f.key} className="field">
+                <span>{f.label}</span>
+                {f.valueType === "longText" || v.length > 80 ? (
+                  <textarea className="data-textarea" rows={Math.min(10, Math.max(3, Math.ceil(v.length / 70)))} value={v} aria-label={`Entry ${ri + 1} ${f.label}`} onChange={(ev) => setValue(ri, f.key, ev.target.value)} />
+                ) : (
+                  <input type="text" value={v} aria-label={`Entry ${ri + 1} ${f.label}`} onChange={(ev) => setValue(ri, f.key, ev.target.value)} />
+                )}
+              </label>
+            );
+          })}
+          <div className="row"><span className="spacer" /><button type="button" className="btn btn--ghost" onClick={() => set({ ...e, records: e.records.filter((_, j) => j !== ri) })}>Remove this entry</button></div>
+        </details>
+      ))}
+      {develop && ai && (
+        <div className="ai-batch">
+          <label className="field">
+            <span>How many more</span>
+            <input type="number" inputMode="numeric" min={1} max={MAX_DEVELOPED_ENTRIES} value={count} aria-label="How many more entries" onChange={(ev) => setCount(Math.max(1, Math.min(MAX_DEVELOPED_ENTRIES, Math.round(Number(ev.target.value) || 1))))} />
+          </label>
+          <button type="button" className="btn" disabled={busy} onClick={() => onBatch(count)}>{busy ? "Writing the next entries…" : "Write the next batch"}</button>
+          <p className="hint" style={{ flexBasis: "100%" }}>Continues from entry {e.records.length + 1}, up to {MAX_DEVELOPED_ENTRIES} at a time. Uses one of today's proposals.</p>
+          {message && <p className="hint" role="status">{message}</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** A batch's flags name its own entries 1, 2…: renumbered to where they sit in the whole list. */
+const shiftFlags = (flags: Flag[], by: number): Flag[] => flags.map((f) => { const m = /^Entry (\d+)$/.exec(f.where); return m ? { ...f, where: `Entry ${Number(m[1]) + by}` } : f; });
+
 /** A clean outline: blank lines typed into column / item boxes don't become empty columns or items. */
 const tidy = (spec: DocSpec): DocSpec => ({
   ...spec,
@@ -158,14 +227,22 @@ export function AiDocumentWizard({ onCreate, onCancel, signedIn = true, account 
   const [checked, setChecked] = useState<CheckedSpec | null>(null);
   const [spec, setSpec] = useState<DocSpec | null>(null);
   const [alt, setAlt] = useState<string | null>(null);
+  // Structure only (Phase 8) is the default; Develop original content is the maker's choice each time.
+  const [mode, setMode] = useState<GenerationMode>("structure");
+  const [entryCount, setEntryCount] = useState("");
+  const develop = mode === "develop";
+  const [batchBusy, setBatchBusy] = useState(false);
+  const [batchMessage, setBatchMessage] = useState("");
 
   const generate = async () => {
     if (busy) return; // one request at a time
     setError("");
     setBusy(true);
+    setBatchMessage("");
     try {
-      const raw = await requestSpec(description, content);
-      const c = checkProposal(raw, description, content);
+      const n = Math.round(Number(entryCount));
+      const raw = await requestSpec(description, content, develop ? { mode, ...(n >= 1 ? { entryCount: Math.min(MAX_DEVELOPED_ENTRIES, n) } : {}) } : {});
+      const c = checkProposal(raw, description, content, mode);
       setChecked(c);
       setSpec(c.spec);
       setAlt(null);
@@ -196,6 +273,27 @@ export function AiDocumentWizard({ onCreate, onCancel, signedIn = true, account 
   const finalProject = useMemo(() => (built ? (chosen ? chosen.apply(built.project) : built.project) : null), [built, chosen]);
   const doc = useMemo(() => (finalProject ? resolveDocument(finalProject) : null), [finalProject]);
   const setSection = (i: number, s: SpecSection) => setSpec((x) => x && { ...x, sections: x.sections.map((y, j) => (j === i ? s : y)) });
+  /** The next entries of the list the AI is writing, added to the end (one of the day's proposals). */
+  const nextBatch = async (count: number) => {
+    if (!spec || !checked || batchBusy) return;
+    const batch = batchRequest(spec, count);
+    if (!batch) return;
+    setBatchBusy(true);
+    setBatchMessage("");
+    try {
+      const raw = await requestSpec(description, content, { mode: "develop", batch });
+      const more = checkProposal(raw, description, content, "develop");
+      const before = spec.entries?.records.length ?? 0;
+      const r = appendBatch(spec, more);
+      setSpec(r.spec);
+      if (r.added) setChecked({ ...checked, flags: [...checked.flags, ...shiftFlags(more.flags.filter((f) => /^Entry \d+$/.test(f.where)), before)] });
+      setBatchMessage(r.message);
+    } catch (e) {
+      setBatchMessage(e instanceof Error ? e.message : "The next batch couldn't be written.");
+    } finally {
+      setBatchBusy(false);
+    }
+  };
 
   if (!spec || !checked)
     return (
@@ -220,9 +318,29 @@ export function AiDocumentWizard({ onCreate, onCancel, signedIn = true, account 
           <span>Your own wording (optional)</span>
           <textarea className="data-textarea" rows={6} value={content} aria-label="Your own wording" placeholder="Paste questions, instructions, days or entries you've already written. They're used exactly as you wrote them." onChange={(e) => setContent(e.target.value)} />
         </label>
-        <p className="hint">The AI suggests structure and wording; your own wording is kept word for word. Nothing it suggests is checked against laws or regulations — verify anything that must be.</p>
+        <fieldset className="ai-mode" data-testid="ai-mode">
+          <legend>What should the AI do?</legend>
+          <label className="ai-mode-option">
+            <input type="radio" name="ai-mode" value="structure" checked={!develop} onChange={() => setMode("structure")} />
+            <span><strong>Structure only</strong><br /><span className="hint">Pages, sections, blanks and writing space, with what you wrote placed exactly. It doesn't write the content.</span></span>
+          </label>
+          <label className="ai-mode-option">
+            <input type="radio" name="ai-mode" value="develop" checked={develop} onChange={() => setMode("develop")} />
+            <span><strong>Develop original content</strong><br /><span className="hint">It also writes the content — days, lessons, exercises, Scripture connections, activities — marked “AI-written” for you to review and edit. What you wrote yourself is never changed.</span></span>
+          </label>
+        </fieldset>
+        {develop && (
+          <div className="ai-batch">
+            <label className="field">
+              <span>How many entries? (optional)</span>
+              <input type="number" inputMode="numeric" min={1} max={MAX_DEVELOPED_ENTRIES} value={entryCount} placeholder="e.g. 7" aria-label="How many entries" onChange={(e) => setEntryCount(e.target.value)} />
+            </label>
+            <p className="hint" style={{ flex: "1 1 240px" }}>Up to {MAX_DEVELOPED_ENTRIES} per request, each written in full. For a longer series, write the rest with “Write the next batch” on the next screen. Scripture is quoted only from public-domain translations (KJV, WEB); every reference and quotation is listed for you to check.</p>
+          </div>
+        )}
+        <p className="hint">{develop ? "Everything the AI writes is original and marked AI-written until you review it; your own wording is kept word for word." : "The AI suggests structure and wording; your own wording is kept word for word."} Nothing it writes is checked against laws or regulations — verify anything that must be. Either way, each proposal uses one of today's free proposals.</p>
         <div className="row">
-          <button className="btn btn--primary" disabled={busy || description.trim().length < 10} onClick={() => void generate()}>{busy ? "Proposing an outline…" : "Propose an outline"}</button>
+          <button className="btn btn--primary" disabled={busy || description.trim().length < 10} onClick={() => void generate()}>{busy ? (develop ? "Writing the content… (up to two minutes)" : "Proposing an outline…") : develop ? "Propose and write the content" : "Propose an outline"}</button>
         </div>
         {error && <p className="data-issue" role="alert">{error}</p>}
           </>
@@ -251,11 +369,15 @@ export function AiDocumentWizard({ onCreate, onCancel, signedIn = true, account 
           {(checked.problems.length > 0 || checked.flags.length > 0) && (
             <div className="ai-checks" data-testid="ai-checks">
               {checked.problems.map((p, i) => <p key={i} className={p.level === "note" ? "hint" : "data-issue"}>{p.level === "left-out" ? "Left out: " : p.level === "adjusted" ? "Changed: " : ""}{p.message}</p>)}
-              {checked.flags.map((f, i) => (
-                <p key={`f${i}`} className="data-issue" data-flag={f.kind}>
-                  {f.kind === "compliance" ? "Check before printing — a claim about legal or regulatory requirements (not verified): " : "Check before printing — a reference the AI supplied (not verified): "}“{f.text}” ({f.where})
-                </p>
-              ))}
+              {(() => {
+                const items = checked.flags.map((f, i) => (
+                  <p key={`f${i}`} className="data-issue" data-flag={f.kind}>
+                    {f.kind === "compliance" ? "Check before printing — a claim about legal or regulatory requirements (not verified): " : f.kind === "quotation" ? "Check before printing — quoted Scripture the AI supplied (wording and translation not verified): " : "Check before printing — a reference the AI supplied (not verified): "}“{f.text}” ({f.where})
+                  </p>
+                ));
+                // A developed series can carry a reference on every entry: listed in full, folded when long.
+                return items.length > 5 ? <details open={false} data-testid="ai-flags"><summary className="data-issue">{items.length} references and quotations to check before printing</summary>{items}</details> : items;
+              })()}
             </div>
           )}
           <div className="row">
@@ -264,14 +386,9 @@ export function AiDocumentWizard({ onCreate, onCancel, signedIn = true, account 
             <label className="field"><span>Binding</span><select aria-label="Binding" value={spec.page.binding} onChange={(e) => setSpec({ ...spec, page: { ...spec.page, binding: e.target.value as DocSpec["page"]["binding"] } })}>{(Object.keys(BINDING_LABEL) as DocSpec["page"]["binding"][]).map((b) => <option key={b} value={b}>{BINDING_LABEL[b]}</option>)}</select></label>
           </div>
           {spec.page.why && <p className="hint">{spec.page.why}</p>}
-          {spec.entries && (
-            <div className="ai-entries">
-              <strong>{spec.entries.name}</strong> <span className={`badge ${spec.entries.source === "user" ? "badge--ok" : "badge--neutral"}`}>{spec.entries.source === "user" ? "Your words" : "Suggested"}</span>
-              <p className="hint">{spec.entries.records.length} entr{spec.entries.records.length === 1 ? "y" : "ies"} · each has {spec.entries.fields.map((f) => f.label).join(", ")}. Add, edit or paste entries in Your content after creating.</p>
-            </div>
-          )}
+          {spec.entries && <EntriesReview e={spec.entries} develop={checked.mode === "develop"} set={(e) => setSpec({ ...spec, entries: e })} onBatch={(n) => void nextBatch(n)} busy={batchBusy} message={batchMessage} />}
           {spec.sections.map((s, i) => (
-            <OutlineSection key={s.id} s={s} i={i} n={spec.sections.length} spec={spec} set={(x) => setSection(i, x)} remove={() => setSpec({ ...spec, sections: spec.sections.filter((_, j) => j !== i) })} shift={(d) => setSpec({ ...spec, sections: move(spec.sections, i, d) })} />
+            <OutlineSection key={s.id} develop={checked.mode === "develop"} s={s} i={i} n={spec.sections.length} spec={spec} set={(x) => setSection(i, x)} remove={() => setSpec({ ...spec, sections: spec.sections.filter((_, j) => j !== i) })} shift={(d) => setSpec({ ...spec, sections: move(spec.sections, i, d) })} />
           ))}
           {unplaced.length > 0 && (
             <p className="data-issue" role="note" data-testid="ai-unplaced">

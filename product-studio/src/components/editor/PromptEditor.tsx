@@ -540,7 +540,15 @@ export function PromptEditor({
     </>
   );
 
+  const aiWritten = blocks.filter((b) => b.origin).length;
   const list = (
+    <>
+    {aiWritten > 0 && (
+      <div className="ai-review-row" data-testid="ai-review-sections">
+        <p className="hint"><span className="badge badge--ai">AI-written</span> {aiWritten} section{aiWritten === 1 ? "" : "s"} on this page {aiWritten === 1 ? "was" : "were"} written by the AI and {aiWritten === 1 ? "is" : "are"} waiting for your review.</p>
+        <button type="button" className="btn btn--ghost" onClick={() => put({ blocks: blocks.map((b) => (b.origin ? { ...b, origin: undefined } : b)) })}>Mark all reviewed</button>
+      </div>
+    )}
     <ol className="prompt-list">
       {blocks.map((b, i) => {
         const mode = spaceOf(b);
@@ -555,6 +563,7 @@ export function PromptEditor({
             <details className="prompt-block" data-prompt={b.id}>
               <summary>
                 <span className="prompt-block__name">{b.beside && besideOk ? "⇥ " : ""}{name}</span>
+                {b.origin && <span className="badge badge--ai" data-testid="ai-written" title="Written by the AI — read it, edit it as you like, then mark it reviewed. This label never prints.">AI-written — review</span>}
                 <span className="prompt-block__space" data-testid="section-space">
                   {k === "prompt" ? spaceSummary(set, b, got) : KIND_SUMMARY[k](b)}
                   {b.beside && besideOk ? " · beside the section above" : ""}
@@ -562,6 +571,12 @@ export function PromptEditor({
                 </span>
               </summary>
               <div className="prompt-block__body">
+                {b.origin && (
+                  <div className="ai-review-row">
+                    <p className="hint">The AI wrote this section's wording. Check it — especially any Scripture reference or quotation — and change anything you like.</p>
+                    <button type="button" className="btn" onClick={() => putBlock(b.id, { origin: undefined })}>Mark as reviewed</button>
+                  </div>
+                )}
                 {k === "heading" && (
                   <>
                     <Segmented<HeadingTextStyle>
@@ -762,6 +777,7 @@ export function PromptEditor({
         );
       })}
     </ol>
+    </>
   );
   const count = (
     <p className="field-label prompt-count">

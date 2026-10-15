@@ -192,8 +192,14 @@ export type DocumentStructure = {
 // ─── Data ────────────────────────────────────────────────────────────────────
 
 export type FieldValue = string | number | boolean | null;
+/**
+ * Where a piece of content came from, when it wasn't the maker: written by the AI (Generate with AI,
+ * "Develop original content"). Shown in the editor as "AI-written — review" until the maker marks it
+ * reviewed (which removes it). Never printed. Absent = the maker's own (every older product).
+ */
+export type ContentOrigin = { kind: "ai-suggestion"; at: string };
 /** One entry of a list (a devotional day, an inventory item): stable id, values by field key. */
-export type DataRecord = { id: string; values: Record<string, FieldValue> };
+export type DataRecord = { id: string; values: Record<string, FieldValue>; origin?: ContentOrigin };
 export type DocumentData = { values: Record<string, FieldValue>; lists: Record<string, DataRecord[]> };
 
 /**

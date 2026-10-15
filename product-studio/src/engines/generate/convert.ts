@@ -13,7 +13,7 @@ import { PRODUCT_TYPES } from "../../presets/products/productTypes";
 import { PRINT_PROFILES } from "../../presets/printProfiles/printProfiles";
 import { refitPageFilling } from "../recipe/fitRows";
 import type { BindingType } from "../../types/binding";
-import type { ProjectData } from "../../types/document";
+import type { ContentOrigin, ProjectData } from "../../types/document";
 import type { PromptBlock, PromptSet } from "../../types/prompts";
 import type { BookNode, BookStep } from "../../types/recipe";
 import type { ProductProject } from "../../types/project";
@@ -103,8 +103,8 @@ const pageStep = (s: SpecSection, set: PromptSet, cadence: BookStep["cadence"], 
   promptSet: set,
 });
 
-/** The entries as a content list: fields by key, values read by their type (unreadable ones kept as typed). */
-function entriesData(spec: DocSpec): { data?: ProjectData; collectionId?: string; keyOf: (k: string) => string | undefined } {
+/** The entries as a content list: fields by key, values read by their type (unreadable ones kept as typed). AI-written entries carry `origin`. */
+function entriesData(spec: DocSpec, origin: ContentOrigin): { data?: ProjectData; collectionId?: string; keyOf: (k: string) => string | undefined } {
   const e = spec.entries;
   if (!e) return { keyOf: () => undefined };
   const keys = new Map<string, string>();
@@ -122,16 +122,36 @@ function entriesData(spec: DocSpec): { data?: ProjectData; collectionId?: string
       if (k) data = setValue(data, id, a.recordId, k, v.value);
     }
   }
+  if (e.source === "suggested") data = { ...data, collections: data.collections.map((c) => (c.id === id ? { ...c, records: c.records.map((r) => ({ ...r, origin })) } : c)) };
   return { data, collectionId: id, keyOf: (k) => keys.get(k) };
 }
 
-/** The product a checked proposal describes — every part editable in the studio. */
-export function projectFromSpec(checked: CheckedSpec): ProductProject {
+/** Parts that hold wording (not blanks, rules or space): what "AI-written" marks in a developed document. */
+const WORDING: SpecComponent["kind"][] = ["heading", "text", "writing", "checklist", "list"];
+/** A writing space or checklist is structure unless the AI wrote its prompt or items ("Notes" over blank lines isn't content). */
+const hasWording = (c: SpecComponent, b: PromptBlock) =>
+  c.kind === "writing" ? !!b.prompt?.trim() : c.kind === "checklist" ? !!b.items?.some((x) => x.text.trim()) : !!(b.label?.trim() || b.prompt?.trim() || b.items?.some((x) => x.text.trim()));
+
+/**
+ * The product a checked proposal describes — every part editable in the studio. What the AI wrote as content is
+ * marked (`origin`, never printed) so the editor can flag it until the maker reviews it: AI-written entries always;
+ * in "develop" mode also the passages, prompts and lists it wrote. Structure only marks no page sections.
+ * `at`: when it was written (tests pass a fixed time).
+ */
+export function projectFromSpec(checked: CheckedSpec, at = new Date().toISOString()): ProductProject {
   const { spec } = checked;
-  const { data, collectionId, keyOf } = entriesData(spec);
+  const origin: ContentOrigin = { kind: "ai-suggestion", at };
+  const { data, collectionId, keyOf } = entriesData(spec, origin);
+  const develop = checked.mode === "develop";
   const structure: BookNode[] = [];
   for (const s of spec.sections) {
-    const set: PromptSet = { blocks: s.components.flatMap((c) => blocksOf(c, keyOf)) };
+    const set: PromptSet = {
+      blocks: s.components.flatMap((c) => {
+        const blocks = blocksOf(c, keyOf);
+        // A part printing an entry's field shows the entry's words (marked on the entry itself).
+        return develop && c.source === "suggested" && !c.fromEntryField && WORDING.includes(c.kind) ? blocks.map((b) => (hasWording(c, b) ? { ...b, origin } : b)) : blocks;
+      }),
+    };
     if (s.repeat.mode === "per-entry" && collectionId) {
       // Once per entry, in the list's order: the section reads each entry's fields (and `{field}` in its title).
       structure.push({ kind: "group", id: `gen-${s.id}-each`, label: s.title, entries: { collectionId }, children: [pageStep(s, set, { type: "once" })] });

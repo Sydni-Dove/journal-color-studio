@@ -8,8 +8,8 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { DataCollection, DataRecord, FieldDef, ProjectData, ValueType } from "../../types/document";
 import {
-  addCollection, addField, addRecord, applyImport, COLLECTION_STARTERS, displayValue, duplicateRecord, EDITABLE_TYPES, moveField, moveRecord,
-  notImportableText, parseDelimited, planImport, recordIssues, removeCollection, removeField, removeRecord, renameCollection, setValue, updateField, VALUE_TYPE_LABEL,
+  addCollection, addField, addRecord, applyImport, COLLECTION_STARTERS, displayValue, duplicateRecord, EDITABLE_TYPES, markReviewed, moveField, moveRecord,
+  notImportableText, parseDelimited, planImport, recordIssues, removeCollection, removeField, removeRecord, renameCollection, setValue, toReview, updateField, VALUE_TYPE_LABEL,
 } from "../../engines/data/data";
 import { Check, Field, Section } from "./ui";
 import { DEVOTIONAL_STRUCTURES, matchRoles, ROLE_LABEL, usesCollection, type DevotionalRole } from "../../presets/devotionalStructures";
@@ -264,6 +264,7 @@ function RecordsEditor({ c, set }: { c: DataCollection; set: (fn: (d: ProjectDat
   const pages = Math.max(1, Math.ceil(c.records.length / PAGE_SIZE));
   const p = Math.min(page, pages - 1);
   const flagged = c.records.filter((r) => recordIssues(c.fields, r).length).length;
+  const ai = toReview(c);
   const add = () => {
     let id = "";
     set((d) => { const r = addRecord(d, c.id); id = r.recordId; return r.data; });
@@ -271,8 +272,14 @@ function RecordsEditor({ c, set }: { c: DataCollection; set: (fn: (d: ProjectDat
     setPage(Math.floor(c.records.length / PAGE_SIZE));
   };
   return (
-    <Section title={`Entries · ${c.records.length}${flagged ? ` · ${flagged} to check` : ""}`} open>
+    <Section title={`Entries · ${c.records.length}${flagged ? ` · ${flagged} to check` : ""}${ai ? ` · ${ai} AI-written to review` : ""}`} open>
       {c.records.length === 0 && <p className="hint">No entries yet. Add one, or paste rows below.</p>}
+      {ai > 0 && (
+        <div className="ai-review-row" data-testid="ai-review-entries">
+          <p className="hint"><span className="badge badge--ai">AI-written</span> {ai} entr{ai === 1 ? "y was" : "ies were"} written by the AI. Read and edit {ai === 1 ? "it" : "them"} like your own; check any Scripture reference or quotation. The label never prints.</p>
+          <button type="button" className="btn btn--ghost" onClick={() => set((d) => markReviewed(d, c.id))}>Mark all reviewed</button>
+        </div>
+      )}
       {c.records.slice(p * PAGE_SIZE, (p + 1) * PAGE_SIZE).map((r, k) => {
         const i = p * PAGE_SIZE + k;
         const issues = recordIssues(c.fields, r);
@@ -280,6 +287,7 @@ function RecordsEditor({ c, set }: { c: DataCollection; set: (fn: (d: ProjectDat
           <details key={r.id} className="data-record" data-record={r.id} open={open === r.id} onToggle={(e) => { const o = (e.target as HTMLDetailsElement).open; if (o) setOpen(r.id); else if (open === r.id) setOpen(null); }}>
             <summary>
               <span className="data-record__title">{recordTitle(c, r, i + 1)}</span>
+              {r.origin && <span className="badge badge--ai" data-testid="ai-written">AI-written — review</span>}
               {issues.length > 0 && <span className="badge badge--warning">{issues.length} to check</span>}
             </summary>
             {open === r.id && (
@@ -287,6 +295,12 @@ function RecordsEditor({ c, set }: { c: DataCollection; set: (fn: (d: ProjectDat
                 {c.fields.map((f) => (
                   <ValueInput key={f.key} field={f} value={r.values[f.key]} issue={issues.find((x) => x.key === f.key)?.message} onCommit={(v) => set((d) => setValue(d, c.id, r.id, f.key, v))} />
                 ))}
+                {r.origin && (
+                  <div className="ai-review-row">
+                    <p className="hint">Written by the AI. Edit anything you like; mark it reviewed when it says what you mean.</p>
+                    <button type="button" className="btn" onClick={() => set((d) => markReviewed(d, c.id, r.id))}>Mark as reviewed</button>
+                  </div>
+                )}
                 <div className="row">
                   <button type="button" className="btn btn--ghost" disabled={i === 0} aria-label="Move entry up" onClick={() => set((d) => moveRecord(d, c.id, i, i - 1))}>↑ Up</button>
                   <button type="button" className="btn btn--ghost" disabled={i === c.records.length - 1} aria-label="Move entry down" onClick={() => set((d) => moveRecord(d, c.id, i, i + 1))}>↓ Down</button>

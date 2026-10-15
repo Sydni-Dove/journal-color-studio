@@ -203,8 +203,17 @@ export function duplicateRecord(data: ProjectData | undefined, id: string, recor
   const c = (data ?? emptyData()).collections.find((x) => x.id === id);
   const i = c?.records.findIndex((r) => r.id === recordId) ?? -1;
   if (!c || i < 0) return { data: data ?? emptyData(), recordId };
-  return addRecord(data, id, c.records[i].values, i + 1);
+  const copy = addRecord(data, id, c.records[i].values, i + 1);
+  // A copy of AI-written wording is still AI-written.
+  const origin = c.records[i].origin;
+  return origin ? { ...copy, data: withCollection(copy.data, id, (x) => ({ ...x, records: x.records.map((r) => (r.id === copy.recordId ? { ...r, origin } : r)) })) } : copy;
 }
+/** The maker has reviewed AI-written entries (one, or every one in the list): they're no longer flagged. */
+export function markReviewed(data: ProjectData | undefined, id: string, recordId?: string): ProjectData {
+  return withCollection(data, id, (c) => ({ ...c, records: c.records.map((r) => (r.origin && (!recordId || r.id === recordId) ? (({ origin: _o, ...rest }) => rest)(r) : r)) }));
+}
+/** How many entries of a list are AI-written and not yet reviewed. */
+export const toReview = (c: DataCollection) => c.records.filter((r) => r.origin).length;
 export const moveRecord = (data: ProjectData | undefined, id: string, from: number, to: number) => withCollection(data, id, (c) => ({ ...c, records: move(c.records, from, to) }));
 function move<T>(arr: T[], from: number, to: number): T[] {
   if (from === to || from < 0 || from >= arr.length) return arr;

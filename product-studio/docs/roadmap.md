@@ -240,12 +240,17 @@ per product. Order of work:
    lines prints that space too — keep, or make it a setting (open decision).
    **Merged 2026-10-15** (89f054b); Edge Function v8 live (free 5/day, 800-page
    limit).
-   **8.1 Develop original content** — approved, planning on
-   `claude/phase8.1-develop-content`: a mode choice in Generate with AI —
-   *structure only* (today, default) or *develop original content* (the AI writes
-   entries and prompts, all marked suggested and editable; the maker's words
-   unchanged) — same call, schema and engines. No external research. Plan:
-   `docs/phase-8.1-plan.md` on that branch.
+   **8.1 Develop original content** — **built and tested** on
+   `claude/phase8.1-develop-content` (not merged; Edge Function v9 and the cost
+   migration not deployed — awaiting approval). A mode choice in Generate with AI:
+   *Structure only* (default, exactly Phase 8) or *Develop original content* (the
+   AI writes the content — at most 30 whole entries a request, longer series in
+   batches — each request one of the 5 a day). AI-written entries and sections
+   are marked "AI-written — review" in the editor until reviewed, fully editable,
+   never printed; the maker's words never change. Scripture quoted only from
+   public-domain translations, every reference listed to check. Real token use
+   and cost recorded per call for pricing. No external research. Details and the
+   usage-accounting evaluation: `docs/phase-8.1-plan.md`.
 9. **Guided Design Builder & Custom Cover Artwork** — planned; starts only after
    Phase 8 is merged and stable. A guided way through what the studio already
    does, not a second builder: every choice maps onto existing settings, and the

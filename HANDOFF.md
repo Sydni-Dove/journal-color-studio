@@ -3,7 +3,7 @@
 Read this first when picking up the work (any assistant or developer). Keep it current: update it in the same
 commit as any change to state, branches, rules or open decisions.
 
-_Last updated: 2026-10-15 — Phase 8 merged to `main` (89f054b) and live; Edge Function v8 deployed; Phase 8.1 being planned on `claude/phase8.1-develop-content`._
+_Last updated: 2026-10-15 — Phase 8 merged to `main` (89f054b) and live, verified signed in; Edge Function v8 deployed. Phase 8.1 built and tested on `claude/phase8.1-develop-content` — not merged, v9 not deployed, migration not applied (all await approval)._
 
 ## The two apps
 
@@ -25,7 +25,7 @@ that needs its own review.
 | --- | --- |
 | `main` | Phases 0–8 (Phase 8 merged 2026-10-15, 89f054b), paper-gold print fixes, Rose Marble gold. Production for both apps. |
 | `claude/phase8-ai-generation` | Phase 8 as reviewed; merged into `main`. Keep for reference; don't build on it. |
-| `claude/phase8.1-develop-content` | Phase 8.1 (Develop original content): planning, then development. **Not to be merged or deployed without approval.** |
+| `claude/phase8.1-develop-content` | Phase 8.1 (Develop original content): built and tested. **Not to be merged or deployed without approval** (studio merge, Edge Function v9, cost migration). |
 | `preview/product-studio-builder-design-lab` | Older preview branch; everything on it is in `main`. |
 | `claude/roadmap-guided-design-builder` | First draft of the Phase 9 roadmap entry; superseded (now in `main`). Safe to delete. |
 | `backup/*` | Safety copies; do not build on them. |
@@ -42,9 +42,10 @@ that needs its own review.
 ## Phases (details: `product-studio/docs/roadmap.md`)
 
 0–8 done (foundation, measurement, pagination, data layer, devotional, inventory, layout assistant, AI-generated
-documents). **8.1 Develop original content** — approved, plan written (`product-studio/docs/phase-8.1-plan.md` on
-`claude/phase8.1-develop-content`); waiting on Sydni's 4 decisions (daily units, max entries, Scripture policy,
-free/paid) before building. No external research; Edge Function v9 needs approval before deploy.
+documents). **8.1 Develop original content** — built on `claude/phase8.1-develop-content` with Sydni's decisions
+(counts as 1 of the 5; 30 whole entries a request + batches; public-domain Scripture quotations only; free for now).
+Details, test results and the usage-accounting evaluation: `product-studio/docs/phase-8.1-plan.md`. Awaiting approval
+to merge, apply the cost migration and deploy v9. No external research.
 **9 Guided Design Builder & Custom Cover Artwork** — after 8.1 (4 stages; reuses the shared cover snapshot; adds
 image upload; "design styles", not "recipes"). **10 Research and develop content** — future, paid tier.
 **11 Requirements Assistant** — reserved. Technical improvements (any time, not blocking a phase): self-hosted
@@ -110,12 +111,35 @@ fonts (see Testing).
   (2) "A daily log, 900 copies" → 422 "That proposal would have at least 900 pages; a document can have at most 800…"
   (counted as 1 of the 5: the model was called).
   (3) Requests 3–5 → 200; the 6th → 429 "Free accounts can make 5 document proposals a day, and today's are used."
-  `edge_usage_logs` held exactly 5 rows (units 1) — refused requests are not counted. The account's own REST
+  `edge_usage_logs` held exactly 5 rows (units 1) — the 6th, refused at the limit, isn't counted; the 900-page one was
+  (the AI had been called; see the usage-accounting evaluation in `phase-8.1-plan.md`). The account's own REST
   DELETE and PATCH on its rows changed 0 rows, and it stayed blocked afterwards (the cap can't be reset by the user).
 - **Cleanup still open:** the test account was signed out everywhere (no live refresh tokens), but deleting it
   timed out through the Supabase MCP tool (deletes don't run from the cloud session; reads/inserts do). Delete it in
   the Supabase dashboard → Authentication → Users → `ps-livecheck-20261015@example.com`; its 5 usage rows go with it
   (`edge_usage_logs_user_id_fkey` is ON DELETE CASCADE). Expected afterwards: 11 users, 40 usage rows.
+
+## Phase 8.1 — Develop Original Content (built 2026-10-15, not merged or deployed)
+
+- **Mode choice** in Generate with AI: *Structure only* (default; request, prompt and product exactly Phase 8 —
+  tested) or *Develop original content* (the AI writes the days, lessons, exercises, Scripture connections,
+  activities). Optional entry count 1–30; "Write the next batch" continues a series (each request = 1 of the 5).
+- **AI-written content is marked**: `origin` on entries (`DataRecord`) and page sections (`PromptBlock`) →
+  "AI-written — review" badges in Your content and Add to page, "Mark as reviewed" / "Mark all reviewed". Editable
+  like anything else; undo, save and duplicate keep it; **never printed** (tested). The maker's wording is never
+  marked and never changed.
+- **Scripture**: public-domain quotations only (KJV, WEB) in the prompt; every AI reference and quotation is listed to
+  check; a quotation naming a copyrighted translation is flagged to use the reference only.
+- **Server v9 (not deployed)**: validates `mode` / `entryCount` / `batch` before counting; develop gets its own rules
+  (replacing exactly one prompt line), `max_tokens` 12,000, 135 s timeout, no half-written answers; one usage row per
+  request as before; real tokens + estimated cost per model call in `ai_generation_costs` (service role, RLS on, no
+  policies) — migration `supabase/migrations/20261015120000_ai_generation_costs.sql` **not applied**.
+- **Usage accounting: unchanged.** Evaluation and recommendation (stop wasted calls before they happen: page limit in
+  the prompt + a free pre-check; a capped refund only if cost data shows need) in `phase-8.1-plan.md`.
+- **Tests**: unit 1,557/1,557 (32 new), golden snapshots unchanged, build clean; browser 4 new + all existing pass
+  (with the sandbox font routing, see Testing).
+- **To ship (approval needed)**: preview review → apply migration → deploy v9 only (verify project, other functions
+  unchanged) → live develop + batch + structure checks, read back usage and cost rows → merge.
 
 ## AI content: research and creative development (assessed 2026-10-15, not built)
 

@@ -10,12 +10,20 @@ import { supabase } from "../../persistence/cloud";
 import { reviewLayout, type LayoutReview } from "../layout/assistant";
 import { resolveDocument } from "../document/resolve";
 import { projectFromSpec } from "./convert";
-import { checkSpec, MAX_DOCUMENT_PAGES, minimumPages, tooManyPages, unplacedContent, type CheckedSpec, type DocSpec } from "./spec";
+import { checkSpec, MAX_DOCUMENT_PAGES, minimumPages, tooManyPages, unplacedContent, type BatchRequest, type CheckedSpec, type DocSpec, type GenerationMode } from "./spec";
 import type { ProductProject } from "../../types/project";
 
+/**
+ * What else a request asks for. Structure only sends nothing extra (the request is exactly Phase 8's). Develop:
+ * optionally how many entries; or `batch` — the next entries of a list already written.
+ */
+export type RequestOptions = { mode?: GenerationMode; entryCount?: number; batch?: BatchRequest };
+
 /** Ask the Edge Function for a proposal (raw: the studio checks it next). */
-export async function requestSpec(description: string, content: string): Promise<string> {
-  const { data, error } = await supabase().functions.invoke("generate-document", { body: { description, content } });
+export async function requestSpec(description: string, content: string, opts: RequestOptions = {}): Promise<string> {
+  const develop = opts.mode === "develop";
+  const body = develop ? { description, content, mode: "develop", ...(opts.entryCount ? { entryCount: opts.entryCount } : {}), ...(opts.batch ? { batch: opts.batch } : {}) } : { description, content };
+  const { data, error } = await supabase().functions.invoke("generate-document", { body });
   if (error) {
     const res = "context" in error ? (error as { context?: unknown }).context : null;
     const detail = res instanceof Response ? await res.clone().json().catch(() => null) : null;
@@ -27,15 +35,15 @@ export async function requestSpec(description: string, content: string): Promise
 }
 
 /** The checked proposal for the maker's request (throws SpecError when the answer isn't a document). */
-export const checkProposal = (raw: unknown, description: string, content: string): CheckedSpec => checkSpec(raw, { description, content });
+export const checkProposal = (raw: unknown, description: string, content: string, mode: GenerationMode = "structure"): CheckedSpec => checkSpec(raw, { description, content, mode });
 
 /** The product an (edited) outline makes, and how its real pages measure. */
-export function buildFromOutline(spec: DocSpec, content: string, base: Pick<CheckedSpec, "problems" | "flags">): { checked: CheckedSpec; project: ProductProject; review: LayoutReview; limits: string[]; bindings: DocSpec["page"]["binding"][] } {
+export function buildFromOutline(spec: DocSpec, content: string, base: Pick<CheckedSpec, "problems" | "flags" | "mode">): { checked: CheckedSpec; project: ProductProject; review: LayoutReview; limits: string[]; bindings: DocSpec["page"]["binding"][] } {
   // The maker may have removed or edited parts since the check: what of their content is unplaced now.
   // Counted before anything is built: an outline past the page limit is never laid out.
   const least = minimumPages(spec);
   if (least > MAX_DOCUMENT_PAGES) throw new Error(tooManyPages(least));
-  const checked: CheckedSpec = { spec, problems: base.problems, flags: base.flags, unplaced: unplacedContent(spec, content) };
+  const checked: CheckedSpec = { spec, problems: base.problems, flags: base.flags, unplaced: unplacedContent(spec, content), ...(base.mode ? { mode: base.mode } : {}) };
   const project = projectFromSpec(checked);
   // Then the real count (continued pages, fillers) once the pages are expanded.
   const pages = resolveDocument(project).recipe.pageCount;

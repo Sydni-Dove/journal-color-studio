@@ -63,16 +63,32 @@ export type DocSpec = {
   notes: string[];
 };
 
+/**
+ * How much the AI writes. "structure" (Structure only — Phase 8, the default): the document's pages and blanks, and
+ * the maker's own wording placed exactly; it doesn't write content. "develop" (Develop original content): it also
+ * writes the content — days, lessons, exercises, Scripture connections, activities — as AI-written entries the maker
+ * reviews and edits. The maker's own wording is never changed in either mode.
+ */
+export type GenerationMode = "structure" | "develop";
+/** The most entries one "develop" request writes (longer series are written in batches, never cut short). */
+export const MAX_DEVELOPED_ENTRIES = 30;
+/** Safety limit on the AI-written wording one proposal may hold (characters, all entries together). */
+export const MAX_DEVELOPED_TEXT = 150_000;
+/** What a "write the next batch" request tells the server about the list it continues. */
+export type BatchRequest = { name: string; fields: { key: string; label: string; valueType: SpecValueType }[]; from: number; count: number; previous: string[] };
+
 /** Something the check changed or wants the maker to know, in plain words. */
 export type Problem = { level: "left-out" | "adjusted" | "note"; message: string };
 /** Wording to verify before printing: a reference the AI supplied, or a claim about legal / regulatory compliance. */
-export type Flag = { kind: "reference" | "compliance"; text: string; where: string };
+export type Flag = { kind: "reference" | "compliance" | "quotation"; text: string; where: string };
 export type CheckedSpec = {
   spec: DocSpec;
   problems: Problem[];
   flags: Flag[];
   /** Lines of the maker's own content the proposal didn't place: kept on a page of their own (never dropped). */
   unplaced: string[];
+  /** The mode it was asked for (absent: Structure only). */
+  mode?: GenerationMode;
 };
 
 export class SpecError extends Error {}
@@ -114,6 +130,10 @@ const REFERENCE = [
   /§|\b\d+\s?(?:CFR|C\.F\.R\.|U\.S\.C\.|USC)\b|\b(?:Section|Article|Rule)\s\d+[\w.()-]*/,
   /\b(?:according to|as stated in|source:|cited in)\s/i,
 ];
+/** Quoted wording (“…” or "…", four words or more) — with a reference beside it, it's presented as a verse. */
+const QUOTED = /[“"][^”"]*\b\w+\s+\w+\s+\w+\s+\w+[^”"]*[”"]/;
+/** Translations whose text is under copyright: quoting them needs permission (references are fine). */
+const COPYRIGHTED = /\b(?:NIV|ESV|NLT|NKJV|NASB|CSB|HCSB|AMP|AMPC|MSG|TPT|NRSV|NRSVUE|RSV|NET|CEB|GNT|ICB|NIRV|NCV|TLB|CEV|ERV)\b/;
 const COMPLIANCE = /\b(?:compliant|compliance|complies|meets (?:all |the )?(?:legal|regulatory|state|federal|statutory)|legally (?:valid|binding|required|sufficient|compliant)|required by (?:law|regulation|statute)|(?:HIPAA|OSHA|GDPR|FERPA|ADA|IRS)[- ](?:approved|compliant|ready)|satisfies (?:the )?(?:law|regulation)s?|certified)\b/i;
 
 /** The sentence (or line) of `text` a pattern matches, to quote in a flag. */
@@ -128,7 +148,13 @@ function flagsIn(text: string, where: string, aiWrote: boolean): Flag[] {
   // A claim of compliance is flagged whoever wrote it; a reference only when the AI supplied it (the maker's own are theirs).
   if (COMPLIANCE.test(text)) out.push({ kind: "compliance", text: sentenceWith(text, COMPLIANCE), where });
   const ref = REFERENCE.find((r) => r.test(text));
-  if (aiWrote && ref) out.push({ kind: "reference", text: sentenceWith(text, ref), where });
+  if (!aiWrote || !ref) return out;
+  // Quoted verse text the AI supplied: the wording and its translation must be checked (and a copyrighted translation
+  // may not be quoted without permission). Otherwise the reference itself is what to check.
+  if (REFERENCE[0].test(text) && QUOTED.test(text)) {
+    const q = sentenceWith(text, QUOTED);
+    out.push({ kind: "quotation", text: COPYRIGHTED.test(text) ? `${q} — names a copyrighted translation: use the reference only, or a public-domain translation (KJV, WEB)` : q, where });
+  } else out.push({ kind: "reference", text: sentenceWith(text, ref), where });
   return out;
 }
 
@@ -138,7 +164,8 @@ function flagsIn(text: string, where: string, aiWrote: boolean): Flag[] {
  * Check an AI proposal against the studio's rules. Throws SpecError when it isn't a document at all
  * (not JSON, no sections); everything else is repaired or reported, never silently changed.
  */
-export function checkSpec(raw: unknown, input: { description: string; content?: string }): CheckedSpec {
+export function checkSpec(raw: unknown, input: { description: string; content?: string; mode?: GenerationMode }): CheckedSpec {
+  const develop = input.mode === "develop";
   let r: unknown = raw;
   if (typeof r === "string") {
     try {
@@ -177,9 +204,19 @@ export function checkSpec(raw: unknown, input: { description: string; content?: 
       const src: Source = e.source === "user" ? "user" : "suggested";
       const recs = (Array.isArray(e.records) ? e.records : []).filter(isObj).slice(0, LIMITS.entries);
       if (Array.isArray(e.records) && e.records.length > LIMITS.entries) problems.push({ level: "adjusted", message: `Only the first ${LIMITS.entries} entries were kept; add the rest in Your content.` });
-      const records = recs.map((rec) => ({
+      let records = recs.map((rec) => ({
         values: (Array.isArray(rec.values) ? rec.values : []).filter(isObj).filter((v) => seen.has(str(v.key).trim().toLowerCase()) && typeof v.value === "string").map((v) => ({ key: str(v.key).trim().toLowerCase(), value: v.value as string })),
       }));
+      // Written content comes in whole entries, at most a batch at a time: an entry is kept complete or left for the
+      // next batch, never cut short.
+      if (develop && src === "suggested") {
+        let total = 0;
+        const fit = records.findIndex((x, i) => i >= MAX_DEVELOPED_ENTRIES || (total += x.values.reduce((n, v) => n + v.value.length, 0)) > MAX_DEVELOPED_TEXT);
+        if (fit >= 0) {
+          problems.push({ level: "adjusted", message: `The AI wrote ${records.length} entries; the first ${fit} are kept whole (at most ${MAX_DEVELOPED_ENTRIES} per request${fit < MAX_DEVELOPED_ENTRIES ? ", and a safe amount of writing" : ""}). Write the rest with “Write the next batch”.` });
+          records = records.slice(0, fit);
+        }
+      }
       let source = src;
       if (src === "user") {
         // Every value said to be the maker's must be in what they wrote, word for word.
@@ -326,7 +363,44 @@ export function checkSpec(raw: unknown, input: { description: string; content?: 
     sections,
     notes: (Array.isArray(r.notes) ? r.notes : []).filter(nonEmpty).map((n) => str(n).slice(0, 300)).slice(0, 12),
   };
-  return { spec, problems, flags, unplaced: unplacedContent(spec, input.content ?? "") };
+  return { spec, problems, flags, unplaced: unplacedContent(spec, input.content ?? ""), ...(develop ? { mode: "develop" as const } : {}) };
+}
+
+/**
+ * The next batch of AI-written entries, added to the end of the outline's list. The batch is a checked proposal for
+ * the same list: only values for the list's own fields are taken (by key), so the pages that print them stay as
+ * they are. Returns the outline unchanged (and why) when the batch has nothing to add.
+ */
+export function appendBatch(spec: DocSpec, batch: CheckedSpec): { spec: DocSpec; added: number; message: string } {
+  const list = spec.entries;
+  const more = batch.spec.entries;
+  if (!list) return { spec, added: 0, message: "This outline has no list of entries to continue." };
+  if (!more?.records.length) return { spec, added: 0, message: "The AI didn't write any new entries. Try again, or add them in Your content after creating." };
+  const keys = new Set(list.fields.map((f) => f.key));
+  const records = more.records.map((r) => ({ values: r.values.filter((v) => keys.has(v.key)) })).filter((r) => r.values.some((v) => v.value.trim()));
+  const room = LIMITS.entries - list.records.length;
+  const take = records.slice(0, Math.max(0, room));
+  return {
+    // Anything the AI wrote is a suggestion, whatever the list held before.
+    spec: { ...spec, entries: { ...list, records: [...list.records, ...take], source: "suggested" } },
+    added: take.length,
+    message: take.length ? `Added ${take.length} entr${take.length === 1 ? "y" : "ies"} (now ${list.records.length + take.length}).` : "The new entries didn't match this list's fields, so nothing was added.",
+  };
+}
+
+/** What the server needs to continue the outline's list: its fields, where to start, and what's already written. */
+export function batchRequest(spec: DocSpec, count: number): BatchRequest | null {
+  const e = spec.entries;
+  if (!e) return null;
+  const first = e.fields.find((f) => f.valueType === "text") ?? e.fields[0];
+  return {
+    name: e.name,
+    fields: e.fields,
+    from: e.records.length + 1,
+    count: Math.max(1, Math.min(MAX_DEVELOPED_ENTRIES, Math.round(count) || 1)),
+    // The last entries' names, so the next batch continues rather than repeats.
+    previous: e.records.slice(-40).map((r) => (r.values.find((v) => v.key === first.key)?.value ?? "").replace(/\s+/g, " ").trim().slice(0, 100)).filter(Boolean),
+  };
 }
 
 /** Wording the maker's content holds, in everything the proposal marks as theirs (and their entries). */

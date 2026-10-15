@@ -11,6 +11,8 @@
  * tables) are NOT prompt blocks.
  */
 
+import type { ContentOrigin } from "./document";
+
 /** How a prompt's answer area is drawn. */
 export type ResponseStyle = "ruled" | "blank" | "dot-grid" | "graph-grid" | "checkboxes" | "table";
 export type TaskMarker = "square" | "circle" | "none";
@@ -208,6 +210,8 @@ export type PromptBlock = {
    * their pages (the two halves of a table split across facing pages: same rows, same numbers).
    */
   fillGroup?: string;
+  /** Written by the AI ("Develop original content"): flagged in the editor until reviewed; never printed. */
+  origin?: ContentOrigin;
 };
 
 /**
