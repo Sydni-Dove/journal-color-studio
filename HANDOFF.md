@@ -3,7 +3,7 @@
 Read this first when picking up the work (any assistant or developer). Keep it current: update it in the same
 commit as any change to state, branches, rules or open decisions.
 
-_Last updated: 2026-10-15 — Phase 8 merged to `main` (89f054b) and live, verified signed in; Edge Function v8 deployed. Phase 8.1 built and tested on `claude/phase8.1-develop-content` — not merged, v9 not deployed, migration not applied (all await approval)._
+_Last updated: 2026-10-15. Phase 8 is merged to `main` (89f054b) and live. Phase 8.1's server side is live (cost table + `generate-document` with develop mode and page-limit handling) and live-tested; the studio side is on `claude/phase8.1-develop-content`, **not merged** (awaiting approval)._
 
 ## The two apps
 
@@ -25,7 +25,7 @@ that needs its own review.
 | --- | --- |
 | `main` | Phases 0–8 (Phase 8 merged 2026-10-15, 89f054b), paper-gold print fixes, Rose Marble gold. Production for both apps. |
 | `claude/phase8-ai-generation` | Phase 8 as reviewed; merged into `main`. Keep for reference; don't build on it. |
-| `claude/phase8.1-develop-content` | Phase 8.1 (Develop original content): built and tested. **Not to be merged or deployed without approval** (studio merge, Edge Function v9, cost migration). |
+| `claude/phase8.1-develop-content` | Phase 8.1 (Develop original content): built and live-tested; its server side is deployed (approved). **Studio not to be merged without approval.** |
 | `preview/product-studio-builder-design-lab` | Older preview branch; everything on it is in `main`. |
 | `claude/roadmap-guided-design-builder` | First draft of the Phase 9 roadmap entry; superseded (now in `main`). Safe to delete. |
 | `backup/*` | Safety copies; do not build on them. |
@@ -44,8 +44,8 @@ that needs its own review.
 0–8 done (foundation, measurement, pagination, data layer, devotional, inventory, layout assistant, AI-generated
 documents). **8.1 Develop original content** — built on `claude/phase8.1-develop-content` with Sydni's decisions
 (counts as 1 of the 5; 30 whole entries a request + batches; public-domain Scripture quotations only; free for now).
-Details, test results and the usage-accounting evaluation: `product-studio/docs/phase-8.1-plan.md`. Awaiting approval
-to merge, apply the cost migration and deploy v9. No external research.
+Details: `product-studio/docs/phase-8.1-plan.md`. Server side is live and live-tested (below); the studio merge
+awaits approval. No external research.
 **9 Guided Design Builder & Custom Cover Artwork** — after 8.1 (4 stages; reuses the shared cover snapshot; adds
 image upload; "design styles", not "recipes"). **10 Research and develop content** — future, paid tier.
 **11 Requirements Assistant** — reserved. Technical improvements (any time, not blocking a phase): self-hosted
@@ -119,27 +119,95 @@ fonts (see Testing).
   the Supabase dashboard → Authentication → Users → `ps-livecheck-20261015@example.com`; its 5 usage rows go with it
   (`edge_usage_logs_user_id_fkey` is ON DELETE CASCADE). Expected afterwards: 11 users, 40 usage rows.
 
-## Phase 8.1 — Develop Original Content (built 2026-10-15, not merged or deployed)
+## Phase 8.1 — Develop Original Content (live-tested 2026-10-15; branch not merged)
 
-- **Mode choice** in Generate with AI: *Structure only* (default; request, prompt and product exactly Phase 8 —
-  tested) or *Develop original content* (the AI writes the days, lessons, exercises, Scripture connections,
-  activities). Optional entry count 1–30; "Write the next batch" continues a series (each request = 1 of the 5).
-- **AI-written content is marked**: `origin` on entries (`DataRecord`) and page sections (`PromptBlock`) →
-  "AI-written — review" badges in Your content and Add to page, "Mark as reviewed" / "Mark all reviewed". Editable
-  like anything else; undo, save and duplicate keep it; **never printed** (tested). The maker's wording is never
-  marked and never changed.
-- **Scripture**: public-domain quotations only (KJV, WEB) in the prompt; every AI reference and quotation is listed to
-  check; a quotation naming a copyrighted translation is flagged to use the reference only.
-- **Server v9 (not deployed)**: validates `mode` / `entryCount` / `batch` before counting; develop gets its own rules
-  (replacing exactly one prompt line), `max_tokens` 12,000, 135 s timeout, no half-written answers; one usage row per
-  request as before; real tokens + estimated cost per model call in `ai_generation_costs` (service role, RLS on, no
-  policies) — migration `supabase/migrations/20261015120000_ai_generation_costs.sql` **not applied**.
-- **Usage accounting: unchanged.** Evaluation and recommendation (stop wasted calls before they happen: page limit in
-  the prompt + a free pre-check; a capped refund only if cost data shows need) in `phase-8.1-plan.md`.
-- **Tests**: unit 1,557/1,557 (32 new), golden snapshots unchanged, build clean; browser 4 new + all existing pass
-  (with the sandbox font routing, see Testing).
-- **To ship (approval needed)**: preview review → apply migration → deploy v9 only (verify project, other functions
-  unchanged) → live develop + batch + structure checks, read back usage and cost rows → merge.
+**Status:** the server side is live in production (approved): migration `ai_generation_costs` applied, and
+`generate-document` deployed. The **studio changes are only on `claude/phase8.1-develop-content`**: production
+still runs the Phase 8 studio, which never sends `mode`, so production users get Structure only. **Do not merge
+without Sydni's approval.**
+
+**What it does.**
+- **Mode choice** in Generate with AI:
+  - *Structure only* is the default; its request and product are exactly Phase 8's (tested).
+  - *Develop original content* has the AI write the days, lessons, stories, activities, questions and prayers.
+  - Each request counts as 1 of the 5 a day.
+- **Size:** up to 30 complete entries per request. "Write the next batch" continues a series without repeats.
+- **AI-written content is marked:** `origin` on entries and page sections shows "AI-written — review" in Your
+  content and Add to page, with "Mark as reviewed" and "Mark all reviewed".
+  - It stays editable, and undo, save, sync and duplicate keep it.
+  - It is never printed (tested).
+  - The maker's wording is never marked or changed.
+- **Scripture:** quotations only from public-domain translations (KJV, WEB). Every AI reference and quotation is
+  listed to check; copyrighted translations are flagged.
+- **Page limit:**
+  - A clear quantity over 800 ("900 copies") is answered before anything is sent or counted, in both the studio
+    and the server, with the maker's choices: reduce, split, or edit it.
+  - The AI is told the limit, and told never to lower, drop or merely describe pages.
+  - A proposal that still comes back past the limit is returned with the limit, and the review offers "Reduce to
+    fit" (every change listed) or "Split into documents". Nothing changes until the maker chooses.
+  - The old silent 500-copy cut is gone.
+- **Accounting:** unchanged for requests that reach the AI (counted first).
+- **Cost tracking:** real tokens and estimated USD for every model call go to `ai_generation_costs`. It is written
+  with the service role; RLS is on with no policies; `user_id` is set to null when an account is deleted.
+
+**Pre-deploy checks.**
+- The project is `jnlvvlkwskidloripvtp`, the only active project for this app.
+- The migration only creates the new table and its two indexes.
+- Users (12), usage rows (45) and all public tables were unchanged after the migration. The security advisor
+  showed only the expected "RLS enabled, no policy" info notice for the new table.
+- Only `generate-document` was redeployed. The other 10 functions are unchanged (same versions and sha).
+
+**Live results (temporary test accounts, branch build against the live function).**
+
+| Check | Result |
+|---|---|
+| Structure Only | Reading log, 30 pages, 6 s; parts labelled "Suggested" as in Phase 8; 0 AI-written marks |
+| Free pre-check | "A daily log, 900 copies": studio sent nothing; server returned 422 `page-limit` before counting |
+| Develop (children's character journal, ages 6–9, 6 lessons) | 18–21 s; each lesson has a trait, a real fitting verse reference, a story with a named child, an activity, two questions and a prayer; age-appropriate |
+| Next batch ×2 | 12 → 18 lessons; all distinct |
+| Saved and reopened | AI-written labels kept, including after online sync into a fresh browser; the printed pages show none |
+| 6th request | 429 "Free accounts can make 5 document proposals a day…"; the review keeps what was written |
+| Over-limit proposal ("a daily food journal… three years") | AI built 1,095 copies; review offered Reduce (1,095 → 790) or Split into 2 |
+| Cost | 21 calls, $0.074 total. Structure ≈ $0.0015 per proposal; develop with 6 lessons ≈ $0.0045 |
+
+**Live defects found and fixed (each now has a test; the real answer is the fixture
+`tests/fixtures/live/develop-children-2026-10-15.json`):**
+1. The develop answer had `entries: null` while its notes claimed 6 lessons. Fix: develop mode uses a format where
+   entries are required, plus a worked example of the shape.
+2. The AI put the lessons somewhere other than the list. Fix: one retry within the same proposal, naming what's
+   missing. If it's still incomplete, the answer is returned anyway (paid for) with a note, never discarded.
+3. The AI wrote lessons but no page to print them. Fix: the studio adds a page per entry and says so.
+4. Batch 1 repeated lessons 1–6. Fixes:
+   - every name already written goes into the request itself, and close synonyms and reused verses are excluded;
+   - the server retries when half or more are repeats;
+   - the studio leaves out repeated entries and says so.
+5. The two reflection questions were written but never printed (the AI's page gave blank lines). Fix: any written
+   part a page leaves out is added to it and said.
+6. Stories came back as definitions. Fix: the rules ask for the requested form (a story with a named character and
+   an event). Now real stories, but still short.
+7. The page-limit instruction made the AI drop the daily pages and describe them in notes. Fix: build every
+   section at full quantity; the limit is the studio's to handle.
+8. The studio cut any count above 500 copies to 500, silently. Fix: removed; a sanity bound of 20,000 remains.
+
+**Known limitation:** develop stories run 28–50 words against the 100–180 asked for (gpt-4.1-mini writes short).
+Options are listed in the 8.1 report: accept and edit, or try a stronger model for develop only (higher cost per
+request).
+
+**Function versions.** The deploy counter now reads v16; each step above was a redeploy of `generate-document` only.
+The current code is `VERSION generate-document-2026-10-15-spec-v12-page-limit-build`, identical to the branch.
+
+**Tests.**
+- Unit 1,571/1,571; golden snapshots unchanged.
+- Browser 168/168: 162 existing plus 6 new, covering iPhone 390/430 and both page-limit paths, with the sandbox
+  font routing.
+
+**Cleanup (Sydni, dashboard → Authentication → Users).** Delete the temporary accounts:
+- `ps-livecheck-20261015@example.com` (from Phase 8)
+- `ps-livecheck81-20261015@example.com`
+- `ps-livecheck81b-20261015@example.com`
+- `ps-livecheck81c-20261015@example.com`
+
+All are signed out everywhere. Their usage rows go with them; their cost rows stay with `user_id` null.
 
 ## AI content: research and creative development (assessed 2026-10-15, not built)
 

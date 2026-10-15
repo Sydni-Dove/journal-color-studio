@@ -1,7 +1,8 @@
 # Phase 8.1 — Develop Original Content
 
-Status: **built and tested on branch `claude/phase8.1-develop-content`; not merged, not deployed.** Merging the
-studio changes, deploying Edge Function v9 and applying the cost-tracking migration each need Sydni's approval.
+Status: **live-tested.** The server side is deployed with Sydni's approval: the cost table and `generate-document`.
+The studio changes are on branch `claude/phase8.1-develop-content`; merging them needs her approval. Live results
+and the defects found and fixed are in HANDOFF.md (Phase 8.1).
 
 ## What it is
 
@@ -226,6 +227,15 @@ So only answers rejected *after* the call (too many pages, cut off, declined) us
 
 **Recommendation.** Option 1 (a and b) now, deployed with v9 if approved. Option 2 only if `ai_generation_costs`
 (its `outcome` column) shows meaningful numbers of wasted proposals. Nothing in usage accounting has been changed.
+
+## Page limit (approved 2026-10-15, built and live-tested)
+
+- A clear quantity past 800 is answered before anything is sent or counted, with the maker's choices: reduce,
+  split, or edit it themselves.
+- The AI is told the limit, and told never to lower, drop or merely describe pages.
+- A proposal that still comes back past the limit is returned with the limit. The review offers "Reduce to fit"
+  (every change listed) or "Split into documents". Nothing changes until the maker chooses.
+- Allowance accounting is unchanged for requests that reach the AI.
 
 ## Before merge / deploy (needs approval)
 
