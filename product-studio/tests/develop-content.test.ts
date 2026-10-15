@@ -217,6 +217,10 @@ describe("the server: develop mode, limits and cost records (Edge Function v9 â€
     expect(fn).toMatch(/await cost\("incomplete-retried"\)/);
     expect(fn.match(/edge_usage_logs"\)\.insert\(/g)).toHaveLength(1);
   });
+  it("develop answers use the same format with the list of entries required (never null); Structure only keeps the shared schema", () => {
+    expect(fn).toMatch(/entries: \(schema\.properties\.entries as \{ anyOf: unknown\[\] \}\)\.anyOf\[0\]/);
+    expect(fn).toMatch(/schema: develop \? developSchema : schema/);
+  });
   it("a cut-off answer is never handed back half-written", () => {
     expect(fn).toMatch(/finish_reason === "length"/);
   });

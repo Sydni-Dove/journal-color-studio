@@ -23,6 +23,12 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import schema from "./schema.json" with { type: "json" };
 
+/**
+ * Develop mode's answer format: the same schema, except the list of entries is required (not nullable) — live
+ * testing found the model answering "develop" with entries: null and a note claiming the lessons were written.
+ */
+const developSchema = { ...schema, properties: { ...schema.properties, entries: (schema.properties.entries as { anyOf: unknown[] }).anyOf[0] } };
+
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
 /** The most pages a proposal may make (same number as MAX_DOCUMENT_PAGES in product-studio/src/engines/generate/spec.ts). */
@@ -48,7 +54,7 @@ const PAID_DAILY_CAP = Number(Deno.env.get("PAID_DAILY_CAP")) || 50;
 const isPaid = (user: { app_metadata?: Record<string, unknown> }) => user.app_metadata?.plan === "paid";
 const FUNCTION_NAME = "generate-document";
 const MODELS = ["gpt-4.1-mini", "gpt-4o-mini"];
-const VERSION = "generate-document-2026-10-15-spec-v6-develop-check";
+const VERSION = "generate-document-2026-10-15-spec-v7-develop-entries";
 /** The most entries one "develop" request writes (same as MAX_DEVELOPED_ENTRIES in product-studio/src/engines/generate/spec.ts). */
 const MAX_DEVELOPED_ENTRIES = 30;
 /**
@@ -244,7 +250,7 @@ Deno.serve(async (req) => {
           // Develop writes prose: a little more varied wording, and a fixed output ceiling.
           temperature: develop ? 0.5 : 0.2,
           ...(develop ? { max_tokens: DEVELOP_MAX_TOKENS } : {}),
-          response_format: { type: "json_schema", json_schema: { name: "document_spec", strict: true, schema } },
+          response_format: { type: "json_schema", json_schema: { name: "document_spec", strict: true, schema: develop ? developSchema : schema } },
           messages: [{ role: "system", content: system }, { role: "user", content: user }, ...retry],
         }),
       });
