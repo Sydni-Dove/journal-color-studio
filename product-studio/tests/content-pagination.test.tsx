@@ -19,7 +19,7 @@ import type { PromptBlock, PromptSet } from "../src/types/prompts";
 import type { LayoutNode, PageFragment, SolvedPage } from "../src/types/layout";
 import type { StationeryZone } from "../src/types/stationery";
 
-type Opts = { size?: string; orientation?: "portrait" | "landscape"; binding?: string; profile?: string; copies?: number; before?: number };
+type Opts = { size?: string; orientation?: "portrait" | "landscape"; binding?: string; profile?: string; copies?: number; before?: number; paragraphSpace?: boolean };
 function book(blocks: PromptBlock[], o: Opts = {}) {
   return createProject("journal", {
     name: "Pagination",
@@ -29,6 +29,7 @@ function book(blocks: PromptBlock[], o: Opts = {}) {
       ...(o.before ? [step("lined-journal", { type: "copies", count: o.before })] : []),
       step("guided", { type: "copies", count: o.copies ?? 1 }, { title: "Content", promptSet: { blocks } as PromptSet }),
     ] },
+    ...(o.paragraphSpace === undefined ? {} : { layoutOptions: { paragraphSpace: o.paragraphSpace } as never }),
   });
 }
 
@@ -293,4 +294,20 @@ describe("paragraph space at a page break", () => {
       expect(words(printed)).toEqual(words(value));
     });
   }
+});
+
+describe("Space between paragraphs (Spacing panel)", () => {
+  const value = prose(12).split("\n").join("\n\n");
+  const allLines = (r: ReturnType<typeof solve>) => r.guided.flatMap(({ s }) => ofSection(s, "t1", /-prompt$/).flatMap((n) => (n.type === "text" ? n.fit?.lines ?? [n.text] : [])));
+  it("on by default: a blank line between paragraphs prints as an empty line", () => {
+    expect(allLines(solve([bodyText("t1", value)], { size: "8.5x11" })).filter((l) => l === "").length).toBeGreaterThan(0);
+  });
+  it("off: no empty lines, every paragraph still starts on its own line, every word once", () => {
+    const off = solve([bodyText("t1", value)], { size: "8.5x11", paragraphSpace: false });
+    const lines = allLines(off);
+    expect(lines.filter((l) => l === "")).toEqual([]);
+    expect(lines.filter((l) => /^\d+\.1 /.test(l)).length).toBe(12);
+    expect(words(lines.join(" "))).toEqual(words(value));
+    expect(lines.length).toBeLessThan(allLines(solve([bodyText("t1", value)], { size: "8.5x11" })).length);
+  });
 });

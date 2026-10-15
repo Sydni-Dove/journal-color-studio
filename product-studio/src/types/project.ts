@@ -44,6 +44,11 @@ export type LayoutPlacement = "top-left" | "top-right" | "top-center";
 
 /** Per-layout user options, keyed by layout id. */
 export type LayoutOptions = {
+  /**
+   * A blank line between paragraphs of text prints as one empty line (dropped where a page breaks).
+   * Absent = on; false = paragraphs follow each other with no space between them.
+   */
+  paragraphSpace?: boolean;
   datePlacement: LayoutPlacement;
   showSidebar: boolean;
   /**

@@ -468,6 +468,12 @@ export function SpacingPanel({ project, update }: PanelProps) {
         onChange={(density) => update((p) => ({ ...p, spacing: { ...p.spacing, density } }))}
       />
       <p className="hint">{SPACING_LABELS[project.spacing.density]}</p>
+      <Check
+        label="Space between paragraphs"
+        checked={project.layoutOptions.paragraphSpace !== false}
+        onChange={(on) => update((p) => ({ ...p, layoutOptions: { ...p.layoutOptions, paragraphSpace: on } }))}
+      />
+      <p className="hint">Where your text has a blank line between paragraphs, leave a line of space there. Off: paragraphs follow each other directly.</p>
     </Section>
   );
 }
