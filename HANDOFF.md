@@ -507,6 +507,60 @@ overwriting or duplicating, the plan is:
 
 Codex's request for a key file is not needed: this cloud environment already reaches OpenAI (see above).
 
+## Phase 8.1 — GPT-4.1 integration (in progress; handed to a local session 2026-10-15)
+
+Sydni approved gpt-4.1 for **Develop Original Content only**, 6 lessons per request. Structure Only stays on
+gpt-4.1-mini. Nothing below is deployed or merged.
+
+**Codex's branch.** `codex/phase8-1-story-quality` is local to Sydni's Mac. It is not on the remote and could not be
+reached from the cloud session. The local session should integrate it from there, and push it only after checking
+for credentials and temp files (e.g. the key file at `/private/tmp/dove-ps-openai-key` must never be committed).
+
+**Done (cloud session; committed here; NOT deployed).** Changes to `supabase/functions/generate-document/index.ts`:
+
+- **Models.** Develop uses `DEVELOP_MODELS = ["gpt-4.1", "gpt-4.1-mini"]`. Structure `MODELS` is unchanged.
+- **Fallback.** It falls back to gpt-4.1-mini only when gpt-4.1 is unavailable: 404, 408, 409, 429, 5xx, timeout or
+  network error. A 400/401/403, an empty answer or inadequate content does not fall back (it `break`s).
+- **Visible fallback.** Replies carry `fallback: {from, to, reason}`, and the cost row outcome gets a ` (fallback)`
+  suffix.
+- **Size.** `MAX_DEVELOPED_ENTRIES = 6`. The price table now includes gpt-4.1 ($2 / $8 per 1M tokens).
+- **Develop rules.** Each story is 8–10 sentences (about 140 words) with a named child, a real situation, a meaningful
+  decision and its consequence. Every story uses a different child's name. No Scripture reference appears inside a
+  story. Reflection questions are about that story, and at least one names its main character. The activity
+  practises the same trait.
+- **Prompt.** The mini-story ask is appended to the develop user message.
+- **Batches.** A batch accepts `verses[]` (up to 60) and `names[]` (up to 60), and adds them to the prompt as "already
+  used — do not repeat".
+- **Version.** `VERSION` is `generate-document-2026-10-15-spec-v13-develop-gpt41`. The esbuild syntax check passes.
+
+**Still to do (local session).**
+
+1. **Merge Codex's branch first.** Keep its story-length and lesson-completeness validation, its bounded retry and its
+   acknowledged incomplete warning. Where it overlaps the cloud work, Codex's version replaces the cloud's
+   `developGap` retry and the `ai-no-entries` note. The retry must stay on the same model: a quality failure never
+   triggers the gpt-4.1-mini fallback.
+2. **Studio changes** in `product-studio/src/engines/generate/spec.ts`:
+   - Set `MAX_DEVELOPED_ENTRIES = 6`.
+   - Add `verses` and `names` to `BatchRequest`, and fill them in `batchRequest()`:
+     - **verses** come from the field matching /verse|scripture|reference/ or with valueType `reference`;
+     - **names** are each record's main character name.
+3. **Fallback note.** `pipeline.ts` `requestSpec` exposes `fallback`. `AiDocumentWizard.tsx` shows "Written with the
+   backup model (gpt-4.1-mini) because gpt-4.1 was unavailable".
+4. **Defaults.** The entry count and the next batch default to 6, and the "Up to 30" hint text changes to 6.
+5. **Tests.**
+   - Update the 30-cap tests to 6.
+   - Add static server checks:
+     - `DEVELOP_MODELS`;
+     - the availability-only fallback;
+     - quality failures don't fall back;
+     - the story ask;
+     - the verses and names lines;
+     - Structure `MODELS` is unchanged.
+   - Add a browser test for the fallback note.
+6. **Run everything:** tsc, the unit tests (golden and print snapshots), the build, and the full browser suite.
+   Confirm that Structure Only, provenance markers, saving, pagination and printing are unchanged.
+7. **Report to Sydni.** Deploying the function and merging to main both need her approval.
+
 ## AI content: research and creative development (assessed 2026-10-15, not built)
 
 Sydni's test: "A homeschool reading log for kids: book, pages read, a favourite part, and a parent check-off",
