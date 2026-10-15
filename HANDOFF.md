@@ -3,7 +3,7 @@
 Read this first when picking up the work (any assistant or developer). Keep it current: update it in the same
 commit as any change to state, branches, rules or open decisions.
 
-_Last updated: 2026-10-15 — Phase 8 reviewed and fixed (on `claude/phase8-ai-generation`), waiting for merge approval._
+_Last updated: 2026-10-15 — Phase 8 merged to `main` (89f054b) and live; Edge Function v8 deployed; Phase 8.1 being planned on `claude/phase8.1-develop-content`._
 
 ## The two apps
 
@@ -23,10 +23,11 @@ that needs its own review.
 
 | Branch | State |
 | --- | --- |
-| `main` | Phases 0–7, the paper-gold print fixes, Rose Marble gold (d4e5cf1). Production for both apps. |
-| `claude/phase8-ai-generation` | Phase 8 (AI-generated documents) + main merged in + review fixes. **Awaiting approval to merge.** Includes Codex's `codex/product-studio-phase8` and `backup/codex-phase8-uncommitted-2026-10-09`. |
+| `main` | Phases 0–8 (Phase 8 merged 2026-10-15, 89f054b), paper-gold print fixes, Rose Marble gold. Production for both apps. |
+| `claude/phase8-ai-generation` | Phase 8 as reviewed; merged into `main`. Keep for reference; don't build on it. |
+| `claude/phase8.1-develop-content` | Phase 8.1 (Develop original content): planning, then development. **Not to be merged or deployed without approval.** |
 | `preview/product-studio-builder-design-lab` | Older preview branch; everything on it is in `main`. |
-| `claude/roadmap-guided-design-builder` | First draft of the Phase 9 roadmap entry; superseded by the roadmap on the Phase 8 branch. Safe to delete after Phase 8 merges. |
+| `claude/roadmap-guided-design-builder` | First draft of the Phase 9 roadmap entry; superseded (now in `main`). Safe to delete. |
 | `backup/*` | Safety copies; do not build on them. |
 
 ## Rules (from Sydni)
@@ -40,10 +41,12 @@ that needs its own review.
 
 ## Phases (details: `product-studio/docs/roadmap.md`)
 
-0–7 done (foundation, measurement, pagination, data layer, devotional, inventory, layout assistant).
-**8 AI-generated documents** — reviewed, not merged. **9 Guided Design Builder & Custom Cover Artwork** — planned,
-starts after 8 is merged and stable (4 stages; reuses the shared cover snapshot; adds image upload; "design
-styles", not "recipes"). **10 Requirements Assistant** — reserved.
+0–8 done (foundation, measurement, pagination, data layer, devotional, inventory, layout assistant, AI-generated
+documents). **8.1 Develop original content** — approved, planning on its own branch (no external research).
+**9 Guided Design Builder & Custom Cover Artwork** — after 8.1 (4 stages; reuses the shared cover snapshot; adds
+image upload; "design styles", not "recipes"). **10 Research and develop content** — future, paid tier.
+**11 Requirements Assistant** — reserved. Technical improvements (any time, not blocking a phase): self-hosted
+fonts (see Testing).
 
 ## Phase 8 review (2026-10-15)
 
@@ -81,6 +84,27 @@ styles", not "recipes"). **10 Requirements Assistant** — reserved.
 - Remaining refinements (not blocking): the review screen shows `{day}`-style placeholders in page titles (show
   them as friendly chips); whether sign-ups are open (each free account = 5 proposals/day of OpenAI cost);
   home-page "Generate with AI" could say "sign in required" before the click; self-host fonts (see Testing).
+
+## Phase 8 merge and Edge Function deploy (2026-10-15)
+
+- **Merged** `claude/phase8-ai-generation` into `main` (89f054b, a merge commit; the tree is identical to the tested
+  branch). Vercel `dove-product-studio` production built it (READY). Verified at the time: unit 1525/1525, build,
+  browser 162/162 (with fonts reachable — see Testing).
+- **Supabase project verified**: the app's `SUPABASE_URL` is `jnlvvlkwskidloripvtp` = "Dove Expressions App 2",
+  the only active project for this app (others listed are inactive or other apps).
+- **Deployed** `generate-document` **v8** (was v7) with `verify_jwt` still on: free 5/day + paid hook, 800-page
+  limit, new messages, `VERSION generate-document-2026-10-15-spec-v4-plans`; `schema.json` unchanged. The live
+  code was read back and matches `main`. **Nothing else changed**: the other 10 functions kept their version and
+  fingerprint (ocr-image 23, polly-tts 18, transcribe-audio 13, backfill-audio-transcripts 11, acx-extract 10,
+  screenshot-extract 10, hearing-god-video 10, hg-video-diag 5, shared-attachment 3, import-journal 6); no
+  database, policy, secret or migration change.
+- **Live checks done**: no token → 401; public key only (signed out) → 401 "Sign in to generate a document.";
+  forged token → 401; CORS preflight → 204. Production site: signed out, Generate with AI shows the sign-in card,
+  no description box, no request sent. Production bundle contains the new wording.
+- **Live checks that need a real signed-in account (Sydni):** (1) sign in, generate a document → outline appears;
+  (2) a 6th proposal the same day (UTC) → "Free accounts can make 5 document proposals a day…"; (3) ask for "a daily
+  log, 900 copies" → the 800-page message (server or review). Usage can be confirmed afterwards in
+  `edge_usage_logs` (rows per user per day).
 
 ## AI content: research and creative development (assessed 2026-10-15, not built)
 
@@ -140,7 +164,8 @@ npx vite build && npx vitest run -c vitest.browser.config.ts   # browser; needs 
 ```
 In the cloud sandbox set `CHROMIUM_PATH=/opt/pw-browsers/chromium-1194/chrome-linux/chrome`; font-dependent export
 tests fail there (see above). Recommendation: self-host the studio fonts so export never depends on Google Fonts
-(also protects users who print offline).
+(also protects users who print offline). The cloud sandbox's Chromium also stalls on Google font files through
+the proxy; routing font requests through Playwright (`route.fetch`) made all 162 browser tests pass there.
 
 ## Printing notes
 

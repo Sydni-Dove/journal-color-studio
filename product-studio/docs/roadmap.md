@@ -238,10 +238,14 @@ per product. Order of work:
    between paragraphs prints as one empty line, dropped where a page breaks
    (fixed in review). It is always on, so a saved product whose text has blank
    lines prints that space too — keep, or make it a setting (open decision).
-   **8.1 Develop original content** (proposed, small): a mode choice in Generate
-   with AI — *structure only* (today) or *develop original content* (the AI
-   writes entries and prompts, all marked suggested) — same call, schema and
-   engines. Details and the research assessment: `HANDOFF.md`.
+   **Merged 2026-10-15** (89f054b); Edge Function v8 live (free 5/day, 800-page
+   limit).
+   **8.1 Develop original content** — approved, planning on
+   `claude/phase8.1-develop-content`: a mode choice in Generate with AI —
+   *structure only* (today, default) or *develop original content* (the AI writes
+   entries and prompts, all marked suggested and editable; the maker's words
+   unchanged) — same call, schema and engines. No external research. Plan:
+   `docs/phase-8.1-plan.md` on that branch.
 9. **Guided Design Builder & Custom Cover Artwork** — planned; starts only after
    Phase 8 is merged and stable. A guided way through what the studio already
    does, not a second builder: every choice maps onto existing settings, and the
@@ -302,6 +306,15 @@ per product. Order of work:
    verified vs suggested, no claimed curriculum alignment, no proprietary text)
    before the outline; paid-tier feature. See `HANDOFF.md`.
 11. **Requirements Assistant** — reserved in the model; not built.
+
+**Technical improvements (not tied to a phase; never delay a phase merge):**
+- *Self-hosted fonts.* Serve the studio's font files from the app (woff2 in the
+  build, `@font-face` pointing at them; `FONT_CATALOG` already has a `localUrl`
+  field) instead of Google Fonts, so preview and PDF export never depend on
+  Google being reachable (offline printing, outages, blocked networks) and
+  browser tests run anywhere. Check each font's licence (Google Fonts are OFL /
+  Apache), keep the readiness check (export waits for fonts), and confirm text
+  measurement is unchanged (golden snapshots).
 
 Rules: the collection owns words, the recipe owns order, pagination owns page
 breaks, solvers own geometry, and preview and print draw the same pages.
