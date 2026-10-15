@@ -433,7 +433,7 @@ export function AiDocumentWizard({ onCreate, onCreateMany, onCancel, signedIn = 
           </div>
           {spec.page.why && <p className="hint">{spec.page.why}</p>}
           {checked.mode === "develop" && !spec.entries?.records.length && (
-            <p className="data-issue" role="note" data-testid="ai-no-entries">The AI didn't write any entries this time — only the outline. Change the description and propose again, or create it and add entries in Your content.</p>
+            <p className="data-issue" role="note" data-testid="ai-no-entries">The AI didn't write the lessons as a list this time, so “Write the next batch” isn't available. Anything it did write is below, marked AI-written. Propose again (it uses one of today's proposals), or create it and add entries in Your content.</p>
           )}
           {spec.entries && <EntriesReview e={spec.entries} develop={checked.mode === "develop"} set={(e) => setSpec({ ...spec, entries: e })} onBatch={(n) => void nextBatch(n)} busy={batchBusy} message={batchMessage} />}
           {spec.sections.map((s, i) => (

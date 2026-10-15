@@ -54,7 +54,7 @@ const PAID_DAILY_CAP = Number(Deno.env.get("PAID_DAILY_CAP")) || 50;
 const isPaid = (user: { app_metadata?: Record<string, unknown> }) => user.app_metadata?.plan === "paid";
 const FUNCTION_NAME = "generate-document";
 const MODELS = ["gpt-4.1-mini", "gpt-4o-mini"];
-const VERSION = "generate-document-2026-10-15-spec-v8-develop-keep";
+const VERSION = "generate-document-2026-10-15-spec-v9-develop-shape";
 /** The most entries one "develop" request writes (same as MAX_DEVELOPED_ENTRIES in product-studio/src/engines/generate/spec.ts). */
 const MAX_DEVELOPED_ENTRIES = 30;
 /**
@@ -107,7 +107,9 @@ Give every section and component a short unique id. Fill every property: use nul
 const NO_CONTENT = "- Do not invent content entries (days, lessons, readings) unless they ask you to write content; prefer labelled blanks and writing space they will fill in.";
 function developRules(entryCount: number | null, batch: Batch | null): string {
   const asked = batch ? batch.count : entryCount;
-  return `- The maker asked you to DEVELOP ORIGINAL CONTENT: write the content itself, not only the structure. Put the series (days, lessons, sessions, exercises, activities) in entries with source "suggested" — one entry each, with a field for each part (for example title, scripture, teaching, reflection question, activity, prayer) — and a per-entry section that prints the fields with fromEntryField. A one-off passage you write (an introduction, instructions) is a text component with source "suggested". In this mode "entries" is never null: it holds every entry you write, and each value is the finished wording itself (whole sentences a reader will read), not a heading or a description of what should go there. Notes describe what you wrote; they never replace writing it.
+  return `- The maker asked you to DEVELOP ORIGINAL CONTENT: write the content itself, not only the structure. Put the series (days, lessons, sessions, exercises, activities) in entries with source "suggested" — one entry each, with a field for each part (for example title, scripture, teaching, reflection question, activity, prayer) — and a per-entry section that prints the fields with fromEntryField. A one-off passage you write (an introduction, instructions) is a text component with source "suggested". In this mode "entries" is never null: it holds every entry you write, and each value is the finished wording itself (whole sentences a reader will read), not a heading or a description of what should go there. Notes describe what you wrote; they never replace writing it. Each lesson / day / session is ONE record in entries.records — never a section of its own. Shape (shortened):
+"entries": {"name": "Lessons", "fields": [{"key": "title", "label": "Title", "valueType": "text"}, {"key": "verse", "label": "Bible verse", "valueType": "reference"}, {"key": "teaching", "label": "Teaching", "valueType": "longText"}], "records": [{"values": [{"key": "title", "value": "…the lesson's title…"}, {"key": "verse", "value": "…reference…"}, {"key": "teaching", "value": "…the full teaching, in sentences…"}]}, …one record per lesson…], "source": "suggested"}
+and one section with repeat.mode "per-entry" whose components print each field (fromEntryField "title", "verse", "teaching"…) plus any writing space.
 - Write at most ${MAX_DEVELOPED_ENTRIES} entries in this answer${asked ? `; the maker asked for ${asked}` : ""}. If the request needs more (for example a 40-day study), write the first ones, and say in notes how many remain and that they can be written as the next batch. Never shorten or cut off an entry to fit more: fewer complete entries are better than more partial ones.
 - Keep each part complete but proportionate: a teaching passage of about 120–250 words; questions, prompts and prayers of one to three sentences — unless the maker asks otherwise. Keep the whole answer under about 7,000 words: if the entries asked for wouldn't fit complete, write fewer and say in notes how many remain for the next batch.
 - Everything you write is original. Do not reproduce existing devotionals, curricula, books, sermons or song lyrics.
@@ -272,9 +274,11 @@ Deno.serve(async (req) => {
         models.splice(i + 1, 0, model);
         continue;
       }
+      // Still incomplete after the retry: handed back anyway (it was paid for and counted) with what's missing, so the
+      // maker sees what was written and decides — never thrown away.
       if (gap) {
         await cost("incomplete");
-        return reply({ error: "The AI didn't write the content this time (it returned an outline without the lessons). Please try again — or ask for fewer entries.", detail: gap, version: VERSION }, 422);
+        return reply({ spec: message.content, model, version: VERSION, incomplete: gap });
       }
       // Counted here, not only in the studio, so a proposal past the limit is recorded and comes back marked.
       let pages = 0;

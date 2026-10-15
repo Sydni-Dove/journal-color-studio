@@ -230,6 +230,9 @@ describe("the server: develop mode, limits and cost records (Edge Function v9 â€
     expect(fn).toMatch(/const gap = develop \? developGap\(message\.content, wanted\) : null;/);
     expect(fn).toMatch(/if \(gap && !retry\.length && Date\.now\(\) - started < 45_000\)/);
     expect(fn).toMatch(/await cost\("incomplete-retried"\)/);
+    // Still incomplete after the retry: handed back with what's missing â€” a paid answer is never thrown away.
+    expect(fn).toMatch(/return reply\(\{ spec: message\.content, model, version: VERSION, incomplete: gap \}\)/);
+    expect(fn).toMatch(/Each lesson \/ day \/ session is ONE record in entries\.records/);
     expect(fn.match(/edge_usage_logs"\)\.insert\(/g)).toHaveLength(1);
   });
   it("develop answers use the same format with the list of entries required (never null); Structure only keeps the shared schema", () => {
