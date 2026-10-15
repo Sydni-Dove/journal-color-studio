@@ -10,7 +10,7 @@ import { supabase } from "../../persistence/cloud";
 import { reviewLayout, type LayoutReview } from "../layout/assistant";
 import { resolveDocument } from "../document/resolve";
 import { projectFromSpec } from "./convert";
-import { checkSpec, MAX_DOCUMENT_PAGES, minimumPages, PageLimitError, unplacedContent, type BatchRequest, type CheckedSpec, type DocSpec, type GenerationMode } from "./spec";
+import { checkSpec, DEFAULT_DEVELOPED_ENTRIES, MAX_DOCUMENT_PAGES, minimumPages, PageLimitError, unplacedContent, type BatchRequest, type CheckedSpec, type DocSpec, type GenerationMode } from "./spec";
 import type { ProductProject } from "../../types/project";
 
 /**
@@ -20,9 +20,12 @@ import type { ProductProject } from "../../types/project";
 export type RequestOptions = { mode?: GenerationMode; entryCount?: number; batch?: BatchRequest };
 
 /** Ask the Edge Function for a proposal (raw: the studio checks it next). */
-export async function requestProposal(description: string, content: string, opts: RequestOptions = {}): Promise<{ spec: string; incomplete: string | null }> {
+/** Set when the backup model wrote the content because the main one was unavailable (never for weak content). */
+export type ModelFallback = { from: string; to: string; reason: string };
+
+export async function requestProposal(description: string, content: string, opts: RequestOptions = {}): Promise<{ spec: string; incomplete: string | null; fallback: ModelFallback | null }> {
   const develop = opts.mode === "develop";
-  const body = develop ? { description, content, mode: "develop", ...(opts.entryCount ? { entryCount: opts.entryCount } : {}), ...(opts.batch ? { batch: opts.batch } : {}) } : { description, content };
+  const body = develop ? { description, content, mode: "develop", ...(opts.entryCount || !opts.batch ? { entryCount: opts.entryCount ?? DEFAULT_DEVELOPED_ENTRIES } : {}), ...(opts.batch ? { batch: opts.batch } : {}) } : { description, content };
   const { data, error } = await supabase().functions.invoke("generate-document", { body });
   if (error) {
     const res = "context" in error ? (error as { context?: unknown }).context : null;
@@ -31,15 +34,23 @@ export async function requestProposal(description: string, content: string, opts
   }
   if (typeof data?.error === "string") throw new Error(data.error);
   if (typeof data?.spec !== "string") throw new Error("The AI didn't return a document outline. Try again.");
-  return { spec: data.spec, incomplete: develop && typeof data?.incomplete === "string" ? data.incomplete : null };
+  const f = data?.fallback;
+  const fallback = develop && f && typeof f.from === "string" && typeof f.to === "string" ? { from: f.from, to: f.to, reason: typeof f.reason === "string" ? f.reason : "" } : null;
+  return { spec: data.spec, incomplete: develop && typeof data?.incomplete === "string" ? data.incomplete : null, fallback };
 }
 
 /** Existing callers that only need the specification. An incomplete batch is not appended silently. */
 export async function requestSpec(description: string, content: string, opts: RequestOptions = {}): Promise<string> {
   const result = await requestProposal(description, content, opts);
-  if (result.incomplete) throw new Error(`The AI response did not meet your requested content depth: ${result.incomplete} This proposal counted toward today's allowance. Try fewer lessons in the next request.`);
+  if (result.incomplete) throw new Error(incompleteMessage(result.incomplete));
   return result.spec;
 }
+
+/** An incomplete answer that must not be appended silently (next batches). */
+export const incompleteMessage = (gap: string) => `The AI response did not meet your requested content depth: ${gap} This proposal counted toward today's allowance. Try fewer lessons in the next request.`;
+
+/** The note shown when the backup model wrote the content. */
+export const fallbackNotice = (f: ModelFallback) => `The main writing model (${f.from}) was unavailable${f.reason ? ` (${f.reason})` : ""}, so ${f.to} wrote these lessons. Read them with extra care; the next request tries ${f.from} again.`;
 
 /** The checked proposal for the maker's request (throws SpecError when the answer isn't a document). */
 export const checkProposal = (raw: unknown, description: string, content: string, mode: GenerationMode = "structure"): CheckedSpec => checkSpec(raw, { description, content, mode });

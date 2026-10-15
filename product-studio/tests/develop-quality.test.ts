@@ -21,3 +21,8 @@ describe("developed lesson depth", () => {
     expect(lessonQualityGap(response.spec, sent.description)).toMatch(/word story/);
   });
 });
+
+describe("scripture inside the story", () => {
+  it("reports a reference written in the narrative", () =>
+    expect(lessonQualityGap(answer({ story: story + " (Ephesians 4:32)" }), request)).toMatch(/inside the story/));
+});

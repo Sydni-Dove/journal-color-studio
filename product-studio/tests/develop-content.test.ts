@@ -58,11 +58,11 @@ describe("Structure only stays exactly Phase 8", () => {
     const { requestSpec } = await import("../src/engines/generate/pipeline");
     await requestSpec("A garden log for a season", "");
     await requestSpec("A garden log for a season", "", { mode: "structure" });
-    await requestSpec("A garden log for a season", "", { mode: "develop", entryCount: 7 });
+    await requestSpec("A garden log for a season", "", { mode: "develop", entryCount: 6 });
     expect(invoke.mock.calls.map((c) => (c as unknown[])[1])).toEqual([
       { body: { description: "A garden log for a season", content: "" } },
       { body: { description: "A garden log for a season", content: "" } },
-      { body: { description: "A garden log for a season", content: "", mode: "develop", entryCount: 7 } },
+      { body: { description: "A garden log for a season", content: "", mode: "develop", entryCount: 6 } },
     ]);
     vi.doUnmock("../src/persistence/cloud");
   });
@@ -73,7 +73,7 @@ describe("Develop original content: AI-written content is marked, editable, neve
   const project = projectFromSpec(checked, AT);
   it("every AI-written entry and passage carries origin; the maker's own wording never does", () => {
     expect(checked.mode).toBe("develop");
-    expect(records(project)).toHaveLength(7);
+    expect(records(project)).toHaveLength(6);
     expect(records(project).every((r) => r.origin?.kind === "ai-suggestion" && r.origin.at === AT)).toBe(true);
     const bs = blocks(project);
     const maker = bs.find((b) => b.prompt?.includes("church's fast"));
@@ -86,7 +86,7 @@ describe("Develop original content: AI-written content is marked, editable, neve
   it("the maker's wording prints exactly, once; every AI-written day prints", () => {
     const text = allText(project);
     expect(text.split(squash(MAKER)).length - 1).toBe(1);
-    for (let n = 1; n <= 7; n++) expect(text).toContain(`Day ${n}: Drawing Near`);
+    for (let n = 1; n <= 6; n++) expect(text).toContain(`Day ${n}: Drawing Near`);
   });
   it("the marks never print: pages are identical with and without them", () => {
     const strip = stripOrigins(project);
@@ -94,12 +94,12 @@ describe("Develop original content: AI-written content is marked, editable, neve
   });
   it("is an ordinary product: saves and reloads with its marks; editing keeps the mark until reviewed", () => {
     const back = migrate(JSON.parse(JSON.stringify(project)))!;
-    expect(records(back).filter((r) => r.origin)).toHaveLength(7);
+    expect(records(back).filter((r) => r.origin)).toHaveLength(6);
     expect(blocks(back).filter((b) => b.origin)).toHaveLength(2);
     const c = back.data!.collections[0];
-    expect(toReview(c)).toBe(7);
+    expect(toReview(c)).toBe(6);
     const one = markReviewed(back.data, c.id, c.records[0].id);
-    expect(toReview(one.collections[0])).toBe(6);
+    expect(toReview(one.collections[0])).toBe(5);
     expect(one.collections[0].records[0].values).toEqual(c.records[0].values);
     expect(toReview(markReviewed(back.data, c.id).collections[0])).toBe(0);
     // A copy of AI-written wording is still AI-written.
@@ -119,13 +119,13 @@ describe("Develop original content: AI-written content is marked, editable, neve
   });
 });
 
-describe("at most 30 complete entries per request; longer series continue in batches", () => {
-  it("35 written → the first 30 kept whole, and said; each kept entry is exactly as written", () => {
-    const spec = developed(35);
+describe("at most 6 complete entries per request; longer series continue in batches", () => {
+  it("10 written → the first 6 kept whole, and said; each kept entry is exactly as written", () => {
+    const spec = developed(10);
     const c = check(spec, "develop");
     expect(c.spec.entries!.records).toHaveLength(MAX_DEVELOPED_ENTRIES);
-    expect(c.spec.entries!.records).toEqual(spec.entries!.records.slice(0, 30));
-    expect(c.problems.map((p) => p.message).join(" ")).toMatch(/first 30 are kept whole.*Write the next batch/);
+    expect(c.spec.entries!.records).toEqual(spec.entries!.records.slice(0, 6));
+    expect(c.problems.map((p) => p.message).join(" ")).toMatch(/first 6 are kept whole.*Write the next batch/);
   });
   it("too much writing for one request → fewer entries, never a cut-off one", () => {
     const long = "Long teaching. ".repeat(Math.ceil(MAX_DEVELOPED_TEXT / 15 / 3));
@@ -149,25 +149,25 @@ describe("at most 30 complete entries per request; longer series continue in bat
     // Structure only doesn't add pages it wasn't asked for.
     expect(check(spec).spec.sections.some((s) => s.repeat.mode === "per-entry")).toBe(false);
   });
-  it("Structure only keeps the maker's long lists as before (no 30 cap)", () => {
+  it("Structure only keeps the maker's long lists as before (no 6 cap)", () => {
     const spec = developed(35);
     spec.entries!.source = "user";
     expect(checkSpec(JSON.stringify(spec), { description: DESCRIPTION, content: "" }).spec.entries!.records.length).toBe(35);
   });
   it("the next batch continues the list: its own fields only, added to the end, marked AI-written", () => {
-    const first = check(developed(7), "develop");
+    const first = check(developed(6), "develop");
     const req = batchRequest(first.spec, 50)!;
-    expect(req).toMatchObject({ name: "Days", from: 8, count: MAX_DEVELOPED_ENTRIES });
-    expect(req.previous.slice(-1)).toEqual(["Day 7: Drawing Near"]);
-    const answer = developed(3, (n) => day(n + 7));
+    expect(req).toMatchObject({ name: "Days", from: 7, count: MAX_DEVELOPED_ENTRIES });
+    expect(req.previous.slice(-1)).toEqual(["Day 6: Drawing Near"]);
+    const answer = developed(3, (n) => day(n + 6));
     answer.entries!.records[0].values.push({ key: "stray", value: "not one of the fields" });
     const more = check(answer, "develop");
     const r = appendBatch(first.spec, more);
     expect(r.added).toBe(3);
-    expect(r.spec.entries!.records.map((x) => x.values.find((v) => v.key === "title")!.value).slice(-3)).toEqual(["Day 8: Drawing Near", "Day 9: Drawing Near", "Day 10: Drawing Near"]);
+    expect(r.spec.entries!.records.map((x) => x.values.find((v) => v.key === "title")!.value).slice(-3)).toEqual(["Day 7: Drawing Near", "Day 8: Drawing Near", "Day 9: Drawing Near"]);
     expect(r.spec.entries!.records.flatMap((x) => x.values).some((v) => v.key === "stray")).toBe(false);
     const p = projectFromSpec({ ...first, spec: r.spec }, AT);
-    expect(records(p)).toHaveLength(10);
+    expect(records(p)).toHaveLength(9);
     expect(records(p).every((x) => x.origin)).toBe(true);
     expect(appendBatch(first.spec, { ...more, spec: { ...more.spec, entries: null } }).added).toBe(0);
   });
@@ -260,7 +260,7 @@ describe("the server: develop mode, limits and cost records (Edge Function v9 �
     expect(fn).toMatch(/if \(gap && !retry\.length && Date\.now\(\) - started < 45_000\)/);
     expect(fn).toMatch(/await cost\("incomplete-retried"\)/);
     // Still incomplete after the retry: handed back with what's missing — a paid answer is never thrown away.
-    expect(fn).toMatch(/return reply\(\{ spec: message\.content, model, version: VERSION, incomplete: gap \}\)/);
+    expect(fn).toMatch(/return reply\(\{ spec: message\.content, model, version: VERSION, incomplete: gap, \.\.\.fallbackNote\(model\) \}\)/);
     expect(fn).toMatch(/Each lesson \/ day \/ session is ONE record in entries\.records/);
     // Next batches: every name already written goes in the request itself, and repeats trigger the retry.
     expect(fn).toMatch(/THIS IS A NEXT BATCH\. Entries 1–\$\{batch\.from - 1\}/);
@@ -358,5 +358,35 @@ describe("the 800-page limit: explained, never silently reduced — the maker ch
     expect(fn).toMatch(/code: "page-limit"/);
     expect(/const SYSTEM = `([\s\S]*?)`;/.exec(fn)![1]).toMatch(/at most 800 pages in all\. That is the studio's to handle, not yours: always build every section the maker asked for at the full quantity they asked for/);
     expect(fn).toMatch(/pageLimit: \{ pages, max: MAX_DOCUMENT_PAGES \}/);
+  });
+});
+
+const fn = readFileSync("../supabase/functions/generate-document/index.ts", "utf8");
+describe("Phase 8.1: gpt-4.1 for Develop, carried-forward references and names, visible fallback", () => {
+  it("six lessons is the limit and the default", () => {
+    expect(MAX_DEVELOPED_ENTRIES).toBe(6);
+  });
+  it("Develop uses gpt-4.1 with gpt-4.1-mini only for availability failures; Structure Only keeps its models", () => {
+    expect(fn).toMatch(/const DEVELOP_MODELS = \["gpt-4\.1", "gpt-4\.1-mini"\];/);
+    expect(fn).toMatch(/const MODELS = \["gpt-4\.1-mini", "gpt-4o-mini"\];/);
+    expect(fn).toMatch(/const models = develop \? \[\.\.\.DEVELOP_MODELS\] : \[\.\.\.MODELS\];/);
+    expect(fn).toMatch(/if \(develop && !isAvailabilityFailure\(r\.status\)\) break;/);
+    // The quality retry repeats the same model — never the backup.
+    expect(fn).toMatch(/models\.splice\(i \+ 1, 0, model\);/);
+  });
+  it("a backup-model answer is marked so the studio can say so", () => {
+    expect(fn).toMatch(/fallback: \{ from: primary, to: model/);
+    expect(fn.match(/\.\.\.fallbackNote\(model\)/g)!.length).toBeGreaterThanOrEqual(3);
+  });
+  it("next batches carry used references and children's names", () => {
+    const spec = developed(6);
+    spec.entries!.fields.push({ key: "story", label: "Story", valueType: "longText" });
+    const kids = ["Anna", "Ben", "Cara", "Dev", "Eli", "Fay"];
+    spec.entries!.records.forEach((r, i) => r.values.push({ key: "story", value: `One morning ${kids[i]} woke up. Later ${kids[i]} saw a friend smile. Then ${kids[i]} left.` }));
+    const req = batchRequest(check(spec, "develop").spec, 6)!;
+    expect(req.usedNames).toEqual(expect.arrayContaining(["Anna", "Fay"]));
+    expect(Array.isArray(req.usedVerses)).toBe(true);
+    expect(fn).toMatch(/Scripture references already used/);
+    expect(fn).toMatch(/Children's names already used/);
   });
 });

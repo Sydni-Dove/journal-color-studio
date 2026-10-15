@@ -21,6 +21,7 @@ export function lessonQualityGap(raw: string, request: string): string | null {
     const prose = values.get(story) ?? "";
     const words = prose.match(/\b[\p{L}\p{N}]+(?:[’'-][\p{L}\p{N}]+)*\b/gu)?.length ?? 0;
     if (words < min || words > max) return `Lesson ${i + 1} has a ${words}-word story; the requested range is ${min}–${max} words. Develop that lesson's narrative with a situation, conflict, choice and consequence.`;
+    if (/\b(?:[1-3]\s)?(?:Genesis|Exodus|Leviticus|Numbers|Deuteronomy|Joshua|Judges|Ruth|Samuel|Kings|Chronicles|Ezra|Nehemiah|Esther|Job|Psalms?|Proverbs|Ecclesiastes|Isaiah|Jeremiah|Lamentations|Ezekiel|Daniel|Hosea|Joel|Amos|Micah|Matthew|Mark|Luke|John|Acts|Romans|Corinthians|Galatians|Ephesians|Philippians|Colossians|Thessalonians|Timothy|Titus|Hebrews|James|Peter|Jude|Revelation)\s\d{1,3}:\d{1,3}/.test(prose)) return `Lesson ${i + 1} has a Scripture reference written inside the story; remove it (the verse has its own field).`;
     if (/\bactivit/i.test(request) && (!activity || !(values.get(activity) ?? ""))) return `Lesson ${i + 1} is missing its activity.`;
     if (/\b(scripture|bible verse|verse)\b/i.test(request) && (!verse || !(values.get(verse) ?? ""))) return `Lesson ${i + 1} is missing its Scripture reference.`;
     if (/\bprayer\b/i.test(request) && (!prayer || !(values.get(prayer) ?? ""))) return `Lesson ${i + 1} is missing its prayer.`;

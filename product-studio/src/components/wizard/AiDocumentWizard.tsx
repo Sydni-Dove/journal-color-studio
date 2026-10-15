@@ -6,7 +6,7 @@
  * of document (engines/generate/pipeline.ts).
  */
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { buildFromOutline, checkProposal, requestProposal, requestSpec } from "../../engines/generate/pipeline";
+import { buildFromOutline, checkProposal, fallbackNotice, incompleteMessage, requestProposal, type ModelFallback } from "../../engines/generate/pipeline";
 import { appendBatch, batchRequest, MAX_DEVELOPED_ENTRIES, MAX_DOCUMENT_PAGES, PageLimitError, quantityChoices, reduceToFit, requestedOverLimit, SIZES, splitToFit, type CheckedSpec, type DocSpec, type Flag, type GenerationMode, type PageSize, type SpecComponent, type SpecEntries, type SpecSection } from "../../engines/generate/spec";
 import type { ProductProject } from "../../types/project";
 import { PageThumb } from "../preview/PageThumb";
@@ -239,6 +239,7 @@ export function AiDocumentWizard({ onCreate, onCreateMany, onCancel, signedIn = 
   const [batchBusy, setBatchBusy] = useState(false);
   const [batchMessage, setBatchMessage] = useState("");
   const [qualityWarning, setQualityWarning] = useState("");
+  const [fallback, setFallback] = useState<ModelFallback | null>(null);
   const [acknowledgedIncomplete, setAcknowledgedIncomplete] = useState(false);
 
   const generate = async () => {
@@ -259,6 +260,7 @@ export function AiDocumentWizard({ onCreate, onCreateMany, onCancel, signedIn = 
       setChecked(c);
       setSpec(c.spec);
       setQualityWarning(result.incomplete ?? "");
+      setFallback(result.fallback);
       setAcknowledgedIncomplete(false);
       setAlt(null);
     } catch (e) {
@@ -318,8 +320,10 @@ export function AiDocumentWizard({ onCreate, onCreateMany, onCancel, signedIn = 
     setBatchBusy(true);
     setBatchMessage("");
     try {
-      const raw = await requestSpec(description, content, { mode: "develop", batch });
-      const more = checkProposal(raw, description, content, "develop");
+      const result = await requestProposal(description, content, { mode: "develop", batch });
+      if (result.incomplete) throw new Error(incompleteMessage(result.incomplete));
+      if (result.fallback) setFallback(result.fallback);
+      const more = checkProposal(result.spec, description, content, "develop");
       const before = spec.entries?.records.length ?? 0;
       const r = appendBatch(spec, more);
       setSpec(r.spec);
@@ -370,7 +374,7 @@ export function AiDocumentWizard({ onCreate, onCreateMany, onCancel, signedIn = 
           <div className="ai-batch">
             <label className="field">
               <span>How many entries? (optional)</span>
-              <input type="number" inputMode="numeric" min={1} max={MAX_DEVELOPED_ENTRIES} value={entryCount} placeholder="e.g. 7" aria-label="How many entries" onChange={(e) => setEntryCount(e.target.value)} />
+              <input type="number" inputMode="numeric" min={1} max={MAX_DEVELOPED_ENTRIES} value={entryCount} placeholder="6" aria-label="How many entries" onChange={(e) => setEntryCount(e.target.value)} />
             </label>
             <p className="hint" style={{ flex: "1 1 240px" }}>Up to {MAX_DEVELOPED_ENTRIES} per request, each written in full. For a longer series, write the rest with “Write the next batch” on the next screen. Scripture is quoted only from public-domain translations (KJV, WEB); every reference and quotation is listed for you to check.</p>
           </div>
@@ -413,6 +417,7 @@ export function AiDocumentWizard({ onCreate, onCreateMany, onCancel, signedIn = 
             <p className="data-issue"><strong>Some content needs more work.</strong> {qualityWarning} This proposal counted toward today's allowance. Review and edit the lessons before creating the document.</p>
             <label className="check"><input type="checkbox" checked={acknowledgedIncomplete} onChange={(e) => setAcknowledgedIncomplete(e.target.checked)} /> I reviewed the incomplete content and want to continue</label>
           </div>}
+          {fallback && <div className="ai-checks" role="status" data-testid="ai-fallback-note"><p className="data-issue">{fallbackNotice(fallback)}</p></div>}
           <label className="field"><span>Title</span><input type="text" value={spec.title} aria-label="Document title" onChange={(e) => setSpec({ ...spec, title: e.target.value })} /></label>
           {spec.summary && <p className="hint">{spec.summary}</p>}
           {spec.notes.length > 0 && (

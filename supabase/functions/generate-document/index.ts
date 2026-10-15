@@ -55,9 +55,17 @@ const PAID_DAILY_CAP = Number(Deno.env.get("PAID_DAILY_CAP")) || 50;
 const isPaid = (user: { app_metadata?: Record<string, unknown> }) => user.app_metadata?.plan === "paid";
 const FUNCTION_NAME = "generate-document";
 const MODELS = ["gpt-4.1-mini", "gpt-4o-mini"];
-const VERSION = "generate-document-2026-10-15-spec-v12-page-limit-build";
+/**
+ * Develop original content: gpt-4.1 (approved 2026-10-15 after the model comparison in HANDOFF.md — it met the story
+ * length and craft targets that gpt-4.1-mini did not). gpt-4.1-mini is the fallback for genuine availability failures
+ * only (never for weak content: the quality check retries the same model), and the reply says when it was used.
+ */
+const DEVELOP_MODELS = ["gpt-4.1", "gpt-4.1-mini"];
+/** A failed call that another model could fix: unavailable, rate limited, timed out or a provider error — not a bad request or a refusal. */
+const isAvailabilityFailure = (status: number) => status === 404 || status === 408 || status === 429 || status >= 500;
+const VERSION = "generate-document-2026-10-15-spec-v13-develop-gpt41";
 /** The most entries one "develop" request writes (same as MAX_DEVELOPED_ENTRIES in product-studio/src/engines/generate/spec.ts). */
-const MAX_DEVELOPED_ENTRIES = 30;
+const MAX_DEVELOPED_ENTRIES = 6;
 /**
  * Output ceiling for a develop request (tokens): about 8,000 words — never an open-ended bill, and short enough to
  * finish inside the Edge Function's ~150 s limit. Structure only is unchanged.
@@ -67,7 +75,7 @@ const DEVELOP_MAX_TOKENS = 12_000;
 const DEVELOP_TIMEOUT_MS = 135_000;
 const RETRY_WITHIN_MS = 30_000;
 /** Estimated USD per 1M tokens (input, output) — for the cost record only; tokens are the source of truth. Prices as of 2026-10. */
-const PRICES: Record<string, [number, number]> = { "gpt-4.1-mini": [0.4, 1.6], "gpt-4o-mini": [0.15, 0.6] };
+const PRICES: Record<string, [number, number]> = { "gpt-4.1-mini": [0.4, 1.6], "gpt-4.1": [2, 8], "gpt-4o-mini": [0.15, 0.6] };
 
 const SYSTEM = `You design printable documents for Product Studio, a studio for print-ready journals, workbooks, logs, forms, planners and similar products. You return a document specification (the JSON schema given); the studio lays out, paginates and prints it with its own engines. Never think in coordinates or pixels.
 
@@ -143,7 +151,7 @@ function developGap(raw: string, wanted: number, previous: string[] = []): strin
   return null;
 }
 
-type Batch = { name: string; fields: { key: string; label: string; valueType: string }[]; from: number; count: number; previous: string[] };
+type Batch = { name: string; fields: { key: string; label: string; valueType: string }[]; from: number; count: number; previous: string[]; usedVerses: string[]; usedNames: string[] };
 const clean = (v: unknown, max: number) => (typeof v === "string" ? v.replace(/[\u0000-\u001f"`<>]/g, " ").replace(/\s+/g, " ").trim().slice(0, max) : "");
 /** A batch request, checked: only short, plain names and keys reach the prompt. null = not a valid batch. */
 function readBatch(v: unknown): Batch | null {
@@ -159,7 +167,20 @@ function readBatch(v: unknown): Batch | null {
   });
   const name = clean(b.name, 80);
   if (!fields.length || !name) return null;
-  return { name, fields, from, count, previous: (Array.isArray(b.previous) ? b.previous : []).slice(-40).map((p) => clean(p, 100)).filter(Boolean) };
+  return { name, fields, from, count, previous: (Array.isArray(b.previous) ? b.previous : []).slice(-40).map((p) => clean(p, 100)).filter(Boolean),
+    usedVerses: (Array.isArray(b.usedVerses) ? b.usedVerses : []).slice(-120).map((p) => clean(p, 60)).filter(Boolean),
+    usedNames: (Array.isArray(b.usedNames) ? b.usedNames : []).slice(-120).map((p) => clean(p, 30)).filter(Boolean) };
+}
+
+/**
+ * Story-writing ask for Develop requests that want stories. Tested in the model comparison: sentences and story beats
+ * in the per-request message (not only the long system prompt) moved gpt-4.1 to 12 of 12 stories in range.
+ */
+const STORY_ASK = " For every lesson, the story field must be a full mini-story of 8 to 10 sentences (about 140 words): name a child, set the scene, show what tempts or troubles them, the choice they make and what it costs or changes, what happens next, and how it ends. Never fewer than 8 sentences. Give every lesson a different child's name, never one already used in this series. Do not write any Scripture reference or verse inside the story; the verse has its own field. At least one of the two reflection questions must name the story's main character and ask about what they did. The activity must let the child practise the same trait the story shows.";
+const wantsStories = (description: string) => /\b(story|stories|story-style)\b/i.test(description);
+/** What a next batch must not reuse: Scripture references and children's names from the entries already written. */
+function carryForward(batch: Batch): string {
+  return `${batch.usedVerses.length ? `\nScripture references already used (do not use any of these again): ${batch.usedVerses.join("; ")}.` : ""}${batch.usedNames.length ? `\nChildren's names already used (give every new lesson a different name): ${batch.usedNames.join(", ")}.` : ""}`;
 }
 
 /** Records a model call's real usage and estimated cost (service role; best effort — never blocks or fails a request). */
@@ -236,13 +257,18 @@ Deno.serve(async (req) => {
 
   const system = develop ? SYSTEM.replace(NO_CONTENT, developRules(entryCount, batch)) : SYSTEM;
   const mode = develop ? "develop" : "structure";
-  const user = `What the maker wants:\n${description.trim()}${content.trim() ? `\n\nThe maker's own content — use it exactly as written, placed where it belongs:\n<<<\n${content}\n>>>` : ""}${batch ? `\n\nTHIS IS A NEXT BATCH. Entries 1–${batch.from - 1} of "${batch.name}" are already written:\n${batch.previous.map((p, i) => `${batch.from - batch.previous.length + i}. ${p}`).join("\n")}\nWrite entries ${batch.from}–${batch.from + batch.count - 1} only: ${batch.count} NEW entries on themes not covered above (any examples in the description above are already used). Never repeat a title or theme from the list — nor a close synonym of one (for example Truthfulness after Honesty, Thankfulness after Gratitude) — and use Scripture references not used in the entries above.` : ""}`;
+  const user = `What the maker wants:\n${description.trim()}${content.trim() ? `\n\nThe maker's own content — use it exactly as written, placed where it belongs:\n<<<\n${content}\n>>>` : ""}${batch ? `\n\nTHIS IS A NEXT BATCH. Entries 1–${batch.from - 1} of "${batch.name}" are already written:\n${batch.previous.map((p, i) => `${batch.from - batch.previous.length + i}. ${p}`).join("\n")}\nWrite entries ${batch.from}–${batch.from + batch.count - 1} only: ${batch.count} NEW entries on themes not covered above (any examples in the description above are already used). Never repeat a title or theme from the list — nor a close synonym of one (for example Truthfulness after Honesty, Thankfulness after Gratitude) — and use Scripture references not used in the entries above.${carryForward(batch)}` : ""}${develop && wantsStories(description) ? STORY_ASK : ""}`;
   let lastError = "";
   const started = Date.now();
   // Develop: one more attempt when the answer didn't actually write the content (same proposal; counted once).
   let retry: { role: "assistant" | "user"; content: string }[] = [];
   const wanted = batch?.count ?? entryCount ?? 6;
-  for (let i = 0, models = [...MODELS]; i < models.length; i++) {
+  const models = develop ? [...DEVELOP_MODELS] : [...MODELS];
+  const primary = models[0];
+  /** Set when the primary model failed to answer (availability only) and a later model did: shown to the maker. */
+  let failedPrimary = "";
+  const fallbackNote = (model: string) => (develop && model !== primary ? { fallback: { from: primary, to: model, reason: failedPrimary || "the first model was not available" } } : {});
+  for (let i = 0; i < models.length; i++) {
     const model = models[i];
     // A slow failure leaves no time for a second full call before the function's own limit: report it instead.
     if (i > 0 && !retry.length && Date.now() - started > RETRY_WITHIN_MS) break;
@@ -262,7 +288,13 @@ Deno.serve(async (req) => {
         }),
       });
       const result = await r.json().catch(() => null);
-      if (!r.ok) { lastError = result?.error?.message ?? `HTTP ${r.status}`; continue; }
+      if (!r.ok) {
+        lastError = result?.error?.message ?? `HTTP ${r.status}`;
+        if (model === primary && !failedPrimary) failedPrimary = lastError.slice(0, 120);
+        // Develop falls back only when the model is unavailable — a bad request or key problem would fail the same way.
+        if (develop && !isAvailabilityFailure(r.status)) break;
+        continue;
+      }
       const message = result?.choices?.[0]?.message;
       const cost = (outcome: string) => recordCost({ user_id: auth.user.id, mode, model, usage: result?.usage, outcome });
       if (message?.refusal) { await cost("refused"); return reply({ error: `The AI declined: ${message.refusal}` }, 422); }
@@ -285,7 +317,7 @@ Deno.serve(async (req) => {
       // maker sees what was written and decides — never thrown away.
       if (gap) {
         await cost("incomplete");
-        return reply({ spec: message.content, model, version: VERSION, incomplete: gap });
+        return reply({ spec: message.content, model, version: VERSION, incomplete: gap, ...fallbackNote(model) });
       }
       // Counted here, not only in the studio, so a proposal past the limit is recorded and comes back marked.
       let pages = 0;
@@ -294,10 +326,11 @@ Deno.serve(async (req) => {
       // Past the limit after the AI answered (the proposal was paid for and counted): handed back with the limit, so
       // the studio can offer the maker's choices (reduce or split) instead of losing it. The studio never builds an
       // outline past the limit (buildFromOutline checks before laying anything out).
-      if (pages > MAX_DOCUMENT_PAGES) return reply({ spec: message.content, model, version: VERSION, pageLimit: { pages, max: MAX_DOCUMENT_PAGES } });
-      return reply({ spec: message.content, model, version: VERSION });
+      if (pages > MAX_DOCUMENT_PAGES) return reply({ spec: message.content, model, version: VERSION, pageLimit: { pages, max: MAX_DOCUMENT_PAGES }, ...fallbackNote(model) });
+      return reply({ spec: message.content, model, version: VERSION, ...fallbackNote(model) });
     } catch (e) {
       lastError = e instanceof Error ? e.message : String(e);
+      if (model === primary && !failedPrimary) failedPrimary = lastError.slice(0, 120);
     }
   }
   return reply({ error: "Document generation failed. Please try again.", detail: lastError.slice(0, 200), version: VERSION }, 502);

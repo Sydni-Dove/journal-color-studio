@@ -71,11 +71,13 @@ export type DocSpec = {
  */
 export type GenerationMode = "structure" | "develop";
 /** The most entries one "develop" request writes (longer series are written in batches, never cut short). */
-export const MAX_DEVELOPED_ENTRIES = 30;
+/** Lessons per Develop request, and the default: six per request met every quality target in the model comparison. */
+export const MAX_DEVELOPED_ENTRIES = 6;
+export const DEFAULT_DEVELOPED_ENTRIES = 6;
 /** Safety limit on the AI-written wording one proposal may hold (characters, all entries together). */
 export const MAX_DEVELOPED_TEXT = 150_000;
 /** What a "write the next batch" request tells the server about the list it continues. */
-export type BatchRequest = { name: string; fields: { key: string; label: string; valueType: SpecValueType }[]; from: number; count: number; previous: string[] };
+export type BatchRequest = { name: string; fields: { key: string; label: string; valueType: SpecValueType }[]; from: number; count: number; previous: string[]; usedVerses: string[]; usedNames: string[] };
 
 /** Something the check changed or wants the maker to know, in plain words. */
 export type Problem = { level: "left-out" | "adjusted" | "note"; message: string };
@@ -530,7 +532,30 @@ export function batchRequest(spec: DocSpec, count: number): BatchRequest | null 
     count: Math.max(1, Math.min(MAX_DEVELOPED_ENTRIES, Math.round(count) || 1)),
     // The last entries' names, so the next batch continues rather than repeats.
     previous: e.records.slice(-40).map((r) => (r.values.find((v) => v.key === e.fields[0].key)?.value ?? "").replace(/\s+/g, " ").trim().slice(0, 100)).filter(Boolean),
+    // Scripture references and children's names already used, so the next batch doesn't repeat them.
+    usedVerses: usedVerses(e),
+    usedNames: usedNames(e),
   };
+}
+
+const NOT_NAMES = new Set(["God", "Jesus", "Lord", "Bible", "Holy", "Spirit", "Christ", "Father", "Amen", "Mom", "Dad", "Mommy", "Daddy", "Grandma", "Grandpa", "Mrs", "Mr", "She", "He", "They", "The", "Then", "That", "This", "When", "After", "But", "And", "One", "Every", "Each"]);
+/** The Scripture references of the entries already written (from their verse / scripture / reference fields). */
+function usedVerses(e: SpecEntries): string[] {
+  const keys = e.fields.filter((f) => /verse|scripture|reference/i.test(`${f.key} ${f.label}`)).map((f) => f.key);
+  const out = e.records.flatMap((r) => keys.map((k) => (r.values.find((v) => v.key === k)?.value ?? "").replace(/\s+/g, " ").trim().slice(0, 60)).filter(Boolean));
+  return [...new Set(out)].slice(-120);
+}
+/** The main child's name in each story already written: the capitalised word the story repeats most (twice or more). */
+function usedNames(e: SpecEntries): string[] {
+  const keys = e.fields.filter((f) => /story|teaching/i.test(`${f.key} ${f.label}`)).map((f) => f.key);
+  const names: string[] = [];
+  for (const r of e.records) for (const k of keys) {
+    const counts = new Map<string, number>();
+    for (const m of (r.values.find((v) => v.key === k)?.value ?? "").matchAll(/\b[A-Z][a-z]{2,}\b/g)) if (!NOT_NAMES.has(m[0])) counts.set(m[0], (counts.get(m[0]) ?? 0) + 1);
+    const top = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+    if (top && top[1] >= 2) names.push(top[0]);
+  }
+  return [...new Set(names)].slice(-120);
 }
 
 /** Wording the maker's content holds, in everything the proposal marks as theirs (and their entries). */
