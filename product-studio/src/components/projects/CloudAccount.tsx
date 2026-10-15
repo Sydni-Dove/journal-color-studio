@@ -1,11 +1,12 @@
 /** Online saving: sign in with a Dove Expressions account, see where projects are saved. */
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { CloudStatus } from "../../app/useCloud";
 
 export const cloudLabel = (status: CloudStatus) =>
   ({ "signed-out": "On this device only", syncing: "Saving online…", saved: "Saved online", offline: "Offline — on this device; goes online when you're back", error: "Couldn't save online — kept on this device" })[status];
 
-export function CloudAccount({ email, status, error, onSignIn, onSignOut, onRetry }: { email: string | null; status: CloudStatus; error: string | null; onSignIn: (email: string, password: string) => Promise<void>; onSignOut: () => void; onRetry: () => void }) {
+/** intro / signInLabel: wording for another reason to sign in (Generate with AI); the home page keeps its own. */
+export function CloudAccount({ email, status, error, onSignIn, onSignOut, onRetry, intro, signInLabel = "Sign in to save online" }: { email: string | null; status: CloudStatus; error: string | null; onSignIn: (email: string, password: string) => Promise<void>; onSignOut: () => void; onRetry: () => void; intro?: ReactNode; signInLabel?: string }) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ email: "", password: "" });
   const [busy, setBusy] = useState(false);
@@ -25,11 +26,13 @@ export function CloudAccount({ email, status, error, onSignIn, onSignOut, onRetr
     );
   return (
     <section className="cloud-account" aria-label="Online saving">
-      <p>
-        <strong>Your projects are saved on this device only.</strong> Sign in with your Dove Expressions account to save them online and open them anywhere.
-      </p>
+      {intro ?? (
+        <p>
+          <strong>Your projects are saved on this device only.</strong> Sign in with your Dove Expressions account to save them online and open them anywhere.
+        </p>
+      )}
       {!open ? (
-        <button type="button" className="btn btn--primary" onClick={() => setOpen(true)}>Sign in to save online</button>
+        <button type="button" className="btn btn--primary" onClick={() => setOpen(true)}>{signInLabel}</button>
       ) : (
         <form
           className="cloud-account__form"

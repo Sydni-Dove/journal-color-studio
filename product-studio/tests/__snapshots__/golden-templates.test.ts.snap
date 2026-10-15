@@ -510,39 +510,6 @@ exports[`existing templates print exactly as before > deskpad-weekly @ 8.5x11 1`
 }
 `;
 
-exports[`existing templates print exactly as before > devotional-content @ 5.5x8.5 1`] = `
-{
-  "groups": [],
-  "pageCount": 0,
-  "plan": "97d170e1550e",
-  "recipeDiagnostics": [
-    "warning:This book structure produces no pages yet.",
-  ],
-}
-`;
-
-exports[`existing templates print exactly as before > devotional-content @ 7x9 1`] = `
-{
-  "groups": [],
-  "pageCount": 0,
-  "plan": "97d170e1550e",
-  "recipeDiagnostics": [
-    "warning:This book structure produces no pages yet.",
-  ],
-}
-`;
-
-exports[`existing templates print exactly as before > devotional-content @ 8.5x11 1`] = `
-{
-  "groups": [],
-  "pageCount": 0,
-  "plan": "97d170e1550e",
-  "recipeDiagnostics": [
-    "warning:This book structure produces no pages yet.",
-  ],
-}
-`;
-
 exports[`existing templates print exactly as before > guided-lined @ 5.5x8.5 1`] = `
 {
   "groups": [

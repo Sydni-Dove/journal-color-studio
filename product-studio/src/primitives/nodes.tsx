@@ -100,9 +100,10 @@ export function TextBlock({ node, typography }: { node: TextNode; typography: Ty
     <div className="ps-text" style={style} data-node={node.id} data-fit={node.fit ? `${node.fit.sizePt}pt×${node.fit.lines.length}` : undefined}>
       {node.fit?.failed ? (
         // Reported as a heading-fit error (export is blocked); never drawn across its borders meanwhile.
-        node.fit.lines.map((l, i) => <span key={i} style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis" }}>{l}</span>)
+        node.fit.lines.map((l, i) => <span key={i} style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis" }}>{l || "\u00a0"}</span>)
       ) : node.fit && node.fit.lines.length > 1 ? (
-        node.fit.lines.map((l, i) => <span key={i} style={{ display: "block" }}>{l}</span>)
+        // An empty line (paragraph space) keeps its height.
+        node.fit.lines.map((l, i) => <span key={i} style={{ display: "block" }}>{l || "\u00a0"}</span>)
       ) : (
         node.text
       )}

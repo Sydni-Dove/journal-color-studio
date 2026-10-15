@@ -73,7 +73,7 @@ export const guidedPage: LayoutDefinition = {
   pages: 1,
   period: "none",
   capability: {
-    supportedProductTypes: ["journal", "notebook", "planner", "insert", "worksheet", "custom"],
+    supportedProductTypes: ["journal", "notebook", "planner", "insert", "worksheet", "devotional", "custom"],
     supportsPatterns: ["ruled", "dot-grid", "graph-grid", "blank"],
     supportsLineStyle: true,
     supportsSidebar: false,

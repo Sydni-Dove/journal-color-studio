@@ -210,20 +210,38 @@ function tableColumns(b: PromptBlock): { key: string; label: string; referenceWi
 /** Section gap for a prompt set's spacing choice. */
 export const promptGap = (base: number, set?: PromptSet) => base * SPACING_FACTOR[set?.spacing ?? "standard"];
 
-/** Greedy word wrap with the layout measurer (prompts and instructions are creator-editable and may be long). */
-export function wrapText(value: string, width: number, ctx: Pick<LayoutContext, "typography">, role: "prompt" | "body" = "prompt"): string[] {
+/**
+ * Greedy word wrap with the layout measurer (prompts and instructions are creator-editable and may be long).
+ * A line break starts a new line; a blank line between paragraphs prints as one empty line (paragraph space).
+ */
+export function wrapText(value: string, width: number, ctx: Pick<LayoutContext, "typography"> & Partial<Pick<LayoutContext, "options">>, role: "prompt" | "body" = "prompt"): string[] {
+  return wrapLines(value, width, ctx, role).map((l) => l.text);
+}
+
+/** wrapText's lines, with whether each ends its paragraph (a paragraph space ends one too). */
+function wrapLines(value: string, width: number, ctx: Pick<LayoutContext, "typography"> & Partial<Pick<LayoutContext, "options">>, role: "prompt" | "body"): { text: string; end: boolean }[] {
   const m = getLayoutMeasurer().measure, st = styleForRole(ctx.typography, role);
-  const lines: string[] = [];
+  // The product's choice (Spacing → Space between paragraphs); on unless turned off.
+  const paragraphSpace = ctx.options?.paragraphSpace !== false;
+  const lines: { text: string; end: boolean }[] = [];
+  let gap = false;
   for (const para of value.split("\n")) {
+    const words = para.split(/\s+/).filter(Boolean);
+    if (!words.length) {
+      gap = paragraphSpace && lines.length > 0;
+      continue;
+    }
+    if (gap) lines.push({ text: "", end: true });
+    gap = false;
     let cur = "";
-    for (const word of para.split(/\s+/).filter(Boolean)) {
+    for (const word of words) {
       const next = cur ? `${cur} ${word}` : word;
       if (cur && m(next, st) > width) {
-        lines.push(cur);
+        lines.push({ text: cur, end: false });
         cur = word;
       } else cur = next;
     }
-    if (cur) lines.push(cur);
+    lines.push({ text: cur, end: true });
   }
   return lines;
 }
@@ -333,7 +351,7 @@ function flowUnits(zone: StationeryZone, inner: number, ctx: LayoutContext): num
 
 /** Lines of body text, with whether each ends its paragraph (wrapText's lines, paragraph by paragraph). */
 function paragraphEnds(value: string, width: number, ctx: LayoutContext): boolean[] {
-  return value.split("\n").flatMap((para) => wrapText(para, width, ctx, "body").map((_, i, a) => i === a.length - 1));
+  return wrapLines(value, width, ctx, "body").map((l) => l.end);
 }
 
 /** Writing surfaces whose requested lines may continue on another page when they are longer than a whole page. */
@@ -367,8 +385,12 @@ function splitOf(m: Measured, req: ZoneRequest, ctx: LayoutContext, width: numbe
       unit: "line", count: lines.length, minFirst: 2, minLast: 2, policy: "flow",
       breakQuality: (i) => (ends[i] ? 2 : sentence(i) ? 1 : 0),
       piece: (from, to) => {
-        const promptH = (to - from) * line;
-        const zone = register({ ...z, range: rangeOf(from, to, lines.length) }, { ...m, promptLines: lines.slice(from, to), promptH, promptText: promptH, overhead: promptH + ctx.spacing.headingToContentGap });
+        // A paragraph space (an empty line) where a page breaks is dropped: a page never starts or ends on one.
+        let a = from, b = to;
+        while (a < b && lines[a] === "") a++;
+        while (b > a && lines[b - 1] === "") b--;
+        const promptH = (b - a) * line;
+        const zone = register({ ...z, range: rangeOf(from, to, lines.length) }, { ...m, promptLines: lines.slice(a, b), promptH, promptText: promptH, overhead: promptH + ctx.spacing.headingToContentGap });
         return { zone, overheadIn: promptH + ctx.spacing.headingToContentGap + pad, promptTextIn: promptH, lines: 0 };
       },
     };

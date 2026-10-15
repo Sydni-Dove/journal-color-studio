@@ -16,6 +16,7 @@ type Props = {
   projects: ProjectSummary[];
   meta: (id: string) => ProjectMeta;
   onStart: (start?: WizardStart) => void;
+  onGenerate?: () => void;
   onOpen: (id: string) => void;
   onDuplicate: (id: string) => void;
   onDuplicateAsVariant: (id: string) => void;
@@ -117,7 +118,7 @@ function describe(p: ProjectSummary, m: ProjectMeta): string {
   return `${type} · ${size}${pages}`;
 }
 
-export function ProjectList({ projects, meta, onStart, onOpen, onDuplicate, onDuplicateAsVariant, onDelete, now, account }: Props) {
+export function ProjectList({ projects, meta, onStart, onGenerate, onOpen, onDuplicate, onDuplicateAsVariant, onDelete, now, account }: Props) {
   const metas = useMemo(() => new Map(projects.map((p) => [p.id, meta(p.id)])), [projects, meta]);
   const recent = projects.slice(0, RECENT);
   const hasProjects = projects.length > 0;
@@ -131,6 +132,7 @@ export function ProjectList({ projects, meta, onStart, onOpen, onDuplicate, onDu
         </div>
         <span className="spacer" />
         <button className="btn btn--primary" onClick={() => onStart()}>New product</button>
+        {onGenerate && <button className="btn" onClick={onGenerate}>Generate with AI</button>}
       </header>
       <div className="page-shell home">
         <section className="home-hero">

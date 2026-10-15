@@ -19,7 +19,7 @@ import type { PromptBlock, PromptSet } from "../src/types/prompts";
 import type { LayoutNode, PageFragment, SolvedPage } from "../src/types/layout";
 import type { StationeryZone } from "../src/types/stationery";
 
-type Opts = { size?: string; orientation?: "portrait" | "landscape"; binding?: string; profile?: string; copies?: number; before?: number };
+type Opts = { size?: string; orientation?: "portrait" | "landscape"; binding?: string; profile?: string; copies?: number; before?: number; paragraphSpace?: boolean };
 function book(blocks: PromptBlock[], o: Opts = {}) {
   return createProject("journal", {
     name: "Pagination",
@@ -29,6 +29,7 @@ function book(blocks: PromptBlock[], o: Opts = {}) {
       ...(o.before ? [step("lined-journal", { type: "copies", count: o.before })] : []),
       step("guided", { type: "copies", count: o.copies ?? 1 }, { title: "Content", promptSet: { blocks } as PromptSet }),
     ] },
+    ...(o.paragraphSpace === undefined ? {} : { layoutOptions: { paragraphSpace: o.paragraphSpace } as never }),
   });
 }
 
@@ -270,5 +271,43 @@ describe("font safety", () => {
     const r = exportReadiness({ fontsReady: true, browserFonts: "loaded", docMeasurerId: "canvas:x", currentMeasurerId: "canvas:x", failedFonts: ["Playfair Display"] });
     expect(r.ready).toBe(false);
     expect(!r.ready && r.reason).toContain("Playfair Display");
+  });
+});
+
+describe("paragraph space at a page break", () => {
+  // Found in the Phase 8 review: with a blank line between paragraphs, a continued page could start on the
+  // empty line (the text a line lower than on other pages). The space is dropped where the page breaks.
+  for (const o of SIZES) {
+    it(`${label(o)}: no page starts or ends on the blank line between paragraphs; every word once`, () => {
+      const value = prose(40).split("\n").join("\n\n");
+      const r = solve([bodyText("t1", value)], o);
+      checkPages(r, label(o));
+      expect(r.guided.length, "it continues across pages").toBeGreaterThan(1);
+      for (const { s } of r.guided) {
+        const nodes = ofSection(s, "t1", /-prompt$/);
+        const lines = nodes.flatMap((n) => (n.type === "text" ? n.fit?.lines ?? [n.text] : []));
+        if (!lines.length) continue;
+        expect(lines[0], label(o)).not.toBe("");
+        expect(lines.at(-1), label(o)).not.toBe("");
+      }
+      const printed = r.guided.flatMap(({ s }) => ofSection(s, "t1", /-prompt$/).map(textOf)).join(" ");
+      expect(words(printed)).toEqual(words(value));
+    });
+  }
+});
+
+describe("Space between paragraphs (Spacing panel)", () => {
+  const value = prose(12).split("\n").join("\n\n");
+  const allLines = (r: ReturnType<typeof solve>) => r.guided.flatMap(({ s }) => ofSection(s, "t1", /-prompt$/).flatMap((n) => (n.type === "text" ? n.fit?.lines ?? [n.text] : [])));
+  it("on by default: a blank line between paragraphs prints as an empty line", () => {
+    expect(allLines(solve([bodyText("t1", value)], { size: "8.5x11" })).filter((l) => l === "").length).toBeGreaterThan(0);
+  });
+  it("off: no empty lines, every paragraph still starts on its own line, every word once", () => {
+    const off = solve([bodyText("t1", value)], { size: "8.5x11", paragraphSpace: false });
+    const lines = allLines(off);
+    expect(lines.filter((l) => l === "")).toEqual([]);
+    expect(lines.filter((l) => /^\d+\.1 /.test(l)).length).toBe(12);
+    expect(words(lines.join(" "))).toEqual(words(value));
+    expect(lines.length).toBeLessThan(allLines(solve([bodyText("t1", value)], { size: "8.5x11" })).length);
   });
 });
