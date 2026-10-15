@@ -1,7 +1,10 @@
 /**
  * MODEL COMPARISON for "Develop original content" — run by hand, never by `npm test`. Nothing is deployed.
  *
- *   OPENAI_API_KEY=… node tests/live/develop-model-eval.mjs [runs-per-variant=2]
+ *   OPENAI_API_KEY=… node tests/live/develop-model-eval.mjs [runs-per-variant=1] [only-variant-ids,comma-separated]
+ *
+ * Calls kept to the fewest that answer the questions: every variant includes at least one next batch, so continuity
+ * is always tested — 6 lessons then 6 more; 3 then 3; single lessons 1, 1, 1. A spend guard stops before BUDGET_USD.
  *
  * Uses the live Edge Function's own instructions and answer format, byte for byte: the SYSTEM prompt, the develop
  * rules and the develop schema are taken from supabase/functions/generate-document/index.ts at run time (bundled
@@ -15,7 +18,10 @@ import path from "node:path";
 
 const KEY = process.env.OPENAI_API_KEY;
 if (!KEY) { console.error("Set OPENAI_API_KEY (read from the environment; never pasted into chat)."); process.exit(1); }
-const RUNS = Number(process.argv[2] ?? 2);
+const RUNS = Number(process.argv[2] ?? 1);
+const ONLY = process.argv[3] ? new Set(process.argv[3].split(",")) : null;
+const BUDGET_USD = 0.9;
+let spent = 0;
 const ROOT = path.resolve(import.meta.dirname, "../../..");
 const FN = path.join(ROOT, "supabase/functions/generate-document/index.ts");
 
@@ -36,6 +42,8 @@ const VARIANTS = [
   { id: "mini-userlen", model: "gpt-4.1-mini", userExtra: "\n\nFor every lesson, the story is 100–180 words: a named child, a real situation, a choice they make, and how it turns out. Count the words." },
   // Same model, 3 lessons per request: is the length a per-answer budget habit?
   { id: "mini-3", model: "gpt-4.1-mini", entryCount: 3 },
+  // Same model, one complete lesson per request (three requests: lesson 1, then next batches of 1).
+  { id: "mini-1", model: "gpt-4.1-mini", entryCount: 1, requests: 3 },
 ];
 
 const words = (t) => (t.trim() ? t.trim().split(/\s+/).length : 0);
@@ -50,7 +58,9 @@ async function call(model, system, user, schema) {
   if (!r.ok) throw new Error(`${model}: ${j?.error?.message ?? r.status}`);
   const [pi, po] = PRICES[model] ?? [0, 0];
   const u = j.usage ?? {};
-  return { ms: Date.now() - t0, finish: j.choices?.[0]?.finish_reason, usage: u, usd: ((u.prompt_tokens ?? 0) * pi + (u.completion_tokens ?? 0) * po) / 1e6, spec: JSON.parse(j.choices[0].message.content) };
+  const usd = ((u.prompt_tokens ?? 0) * pi + (u.completion_tokens ?? 0) * po) / 1e6;
+  spent += usd;
+  return { ms: Date.now() - t0, finish: j.choices?.[0]?.finish_reason, usage: u, usd, spec: JSON.parse(j.choices[0].message.content) };
 }
 function measure(spec) {
   const e = spec.entries ?? { fields: [], records: [] };
@@ -70,22 +80,33 @@ function measure(spec) {
 }
 
 const results = [];
-for (const v of VARIANTS) for (let run = 1; run <= RUNS; run++) {
-  const n = v.entryCount ?? 6;
-  const system = mod.SYSTEM.replace(mod.NO_CONTENT, mod.developRules(n, null));
-  const first = await call(v.model, system, `What the maker wants:\n${DESCRIPTION}${v.userExtra ?? ""}`, mod.developSchema);
-  const m1 = measure(first.spec);
-  const e = first.spec.entries;
-  const batch = { name: e.name, fields: e.fields, from: m1.lessons + 1, count: n, previous: m1.titles };
-  const user2 = `What the maker wants:\n${DESCRIPTION}${v.userExtra ?? ""}\n\nTHIS IS A NEXT BATCH. Entries 1–${batch.from - 1} of "${batch.name}" are already written:\n${batch.previous.map((p, i) => `${i + 1}. ${p}`).join("\n")}\nWrite entries ${batch.from}–${batch.from + n - 1} only: ${n} NEW entries on themes not covered above (any examples in the description above are already used). Never repeat a title or theme from the list — nor a close synonym of one (for example Truthfulness after Honesty, Thankfulness after Gratitude) — and use Scripture references not used in the entries above.`;
-  const second = await call(v.model, mod.SYSTEM.replace(mod.NO_CONTENT, mod.developRules(null, batch)), user2, mod.developSchema);
-  const m2 = measure(second.spec);
-  const all = [...m1.titles, ...m2.titles].map(norm);
-  const row = { variant: v.id, model: v.model, run, first: { ms: first.ms, finish: first.finish, usage: first.usage, usd: first.usd, ...m1 }, batch: { ms: second.ms, finish: second.finish, usage: second.usage, usd: second.usd, ...m2 }, repeatedTitles: all.length - new Set(all).size, raw: [first.spec, second.spec] };
-  results.push(row);
-  console.log(`${v.id} #${run}: stories ${m1.storyWords.join("/")} | ${m2.storyWords.join("/")} · in 100–180: ${m1.inRange + m2.inRange}/${m1.lessons + m2.lessons} · repeats ${row.repeatedTitles} · ${(first.ms / 1000).toFixed(0)}s+${(second.ms / 1000).toFixed(0)}s · $${(first.usd + second.usd).toFixed(4)}`);
+const batchUser = (extra, b, n) => `What the maker wants:\n${DESCRIPTION}${extra ?? ""}\n\nTHIS IS A NEXT BATCH. Entries 1–${b.from - 1} of "${b.name}" are already written:\n${b.previous.map((p, i) => `${i + 1}. ${p}`).join("\n")}\nWrite entries ${b.from}–${b.from + n - 1} only: ${n} NEW entries on themes not covered above (any examples in the description above are already used). Never repeat a title or theme from the list — nor a close synonym of one (for example Truthfulness after Honesty, Thankfulness after Gratitude) — and use Scripture references not used in the entries above.`;
+for (const v of VARIANTS) {
+  if (ONLY && !ONLY.has(v.id)) continue;
+  for (let run = 1; run <= RUNS; run++) {
+    const n = v.entryCount ?? 6, requests = v.requests ?? 2;
+    const calls = [];
+    let fields, name, titles = [];
+    for (let k = 0; k < requests; k++) {
+      if (spent >= BUDGET_USD) { console.log(`budget guard: stopping at $${spent.toFixed(4)}`); break; }
+      const b = k === 0 ? null : { name, fields, from: titles.length + 1, count: n, previous: titles };
+      // The live function's own system prompt for this request (develop rules with the batch when continuing).
+      const system = mod.SYSTEM.replace(mod.NO_CONTENT, mod.developRules(k === 0 ? n : null, b));
+      const user = k === 0 ? `What the maker wants:\n${DESCRIPTION}${v.userExtra ?? ""}` : batchUser(v.userExtra, b, n);
+      const c = await call(v.model, system, user, mod.developSchema);
+      const m = measure(c.spec);
+      if (k === 0) { fields = c.spec.entries?.fields ?? []; name = c.spec.entries?.name ?? "Lessons"; }
+      titles = [...titles, ...m.titles];
+      calls.push({ ms: c.ms, finish: c.finish, usage: c.usage, usd: c.usd, ...m, raw: c.spec });
+    }
+    const all = titles.map(norm);
+    const story = calls.flatMap((c) => c.storyWords);
+    const row = { variant: v.id, model: v.model, run, calls, lessons: story.length, repeatedTitles: all.length - new Set(all).size, usd: calls.reduce((a, c) => a + c.usd, 0), seconds: calls.reduce((a, c) => a + c.ms, 0) / 1000 };
+    results.push(row);
+    console.log(`${v.id} #${run}: stories ${calls.map((c) => c.storyWords.join("/")).join(" | ")} · in 100–180: ${story.filter((w) => w >= 100 && w <= 180).length}/${story.length} · repeats ${row.repeatedTitles} · ${row.seconds.toFixed(0)}s · $${row.usd.toFixed(4)} (total $${spent.toFixed(4)})`);
+  }
 }
 fs.mkdirSync(path.join(import.meta.dirname, "out"), { recursive: true });
 const file = path.join(import.meta.dirname, "out", `develop-model-eval-${Date.now()}.json`);
 fs.writeFileSync(file, JSON.stringify(results, null, 1));
-console.log("saved", file);
+console.log("saved", file, "| total spent $" + spent.toFixed(4));

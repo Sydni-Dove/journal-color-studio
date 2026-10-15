@@ -278,7 +278,25 @@ deploying, which is on hold. Everything that doesn't need new AI calls is done:
   (gpt-4.1 about $0.03–0.05 per request; mini about $0.005). The prices in the script should be checked against
   OpenAI's pricing page.
 
-**To unblock (Sydni's choice):**
+**Approved 2026-10-15: option (a).** Sydni is adding a dedicated key as `OPENAI_API_KEY` in this cloud environment's
+settings. A new session picks it up; this one can't see it.
+
+Her additions:
+- a 6th variant, one complete lesson per request (`mini-1`: lessons 1, 2, 3 in three requests);
+- fewest calls for a meaningful comparison;
+- total spend under $1;
+- judge quality by reading the lessons (teaching value, creativity, story development, age fit, Scripture
+  relevance, whether questions truly connect to the story), not by word counts alone;
+- no deploy, no merge, and no change to the live Edge Function.
+
+**Next session — run it:** from `product-studio/`, run `node tests/live/develop-model-eval.mjs`.
+- That is 1 run of each of the 6 variants, 13 calls in all, estimated at about $0.20–0.30.
+- A spend guard stops it at $0.90.
+- If two variants are close, re-run just those once: `node tests/live/develop-model-eval.mjs 1 <id>,<id>`.
+- Then read every lesson in `tests/live/out/`, compare, recommend a model, prompt structure and batch size, and
+  record the findings and the actual cost here.
+
+**Options considered before the approval:**
 - (a) Add an OpenAI key as a secret in this cloud environment (environment settings → Edit), named
   `OPENAI_API_KEY`. A dedicated key with a low spending limit is best. Nothing is deployed; delete the key after.
 - (b) Approve a temporary, separate evaluation function (not `generate-document`, test accounts only, deleted
