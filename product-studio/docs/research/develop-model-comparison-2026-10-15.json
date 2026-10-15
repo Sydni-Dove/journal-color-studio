@@ -1,0 +1,2647 @@
+[
+ {
+  "variant": "mini-ship",
+  "model": "gpt-4.1-mini",
+  "run": 1,
+  "calls": [
+   {
+    "ms": 17902,
+    "finish": "stop",
+    "usage": {
+     "prompt_tokens": 2793,
+     "completion_tokens": 2478,
+     "total_tokens": 5271,
+     "prompt_tokens_details": {
+      "cached_tokens": 2560,
+      "audio_tokens": 0
+     },
+     "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "audio_tokens": 0,
+      "accepted_prediction_tokens": 0,
+      "rejected_prediction_tokens": 0
+     }
+    },
+    "usd": 0.005082,
+    "lessons": 6,
+    "titles": [
+     "Kindness",
+     "Honesty",
+     "Courage",
+     "Patience",
+     "Forgiveness",
+     "Gratitude"
+    ],
+    "verses": [
+     "Ephesians 4:32",
+     "Proverbs 12:22",
+     "Joshua 1:9",
+     "Galatians 5:22",
+     "Ephesians 4:32",
+     "1 Thessalonians 5:18"
+    ],
+    "storyWords": [
+     94,
+     84,
+     75,
+     77,
+     66,
+     70
+    ],
+    "inRange": 0,
+    "medianStory": 77,
+    "activityWords": [
+     29,
+     20,
+     28,
+     21,
+     20,
+     17
+    ],
+    "namedCharacter": [
+     "Emma",
+     "Tom",
+     null,
+     "Ben",
+     "Max",
+     null
+    ],
+    "questionsNameTheCharacter": 4,
+    "raw": {
+     "title": "Character-Building Journal for Children Ages 6-9",
+     "summary": "A Scripture-based journal designed to teach children ages 6 to 9 important character traits through Bible verses, engaging mini-stories, daily activities, reflection questions, and prayers, with space for drawing or writing.",
+     "page": {
+      "size": "8.5x11",
+      "orientation": "portrait",
+      "binding": "spiral",
+      "why": "The 8.5x11 portrait size with spiral binding is ideal for children to write and draw comfortably, and the spiral allows the journal to lay flat during use."
+     },
+     "entries": {
+      "name": "Lessons",
+      "fields": [
+       {
+        "key": "trait",
+        "label": "Character Trait",
+        "valueType": "text"
+       },
+       {
+        "key": "verse",
+        "label": "Bible Verse",
+        "valueType": "reference"
+       },
+       {
+        "key": "story",
+        "label": "Story",
+        "valueType": "longText"
+       },
+       {
+        "key": "activity",
+        "label": "Activity",
+        "valueType": "longText"
+       },
+       {
+        "key": "reflection1",
+        "label": "Reflection Question 1",
+        "valueType": "text"
+       },
+       {
+        "key": "reflection2",
+        "label": "Reflection Question 2",
+        "valueType": "text"
+       },
+       {
+        "key": "prayer",
+        "label": "Prayer",
+        "valueType": "longText"
+       }
+      ],
+      "records": [
+       {
+        "values": [
+         {
+          "key": "trait",
+          "value": "Kindness"
+         },
+         {
+          "key": "verse",
+          "value": "Ephesians 4:32"
+         },
+         {
+          "key": "story",
+          "value": "Lily was playing in the park when she saw a new girl sitting alone on a bench. The new girl looked sad and didn’t know anyone. Lily felt shy but remembered how Jesus taught to be kind to others. She decided to go and say hello. The new girl smiled and said her name was Emma. They played together, and Emma felt much happier. Later, Lily’s mom told her that being kind is like sharing God’s love. Lily was glad she made a new friend by being kind, just like the Bible verse said."
+         },
+         {
+          "key": "activity",
+          "value": "Today, try to do something kind for someone, like helping a family member or sharing a toy with a friend. Draw a picture or write about what you did."
+         },
+         {
+          "key": "reflection1",
+          "value": "How did Lily show kindness to Emma in the story?"
+         },
+         {
+          "key": "reflection2",
+          "value": "Can you think of a time when someone was kind to you?"
+         },
+         {
+          "key": "prayer",
+          "value": "Dear God, help me to be kind like Lily and share your love with others every day. Amen."
+         }
+        ]
+       },
+       {
+        "values": [
+         {
+          "key": "trait",
+          "value": "Honesty"
+         },
+         {
+          "key": "verse",
+          "value": "Proverbs 12:22"
+         },
+         {
+          "key": "story",
+          "value": "Tom found a shiny toy on the playground that didn’t belong to him. His friends told him to keep it, but Tom remembered that God wants us to tell the truth. He looked around and saw a boy crying because he lost his toy. Tom walked over and gave the toy back. The boy smiled and thanked him. Tom felt happy because he did the right thing. His teacher said, “Honesty is a good choice.” Tom knew that telling the truth made God happy."
+         },
+         {
+          "key": "activity",
+          "value": "Today, practice telling the truth even when it’s hard. You can draw or write about a time you were honest."
+         },
+         {
+          "key": "reflection1",
+          "value": "What honest choice did Tom make in the story?"
+         },
+         {
+          "key": "reflection2",
+          "value": "Why do you think honesty is important?"
+         },
+         {
+          "key": "prayer",
+          "value": "Dear God, please help me to always tell the truth and be honest like Tom. Amen."
+         }
+        ]
+       },
+       {
+        "values": [
+         {
+          "key": "trait",
+          "value": "Courage"
+         },
+         {
+          "key": "verse",
+          "value": "Joshua 1:9"
+         },
+         {
+          "key": "story",
+          "value": "Sara was scared to try the big slide at the playground. She looked at the tall slide and felt nervous. Her friend said, “You can do it!” Sara remembered that God tells us to be strong and brave. She took a deep breath and climbed the ladder. When she slid down, she felt happy and proud. Sara learned that courage means trying even when you are afraid. She thanked God for helping her be brave."
+         },
+         {
+          "key": "activity",
+          "value": "Today, try something that feels a little scary, like speaking in front of your family or trying a new game. Draw or write about how you showed courage."
+         },
+         {
+          "key": "reflection1",
+          "value": "How did Sara show courage in the story?"
+         },
+         {
+          "key": "reflection2",
+          "value": "What is something you can be brave about today?"
+         },
+         {
+          "key": "prayer",
+          "value": "Dear God, thank you for giving me courage to try new things. Help me to be brave like Sara. Amen."
+         }
+        ]
+       },
+       {
+        "values": [
+         {
+          "key": "trait",
+          "value": "Patience"
+         },
+         {
+          "key": "verse",
+          "value": "Galatians 5:22"
+         },
+         {
+          "key": "story",
+          "value": "Ben wanted to open his birthday presents right away, but his mom said he needed to wait until after dinner. Ben felt impatient and fidgeted at the table. Then he remembered that patience is a fruit of the Spirit. He took deep breaths and waited quietly. After dinner, Ben opened his gifts and was very happy. He learned that waiting patiently can be hard but is a good choice. Ben thanked God for helping him be patient."
+         },
+         {
+          "key": "activity",
+          "value": "Today, practice waiting patiently, like waiting your turn or waiting for a snack. Draw or write about how you showed patience."
+         },
+         {
+          "key": "reflection1",
+          "value": "How did Ben practice patience in the story?"
+         },
+         {
+          "key": "reflection2",
+          "value": "When is a time you have to wait patiently?"
+         },
+         {
+          "key": "prayer",
+          "value": "Dear God, please help me to be patient and wait calmly like Ben. Amen."
+         }
+        ]
+       },
+       {
+        "values": [
+         {
+          "key": "trait",
+          "value": "Forgiveness"
+         },
+         {
+          "key": "verse",
+          "value": "Ephesians 4:32"
+         },
+         {
+          "key": "story",
+          "value": "Anna and her friend Max were playing when Max accidentally broke Anna’s toy. Anna felt sad and angry. She wanted to be mad, but then she remembered that Jesus forgives us. Anna told Max it was okay and forgave him. Max said sorry and promised to be more careful. They hugged and kept playing happily. Anna learned that forgiving others makes our hearts lighter and happier."
+         },
+         {
+          "key": "activity",
+          "value": "Today, think of someone you can forgive or say sorry to. Draw or write about how you can show forgiveness."
+         },
+         {
+          "key": "reflection1",
+          "value": "How did Anna show forgiveness to Max in the story?"
+         },
+         {
+          "key": "reflection2",
+          "value": "Why is forgiveness important?"
+         },
+         {
+          "key": "prayer",
+          "value": "Dear God, help me to forgive others just like you forgive me. Amen."
+         }
+        ]
+       },
+       {
+        "values": [
+         {
+          "key": "trait",
+          "value": "Gratitude"
+         },
+         {
+          "key": "verse",
+          "value": "1 Thessalonians 5:18"
+         },
+         {
+          "key": "story",
+          "value": "Jack woke up feeling grumpy because it was raining outside. But then he remembered to thank God for all the good things in his life. He thought about his family, his friends, and his toys. Jack told his mom he was thankful for their warm home and yummy food. His smile grew bigger as he thanked God. Jack learned that being grateful makes our hearts happy even on rainy days."
+         },
+         {
+          "key": "activity",
+          "value": "Today, write or draw three things you are thankful for. Try to thank God for each one."
+         },
+         {
+          "key": "reflection1",
+          "value": "What did Jack remember to do even though it was raining?"
+         },
+         {
+          "key": "reflection2",
+          "value": "What are three things you are thankful for?"
+         },
+         {
+          "key": "prayer",
+          "value": "Dear God, thank you for all the good things you give me. Help me to always have a thankful heart. Amen."
+         }
+        ]
+       }
+      ],
+      "source": "suggested"
+     },
+     "sections": [
+      {
+       "id": "intro1",
+       "title": "Welcome to Your Character-Building Journal",
+       "purpose": "Introduce the journal and how to use it",
+       "repeat": {
+        "mode": "once",
+        "count": 1
+       },
+       "startOnRightPage": true,
+       "components": [
+        {
+         "id": "heading1",
+         "kind": "heading",
+         "label": null,
+         "text": "Welcome to Your Character-Building Journal",
+         "source": "suggested",
+         "fromEntryField": null,
+         "fields": [],
+         "rows": null,
+         "numbered": false,
+         "fillPage": false,
+         "lines": null,
+         "items": [],
+         "marker": null,
+         "size": null
+        },
+        {
+         "id": "text1",
+         "kind": "text",
+         "label": null,
+         "text": "This journal will help you learn important character traits like kindness, honesty, courage, patience, forgiveness, and gratitude. Each lesson has a Bible verse, a story about a child, an activity you can do, questions to think about, and a prayer. There is space for you to draw or write your thoughts. Have fun learning and growing!",
+         "source": "suggested",
+         "fromEntryField": null,
+         "fields": [],
+         "rows": null,
+         "numbered": false,
+         "fillPage": false,
+         "lines": null,
+         "items": [],
+         "marker": null,
+         "size": null
+        }
+       ]
+      },
+      {
+       "id": "lessonSection",
+       "title": "Lesson {#}: {trait}",
+       "purpose": "Teach one character trait per lesson with Bible verse, story, activity, reflection, and prayer",
+       "repeat": {
+        "mode": "per-entry",
+        "count": 6
+       },
+       "startOnRightPage": true,
+       "components": [
+        {
+         "id": "headingTrait",
+         "kind": "heading",
+         "label": null,
+         "text": null,
+         "source": "suggested",
+         "fromEntryField": "trait",
+         "fields": [],
+         "rows": null,
+         "numbered": false,
+         "fillPage": false,
+         "lines": null,
+         "items": [],
+         "marker": null,
+         "size": null
+        },
+        {
+         "id": "verse1",
+         "kind": "heading",
+         "label": "Bible Verse",
+         "text": null,
+         "source": "user",
+         "fromEntryField": "verse",
+         "fields": [],
+         "rows": null,
+         "numbered": false,
+         "fillPage": false,
+         "lines": null,
+         "items": [],
+         "marker": null,
+         "size": null
+        },
+        {
+         "id": "story1",
+         "kind": "text",
+         "label": "Story",
+         "text": null,
+         "source": "user",
+         "fromEntryField": "story",
+         "fields": [],
+         "rows": null,
+         "numbered": false,
+         "fillPage": false,
+         "lines": null,
+         "items": [],
+         "marker": null,
+         "size": null
+        },
+        {
+         "id": "activity1",
+         "kind": "text",
+         "label": "Activity",
+         "text": null,
+         "source": "user",
+         "fromEntryField": "activity",
+         "fields": [],
+         "rows": null,
+         "numbered": false,
+         "fillPage": false,
+         "lines": null,
+         "items": [],
+         "marker": null,
+         "size": null
+        },
+        {
+         "id": "checklistReflection",
+         "kind": "checklist",
+         "label": "Reflection Questions",
+         "text": null,
+         "source": "user",
+         "fromEntryField": null,
+         "fields": [],
+         "rows": 2,
+         "numbered": false,
+         "fillPage": false,
+         "lines": null,
+         "items": [
+          "Reflection Question 1: {reflection1}",
+          "Reflection Question 2: {reflection2}"
+         ],
+         "marker": "bullet",
+         "size": null
+        },
+        {
+         "id": "writingSpace",
+         "kind": "writing",
+         "label": "Your Drawing or Writing Space",
+         "text": "Draw or write your thoughts here.",
+         "source": "suggested",
+         "fromEntryField": null,
+         "fields": [],
+         "rows": 10,
+         "numbered": false,
+         "fillPage": false,
+         "lines": 10,
+         "items": [],
+         "marker": null,
+         "size": null
+        },
+        {
+         "id": "prayer1",
+         "kind": "text",
+         "label": "Prayer",
+         "text": null,
+         "source": "user",
+         "fromEntryField": "prayer",
+         "fields": [],
+         "rows": null,
+         "numbered": false,
+         "fillPage": false,
+         "lines": null,
+         "items": [],
+         "marker": null,
+         "size": null
+        }
+       ]
+      }
+     ],
+     "notes": [
+      "The journal includes 6 lessons, each teaching a character trait with a Bible verse, a full mini-story of 8 to 10 sentences, an activity, two reflection questions (one naming the story's main character), and a short prayer, as requested.",
+      "The page size 8.5x11 with portrait orientation and spiral binding is chosen for ease of writing and drawing by children.",
+      "The introduction section welcomes the child and explains how to use the journal.",
+      "The lesson section repeats once per each of the 6 lessons provided in entries.records.",
+      "Reflection questions are presented as a checklist with bullet markers to encourage thoughtful responses.",
+      "The writing space for drawing or writing is 10 lines per lesson, providing ample room for children to express themselves."
+     ]
+    }
+   },
+   {
+    "ms": 16262,
+    "finish": "stop",
+    "usage": {
+     "prompt_tokens": 3107,
+     "completion_tokens": 2458,
+     "total_tokens": 5565,
+     "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "audio_tokens": 0
+     },
+     "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "audio_tokens": 0,
+      "accepted_prediction_tokens": 0,
+      "rejected_prediction_tokens": 0
+     }
+    },
+    "usd": 0.005175600000000001,
+    "lessons": 6,
+    "titles": [
+     "Generosity",
+     "Respect",
+     "Self-Control",
+     "Kindness to Animals",
+     "Humility",
+     "Thankfulness for Creation"
+    ],
+    "verses": [
+     "2 Corinthians 9:7",
+     "Romans 12:10",
+     "Proverbs 25:28",
+     "Proverbs 12:10",
+     "Philippians 2:3",
+     "Psalm 24:1"
+    ],
+    "storyWords": [
+     106,
+     98,
+     104,
+     103,
+     95,
+     90
+    ],
+    "inRange": 3,
+    "medianStory": 103,
+    "activityWords": [
+     33,
+     18,
+     24,
+     26,
+     21,
+     18
+    ],
+    "namedCharacter": [
+     null,
+     "Mia",
+     "Emma",
+     null,
+     null,
+     null
+    ],
+    "questionsNameTheCharacter": 2,
+    "raw": {
+     "title": "Character-Building Journal for Children Ages 6 to 9: Lessons 7 to 12",
+     "summary": "A Scripture-based character-building journal for children ages 6 to 9, teaching six new character traits with Bible verses, stories, activities, reflection questions, and prayers. This is the continuation of the series, lessons 7 to 12, following kindness, honesty, courage, patience, forgiveness, and gratitude.",
+     "page": {
+      "size": "6x9",
+      "orientation": "portrait",
+      "binding": "book",
+      "why": "A 6x9 portrait book with book binding is ideal for a children's character journal, offering a comfortable size for young children to write and draw, and the binding allows easy flipping and durability."
+     },
+     "entries": {
+      "name": "Lessons",
+      "fields": [
+       {
+        "key": "trait",
+        "label": "Character Trait",
+        "valueType": "text"
+       },
+       {
+        "key": "verse",
+        "label": "Bible Verse",
+        "valueType": "reference"
+       },
+       {
+        "key": "story",
+        "label": "Story",
+        "valueType": "longText"
+       },
+       {
+        "key": "activity",
+        "label": "Activity",
+        "valueType": "longText"
+       },
+       {
+        "key": "reflection1",
+        "label": "Reflection Question 1",
+        "valueType": "text"
+       },
+       {
+        "key": "reflection2",
+        "label": "Reflection Question 2",
+        "valueType": "text"
+       },
+       {
+        "key": "prayer",
+        "label": "Prayer",
+        "valueType": "longText"
+       }
+      ],
+      "records": [
+       {
+        "values": [
+         {
+          "key": "trait",
+          "value": "Generosity"
+         },
+         {
+          "key": "verse",
+          "value": "2 Corinthians 9:7"
+         },
+         {
+          "key": "story",
+          "value": "Lily loved to collect pretty stones and shells from the beach. One sunny afternoon, she found a shiny blue shell that she really wanted to keep. But then she saw her little brother watching her with big eyes. He didn't have any treasures of his own. Lily thought about keeping the shell just for herself, but then she smiled and gave it to her brother. He was so happy that he hugged her tightly. Their mom said, \"God loves a cheerful giver,\" just like in the Bible. Lily felt warm inside because sharing made her heart glad, and she knew she was doing what God wanted."
+         },
+         {
+          "key": "activity",
+          "value": "Find something you can share with a friend or family member today. It could be a toy, a snack, or even your time. Notice how sharing makes you and the other person feel."
+         },
+         {
+          "key": "reflection1",
+          "value": "What did Lily do with the shiny blue shell? How did it make her feel?"
+         },
+         {
+          "key": "reflection2",
+          "value": "Can you think of a time when you shared something special? How did it make you feel?"
+         },
+         {
+          "key": "prayer",
+          "value": "Dear God, help me to be generous like Lily, sharing what I have with others cheerfully. Thank You for the joy that comes from giving. Amen."
+         }
+        ]
+       },
+       {
+        "values": [
+         {
+          "key": "trait",
+          "value": "Respect"
+         },
+         {
+          "key": "verse",
+          "value": "Romans 12:10"
+         },
+         {
+          "key": "story",
+          "value": "Tommy was playing with his favorite toy car when his friend Mia came over. Mia wanted to play too, but Tommy didn’t want to share. He crossed his arms and said, \"It's mine!\" Mia looked sad and walked away. Later, Tommy remembered how he felt when someone didn’t share with him. He thought about the Bible verse that says to be kind and respectful to others. So, Tommy called Mia back and said, \"You can play with my car too.\" Mia smiled, and they had fun playing together. Tommy learned that respecting others means thinking about their feelings."
+         },
+         {
+          "key": "activity",
+          "value": "Today, try to show respect by listening carefully when someone is talking and by sharing your things kindly."
+         },
+         {
+          "key": "reflection1",
+          "value": "How did Tommy show respect to Mia at the end of the story?"
+         },
+         {
+          "key": "reflection2",
+          "value": "Why is it important to think about other people's feelings?"
+         },
+         {
+          "key": "prayer",
+          "value": "Dear God, please help me to respect others and be kind in my words and actions. Teach me to think about how others feel. Amen."
+         }
+        ]
+       },
+       {
+        "values": [
+         {
+          "key": "trait",
+          "value": "Self-Control"
+         },
+         {
+          "key": "verse",
+          "value": "Proverbs 25:28"
+         },
+         {
+          "key": "story",
+          "value": "Emma loved candy, especially the colorful ones she found at the store. One day, her mom gave her a small bag of candy but told her to eat just one piece a day. Emma wanted to eat them all at once, but she remembered the Bible verse about self-control. She took one candy and put the rest away. Each day, Emma waited patiently and enjoyed one candy. She felt proud because she was learning to control her wants, just like the Bible teaches. Her mom hugged her and said she was doing a great job. Emma knew that self-control helped her make good choices."
+         },
+         {
+          "key": "activity",
+          "value": "Think of something you want to do or eat a lot of. Practice waiting and controlling yourself by doing a little at a time."
+         },
+         {
+          "key": "reflection1",
+          "value": "What did Emma do when she wanted to eat all the candy?"
+         },
+         {
+          "key": "reflection2",
+          "value": "How does practicing self-control help you in your daily life?"
+         },
+         {
+          "key": "prayer",
+          "value": "Dear God, thank You for teaching me self-control. Help me to make good choices and be patient when I want something. Amen."
+         }
+        ]
+       },
+       {
+        "values": [
+         {
+          "key": "trait",
+          "value": "Kindness to Animals"
+         },
+         {
+          "key": "verse",
+          "value": "Proverbs 12:10"
+         },
+         {
+          "key": "story",
+          "value": "Ben found a little bird with a hurt wing in his backyard. He wanted to help but didn’t know how. He gently picked up the bird and asked his mom what to do. She helped him make a small soft bed for the bird and gave it some water. Ben took care of the bird every day until it was strong enough to fly away. He felt happy knowing he was kind to a creature God made. Ben remembered the Bible says that a kind person cares for animals. He learned that kindness is not just for people but for all God’s creatures."
+         },
+         {
+          "key": "activity",
+          "value": "Look for ways to be kind to animals today. It could be feeding birds, giving water to pets, or just being gentle with animals you see."
+         },
+         {
+          "key": "reflection1",
+          "value": "How did Ben show kindness to the little bird?"
+         },
+         {
+          "key": "reflection2",
+          "value": "Why do you think God wants us to be kind to animals?"
+         },
+         {
+          "key": "prayer",
+          "value": "Dear God, help me to be kind to all the animals You have made. Teach me to care for them gently and lovingly. Amen."
+         }
+        ]
+       },
+       {
+        "values": [
+         {
+          "key": "trait",
+          "value": "Humility"
+         },
+         {
+          "key": "verse",
+          "value": "Philippians 2:3"
+         },
+         {
+          "key": "story",
+          "value": "Sophie won a prize at school for drawing a beautiful picture. She felt proud and wanted everyone to know she was the best. But then she remembered what her teacher said about being humble and thinking of others as better than herself. Sophie decided to tell her friends about their great drawings too. She said, \"We all did a wonderful job!\" Her friends smiled and thanked her. Sophie felt happy because she was sharing the joy and not bragging. She learned that humility means being kind and not thinking you are more important than others."
+         },
+         {
+          "key": "activity",
+          "value": "Today, try to say something nice about a friend or family member’s work or effort instead of only talking about yourself."
+         },
+         {
+          "key": "reflection1",
+          "value": "What did Sophie do to show humility after winning the prize?"
+         },
+         {
+          "key": "reflection2",
+          "value": "How can being humble help you get along with others?"
+         },
+         {
+          "key": "prayer",
+          "value": "Dear God, please help me to be humble and kind. Teach me to think of others and share their happiness. Amen."
+         }
+        ]
+       },
+       {
+        "values": [
+         {
+          "key": "trait",
+          "value": "Thankfulness for Creation"
+         },
+         {
+          "key": "verse",
+          "value": "Psalm 24:1"
+         },
+         {
+          "key": "story",
+          "value": "Jacob loved playing outside in the park. One day, he noticed the tall trees, colorful flowers, and chirping birds. He felt amazed at how beautiful everything was. Jacob’s mom told him that the whole world belongs to God, and He made it all. Jacob decided to thank God for the wonderful creation every day. He even started picking up trash to keep the park clean. Jacob felt happy knowing he was helping take care of God’s world. He learned that being thankful means noticing God’s gifts and caring for them."
+         },
+         {
+          "key": "activity",
+          "value": "Go outside and find three things in nature that you are thankful for. Draw or write about them."
+         },
+         {
+          "key": "reflection1",
+          "value": "What did Jacob do to show thankfulness for God’s creation?"
+         },
+         {
+          "key": "reflection2",
+          "value": "Why is it important to take care of the world God made?"
+         },
+         {
+          "key": "prayer",
+          "value": "Dear God, thank You for the beautiful world You made. Help me to be thankful and take care of Your creation every day. Amen."
+         }
+        ]
+       }
+      ],
+      "source": "suggested"
+     },
+     "sections": [
+      {
+       "id": "sec1",
+       "title": "Character Lessons 7 to 12",
+       "purpose": "To teach six new character traits with Scripture, stories, activities, reflections, and prayers for children ages 6 to 9.",
+       "repeat": {
+        "mode": "per-entry",
+        "count": 6
+       },
+       "startOnRightPage": true,
+       "components": [
+        {
+         "id": "c1",
+         "kind": "heading",
+         "label": null,
+         "text": "Character Trait: ",
+         "source": "suggested",
+         "fromEntryField": "trait",
+         "fields": [],
+         "rows": null,
+         "numbered": false,
+         "fillPage": false,
+         "lines": null,
+         "items": [],
+         "marker": null,
+         "size": null
+        },
+        {
+         "id": "c2",
+         "kind": "text",
+         "label": "Bible Verse",
+         "text": null,
+         "source": "suggested",
+         "fromEntryField": "verse",
+         "fields": [],
+         "rows": null,
+         "numbered": false,
+         "fillPage": false,
+         "lines": null,
+         "items": [],
+         "marker": null,
+         "size": null
+        },
+        {
+         "id": "c3",
+         "kind": "text",
+         "label": "Story",
+         "text": null,
+         "source": "suggested",
+         "fromEntryField": "story",
+         "fields": [],
+         "rows": null,
+         "numbered": false,
+         "fillPage": false,
+         "lines": null,
+         "items": [],
+         "marker": null,
+         "size": null
+        },
+        {
+         "id": "c4",
+         "kind": "writing",
+         "label": "Activity",
+         "text": null,
+         "source": "suggested",
+         "fromEntryField": "activity",
+         "fields": [],
+         "rows": 6,
+         "numbered": false,
+         "fillPage": false,
+         "lines": 6,
+         "items": [],
+         "marker": null,
+         "size": null
+        },
+        {
+         "id": "c5",
+         "kind": "fields",
+         "label": null,
+         "text": null,
+         "source": "suggested",
+         "fromEntryField": null,
+         "fields": [
+          {
+           "label": "Reflection Question 1",
+           "valueType": "text"
+          },
+          {
+           "label": "Reflection Question 2",
+           "valueType": "text"
+          }
+         ],
+         "rows": 1,
+         "numbered": false,
+         "fillPage": false,
+         "lines": null,
+         "items": [],
+         "marker": null,
+         "size": null
+        },
+        {
+         "id": "c6",
+         "kind": "writing",
+         "label": "Prayer",
+         "text": null,
+         "source": "suggested",
+         "fromEntryField": "prayer",
+         "fields": [],
+         "rows": 3,
+         "numbered": false,
+         "fillPage": false,
+         "lines": 3,
+         "items": [],
+         "marker": null,
+         "size": null
+        }
+       ]
+      }
+     ],
+     "notes": [
+      "This batch continues the character-building journal for children ages 6 to 9 with six new lessons on Generosity, Respect, Self-Control, Kindness to Animals, Humility, and Thankfulness for Creation.",
+      "Each lesson includes a Bible verse not previously used in entries 1-6, a story of about 8-10 sentences featuring a child character, an activity to practice the trait, two reflection questions (one naming the story's child), and a short prayer.",
+      "The page size 6x9 portrait with book binding suits a children's journal that will be easy to handle and write in.",
+      "The per-entry section repeats once for each of the six new lessons, starting each on a right-hand page for a neat layout.",
+      "The maker's original instructions and wording style are followed strictly for consistency and clarity."
+     ]
+    }
+   }
+  ],
+  "lessons": 12,
+  "repeatedTitles": 0,
+  "usd": 0.0102576,
+  "seconds": 34.164
+ },
+ {
+  "variant": "mini-ship-3",
+  "model": "gpt-4.1-mini",
+  "run": 1,
+  "calls": [
+   {
+    "ms": 15853,
+    "finish": "stop",
+    "usage": {
+     "prompt_tokens": 2793,
+     "completion_tokens": 2045,
+     "total_tokens": 4838,
+     "prompt_tokens_details": {
+      "cached_tokens": 2560,
+      "audio_tokens": 0
+     },
+     "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "audio_tokens": 0,
+      "accepted_prediction_tokens": 0,
+      "rejected_prediction_tokens": 0
+     }
+    },
+    "usd": 0.0043892,
+    "lessons": 3,
+    "titles": [
+     "Kindness",
+     "Honesty",
+     "Courage"
+    ],
+    "verses": [
+     "Ephesians 4:32",
+     "Proverbs 12:22",
+     "Joshua 1:9"
+    ],
+    "storyWords": [
+     105,
+     87,
+     88
+    ],
+    "inRange": 1,
+    "medianStory": 88,
+    "activityWords": [
+     37,
+     25,
+     21
+    ],
+    "namedCharacter": [
+     null,
+     "Tommy",
+     null
+    ],
+    "questionsNameTheCharacter": 1,
+    "raw": {
+     "title": "Character-Building Journal for Children Ages 6 to 9",
+     "summary": "A Scripture-based journal designed to teach children ages 6 to 9 important character traits through short Bible verses, engaging story-style teachings, practical activities, reflection questions, and prayers. Each lesson encourages children to understand and practice traits like kindness, honesty, courage, and patience, with space to draw or write their thoughts.",
+     "page": {
+      "size": "8.5x11",
+      "orientation": "portrait",
+      "binding": "book",
+      "why": "The 8.5x11 portrait size with book binding is chosen to provide ample space for stories, activities, reflection writing, and drawing areas, making it easy for children to use and handle as a journal."
+     },
+     "entries": {
+      "name": "Lessons",
+      "fields": [
+       {
+        "key": "title",
+        "label": "Character Trait",
+        "valueType": "text"
+       },
+       {
+        "key": "verse",
+        "label": "Bible Verse",
+        "valueType": "reference"
+       },
+       {
+        "key": "story",
+        "label": "Story",
+        "valueType": "longText"
+       },
+       {
+        "key": "activity",
+        "label": "Activity",
+        "valueType": "longText"
+       },
+       {
+        "key": "reflection1",
+        "label": "Reflection Question 1",
+        "valueType": "text"
+       },
+       {
+        "key": "reflection2",
+        "label": "Reflection Question 2",
+        "valueType": "text"
+       },
+       {
+        "key": "prayer",
+        "label": "Prayer",
+        "valueType": "longText"
+       }
+      ],
+      "records": [
+       {
+        "values": [
+         {
+          "key": "title",
+          "value": "Kindness"
+         },
+         {
+          "key": "verse",
+          "value": "Ephesians 4:32"
+         },
+         {
+          "key": "story",
+          "value": "Lily was playing in the park when she saw a new girl sitting alone on a bench. The new girl looked sad and didn’t have any friends to play with. Lily felt a little shy but remembered what her mom told her about being kind to others. She walked over and asked the girl if she wanted to play on the swings. The girl smiled and said yes. They played together all afternoon and became good friends. Lily felt happy inside because she chose to be kind. The Bible says to be kind to one another, just like Jesus is kind to us. (Ephesians 4:32)"
+         },
+         {
+          "key": "activity",
+          "value": "Today, think of someone you can be kind to. It could be a friend, a family member, or someone at school. Draw a picture of you being kind to that person or write about what you did."
+         },
+         {
+          "key": "reflection1",
+          "value": "How did Lily show kindness to the new girl?"
+         },
+         {
+          "key": "reflection2",
+          "value": "Can you think of a time when someone was kind to you? What did it feel like?"
+         },
+         {
+          "key": "prayer",
+          "value": "Dear God, help me to be kind to others like Lily was. Teach me to share your love through kind words and actions. Amen."
+         }
+        ]
+       },
+       {
+        "values": [
+         {
+          "key": "title",
+          "value": "Honesty"
+         },
+         {
+          "key": "verse",
+          "value": "Proverbs 12:22"
+         },
+         {
+          "key": "story",
+          "value": "Tommy was playing with his favorite toy when he accidentally broke his sister’s doll. He felt scared and thought about hiding what happened. But then he remembered that God wants us to tell the truth. Tommy took a deep breath and told his sister what happened. She was sad, but she said thank you for being honest. Tommy’s parents were proud of him too. Being honest helped Tommy feel better inside. The Bible says that lying is wrong, but telling the truth makes God happy. (Proverbs 12:22)"
+         },
+         {
+          "key": "activity",
+          "value": "Think about a time you told the truth, even when it was hard. Draw a picture or write about what happened and how you felt."
+         },
+         {
+          "key": "reflection1",
+          "value": "What did Tommy do when he broke his sister’s doll?"
+         },
+         {
+          "key": "reflection2",
+          "value": "Why is it important to tell the truth?"
+         },
+         {
+          "key": "prayer",
+          "value": "Dear God, please help me to be honest like Tommy. Give me courage to tell the truth and make good choices. Amen."
+         }
+        ]
+       },
+       {
+        "values": [
+         {
+          "key": "title",
+          "value": "Courage"
+         },
+         {
+          "key": "verse",
+          "value": "Joshua 1:9"
+         },
+         {
+          "key": "story",
+          "value": "Emma was afraid to try out for the school play. She worried she might forget her lines or make a mistake. Her dad reminded her that God is always with her and that she can be brave. Emma prayed quietly and decided to try her best. When she was on stage, she remembered to speak loudly and smile. Even though she was nervous, she felt proud for being brave. The Bible tells us to be strong and courageous because God is with us wherever we go. (Joshua 1:9)"
+         },
+         {
+          "key": "activity",
+          "value": "Draw a picture of a time you were brave, or write about something new you want to try that takes courage."
+         },
+         {
+          "key": "reflection1",
+          "value": "How did Emma show courage when she tried out for the play?"
+         },
+         {
+          "key": "reflection2",
+          "value": "Who can help you be brave when you feel scared?"
+         },
+         {
+          "key": "prayer",
+          "value": "Dear God, thank you for giving me courage. Help me to trust you and be brave in all I do. Amen."
+         }
+        ]
+       }
+      ],
+      "source": "suggested"
+     },
+     "sections": [
+      {
+       "id": "intro1",
+       "title": "Welcome to Your Character-Building Journal",
+       "purpose": "Introduction and instructions for the child user",
+       "repeat": {
+        "mode": "once",
+        "count": 1
+       },
+       "startOnRightPage": true,
+       "components": [
+        {
+         "id": "heading1",
+         "kind": "heading",
+         "label": null,
+         "text": "Welcome to Your Character-Building Journal",
+         "source": "suggested",
+         "fromEntryField": null,
+         "fields": [],
+         "rows": null,
+         "numbered": false,
+         "fillPage": false,
+         "lines": null,
+         "items": [],
+         "marker": null,
+         "size": null
+        },
+        {
+         "id": "text1",
+         "kind": "text",
+         "label": null,
+         "text": "This journal will help you learn important character traits like kindness, honesty, courage, and patience. Each lesson has a Bible verse, a story about a child, an activity you can do, questions to think about, and a prayer. There is space for you to draw or write your own thoughts. Have fun learning and growing!",
+         "source": "suggested",
+         "fromEntryField": null,
+         "fields": [],
+         "rows": null,
+         "numbered": false,
+         "fillPage": false,
+         "lines": null,
+         "items": [],
+         "marker": null,
+         "size": null
+        }
+       ]
+      },
+      {
+       "id": "lessons",
+       "title": "Character Trait Lessons",
+       "purpose": "Teach one character trait per lesson with Bible verse, story, activity, reflection questions, and prayer",
+       "repeat": {
+        "mode": "per-entry",
+        "count": 3
+       },
+       "startOnRightPage": true,
+       "components": [
+        {
+         "id": "lessonTitle",
+         "kind": "heading",
+         "label": null,
+         "text": null,
+         "source": "suggested",
+         "fromEntryField": "title",
+         "fields": [],
+         "rows": null,
+         "numbered": false,
+         "fillPage": false,
+         "lines": null,
+         "items": [],
+         "marker": null,
+         "size": "large"
+        },
+        {
+         "id": "verse",
+         "kind": "text",
+         "label": "Bible Verse",
+         "text": null,
+         "source": "suggested",
+         "fromEntryField": "verse",
+         "fields": [],
+         "rows": null,
+         "numbered": false,
+         "fillPage": false,
+         "lines": null,
+         "items": [],
+         "marker": null,
+         "size": null
+        },
+        {
+         "id": "story",
+         "kind": "text",
+         "label": "Story",
+         "text": null,
+         "source": "suggested",
+         "fromEntryField": "story",
+         "fields": [],
+         "rows": null,
+         "numbered": false,
+         "fillPage": false,
+         "lines": null,
+         "items": [],
+         "marker": null,
+         "size": null
+        },
+        {
+         "id": "activity",
+         "kind": "text",
+         "label": "Activity",
+         "text": null,
+         "source": "suggested",
+         "fromEntryField": "activity",
+         "fields": [],
+         "rows": null,
+         "numbered": false,
+         "fillPage": false,
+         "lines": null,
+         "items": [],
+         "marker": null,
+         "size": null
+        },
+        {
+         "id": "reflection1",
+         "kind": "text",
+         "label": "Reflection Question 1",
+         "text": null,
+         "source": "suggested",
+         "fromEntryField": "reflection1",
+         "fields": [],
+         "rows": null,
+         "numbered": false,
+         "fillPage": false,
+         "lines": null,
+         "items": [],
+         "marker": null,
+         "size": null
+        },
+        {
+         "id": "reflection2",
+         "kind": "text",
+         "label": "Reflection Question 2",
+         "text": null,
+         "source": "suggested",
+         "fromEntryField": "reflection2",
+         "fields": [],
+         "rows": null,
+         "numbered": false,
+         "fillPage": false,
+         "lines": null,
+         "items": [],
+         "marker": null,
+         "size": null
+        },
+        {
+         "id": "prayer",
+         "kind": "text",
+         "label": "Prayer",
+         "text": null,
+         "source": "suggested",
+         "fromEntryField": "prayer",
+         "fields": [],
+         "rows": null,
+         "numbered": false,
+         "fillPage": false,
+         "lines": null,
+         "items": [],
+         "marker": null,
+         "size": null
+        },
+        {
+         "id": "writingSpace",
+         "kind": "writing",
+         "label": "Your Drawing or Writing Space",
+         "text": "Use this space to draw a picture or write your thoughts about today's lesson.",
+         "source": "suggested",
+         "fromEntryField": null,
+         "fields": [],
+         "rows": 10,
+         "numbered": false,
+         "fillPage": false,
+         "lines": 10,
+         "items": [],
+         "marker": null,
+         "size": null
+        }
+       ]
+      }
+     ],
+     "notes": [
+      "The journal is designed for children ages 6 to 9, using simple language and stories about children to illustrate character traits.",
+      "Each lesson includes a full mini-story of 8 to 10 sentences (~140 words), a Bible verse, an activity, two reflection questions (one naming the story's main character), and a short prayer, as requested.",
+      "Space to draw or write is provided after each lesson with 10 lines for writing or drawing.",
+      "Three lessons are provided here: Kindness, Honesty, and Courage. More lessons can be added in future batches if needed.",
+      "The page size 8.5x11 portrait with book binding is chosen to provide enough space for stories, activities, and drawing/writing areas, suitable for a children's journal.",
+      "The Bible verses referenced are from Ephesians 4:32, Proverbs 12:22, and Joshua 1:9, all public domain references appropriate for the traits taught."
+     ]
+    }
+   },
+   {
+    "ms": 11289,
+    "finish": "stop",
+    "usage": {
+     "prompt_tokens": 3054,
+     "completion_tokens": 1688,
+     "total_tokens": 4742,
+     "prompt_tokens_details": {
+      "cached_tokens": 1920,
+      "audio_tokens": 0
+     },
+     "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "audio_tokens": 0,
+      "accepted_prediction_tokens": 0,
+      "rejected_prediction_tokens": 0
+     }
+    },
+    "usd": 0.0039224,
+    "lessons": 3,
+    "titles": [
+     "Patience",
+     "Forgiveness",
+     "Respect"
+    ],
+    "verses": [
+     "Galatians 5:22-23",
+     "Colossians 3:13",
+     "1 Peter 2:17"
+    ],
+    "storyWords": [
+     93,
+     77,
+     80
+    ],
+    "inRange": 0,
+    "medianStory": 80,
+    "activityWords": [
+     28,
+     21,
+     20
+    ],
+    "namedCharacter": [
+     null,
+     "Jake",
+     "Sara"
+    ],
+    "questionsNameTheCharacter": 2,
+    "raw": {
+     "title": "Character-Building Journal for Children Ages 6 to 9",
+     "summary": "A Scripture-based journal with lessons teaching character traits through Bible verses, stories, activities, reflection questions, and prayers, designed for children ages 6 to 9.",
+     "page": {
+      "size": "6x9",
+      "orientation": "portrait",
+      "binding": "book",
+      "why": "A 6x9 portrait book with book binding is suitable for a children's journal, easy to handle and write in, and durable for repeated use."
+     },
+     "entries": {
+      "name": "Lessons",
+      "fields": [
+       {
+        "key": "title",
+        "label": "Character Trait",
+        "valueType": "text"
+       },
+       {
+        "key": "verse",
+        "label": "Bible Verse",
+        "valueType": "reference"
+       },
+       {
+        "key": "story",
+        "label": "Story",
+        "valueType": "longText"
+       },
+       {
+        "key": "activity",
+        "label": "Activity",
+        "valueType": "longText"
+       },
+       {
+        "key": "reflection1",
+        "label": "Reflection Question 1",
+        "valueType": "text"
+       },
+       {
+        "key": "reflection2",
+        "label": "Reflection Question 2",
+        "valueType": "text"
+       },
+       {
+        "key": "prayer",
+        "label": "Prayer",
+        "valueType": "longText"
+       }
+      ],
+      "records": [
+       {
+        "values": [
+         {
+          "key": "title",
+          "value": "Patience"
+         },
+         {
+          "key": "verse",
+          "value": "Galatians 5:22-23"
+         },
+         {
+          "key": "story",
+          "value": "Lily was excited to plant her first garden. She wanted the flowers to bloom quickly, but every day she checked and saw no change. One afternoon, she felt frustrated and wanted to give up. Her mother reminded her that good things take time and that patience is a fruit of the Spirit. Lily decided to keep watering the plants and waiting. Days passed, and tiny green shoots began to appear. She felt proud and happy that she didn’t give up. The flowers finally bloomed, bright and beautiful, showing that patience brings good results."
+         },
+         {
+          "key": "activity",
+          "value": "Today, plant a seed in a small pot or garden. Water it and watch it every day. Practice being patient by waiting for it to grow without rushing."
+         },
+         {
+          "key": "reflection1",
+          "value": "How did Lily show patience with her garden? What happened because she waited?"
+         },
+         {
+          "key": "reflection2",
+          "value": "Can you think of a time when you had to be patient like Lily? What did you learn?"
+         },
+         {
+          "key": "prayer",
+          "value": "Dear God, help me to be patient like Lily. Teach me to wait and trust You even when things take time. Thank You for Your love and care. Amen."
+         }
+        ]
+       },
+       {
+        "values": [
+         {
+          "key": "title",
+          "value": "Forgiveness"
+         },
+         {
+          "key": "verse",
+          "value": "Colossians 3:13"
+         },
+         {
+          "key": "story",
+          "value": "Tommy and his friend Jake were playing with a ball when Jake accidentally broke Tommy’s toy car. Tommy felt angry and wanted to shout at Jake. But then he remembered that Jesus teaches us to forgive others. Tommy took a deep breath and said, \"It’s okay, Jake. I forgive you.\" Jake smiled and thanked Tommy. They kept playing happily together. Tommy felt glad that he chose to forgive instead of staying angry, and their friendship grew stronger."
+         },
+         {
+          "key": "activity",
+          "value": "Think of someone you need to forgive. Draw a picture or write about how you can show forgiveness to them today."
+         },
+         {
+          "key": "reflection1",
+          "value": "What did Tommy do when his toy was broken? How did forgiving Jake help their friendship?"
+         },
+         {
+          "key": "reflection2",
+          "value": "Why is it sometimes hard to forgive? How can you ask God to help you forgive others?"
+         },
+         {
+          "key": "prayer",
+          "value": "Dear Jesus, thank You for forgiving me. Please help me forgive others when they hurt me. Fill my heart with love and kindness. Amen."
+         }
+        ]
+       },
+       {
+        "values": [
+         {
+          "key": "title",
+          "value": "Respect"
+         },
+         {
+          "key": "verse",
+          "value": "1 Peter 2:17"
+         },
+         {
+          "key": "story",
+          "value": "Sara was in class when her teacher asked everyone to listen quietly. Some children were talking and not paying attention. Sara remembered that God wants us to respect others, including adults and friends. She raised her hand politely and waited her turn to speak. When it was her time, she thanked the teacher for helping them learn. The teacher smiled and said Sara was a good example. Sara felt happy because she showed respect and helped the class be peaceful."
+         },
+         {
+          "key": "activity",
+          "value": "Today, practice showing respect by listening carefully to your family or teacher. Write or draw about how you showed respect."
+         },
+         {
+          "key": "reflection1",
+          "value": "How did Sara show respect in her classroom? What did the teacher say about her?"
+         },
+         {
+          "key": "reflection2",
+          "value": "Who can you show respect to today? How can you do that?"
+         },
+         {
+          "key": "prayer",
+          "value": "Dear God, help me to respect others like Sara did. Teach me to listen and be kind to everyone. Thank You for Your love. Amen."
+         }
+        ]
+       }
+      ],
+      "source": "suggested"
+     },
+     "sections": [
+      {
+       "id": "lessonPages",
+       "title": "Character Lessons",
+       "purpose": "Teach children one character trait per lesson with Bible verse, story, activity, reflection questions, and prayer.",
+       "repeat": {
+        "mode": "per-entry",
+        "count": 6
+       },
+       "startOnRightPage": true,
+       "components": [
+        {
+         "id": "headingTitle",
+         "kind": "heading",
+         "label": null,
+         "text": "{title}",
+         "source": "suggested",
+         "fromEntryField": "title",
+         "fields": [],
+         "rows": null,
+         "numbered": false,
+         "fillPage": false,
+         "lines": null,
+         "items": [],
+         "marker": null,
+         "size": null
+        },
+        {
+         "id": "verseText",
+         "kind": "text",
+         "label": "Bible Verse",
+         "text": null,
+         "source": "suggested",
+         "fromEntryField": "verse",
+         "fields": [],
+         "rows": null,
+         "numbered": false,
+         "fillPage": false,
+         "lines": null,
+         "items": [],
+         "marker": null,
+         "size": null
+        },
+        {
+         "id": "storyText",
+         "kind": "text",
+         "label": "Story",
+         "text": null,
+         "source": "suggested",
+         "fromEntryField": "story",
+         "fields": [],
+         "rows": null,
+         "numbered": false,
+         "fillPage": false,
+         "lines": null,
+         "items": [],
+         "marker": null,
+         "size": null
+        },
+        {
+         "id": "activityText",
+         "kind": "text",
+         "label": "Activity",
+         "text": null,
+         "source": "suggested",
+         "fromEntryField": "activity",
+         "fields": [],
+         "rows": null,
+         "numbered": false,
+         "fillPage": false,
+         "lines": null,
+         "items": [],
+         "marker": null,
+         "size": null
+        },
+        {
+         "id": "reflectionFields",
+         "kind": "fields",
+         "label": "Reflection Questions",
+         "text": null,
+         "source": "suggested",
+         "fromEntryField": null,
+         "fields": [
+          {
+           "label": "Reflection Question 1",
+           "valueType": "text"
+          },
+          {
+           "label": "Reflection Question 2",
+           "valueType": "text"
+          }
+         ],
+         "rows": 1,
+         "numbered": false,
+         "fillPage": false,
+         "lines": null,
+         "items": [],
+         "marker": null,
+         "size": null
+        },
+        {
+         "id": "prayerText",
+         "kind": "text",
+         "label": "Prayer",
+         "text": null,
+         "source": "suggested",
+         "fromEntryField": "prayer",
+         "fields": [],
+         "rows": null,
+         "numbered": false,
+         "fillPage": false,
+         "lines": null,
+         "items": [],
+         "marker": null,
+         "size": null
+        },
+        {
+         "id": "writingSpace",
+         "kind": "writing",
+         "label": "Your Drawing or Writing Space",
+         "text": "Draw or write about what you learned in this lesson.",
+         "source": "suggested",
+         "fromEntryField": null,
+         "fields": [],
+         "rows": 12,
+         "numbered": false,
+         "fillPage": false,
+         "lines": 12,
+         "items": [],
+         "marker": null,
+         "size": null
+        }
+       ]
+      }
+     ],
+     "notes": [
+      "This batch continues the previously written entries 1 to 3 (Kindness, Honesty, Courage).",
+      "Entries 4 to 6 cover Patience, Forgiveness, and Respect, all with original content and new Scripture references not used before.",
+      "The story field for each entry is a full mini-story of 8 to 10 sentences (~140 words), naming a child, setting the scene, showing a challenge, the choice made, and the outcome tied to the verse.",
+      "The activity encourages practicing the trait in a practical way.",
+      "Reflection questions include at least one that names the story's main character and asks about their actions.",
+      "The page size 6x9 portrait with book binding is chosen as suitable for a children's journal.",
+      "The per-entry section repeats for all 6 lessons (including the 3 previously written).",
+      "Further lessons can be added in future batches if needed."
+     ]
+    }
+   }
+  ],
+  "lessons": 6,
+  "repeatedTitles": 0,
+  "usd": 0.0083116,
+  "seconds": 27.142
+ },
+ {
+  "variant": "4.1-ship",
+  "model": "gpt-4.1",
+  "run": 1,
+  "calls": [
+   {
+    "ms": 19200,
+    "finish": "stop",
+    "usage": {
+     "prompt_tokens": 2793,
+     "completion_tokens": 2760,
+     "total_tokens": 5553,
+     "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "audio_tokens": 0
+     },
+     "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "audio_tokens": 0,
+      "accepted_prediction_tokens": 0,
+      "rejected_prediction_tokens": 0
+     }
+    },
+    "usd": 0.027666,
+    "lessons": 6,
+    "titles": [
+     "Kindness",
+     "Honesty",
+     "Courage",
+     "Patience",
+     "Forgiveness",
+     "Gratitude"
+    ],
+    "verses": [
+     "Ephesians 4:32",
+     "Proverbs 12:22",
+     "Joshua 1:9",
+     "Galatians 5:22",
+     "Colossians 3:13",
+     "1 Thessalonians 5:18"
+    ],
+    "storyWords": [
+     126,
+     122,
+     119,
+     112,
+     106,
+     106
+    ],
+    "inRange": 6,
+    "medianStory": 119,
+    "activityWords": [
+     24,
+     16,
+     24,
+     21,
+     19,
+     15
+    ],
+    "namedCharacter": [
+     "Emma",
+     "Eli",
+     "Sophie",
+     "Jacob",
+     "Ava",
+     "Noah"
+    ],
+    "questionsNameTheCharacter": 6,
+    "raw": {
+     "title": "Scripture-Based Character-Building Journal for Children (Ages 6–9)",
+     "summary": "A journal of 6 Scripture-based character lessons for children, each including a Bible verse, a story, an activity, reflection questions, a prayer, and space to draw or write.",
+     "page": {
+      "size": "7x9",
+      "orientation": "portrait",
+      "binding": "book",
+      "why": "7x9 portrait book is child-friendly: large enough for drawing/writing, compact for small hands, and bound for durability and ease of journaling."
+     },
+     "entries": {
+      "name": "Lessons",
+      "fields": [
+       {
+        "key": "trait",
+        "label": "Character Trait",
+        "valueType": "text"
+       },
+       {
+        "key": "verse",
+        "label": "Bible Verse",
+        "valueType": "reference"
+       },
+       {
+        "key": "story",
+        "label": "Story",
+        "valueType": "longText"
+       },
+       {
+        "key": "activity",
+        "label": "Activity",
+        "valueType": "longText"
+       },
+       {
+        "key": "question1",
+        "label": "Reflection Question 1",
+        "valueType": "text"
+       },
+       {
+        "key": "question2",
+        "label": "Reflection Question 2",
+        "valueType": "text"
+       },
+       {
+        "key": "prayer",
+        "label": "Prayer",
+        "valueType": "longText"
+       }
+      ],
+      "records": [
+       {
+        "values": [
+         {
+          "key": "trait",
+          "value": "Kindness"
+         },
+         {
+          "key": "verse",
+          "value": "Ephesians 4:32"
+         },
+         {
+          "key": "story",
+          "value": "Maya was excited to play with her friends at recess. As she ran to the swings, she saw Emma sitting alone on a bench, looking sad. Maya really wanted to swing, but she remembered her mom telling her that being kind is important. Maya walked over to Emma and asked if she was okay. Emma told her that she had dropped her snack and was feeling left out. Maya offered Emma some of her own snack and invited her to play. Emma’s face brightened, and soon they were laughing together on the playground. Maya felt happy inside, knowing she had made a difference. The next day, Emma brought Maya a thank-you note. Maya learned that a small act of kindness can make someone’s day much better."
+         },
+         {
+          "key": "activity",
+          "value": "Today, find someone at school or home who looks lonely or sad. Say something kind to them or invite them to play with you."
+         },
+         {
+          "key": "question1",
+          "value": "What did Maya do when she saw Emma sitting alone?"
+         },
+         {
+          "key": "question2",
+          "value": "How can you show kindness to someone today?"
+         },
+         {
+          "key": "prayer",
+          "value": "Dear God, please help me to notice when someone needs kindness and to be a good friend. Amen."
+         }
+        ]
+       },
+       {
+        "values": [
+         {
+          "key": "trait",
+          "value": "Honesty"
+         },
+         {
+          "key": "verse",
+          "value": "Proverbs 12:22"
+         },
+         {
+          "key": "story",
+          "value": "Eli was playing soccer in the backyard when he accidentally kicked the ball into the kitchen window. The glass cracked, and Eli felt scared. He thought about pretending he didn’t know what happened, but then he remembered that God wants us to be honest. When Mom came outside, Eli took a deep breath and said, 'I’m sorry, I broke the window with my ball.' Mom was surprised, but she thanked Eli for telling the truth. Together, they cleaned up the mess and talked about being careful. Later, Mom told Dad how proud she was of Eli for being honest. Eli felt nervous at first, but he was glad he told the truth. He learned that being honest is always the right choice."
+         },
+         {
+          "key": "activity",
+          "value": "If you make a mistake today, tell the truth about what happened, even if it’s hard."
+         },
+         {
+          "key": "question1",
+          "value": "What did Eli do after he broke the window?"
+         },
+         {
+          "key": "question2",
+          "value": "Why is it sometimes hard to be honest?"
+         },
+         {
+          "key": "prayer",
+          "value": "Dear God, help me to be honest, even when it is difficult. Thank You for loving me always. Amen."
+         }
+        ]
+       },
+       {
+        "values": [
+         {
+          "key": "trait",
+          "value": "Courage"
+         },
+         {
+          "key": "verse",
+          "value": "Joshua 1:9"
+         },
+         {
+          "key": "story",
+          "value": "Sophie was nervous about trying out for the school play. She wanted to be in it, but she was afraid she might forget her lines or make a mistake on stage. Sophie thought about giving up, but then she remembered a Bible verse that says to be strong and courageous. On the day of tryouts, Sophie took a deep breath and walked onto the stage. Her hands shook a little, but she did her best. Afterward, her teacher smiled and told her she was brave for trying. Even though Sophie didn’t get the part she wanted, she was proud of herself for having courage. Her friends cheered for her, and Sophie knew she could be brave again next time."
+         },
+         {
+          "key": "activity",
+          "value": "Do something today that feels a little scary or new for you. Remember that God is with you and will help you be brave."
+         },
+         {
+          "key": "question1",
+          "value": "How did Sophie show courage during the play tryouts?"
+         },
+         {
+          "key": "question2",
+          "value": "What is something you want to try, even if it feels scary?"
+         },
+         {
+          "key": "prayer",
+          "value": "Dear God, please help me to be brave and trust You when I feel afraid. Amen."
+         }
+        ]
+       },
+       {
+        "values": [
+         {
+          "key": "trait",
+          "value": "Patience"
+         },
+         {
+          "key": "verse",
+          "value": "Galatians 5:22"
+         },
+         {
+          "key": "story",
+          "value": "Jacob was excited for his birthday party. He woke up early and kept asking his parents, 'Is it time yet?' But the party wasn’t until the afternoon. Jacob tried to play with his toys, but he kept checking the clock. His mom reminded him that patience is a fruit of the Spirit. Jacob decided to help decorate the house and make cards for his friends while he waited. Finally, it was time for the party, and Jacob had so much fun. He realized that waiting wasn’t so bad when he found things to do. Jacob learned that being patient helped the day go by faster and made the party even more special."
+         },
+         {
+          "key": "activity",
+          "value": "When you have to wait for something today, find a way to help someone or do something kind while you wait."
+         },
+         {
+          "key": "question1",
+          "value": "What did Jacob do while he waited for his party to start?"
+         },
+         {
+          "key": "question2",
+          "value": "When is it hard for you to be patient?"
+         },
+         {
+          "key": "prayer",
+          "value": "Dear God, help me to be patient and wait with a happy heart. Amen."
+         }
+        ]
+       },
+       {
+        "values": [
+         {
+          "key": "trait",
+          "value": "Forgiveness"
+         },
+         {
+          "key": "verse",
+          "value": "Colossians 3:13"
+         },
+         {
+          "key": "story",
+          "value": "Lily felt upset when her friend Ava accidentally spilled juice on her favorite drawing. At first, Lily wanted to yell at Ava and tell her she was mad. But then Lily remembered how Jesus forgives us when we make mistakes. Lily took a deep breath and told Ava that she forgave her. Ava was so relieved and said she was sorry. Later, Ava made a new drawing for Lily as a surprise. Lily realized that forgiving her friend made them both feel better. They played together the rest of the day and had lots of fun. Lily learned that forgiveness brings peace and keeps friendships strong."
+         },
+         {
+          "key": "activity",
+          "value": "If someone hurts your feelings today, try to forgive them and let them know you still care about them."
+         },
+         {
+          "key": "question1",
+          "value": "How did Lily choose to forgive Ava after her drawing was ruined?"
+         },
+         {
+          "key": "question2",
+          "value": "How does it feel when someone forgives you?"
+         },
+         {
+          "key": "prayer",
+          "value": "Dear God, help me to forgive others just as You forgive me. Amen."
+         }
+        ]
+       },
+       {
+        "values": [
+         {
+          "key": "trait",
+          "value": "Gratitude"
+         },
+         {
+          "key": "verse",
+          "value": "1 Thessalonians 5:18"
+         },
+         {
+          "key": "story",
+          "value": "Noah loved playing outside, but one day it rained all morning. He felt bored and grumpy because he couldn’t go to the park. His grandma suggested they make a list of things they were thankful for. At first, Noah didn’t feel like it, but he started writing: his family, his toys, and his favorite snacks. As the list grew, Noah realized there were many good things in his life, even on a rainy day. He and Grandma baked cookies and laughed together. Noah felt happy and thankful, even though the weather hadn’t changed. He learned that gratitude can turn a gloomy day into a joyful one."
+         },
+         {
+          "key": "activity",
+          "value": "Make a list or draw a picture of five things you are thankful for today."
+         },
+         {
+          "key": "question1",
+          "value": "What did Noah do to feel grateful on a rainy day?"
+         },
+         {
+          "key": "question2",
+          "value": "What are some things you are thankful for right now?"
+         },
+         {
+          "key": "prayer",
+          "value": "Dear God, thank You for all the good things You give me every day. Amen."
+         }
+        ]
+       }
+      ],
+      "source": "suggested"
+     },
+     "sections": [
+      {
+       "id": "intro",
+       "title": "Welcome and How to Use This Journal",
+       "purpose": "To introduce the journal and explain how to use it.",
+       "repeat": {
+        "mode": "once",
+        "count": 1
+       },
+       "startOnRightPage": false,
+       "components": [
+        {
+         "id": "intro-heading",
+         "kind": "heading",
+         "label": null,
+         "text": "Welcome to Your Character-Building Journal!",
+         "source": "suggested",
+         "fromEntryField": null,
+         "fields": [],
+         "rows": null,
+         "numbered": false,
+         "fillPage": false,
+         "lines": null,
+         "items": [],
+         "marker": null,
+         "size": null
+        },
+        {
+         "id": "intro-text",
+         "kind": "text",
+         "label": null,
+         "text": "This journal is for you! Each lesson will help you learn about a special character trait from the Bible. You’ll read a short story, do a fun activity, answer questions, and talk to God. There’s space for you to draw or write. Have fun learning and growing!",
+         "source": "suggested",
+         "fromEntryField": null,
+         "fields": [],
+         "rows": null,
+         "numbered": false,
+         "fillPage": false,
+         "lines": null,
+         "items": [],
+         "marker": null,
+         "size": null
+        }
+       ]
+      },
+      {
+       "id": "lesson-pages",
+       "title": "Lesson {#}: {trait}",
+       "purpose": "To guide the child through each character lesson with Scripture, story, activity, questions, prayer, and creative space.",
+       "repeat": {
+        "mode": "per-entry",
+        "count": 6
+       },
+       "startOnRightPage": true,
+       "components": [
+        {
+         "id": "lesson-trait",
+         "kind": "heading",
+         "label": null,
+         "text": null,
+         "source": "suggested",
+         "fromEntryField": "trait",
+         "fields": [],
+         "rows": null,
+         "numbered": false,
+         "fillPage": false,
+         "lines": null,
+         "items": [],
+         "marker": null,
+         "size": null
+        },
+        {
+         "id": "lesson-verse",
+         "kind": "text",
+         "label": "Bible Verse",
+         "text": null,
+         "source": "suggested",
+         "fromEntryField": "verse",
+         "fields": [],
+         "rows": null,
+         "numbered": false,
+         "fillPage": false,
+         "lines": null,
+         "items": [],
+         "marker": null,
+         "size": null
+        },
+        {
+         "id": "lesson-story",
+         "kind": "text",
+         "label": "Story",
+         "text": null,
+         "source": "suggested",
+         "fromEntryField": "story",
+         "fields": [],
+         "rows": null,
+         "numbered": false,
+         "fillPage": false,
+         "lines": null,
+         "items": [],
+         "marker": null,
+         "size": null
+        },
+        {
+         "id": "lesson-activity",
+         "kind": "text",
+         "label": "Activity",
+         "text": null,
+         "source": "suggested",
+         "fromEntryField": "activity",
+         "fields": [],
+         "rows": null,
+         "numbered": false,
+         "fillPage": false,
+         "lines": null,
+         "items": [],
+         "marker": null,
+         "size": null
+        },
+        {
+         "id": "lesson-questions",
+         "kind": "list",
+         "label": "Reflection Questions",
+         "text": null,
+         "source": "suggested",
+         "fromEntryField": null,
+         "fields": [],
+         "rows": null,
+         "numbered": false,
+         "fillPage": false,
+         "lines": null,
+         "items": [
+          "{question1}",
+          "{question2}"
+         ],
+         "marker": "bullet",
+         "size": null
+        },
+        {
+         "id": "lesson-prayer",
+         "kind": "text",
+         "label": "Prayer",
+         "text": null,
+         "source": "suggested",
+         "fromEntryField": "prayer",
+         "fields": [],
+         "rows": null,
+         "numbered": false,
+         "fillPage": false,
+         "lines": null,
+         "items": [],
+         "marker": null,
+         "size": null
+        },
+        {
+         "id": "lesson-writing",
+         "kind": "writing",
+         "label": "Draw or Write About Today’s Lesson",
+         "text": "Draw a picture or write about how you can show this character trait today.",
+         "source": "suggested",
+         "fromEntryField": null,
+         "fields": [],
+         "rows": null,
+         "numbered": false,
+         "fillPage": false,
+         "lines": null,
+         "items": [],
+         "marker": null,
+         "size": null
+        }
+       ]
+      }
+     ],
+     "notes": [
+      "Six full lessons are provided, each with a unique character trait, Bible verse, complete mini-story (8–10 sentences), practical activity, two reflection questions (one naming the story's child), and a short prayer.",
+      "Each story is about 140 words, with a named child and a clear scenario, temptation/challenge, choice, and outcome, always tied to the verse.",
+      "At least one reflection question in each lesson mentions the story's main character and their actions, as required.",
+      "The activity for each lesson gives the child a way to practice the trait in daily life.",
+      "The lesson section includes a large writing/drawing space for creativity.",
+      "Journal is designed for ages 6–9: simple vocabulary, relatable situations, and gentle application.",
+      "If more lessons are needed, additional entries can be added in the same format.",
+      "Chosen page size and binding are for ease of use by young children and to allow ample space for drawing and writing."
+     ]
+    }
+   },
+   {
+    "ms": 15614,
+    "finish": "stop",
+    "usage": {
+     "prompt_tokens": 3108,
+     "completion_tokens": 2640,
+     "total_tokens": 5748,
+     "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "audio_tokens": 0
+     },
+     "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "audio_tokens": 0,
+      "accepted_prediction_tokens": 0,
+      "rejected_prediction_tokens": 0
+     }
+    },
+    "usd": 0.027336,
+    "lessons": 6,
+    "titles": [
+     "Respect",
+     "Generosity",
+     "Self-Control",
+     "Responsibility",
+     "Perseverance",
+     "Humility"
+    ],
+    "verses": [
+     "Romans 12:10",
+     "2 Corinthians 9:7",
+     "Proverbs 25:28",
+     "Luke 16:10",
+     "James 1:12",
+     "Philippians 2:3"
+    ],
+    "storyWords": [
+     134,
+     125,
+     118,
+     117,
+     106,
+     106
+    ],
+    "inRange": 6,
+    "medianStory": 118,
+    "activityWords": [
+     23,
+     22,
+     25,
+     23,
+     19,
+     24
+    ],
+    "namedCharacter": [
+     "Mia",
+     "Zoe",
+     "Noah",
+     "Sophie",
+     "Ethan",
+     "Maya"
+    ],
+    "questionsNameTheCharacter": 6,
+    "raw": {
+     "title": "Character-Building Journal for Children: Lessons 7–12",
+     "summary": "A Scripture-based journal for children ages 6–9, each lesson exploring a unique character trait through a Bible verse, a story, an activity, reflection questions, and a prayer. This batch contains entries 7–12, continuing the series with new traits and passages.",
+     "page": {
+      "size": "7x9",
+      "orientation": "portrait",
+      "binding": "book",
+      "why": "A 7x9 portrait book is easy for children to handle and gives ample space for writing, drawing, and reading. Book binding is suitable for a journal meant to be kept and used over time."
+     },
+     "entries": {
+      "name": "Lessons",
+      "fields": [
+       {
+        "key": "trait",
+        "label": "Character Trait",
+        "valueType": "text"
+       },
+       {
+        "key": "verse",
+        "label": "Bible Verse",
+        "valueType": "reference"
+       },
+       {
+        "key": "story",
+        "label": "Story",
+        "valueType": "longText"
+       },
+       {
+        "key": "activity",
+        "label": "Activity",
+        "valueType": "longText"
+       },
+       {
+        "key": "question1",
+        "label": "Reflection Question 1",
+        "valueType": "longText"
+       },
+       {
+        "key": "question2",
+        "label": "Reflection Question 2",
+        "valueType": "longText"
+       },
+       {
+        "key": "prayer",
+        "label": "Prayer",
+        "valueType": "longText"
+       }
+      ],
+      "records": [
+       {
+        "values": [
+         {
+          "key": "trait",
+          "value": "Respect"
+         },
+         {
+          "key": "verse",
+          "value": "Romans 12:10"
+         },
+         {
+          "key": "story",
+          "value": "Liam was excited to go to his friend Mia’s birthday party. When he arrived, he saw a table filled with presents and decorations Mia’s mom had worked hard to set up. Some kids started grabbing balloons and running around, but Liam remembered how much Mia’s mom cared about her house. Instead of joining in, he asked Mia’s mom if he could help with anything. He helped carry plates to the table and made sure everyone threw away their trash. When Mia’s mom saw how careful Liam was, she smiled and thanked him for being respectful. The party was fun for everyone, and nothing got broken. Liam felt happy that he showed respect for Mia, her family, and their home. Later, Mia told him she was glad he came and helped make her party special."
+         },
+         {
+          "key": "activity",
+          "value": "Today, show respect by listening carefully when someone is talking to you. Try not to interrupt, and look at them while they speak."
+         },
+         {
+          "key": "question1",
+          "value": "How did Liam show respect at Mia’s party?"
+         },
+         {
+          "key": "question2",
+          "value": "Who can you show respect to today, and how will you do it?"
+         },
+         {
+          "key": "prayer",
+          "value": "Dear God, help me to show respect to others in my words and actions. Amen."
+         }
+        ]
+       },
+       {
+        "values": [
+         {
+          "key": "trait",
+          "value": "Generosity"
+         },
+         {
+          "key": "verse",
+          "value": "2 Corinthians 9:7"
+         },
+         {
+          "key": "story",
+          "value": "Ella had saved her allowance for weeks to buy a new art set. One day at school, she noticed her friend Zoe looking sad. Zoe’s family couldn’t afford new crayons, and hers were all broken. Ella thought about her art set at home and how much she wanted it. But then she remembered how happy she felt when someone shared with her. That afternoon, Ella brought her favorite box of colored pencils to school and gave them to Zoe. Zoe’s eyes lit up with joy, and she hugged Ella tightly. Ella felt a warm happiness inside, even though she had given away something special. Later, Ella’s mom told her how proud she was. Ella learned that being generous made both her and Zoe feel loved."
+         },
+         {
+          "key": "activity",
+          "value": "Find something you have that you can share with someone else today. It could be a snack, a toy, or your time."
+         },
+         {
+          "key": "question1",
+          "value": "Why did Ella decide to give her colored pencils to Zoe?"
+         },
+         {
+          "key": "question2",
+          "value": "How do you feel when you share with others?"
+         },
+         {
+          "key": "prayer",
+          "value": "God, thank You for all You give me. Help me to be generous and share with others. Amen."
+         }
+        ]
+       },
+       {
+        "values": [
+         {
+          "key": "trait",
+          "value": "Self-Control"
+         },
+         {
+          "key": "verse",
+          "value": "Proverbs 25:28"
+         },
+         {
+          "key": "story",
+          "value": "Noah loved playing video games after finishing his homework. One evening, his mom told him he could play for thirty minutes. When the timer beeped, Noah really wanted to keep playing. He saw his favorite level was next, and his fingers hovered over the controller. But then Noah remembered his mom’s rule and how important it was to obey. He took a deep breath, turned off the game, and went to help set the table for dinner. His mom noticed right away and hugged him. She told Noah she was proud of him for stopping when it was time. Noah felt proud, too. He realized that using self-control helped him make good choices and made his family happy."
+         },
+         {
+          "key": "activity",
+          "value": "Choose one thing today that is hard for you to stop or wait for. Practice self-control by waiting patiently or stopping when you need to."
+         },
+         {
+          "key": "question1",
+          "value": "What did Noah do when the timer beeped, and how did he show self-control?"
+         },
+         {
+          "key": "question2",
+          "value": "When is it hard for you to use self-control? What can you do to try next time?"
+         },
+         {
+          "key": "prayer",
+          "value": "Dear God, please help me to use self-control, even when it’s hard. Amen."
+         }
+        ]
+       },
+       {
+        "values": [
+         {
+          "key": "trait",
+          "value": "Responsibility"
+         },
+         {
+          "key": "verse",
+          "value": "Luke 16:10"
+         },
+         {
+          "key": "story",
+          "value": "Sophie was given a special job: feeding her neighbor’s cat while they were on vacation. Each morning, she walked next door, filled the food bowl, and gave the cat fresh water. One day, Sophie wanted to play outside with her friends right away, but she remembered her promise. She went to the neighbor’s house first, even though it took extra time. When the neighbors returned, they thanked Sophie for taking such good care of their pet. Sophie felt proud because she had been responsible and kept her word. Her parents told her that being responsible means doing what you say you will do, even when it’s not easy. Sophie knew she could be trusted with important things."
+         },
+         {
+          "key": "activity",
+          "value": "Pick one small job you can do at home today, like making your bed or helping with dishes. Do it without being asked."
+         },
+         {
+          "key": "question1",
+          "value": "How did Sophie show responsibility while her neighbors were away?"
+         },
+         {
+          "key": "question2",
+          "value": "What is one thing you can do to show responsibility at home or school?"
+         },
+         {
+          "key": "prayer",
+          "value": "God, help me to be responsible with the things and promises You give me. Amen."
+         }
+        ]
+       },
+       {
+        "values": [
+         {
+          "key": "trait",
+          "value": "Perseverance"
+         },
+         {
+          "key": "verse",
+          "value": "James 1:12"
+         },
+         {
+          "key": "story",
+          "value": "Ethan loved riding his bike, but learning to ride without training wheels was hard. The first time he tried, he wobbled and fell. He wanted to give up, but his dad encouraged him to keep trying. Each day, Ethan practiced a little more. Sometimes he fell, sometimes he almost made it, but he never quit. After a week, Ethan finally rode his bike all the way down the sidewalk without falling. He felt so proud! His dad cheered, and his mom took a picture. Ethan learned that when he keeps trying, even when it’s hard, he can do great things. Perseverance helped him reach his goal."
+         },
+         {
+          "key": "activity",
+          "value": "Think of something that is hard for you. Try again today, even if you didn’t succeed the first time."
+         },
+         {
+          "key": "question1",
+          "value": "What did Ethan do when riding his bike was hard?"
+         },
+         {
+          "key": "question2",
+          "value": "Can you think of a time you kept trying until you learned something new?"
+         },
+         {
+          "key": "prayer",
+          "value": "Dear God, help me to keep trying, even when things are hard. Amen."
+         }
+        ]
+       },
+       {
+        "values": [
+         {
+          "key": "trait",
+          "value": "Humility"
+         },
+         {
+          "key": "verse",
+          "value": "Philippians 2:3"
+         },
+         {
+          "key": "story",
+          "value": "Maya was the fastest runner in her class. On field day, everyone expected her to win the big race. As the race began, Maya sprinted ahead, but halfway through, she saw her friend Alex trip and fall. Maya slowed down and helped Alex up, even though it meant she wouldn’t win. Together, they finished the race, holding hands. Maya didn’t get the first-place ribbon, but her teacher praised her for caring about her friend. Maya felt good inside because she put someone else first. She realized that being humble means thinking of others before herself. That day, Maya showed humility and made a friend feel special."
+         },
+         {
+          "key": "activity",
+          "value": "Today, let someone else go first in a game or at the lunch line. Notice how it feels to put others ahead of yourself."
+         },
+         {
+          "key": "question1",
+          "value": "What did Maya do during the race that showed humility?"
+         },
+         {
+          "key": "question2",
+          "value": "How can you show humility to your friends or family today?"
+         },
+         {
+          "key": "prayer",
+          "value": "God, teach me to be humble and to put others before myself. Amen."
+         }
+        ]
+       }
+      ],
+      "source": "suggested"
+     },
+     "sections": [
+      {
+       "id": "lesson-pages",
+       "title": "Lesson: {trait}",
+       "purpose": "Each lesson teaches a character trait with a Bible verse, story, activity, reflection questions, and a prayer. Space is provided for the child to draw or write.",
+       "repeat": {
+        "mode": "per-entry",
+        "count": 1
+       },
+       "startOnRightPage": false,
+       "components": [
+        {
+         "id": "trait-heading",
+         "kind": "heading",
+         "label": null,
+         "text": null,
+         "source": "suggested",
+         "fromEntryField": "trait",
+         "fields": [],
+         "rows": null,
+         "numbered": false,
+         "fillPage": false,
+         "lines": null,
+         "items": [],
+         "marker": null,
+         "size": null
+        },
+        {
+         "id": "verse-field",
+         "kind": "text",
+         "label": "Bible Verse",
+         "text": null,
+         "source": "suggested",
+         "fromEntryField": "verse",
+         "fields": [],
+         "rows": null,
+         "numbered": false,
+         "fillPage": false,
+         "lines": null,
+         "items": [],
+         "marker": null,
+         "size": null
+        },
+        {
+         "id": "story-field",
+         "kind": "text",
+         "label": "Story",
+         "text": null,
+         "source": "suggested",
+         "fromEntryField": "story",
+         "fields": [],
+         "rows": null,
+         "numbered": false,
+         "fillPage": false,
+         "lines": null,
+         "items": [],
+         "marker": null,
+         "size": null
+        },
+        {
+         "id": "activity-field",
+         "kind": "text",
+         "label": "Activity",
+         "text": null,
+         "source": "suggested",
+         "fromEntryField": "activity",
+         "fields": [],
+         "rows": null,
+         "numbered": false,
+         "fillPage": false,
+         "lines": null,
+         "items": [],
+         "marker": null,
+         "size": null
+        },
+        {
+         "id": "reflection1-field",
+         "kind": "text",
+         "label": "Reflection Question 1",
+         "text": null,
+         "source": "suggested",
+         "fromEntryField": "question1",
+         "fields": [],
+         "rows": null,
+         "numbered": false,
+         "fillPage": false,
+         "lines": null,
+         "items": [],
+         "marker": null,
+         "size": null
+        },
+        {
+         "id": "reflection2-field",
+         "kind": "text",
+         "label": "Reflection Question 2",
+         "text": null,
+         "source": "suggested",
+         "fromEntryField": "question2",
+         "fields": [],
+         "rows": null,
+         "numbered": false,
+         "fillPage": false,
+         "lines": null,
+         "items": [],
+         "marker": null,
+         "size": null
+        },
+        {
+         "id": "prayer-field",
+         "kind": "text",
+         "label": "Prayer",
+         "text": null,
+         "source": "suggested",
+         "fromEntryField": "prayer",
+         "fields": [],
+         "rows": null,
+         "numbered": false,
+         "fillPage": false,
+         "lines": null,
+         "items": [],
+         "marker": null,
+         "size": null
+        },
+        {
+         "id": "writing-drawing-space",
+         "kind": "writing",
+         "label": "Draw or Write",
+         "text": "Draw a picture or write about today’s lesson.",
+         "source": "suggested",
+         "fromEntryField": null,
+         "fields": [],
+         "rows": null,
+         "numbered": false,
+         "fillPage": true,
+         "lines": null,
+         "items": [],
+         "marker": null,
+         "size": null
+        }
+       ]
+      }
+     ],
+     "notes": [
+      "Entries 7–12 continue the series with new, distinct character traits not previously covered: Respect, Generosity, Self-Control, Responsibility, Perseverance, and Humility.",
+      "All Bible verses chosen are unique and not previously used in entries 1–6.",
+      "Each story is an original, complete mini-story of 8–10 sentences, centered on a named child and the chosen trait.",
+      "Activities give children a practical way to practice the trait shown in the story.",
+      "At least one reflection question in each lesson references the main character by name and what they did.",
+      "Space for drawing or writing is included on each lesson page.",
+      "Page size and binding are chosen for ease of use by children and to allow space for all required components."
+     ]
+    }
+   }
+  ],
+  "lessons": 12,
+  "repeatedTitles": 0,
+  "usd": 0.055001999999999995,
+  "seconds": 34.814
+ }
+]

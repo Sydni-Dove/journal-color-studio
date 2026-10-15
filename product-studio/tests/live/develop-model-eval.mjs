@@ -36,6 +36,9 @@ const mod = await import("data:text/javascript;base64," + Buffer.from(out.output
 const PRICES = { "gpt-4.1-mini": [0.4, 1.6], "gpt-4.1": [2, 8], "gpt-4o": [2.5, 10], "gpt-4o-mini": [0.15, 0.6] };
 const DESCRIPTION = "A Scripture-based character-building journal for children ages 6 to 9. Each lesson teaches one character trait (such as kindness, honesty, courage, patience) with a short Bible verse, a simple story-style teaching a child can understand, an activity the child can do that day, two reflection questions, and a short prayer. Leave space for the child to draw or write.";
 const SENT = "\n\nFor every lesson, the story field must be a full mini-story of 8 to 10 sentences (about 140 words): name a child, set the scene, show what tempts or troubles them, the choice they make, what happens next, and how it ends, tied to the verse. Never fewer than 8 sentences.";
+// The ship candidate (2026-10-15 follow-up): the sentence instruction plus a question that names the story's child;
+// its next batches also list the Scripture references already used (`verses: true`).
+const SENT2 = SENT + " At least one of the two reflection questions must name the story's main character and ask about what they did. The activity must let the child practise the same trait the story shows.";
 /** Variants: models with the live prompt, plus prompt-only changes on the current model (to separate prompt from model). */
 const VARIANTS = [
   { id: "mini-live", model: "gpt-4.1-mini" },
@@ -49,6 +52,10 @@ const VARIANTS = [
   { id: "mini-sent", model: "gpt-4.1-mini", userExtra: SENT },
   { id: "mini-sent-3", model: "gpt-4.1-mini", entryCount: 3, userExtra: SENT },
   { id: "4.1-sent", model: "gpt-4.1", userExtra: SENT },
+  // Final comparison (approved 2026-10-15): the ship candidate on mini (6 and 3 per request) and on gpt-4.1.
+  { id: "mini-ship", model: "gpt-4.1-mini", userExtra: SENT2, verses: true },
+  { id: "mini-ship-3", model: "gpt-4.1-mini", entryCount: 3, userExtra: SENT2, verses: true },
+  { id: "4.1-ship", model: "gpt-4.1", userExtra: SENT2, verses: true },
   // Same model, one complete lesson per request (three requests: lesson 1, then next batches of 1).
   { id: "mini-1", model: "gpt-4.1-mini", entryCount: 1, requests: 3 },
 ];
@@ -87,29 +94,32 @@ function measure(spec) {
 }
 
 const results = [];
-const batchUser = (extra, b, n) => `What the maker wants:\n${DESCRIPTION}${extra ?? ""}\n\nTHIS IS A NEXT BATCH. Entries 1–${b.from - 1} of "${b.name}" are already written:\n${b.previous.map((p, i) => `${i + 1}. ${p}`).join("\n")}\nWrite entries ${b.from}–${b.from + n - 1} only: ${n} NEW entries on themes not covered above (any examples in the description above are already used). Never repeat a title or theme from the list — nor a close synonym of one (for example Truthfulness after Honesty, Thankfulness after Gratitude) — and use Scripture references not used in the entries above.`;
+const batchUser = (extra, b, n, verses) => `What the maker wants:\n${DESCRIPTION}${extra ?? ""}\n\nTHIS IS A NEXT BATCH. Entries 1–${b.from - 1} of "${b.name}" are already written:\n${b.previous.map((p, i) => `${i + 1}. ${p}`).join("\n")}\nWrite entries ${b.from}–${b.from + n - 1} only: ${n} NEW entries on themes not covered above (any examples in the description above are already used). Never repeat a title or theme from the list — nor a close synonym of one (for example Truthfulness after Honesty, Thankfulness after Gratitude) — and use Scripture references not used in the entries above.${verses?.length ? `\nScripture references already used (do not use any of these again): ${verses.join("; ")}.` : ""}`;
 for (const v of VARIANTS) {
   if (ONLY && !ONLY.has(v.id)) continue;
   for (let run = 1; run <= RUNS; run++) {
     const n = v.entryCount ?? 6, requests = v.requests ?? 2;
     const calls = [];
-    let fields, name, titles = [];
+    let fields, name, titles = [], usedVerses = [];
     for (let k = 0; k < requests; k++) {
       if (spent >= BUDGET_USD) { console.log(`budget guard: stopping at $${spent.toFixed(4)}`); break; }
       const b = k === 0 ? null : { name, fields, from: titles.length + 1, count: n, previous: titles };
       // The live function's own system prompt for this request (develop rules with the batch when continuing).
       const system = mod.SYSTEM.replace(mod.NO_CONTENT, mod.developRules(k === 0 ? n : null, b));
-      const user = k === 0 ? `What the maker wants:\n${DESCRIPTION}${v.userExtra ?? ""}` : batchUser(v.userExtra, b, n);
+      const user = k === 0 ? `What the maker wants:\n${DESCRIPTION}${v.userExtra ?? ""}` : batchUser(v.userExtra, b, n, v.verses ? usedVerses : null);
       const c = await call(v.model, system, user, mod.developSchema);
       const m = measure(c.spec);
       if (k === 0) { fields = c.spec.entries?.fields ?? []; name = c.spec.entries?.name ?? "Lessons"; }
       titles = [...titles, ...m.titles];
+      usedVerses = [...usedVerses, ...m.verses.filter(Boolean)];
       calls.push({ ms: c.ms, finish: c.finish, usage: c.usage, usd: c.usd, ...m, raw: c.spec });
     }
     const all = titles.map(norm);
     const story = calls.flatMap((c) => c.storyWords);
     const row = { variant: v.id, model: v.model, run, calls, lessons: story.length, repeatedTitles: all.length - new Set(all).size, usd: calls.reduce((a, c) => a + c.usd, 0), seconds: calls.reduce((a, c) => a + c.ms, 0) / 1000 };
     results.push(row);
+    fs.mkdirSync(path.join(import.meta.dirname, "out"), { recursive: true });
+    fs.writeFileSync(path.join(import.meta.dirname, "out", `develop-model-eval-partial-${process.pid}.json`), JSON.stringify(results, null, 1));
     console.log(`${v.id} #${run}: stories ${calls.map((c) => c.storyWords.join("/")).join(" | ")} · in 100–180: ${story.filter((w) => w >= 100 && w <= 180).length}/${story.length} · repeats ${row.repeatedTitles} · ${row.seconds.toFixed(0)}s · $${row.usd.toFixed(4)} (total $${spent.toFixed(4)})`);
   }
 }
