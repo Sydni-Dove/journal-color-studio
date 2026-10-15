@@ -5,7 +5,7 @@ import fs from "node:fs";
 const OUT = "/tmp/claude-0/-home-user-dove-expressions-journal-app/5aa5d40a-f138-5a6c-a062-278b6a23fecd/scratchpad/live81";
 const U = "https://jnlvvlkwskidloripvtp.supabase.co", K = "sb_publishable_lopqr1HC3kjSio_vVFN_tg_VdBoTi4R";
 const log = (...a) => { const s = a.map((x) => (typeof x === "string" ? x : JSON.stringify(x))).join(" "); console.log(s); fs.appendFileSync(OUT + "/log.txt", s + "\n"); };
-const session = await (await fetch(U + "/auth/v1/token?grant_type=password", { method: "POST", headers: { apikey: K, "Content-Type": "application/json" }, body: JSON.stringify({ email: "ps-livecheck81-20261015@example.com", password: fs.readFileSync(OUT + "/pw", "utf8").trim() }) })).json();
+const session = await (await fetch(U + "/auth/v1/token?grant_type=password", { method: "POST", headers: { apikey: K, "Content-Type": "application/json" }, body: JSON.stringify({ email: process.env.ACCT === "B" ? "ps-livecheck81b-20261015@example.com" : "ps-livecheck81-20261015@example.com", password: fs.readFileSync(OUT + (process.env.ACCT === "B" ? "/pwB" : "/pw"), "utf8").trim() }) })).json();
 if (!session.access_token) throw new Error("sign-in failed " + JSON.stringify(session));
 fs.writeFileSync(OUT + "/token", session.access_token);
 const server = await preview({ preview: { port: 0, host: "127.0.0.1" }, logLevel: "silent" });

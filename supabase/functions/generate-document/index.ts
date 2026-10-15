@@ -54,7 +54,7 @@ const PAID_DAILY_CAP = Number(Deno.env.get("PAID_DAILY_CAP")) || 50;
 const isPaid = (user: { app_metadata?: Record<string, unknown> }) => user.app_metadata?.plan === "paid";
 const FUNCTION_NAME = "generate-document";
 const MODELS = ["gpt-4.1-mini", "gpt-4o-mini"];
-const VERSION = "generate-document-2026-10-15-spec-v7-develop-entries";
+const VERSION = "generate-document-2026-10-15-spec-v8-develop-keep";
 /** The most entries one "develop" request writes (same as MAX_DEVELOPED_ENTRIES in product-studio/src/engines/generate/spec.ts). */
 const MAX_DEVELOPED_ENTRIES = 30;
 /**
@@ -119,16 +119,15 @@ THIS REQUEST CONTINUES A LIST ALREADY WRITTEN: "${batch.name}". Write entries ${
 }
 
 /**
- * A developed answer that didn't develop anything: no entries, no page that prints them, or entries too thin to be
- * real content (headings only). Returns what's missing, to ask the AI once more; null when it's complete.
+ * A developed answer that didn't develop anything: no entries, too few, or entries too thin to be real content
+ * (headings only). Returns what's missing, to ask the AI once more; null when it's complete. (Entries with no page
+ * printing them are kept: the studio adds that page itself — the content isn't thrown away.)
  */
 function developGap(raw: string, wanted: number): string | null {
   let spec: { entries?: { records?: { values?: { value?: string }[] }[] } | null; sections?: { repeat?: { mode?: string }; components?: { fromEntryField?: string | null }[] }[] };
   try { spec = JSON.parse(raw); } catch { return null; }
   const records = spec.entries?.records ?? [];
   if (!records.length) return `"entries" is ${spec.entries ? "empty" : "null"}: none of the ${wanted} entries were written. Write every entry in full in "entries".`;
-  if (!(spec.sections ?? []).some((s) => s.repeat?.mode === "per-entry" && (s.components ?? []).some((c) => c.fromEntryField)))
-    return `no section repeats "per-entry" with components that print the entries' fields (fromEntryField), so the entries would never print. Add that section.`;
   const need = Math.min(wanted, 3);
   if (records.length < need) return `only ${records.length} of the ${wanted} entries were written. Write at least ${need}, each complete.`;
   const thin = records.filter((r) => (r.values ?? []).reduce((n, v) => n + (v.value ?? "").trim().length, 0) < 250).length;
@@ -275,7 +274,7 @@ Deno.serve(async (req) => {
       }
       if (gap) {
         await cost("incomplete");
-        return reply({ error: "The AI didn't write the content this time (it returned an outline without the lessons). Please try again — or ask for fewer entries.", version: VERSION }, 422);
+        return reply({ error: "The AI didn't write the content this time (it returned an outline without the lessons). Please try again — or ask for fewer entries.", detail: gap, version: VERSION }, 422);
       }
       // Counted here, not only in the studio, so a proposal past the limit is recorded and comes back marked.
       let pages = 0;

@@ -444,6 +444,19 @@ export function checkSpec(raw: unknown, input: { description: string; content?: 
   if (notVerbatim.length && normWords(input.content ?? "")) problems.push({ level: "note", message: `${notVerbatim.length === 1 ? `${notVerbatim[0]} was` : `${notVerbatim.length} parts were`} marked as your wording but ${notVerbatim.length === 1 ? "isn't" : "aren't"} word for word what you wrote, so ${notVerbatim.length === 1 ? "it's shown as a suggestion" : "they're shown as suggestions"}.` });
   // Entries with no records were only a shape for blank pages (now copies).
   if (entries && !entries.records.length) entries = null;
+  // Written entries with no page that prints them (the AI wrote the content but not its page): a page per entry
+  // that prints every field is added, so nothing written is lost — and said.
+  if (develop && entries?.records.length && !sections.some((s) => s.repeat.mode === "per-entry" && s.components.some((c) => c.fromEntryField))) {
+    const e = entries;
+    const titleField = e.fields.find((f) => f.valueType === "text") ?? e.fields[0];
+    const comps: SpecComponent[] = e.fields.map((f, i) => ({
+      id: uid(`each-${f.key}`, `each-${i + 1}`), kind: "text", label: f.key === titleField.key ? null : f.label, text: null, source: e.source, fromEntryField: f.key,
+      fields: [], rows: null, numbered: false, fillPage: false, lines: null, items: [], marker: null, size: null,
+    }));
+    comps.push({ id: uid("each-notes", "each-notes"), kind: "writing", label: "My thoughts", text: null, source: "suggested", fromEntryField: null, fields: [], rows: null, numbered: false, fillPage: false, lines: null, items: [], marker: null, size: null });
+    sections.push({ id: uid("each-entry", "each-entry"), title: `{${titleField.key}}`, purpose: "", repeat: { mode: "per-entry", count: 1 }, startOnRightPage: false, components: comps.filter((c) => c.fromEntryField !== titleField.key) });
+    problems.push({ level: "adjusted", message: `The AI wrote ${e.records.length} ${e.name.toLowerCase()} but no page to print them, so a page for each one was added (its title, then ${e.fields.filter((f) => f.key !== titleField.key).map((f) => f.label).join(", ")}, then room to write). Change it below.` });
+  }
   if (!sections.length) throw new SpecError("Nothing in the AI's outline is something the studio can print. Try describing the document again.");
   flags.push(...flagsIn(`${str(r.title)} ${str(r.summary)}`, "the document's title or summary", true));
 

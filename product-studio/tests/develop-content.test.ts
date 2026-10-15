@@ -135,6 +135,20 @@ describe("at most 30 complete entries per request; longer series continue in bat
     expect(kept.length).toBeLessThan(6);
     for (const r of kept) expect(r.values.find((v) => v.key === "teaching")!.value).toBe(long);
   });
+  it("written entries with no page printing them: a page per entry is added (nothing written is lost), and said", () => {
+    const spec = developed(3);
+    spec.sections = [spec.sections[0]];
+    const c = check(spec, "develop");
+    const each = c.spec.sections.find((s) => s.repeat.mode === "per-entry")!;
+    expect(each.title).toBe("{title}");
+    expect(each.components.map((x) => x.fromEntryField)).toEqual(["scripture", "teaching", "question", "prayer", null]);
+    expect(c.problems.map((p) => p.message).join(" ")).toMatch(/no page to print them, so a page for each one was added/);
+    const text = allText(projectFromSpec(c, AT));
+    for (let n = 1; n <= 3; n++) expect(text).toContain(`Day ${n}: Drawing Near`);
+    expect(text).toContain("Where have you kept God at a distance?");
+    // Structure only doesn't add pages it wasn't asked for.
+    expect(check(spec).spec.sections.some((s) => s.repeat.mode === "per-entry")).toBe(false);
+  });
   it("Structure only keeps the maker's long lists as before (no 30 cap)", () => {
     const spec = developed(35);
     spec.entries!.source = "user";
@@ -212,6 +226,7 @@ describe("the server: develop mode, limits and cost records (Edge Function v9 â€
   });
   it("a developed answer without the content (no entries, nothing printing them, headings only) gets one retry within the same proposal, then a clear message", () => {
     expect(fn).toMatch(/function developGap\(raw: string, wanted: number\)/);
+    expect(fn).not.toMatch(/so the entries would never print/);
     expect(fn).toMatch(/const gap = develop \? developGap\(message\.content, wanted\) : null;/);
     expect(fn).toMatch(/if \(gap && !retry\.length && Date\.now\(\) - started < 45_000\)/);
     expect(fn).toMatch(/await cost\("incomplete-retried"\)/);
