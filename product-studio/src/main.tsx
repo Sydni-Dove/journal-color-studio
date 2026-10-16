@@ -1,3 +1,4 @@
+// Build-rule check 2026-10-16: comment only, no behaviour change (reverted next).
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./app/App";
