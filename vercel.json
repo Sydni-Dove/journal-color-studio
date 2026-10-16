@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "ignoreCommand": "bash -c 'B=\"${VERCEL_GIT_PREVIOUS_SHA:-$(git merge-base HEAD origin/main 2>/dev/null)}\"; [ -n \"$B\" ] && [ \"$B\" != \"$(git rev-parse HEAD)\" ] && git cat-file -e \"$B^{commit}\" 2>/dev/null || exit 1; git diff --quiet \"$B\" HEAD -- . \":(exclude)product-studio\" \":(exclude)supabase\" \":(exclude)*.md\" \":(exclude).gitignore\" \":(exclude).vercelignore\" \":(exclude)vercel.json\"'",
+  "ignoreCommand": "bash vercel-ignore.sh",
   "git": {
     "deploymentEnabled": {
       "backup/*": false,

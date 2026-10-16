@@ -4,5 +4,5 @@
   "installCommand": "npm ci",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "ignoreCommand": "bash -c 'B=\"${VERCEL_GIT_PREVIOUS_SHA:-$(git merge-base HEAD origin/main 2>/dev/null)}\"; [ -n \"$B\" ] && [ \"$B\" != \"$(git rev-parse HEAD)\" ] && git cat-file -e \"$B^{commit}\" 2>/dev/null || exit 1; git diff --quiet \"$B\" HEAD -- . \":(exclude)*.md\" \":(exclude)docs\"'"
+  "ignoreCommand": "bash vercel-ignore.sh"
 }
