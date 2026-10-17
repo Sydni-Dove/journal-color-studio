@@ -1,3 +1,4 @@
+import type { HardcoverSettings } from "../engines/assembly/hardcover";
 import type { ElementPosition, SemanticTextKey } from "./layout";
 import type { BindingType } from "./binding";
 import type { CalendarSettings } from "./calendar";
@@ -38,6 +39,8 @@ export type ProductionSettings = {
   /** USER-DESIGN margins (inches) — never allowed below required geometry. */
   userMargins?: Partial<Record<LogicalEdge, number>>;
   paperColor?: "white" | "cream";
+  /** Hardcover assembly (Wire-O / disc-bound boards). Absent: no hardcover features anywhere. */
+  hardcover?: HardcoverSettings;
 };
 
 export type LayoutPlacement = "top-left" | "top-right" | "top-center";
@@ -150,7 +153,22 @@ export type ExportSettings = {
   paper?: "page" | "letter" | "a4";
   /** Home printing only: show corner trim/cut marks around the finished page. Default false. */
   showTrimMarks?: boolean;
+  /**
+   * Hardcover assembly output instead of the pages: the front/back cover sheets sized for wrapping chipboard,
+   * the assembly guide, or the actual-size alignment template. Absent: the ordinary export.
+   */
+  assembly?: AssemblyExport;
 };
+
+export type AssemblyExport = {
+  output: "cover-sheets" | "guide" | "template";
+  /** Cover sheets: each kind of mark is chosen on its own (all off by default). */
+  marks?: { cut?: boolean; laminate?: boolean; board?: boolean };
+  /** Paper for cover sheets and the template ("sheet": exactly the size needed, for Save as PDF / print shops). */
+  paper?: AssemblyPaper;
+};
+
+export type AssemblyPaper = "sheet" | "letter" | "legal" | "tabloid" | "super-b";
 
 export type ProductVariant = {
   id: string;

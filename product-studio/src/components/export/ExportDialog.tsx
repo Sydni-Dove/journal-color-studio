@@ -16,6 +16,13 @@ import type { ProjectUsage } from "../../engines/document/usage";
 import type { ValidationIssue } from "../../types/validation";
 import { Check, LabeledNumeric, Segmented } from "../editor/ui";
 import { PrintDocument } from "./PrintDocument";
+import { createPortal } from "react-dom";
+import { geometryFor } from "../../engines/document/resolve";
+import { resolveComposition } from "../../engines/composition/composition";
+import { hardcoverPlanFor } from "../../engines/assembly/forDocument";
+import { assemblyJob, sheetGeometry, type AssemblyJob } from "../assembly/AssemblyPrint";
+import { ASSEMBLY_PAPER } from "../../engines/assembly/assemblyPrint";
+import type { AssemblyExport, AssemblyPaper } from "../../types/project";
 
 /** Identical issues on many pages are listed once, with the pages they occur on. */
 function groupIssues(issues: ValidationIssue[]): { issue: ValidationIssue; pages: number[]; details: string[] }[] {
@@ -118,9 +125,16 @@ export function ExportDialog({ doc, usage, currentIndex, fontsReady, onClose, on
     setPreparing(true);
     setPrepError(null);
     try {
-      const pages = [...new Set(plan.sequence)].map((i) => ({ g: contentGeometryFor(doc, doc.recipe.pages[i], i), comp: compositionFor(doc, i) }));
+      const pages = pageIndices.map((i) => ({ g: contentGeometryFor(doc, doc.recipe.pages[i], i), comp: compositionFor(doc, i) }));
+      // Cover sheets: the same covers drawn over the whole wrapping sheet.
+      if (job && hardcover && assembly?.output === "cover-sheets")
+        for (const [i, face] of [[job.coverIndices[0], hardcover.front], [job.coverIndices[1] ?? job.coverIndices[0], hardcover.back]] as const) {
+          if (i === undefined) continue;
+          const g = sheetGeometry(geometryFor(doc, doc.recipe.pages[i], i), face, hardcover).geometry;
+          pages.push({ g, comp: resolveComposition(g, solvePage(doc, i), doc.typography, doc.spacing) });
+        }
       // Covers with their own design-library surface: prepared in that surface's colors, for those pages only.
-      const surfaces = [...new Set(plan.sequence)].flatMap((i) => {
+      const surfaces = pageIndices.flatMap((i) => {
         const surface = solvePage(doc, i).surface;
         if (!surface) return [];
         const page = { g: contentGeometryFor(doc, doc.recipe.pages[i], i), comp: { ...compositionFor(doc, i), ownArtwork: false } };
@@ -135,7 +149,11 @@ export function ExportDialog({ doc, usage, currentIndex, fontsReady, onClose, on
     }
   };
   const plan = useMemo(() => planPrint(doc, settings, currentIndex), [doc, settings, currentIndex]);
-  const pageIndices = useMemo(() => [...new Set(plan.sequence)], [plan]);
+  // Hardcover outputs (only when the product has hardcover turned on and one is chosen): replace the pages in this print job.
+  const hardcover = useMemo(() => hardcoverPlanFor(doc), [doc]);
+  const assembly = hardcover ? settings.assembly : undefined;
+  const job = useMemo(() => (hardcover && assembly ? assemblyJob(doc, hardcover, assembly) : null), [doc, hardcover, assembly]);
+  const pageIndices = useMemo(() => (job ? job.coverIndices : [...new Set(plan.sequence)]), [plan, job]);
 
   const report = useMemo(() => {
     const measure = (fontsReady && createCanvasMeasurer()) || heuristicMeasurer;
@@ -154,7 +172,8 @@ export function ExportDialog({ doc, usage, currentIndex, fontsReady, onClose, on
   // The latest check, for the moment just before printing (fonts can finish loading while artwork is prepared).
   const latestReadiness = useRef(readinessNow);
   latestReadiness.current = readinessNow;
-  const blocked = !report.exportAllowed || plan.errors.length > 0 || !readiness.ready;
+  const blocked = job ? job.errors.length > 0 || job.pages === 0 || !readiness.ready || (job.coverIndices.length > 0 && !report.exportAllowed) : !report.exportAllowed || plan.errors.length > 0 || !readiness.ready;
+  const setAssembly = (a: AssemblyExport | undefined) => onSettings({ ...settings, assembly: a });
 
   useEffect(() => {
     if (!printing) return;
@@ -192,6 +211,21 @@ export function ExportDialog({ doc, usage, currentIndex, fontsReady, onClose, on
     <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Export">
       <div className="modal">
         <h2>Print / Save PDF</h2>
+        {hardcover && (
+          <Segmented
+            label="Print"
+            value={assembly?.output ?? "pages"}
+            options={[
+              { value: "pages", label: "Journal pages" },
+              { value: "cover-sheets", label: "Hardcover sheets" },
+              { value: "guide", label: "Assembly guide" },
+              { value: "template", label: "Alignment template" },
+            ]}
+            // Each output starts on its own paper: sheets exact size (PDF / print shop), the template on Letter (tiled).
+            onChange={(v) => setAssembly(v === "pages" ? undefined : { ...assembly, output: v as AssemblyExport["output"], paper: v === "template" ? "letter" : "sheet" })}
+          />
+        )}
+        {job && assembly ? <AssemblyOptions assembly={assembly} job={job} onChange={setAssembly} /> : <>
         <Segmented
           label="What to export"
           value={settings.scope}
@@ -258,12 +292,13 @@ export function ExportDialog({ doc, usage, currentIndex, fontsReady, onClose, on
             ? `In the print dialog keep scale at 100% (“Default” or “Actual size”) and turn on background graphics.${settings.showTrimMarks ? ` Cut along the corner marks for a page whose art runs to every edge${doc.project.production.includeBleed ? "" : " — turn on “Extend background past the cut edge” (Page setup) so no white shows where you cut"}.` : " Trim marks are off; turn them on above only when you plan to cut the sheet down to the finished page size."}`
             : "In the print dialog choose “Save as PDF”, margins “None”, scale 100%, and turn on background graphics. A home printer has no paper this size — choose Letter or A4 above to print at home."}
         </p>
+        </>}
         <div className="row">
           <span className={`badge ${report.errorCount ? "badge--error" : "badge--ok"}`}>{report.errorCount} to fix</span>
           <span className={`badge ${report.warningCount ? "badge--warning" : ""}`}>{report.warningCount} to check</span>
           <span className="hint">{report.checkedPages} page(s) checked · {readiness.ready ? "checked with your fonts" : "not ready to export yet"}</span>
         </div>
-        {plan.errors.map((e) => (
+        {(job ? job.errors : plan.errors).map((e) => (
           <div key={e} className="issue issue--error">{e}</div>
         ))}
         <IssueList
@@ -283,7 +318,47 @@ export function ExportDialog({ doc, usage, currentIndex, fontsReady, onClose, on
           </button>
         </div>
       </div>
-      {printing && <PrintDocument doc={doc} plan={plan} />}
+      {printing && (job ? <AssemblyPrintDocument job={job} /> : <PrintDocument doc={doc} plan={plan} />)}
+    </div>
+  );
+}
+
+function AssemblyPrintDocument({ job }: { job: AssemblyJob }) {
+  const target = document.getElementById("print-root");
+  return target ? createPortal(job.render(), target) : null;
+}
+
+const PAPERS: { value: AssemblyPaper; label: string }[] = [
+  { value: "sheet", label: "Exact size (PDF, print shop)" },
+  ...(Object.keys(ASSEMBLY_PAPER) as Exclude<AssemblyPaper, "sheet">[]).map((k) => ({ value: k, label: ASSEMBLY_PAPER[k].label })),
+];
+
+/** Hardcover output options: the marks (each on its own) and the paper. */
+function AssemblyOptions({ assembly, job, onChange }: { assembly: AssemblyExport; job: AssemblyJob; onChange: (a: AssemblyExport) => void }) {
+  const marks = assembly.marks ?? {};
+  const mark = (k: keyof NonNullable<AssemblyExport["marks"]>) => (on: boolean) => onChange({ ...assembly, marks: { ...marks, [k]: on } });
+  return (
+    <div data-testid="assembly-options">
+      {assembly.output === "cover-sheets" && (
+        <fieldset className="field" style={{ border: 0, padding: 0, margin: 0 }}>
+          <legend className="hint">Marks on the cover sheets (choose any; your design is unchanged)</legend>
+          <Check label="Cutting marks (sheet edges and corner cuts)" checked={!!marks.cut} onChange={mark("cut")} />
+          <Check label="Laminate alignment marks" checked={!!marks.laminate} onChange={mark("laminate")} />
+          <Check label="Chipboard positioning marks" checked={!!marks.board} onChange={mark("board")} />
+        </fieldset>
+      )}
+      {assembly.output !== "guide" && (
+        <label className="field">
+          <span>Paper</span>
+          <select value={assembly.paper ?? "sheet"} onChange={(e) => onChange({ ...assembly, paper: e.target.value as AssemblyPaper })}>
+            {PAPERS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+          </select>
+        </label>
+      )}
+      <p className="hint" data-testid="export-output">
+        Output: {job.pages} sheet(s), {+job.pageW.toFixed(3)}" × {+job.pageH.toFixed(3)}". Print at 100% (“Actual size”) with background graphics on.
+      </p>
+      {job.notes.map((n) => <p key={n} className="hint">{n}</p>)}
     </div>
   );
 }

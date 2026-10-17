@@ -3,7 +3,7 @@
 Read this first when picking up the work (any assistant or developer). Keep it current: update it in the same
 commit as any change to state, branches, rules or open decisions.
 
-_Last updated: 2026-10-15 — Phase 8 merged to `main` (89f054b) and live; Edge Function v8 deployed; Phase 8.1 being planned on `claude/phase8.1-develop-content`._
+_Last updated: 2026-10-17 — hardcover assembly on `claude/hardcover-assembly` (review pending). Earlier: 2026-10-15 — Phase 8 merged to `main` (89f054b) and live; Edge Function v8 deployed; Phase 8.1 being planned on `claude/phase8.1-develop-content`._
 
 ## The two apps
 
@@ -26,6 +26,7 @@ that needs its own review.
 | `main` | Phases 0–8 (Phase 8 merged 2026-10-15, 89f054b), paper-gold print fixes, Rose Marble gold. Production for both apps. |
 | `claude/phase8-ai-generation` | Phase 8 as reviewed; merged into `main`. Keep for reference; don't build on it. |
 | `claude/phase8.1-develop-content` | Phase 8.1 (Develop original content): planning, then development. **Not to be merged or deployed without approval.** |
+| `claude/hardcover-assembly` | Hardcover assembly guide for Wire-O / disc-bound chipboard covers (2026-10-17, from `main` 7d7bb23). **Not to be merged or deployed without approval.** See "Hardcover assembly" below. |
 | `preview/product-studio-builder-design-lab` | Older preview branch; everything on it is in `main`. |
 | `claude/roadmap-guided-design-builder` | First draft of the Phase 9 roadmap entry; superseded (now in `main`). Safe to delete. |
 | `backup/*` | Safety copies; do not build on them. |
@@ -47,6 +48,30 @@ documents). **8.1 Develop original content** — approved, planning on its own b
 image upload; "design styles", not "recipes"). **10 Research and develop content** — future, paid tier.
 **11 Requirements Assistant** — reserved. Technical improvements (any time, not blocking a phase): self-hosted
 fonts (see Testing).
+
+## Hardcover assembly (branch `claude/hardcover-assembly`, 2026-10-17 — waiting for review)
+
+Sydni's request: help physically assemble hardcover journals (mostly 3/4" Wire-O, also disc-bound). Optional and
+off by default; with it off, nothing in pages, geometry or the ordinary export changes (tests check this).
+- **Page setup → "Hardcover with chipboard"** (`production.hardcover`): chipboard thickness (presets + other),
+  board overhang (squares), turn-in, corner gap, laminate (board + edges + a little turn-in / whole sheet / inset /
+  set size), Wire-O size, punch depth, binding-edge keep-clear. Live measurements and a small diagram.
+- **Engine** `src/engines/assembly/hardcover.ts`: one plan from trim (as oriented) + binding + bound edge + materials:
+  printed sheet, chipboard (flush on the binding edge, squares elsewhere), placement, wrap per side, laminate
+  rect/offsets, 45° corner cuts, keep-clear band, hole/slot positions, back cover mirrored; written steps.
+  Defaults: Wire-O ≥ 9/16" 2:1 pitch, 1/4" punch depth (3:1: 5 mm); disc 0.98" pitch, 0.3" slots; keep-clear from
+  the existing binding research (0.525" / 0.5"). Punch values are editable — the maker's punch decides.
+- **Export → Print: Journal pages | Hardcover sheets | Assembly guide | Alignment template** (only when hardcover is
+  on; `exportSettings.assembly`). Cover sheets: the cover page at its own trim and scale on the board, art 1/8" past
+  the board edge, plain background on the rest of the turn-in; marks chosen separately (cut / laminate / chipboard);
+  cut marks move inside the cut-away corners when the paper has no room outside. Template: actual size, tiled with
+  1/2" overlaps, + registration marks and a 1" check square. Paper: exact size, Letter, Legal, Tabloid, Super B.
+- Tests: `tests/hardcover-assembly.test.ts`, `tests/hardcover-print.test.tsx`, `tests/browser/hardcover.browser.ts`.
+  Unit 1552/1552, browser 165/165, golden snapshots unchanged.
+- Open: Sydni's "pink mold" reference images (not received) — match the template to them; the notary journal
+  (`~/Downloads/notary_journal_virginia_100_entries_landscape.pdf` + cover) as a Product Studio template; whether
+  JCS gets the notary cover (JCS pages are portrait-only today; covers reach PS only through the design-library
+  snapshot).
 
 ## Phase 8 review (2026-10-15)
 

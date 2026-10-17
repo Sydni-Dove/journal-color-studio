@@ -19,6 +19,7 @@ import type { ProductProject } from "../../types/project";
 import type { RecipeItem, RepeatRule } from "../../types/recipe";
 import { Check, Field, LabeledNumeric, NumberField, Section, Segmented, Select, type EditorNav } from "./ui";
 import { Advanced, TechnicalDetails, Visual } from "../help/visuals";
+import { HardcoverControls } from "./HardcoverPanel";
 
 /** Upper bound for a user margin entry (inches); larger values leave no usable page. */
 const MAX_USER_MARGIN_IN = 3;
@@ -104,6 +105,7 @@ export function ProductionPanel({ project, update, doc, nav }: PanelProps & { do
       <Check label="Extend background past the cut edge" checked={prod.includeBleed} onChange={(includeBleed) => set({ includeBleed })} />
       <p className="hint">Turn this on when color or artwork runs to the edge of the page, so no white line shows after trimming. Printers call this “bleed”.</p>
       <Visual kind="bleed" />
+      <HardcoverControls doc={doc} prod={prod} set={set} />
       {binding.boundEdgeMode === "punched-leaf" && (
         <>
           <Check label="Printed on both sides" checked={prod.duplex} onChange={(duplex) => set({ duplex })} />
