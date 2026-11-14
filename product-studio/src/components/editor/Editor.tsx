@@ -54,6 +54,10 @@ type Props = {
   saveStatus: "saved" | "saving" | "error";
   /** Where the project is saved beyond this device ("Saved online", "On this device only"…). */
   cloudLabel?: string;
+  /** Open with the print / export dialog showing (a Coloring Book's "Export"). */
+  startInExport?: boolean;
+  /** The back button's label (default "‹ Projects"). */
+  backLabel?: string;
 };
 
 function tryResolve(p: ProductProject): { doc: ResolvedDocument | null; error: string | null } {
@@ -64,7 +68,7 @@ function tryResolve(p: ProductProject): { doc: ResolvedDocument | null; error: s
   }
 }
 
-export function Editor({ project, onChange, onBack, saveStatus, cloudLabel }: Props) {
+export function Editor({ project, onChange, onBack, saveStatus, cloudLabel, startInExport = false, backLabel = "‹ Projects" }: Props) {
   // Open on the first real page (spread products start with a filler page).
   const [index, setIndex] = useState(() => {
     try {
@@ -74,7 +78,7 @@ export function Editor({ project, onChange, onBack, saveStatus, cloudLabel }: Pr
     }
   });
   const [debug, setDebug] = useState<DebugFlags>(DEBUG_OFF);
-  const [exporting, setExporting] = useState(false);
+  const [exporting, setExporting] = useState(startInExport);
   const panel = usePanelWidth();
   // The Neutral Cheetah Luxe script is always loaded: covers and dividers in that design use it for their title.
   // Fonts chosen for one heading or one kind of title load too (not only the Style fonts).
@@ -249,7 +253,7 @@ export function Editor({ project, onChange, onBack, saveStatus, cloudLabel }: Pr
   return (
     <>
       <header className="topbar">
-        <button className="btn" onClick={onBack}>‹ Projects</button>
+        <button className="btn" onClick={onBack}>{backLabel}</button>
         <input className="name-input" value={project.name} aria-label="Project name" onChange={(e) => update((p) => ({ ...p, name: e.target.value }))} />
         <span className={`save-status ${saveStatus === "error" ? "save-status--error" : ""}`}>
           {saveStatus === "saved" ? "Saved" : saveStatus === "saving" ? "Saving…" : "Save failed (storage full?)"}

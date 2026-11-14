@@ -24,6 +24,9 @@ import type { BookStep } from "../../types/recipe";
 import type { ArtworkAsset, ArtworkPlacement } from "../../types/artwork";
 import type { CoverBrief, PageOutput, Scene } from "./brief";
 
+/** Verse, lesson and custom text on a Coloring Book page (13 pt: children read it). */
+export const BOOK_TEXT_PT = 13;
+
 export type Rect = { x: number; y: number; w: number; h: number };
 
 /** The page the coloring book is printed on: trim, DPI and its pixel canvas. */
@@ -35,10 +38,24 @@ export function pageCanvas(b: CoverBrief): { trimW: number; trimH: number; dpi: 
 
 const outputOf = (b: CoverBrief, s: Scene): PageOutput => s.output ?? b.output;
 
-/** The words Product Studio prints for the verse: the reference, plus the wording only once it is verified. */
+/** What a page shows in a Coloring Book: the book's choice with the page's own on top (null outside a Coloring Book). */
+export const pageContentOf = (b: CoverBrief, s: Scene) => (b.pageContent ? { ...b.pageContent, ...(s.content ?? {}) } : null);
+
+/**
+ * The words Product Studio prints for the verse.
+ *   Cover Studio: the reference, plus the wording only once it is verified.
+ *   Coloring Book: nothing when the page shows no Scripture; the reference alone when it shows the reference; the
+ *   full verse ("wording" — Reference (Translation)) only once the customer approved this page's wording. Until then
+ *   the reference stands alone, and the book's review lists the page as missing its approved verse.
+ */
 export function verseLine(b: CoverBrief, s: Scene): string {
-  const ref = (s.scriptureRef || b.scripture || "").trim();
-  if (!ref) return "";
+  const content = pageContentOf(b, s);
+  const ref = (s.scriptureRef || (content ? "" : b.scripture) || "").trim();
+  if (!ref || content?.scripture === "none") return "";
+  if (content) {
+    const words = content.scripture === "full" && s.verseApproved && s.verseText?.trim() ? s.verseText.trim() : "";
+    return words ? `“${words.replace(/^["“]|["”]$/g, "")}” — ${ref} (${b.translation})` : `${ref} (${b.translation})`;
+  }
   const words = b.verseVerified && s.verseText?.trim() ? `${s.verseText.trim()} ` : "";
   return `${words}${ref} (${b.translation})`;
 }
@@ -47,6 +64,8 @@ export function verseLine(b: CoverBrief, s: Scene): string {
 export function pageBlocks(b: CoverBrief, s: Scene, withText = true): PromptBlock[] {
   const t = b.pageTypography;
   const output = outputOf(b, s);
+  const content = pageContentOf(b, s);
+  if (content) return bookPageBlocks(b, s, content, withText);
   const title: PromptBlock = { id: "title", kind: "heading", label: (s.pageTitle ?? s.title).trim() || " ", textStyle: "title", headingAlign: t.align, headingFont: t.titleFont, headingSizePt: t.titleSizePt };
   // A verse lettered into the artwork isn't typeset again.
   const verseText = (s.scriptureMode ?? b.scriptureMode) === "art" ? "" : verseLine(b, s);
@@ -69,6 +88,39 @@ export function pageBlocks(b: CoverBrief, s: Scene, withText = true): PromptBloc
       return [art, ...extra, title, ...(verse ? [verse] : [])];
     default:
       return [title, art, ...extra, ...(verse ? [verse] : [])];
+  }
+}
+
+/**
+ * A Coloring Book page: only what the customer chose to show. A part that is switched off, or empty, is not on the
+ * page at all (no label, heading, placeholder or reserved space).
+ */
+function bookPageBlocks(b: CoverBrief, s: Scene, c: NonNullable<ReturnType<typeof pageContentOf>>, withText: boolean): PromptBlock[] {
+  const t = b.pageTypography;
+  const text = (id: string, label: string, style: "title" | "body"): PromptBlock => ({
+    id, kind: "heading", label, textStyle: style, headingAlign: t.align, headingFont: style === "title" ? t.titleFont : t.scriptureFont,
+    // Children read these: the title at its size, a verse and other text at a comfortable 13 pt (not the body's small default).
+    headingSizePt: style === "title" ? t.titleSizePt : BOOK_TEXT_PT,
+  });
+  const titleText = (s.pageTitle ?? s.title).trim();
+  const verse = (s.scriptureMode ?? b.scriptureMode) === "art" ? "" : verseLine(b, s);
+  const art: PromptBlock = { id: "art", label: "", space: "fill", responseStyle: "blank", weight: 3 };
+  const parts = {
+    title: c.title && titleText ? [text("title", titleText, "title")] : [],
+    rest: [
+      ...(verse ? [text("verse", verse, "body")] : []),
+      ...(c.lesson && s.lessonText?.trim() ? [text("lesson", s.lessonText.trim(), "body")] : []),
+      ...(c.customText && s.customText?.trim() ? [text("custom", s.customText.trim(), "body")] : []),
+    ],
+  };
+  if (!withText || b.textPlacement === "none") return [art];
+  switch (b.textPlacement) {
+    case "top":
+      return [...parts.title, ...parts.rest, art];
+    case "top-and-bottom":
+      return [...parts.title, art, ...parts.rest];
+    default:
+      return [art, ...parts.title, ...parts.rest];
   }
 }
 

@@ -35,7 +35,7 @@ export function RefThumb({ id, name, size = 72 }: { id?: string; name?: string; 
 }
 
 /** Upload an image (kept on this device, like product artwork) and report its id and file name. */
-function ImageButton({ label, onImage, testId }: { label: string; onImage: (a: ArtworkAsset) => void; testId?: string }) {
+export function ImageButton({ label, onImage, testId }: { label: string; onImage: (a: ArtworkAsset) => void; testId?: string }) {
   const ref = useRef<HTMLInputElement>(null);
   const [err, setErr] = useState<string | null>(null);
   const pick = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -74,7 +74,7 @@ const REGISTRY: { key: keyof CastMember; label: string; placeholder: string }[] 
   { key: "traits", label: "Always keep", placeholder: "the details that must never change" },
 ];
 
-export function CastPanel({ brief, set, selecting = false, productImages = [], copy }: { brief: CoverBrief; set: Set_; selecting?: boolean; productImages?: { asset: ArtworkAsset; product: string }[]; copy?: (t: string) => void }) {
+export function CastPanel({ brief, set, selecting = false, productImages = [], copy, emptyHint }: { brief: CoverBrief; set: Set_; selecting?: boolean; productImages?: { asset: ArtworkAsset; product: string }[]; copy?: (t: string) => void; /** The gallery's hint when no characters are saved (where to add them). */ emptyHint?: string }) {
   const setMember = (id: string, patch: Partial<CastMember>) => set({ cast: brief.cast.map((c) => (c.id === id ? { ...c, ...patch } : c)) });
   const selected = brief.castSelected.length ? brief.castSelected : brief.cast.map((c) => c.id);
   const toggle = (id: string, on: boolean) => set({ castSelected: on ? [...new Set([...selected, id])] : selected.filter((x) => x !== id) });
@@ -89,7 +89,7 @@ export function CastPanel({ brief, set, selecting = false, productImages = [], c
         <p className="hint">
           {brief.cast.length
             ? "The characters saved with this collection for its interior pages. The cover uses only the ones ticked, and names their reference images to attach."
-            : "No interior characters saved yet. Add them under Children’s Character Illustrations → Cast & references."}
+            : emptyHint ?? "No interior characters saved yet. Add them under Children’s Character Illustrations → Cast & references."}
         </p>
       )}
       {!selecting && brief.cast.length === 0 && (
@@ -498,7 +498,7 @@ export function LayoutPanel({ brief, set }: { brief: CoverBrief; set: Set_ }) {
   );
 }
 
-const CHECKS: { key: string; label: string }[] = [
+export const CHECKS: { key: string; label: string }[] = [
   { key: "faces", label: "Same faces and skin tones as the references" },
   { key: "hair", label: "Same hairstyles and hair accessories" },
   { key: "clothing", label: "Same signature clothing and accessories" },
@@ -575,7 +575,7 @@ export function SceneReview({ brief, set, copy, say, onEdit, onAssemble }: { bri
   );
 }
 
-function Regenerate({ scene, onRegenerate }: { scene: Scene; onRegenerate: (notes: string) => void }) {
+export function Regenerate({ scene, onRegenerate }: { scene: Scene; onRegenerate: (notes: string) => void }) {
   const [notes, setNotes] = useState(scene.rejectNotes ?? "");
   return (
     <details className="cast-changes">
@@ -587,7 +587,7 @@ function Regenerate({ scene, onRegenerate }: { scene: Scene; onRegenerate: (note
 }
 
 /** The generated illustration: its size checked, previewed alone and on the assembled page, compared with the references, approved. */
-function IllustrationCheck({ brief, scene, index, cast, setScene, onNext }: { brief: CoverBrief; scene: Scene; index: number; cast: CastMember[]; setScene: (p: Partial<Scene>) => void; onNext: () => void }) {
+export function IllustrationCheck({ brief, scene, index, cast, setScene, onNext, preview = true }: { brief: CoverBrief; scene: Scene; index: number; cast: CastMember[]; setScene: (p: Partial<Scene>) => void; onNext: () => void; /** Its own page preview (off where the finished page is already shown). */ preview?: boolean }) {
   const [view, setView] = useState<"art" | "page">("page");
   const [showSafe, setShowSafe] = useState(true);
   const canvas = pageCanvas(brief);
@@ -613,12 +613,16 @@ function IllustrationCheck({ brief, scene, index, cast, setScene, onNext }: { br
               : `Not the ${canvas.pxW} × ${canvas.pxH} page canvas: it is placed whole and in proportion inside the illustration area (never stretched or cropped), clear of the text and the binding gutter.`}{" "}
             {ppi?.text}
           </p>
-          <div className="segmented" role="group" aria-label="Preview">
-            <button type="button" aria-pressed={view === "art"} style={{ minHeight: 44 }} onClick={() => setView("art")}>Artwork without text</button>
-            <button type="button" aria-pressed={view === "page"} style={{ minHeight: 44 }} onClick={() => setView("page")}>Assembled page with text</button>
-          </div>
-          <Check label="Show text-safe space" checked={showSafe} onChange={setShowSafe} />
-          <AssembledPreview brief={brief} scene={scene} withText={view === "page"} showSafe={showSafe} />
+          {preview && (
+            <>
+              <div className="segmented" role="group" aria-label="Preview">
+                <button type="button" aria-pressed={view === "art"} style={{ minHeight: 44 }} onClick={() => setView("art")}>Artwork without text</button>
+                <button type="button" aria-pressed={view === "page"} style={{ minHeight: 44 }} onClick={() => setView("page")}>Assembled page with text</button>
+              </div>
+              <Check label="Show text-safe space" checked={showSafe} onChange={setShowSafe} />
+              <AssembledPreview brief={brief} scene={scene} withText={view === "page"} showSafe={showSafe} />
+            </>
+          )}
           <div className="compare" data-testid={`compare-${index + 1}`}>
             <figure><RefThumb id={scene.illustrationId} name={scene.illustrationName} size={140} /><figcaption>This illustration</figcaption></figure>
             {(brief.useRefs && brief.useGroupRef && brief.groupRefId ? [{ id: "g", name: "Group", refId: brief.groupRefId, refName: brief.groupRefName }] : cast.filter((c) => c.refId && brief.useRefs)).map((c) => (

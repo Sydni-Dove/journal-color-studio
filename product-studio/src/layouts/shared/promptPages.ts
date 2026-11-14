@@ -88,6 +88,14 @@ export function blocksToZones(set: PromptSet, surfaceOf: (b: PromptBlock) => { s
   return out;
 }
 
+/** The layout context with a body zone's own font and size applied to its text role (unchanged otherwise). */
+function promptCtx<C extends Pick<LayoutContext, "typography">>(ctx: C, z: StationeryZone): C {
+  if (!z.promptFont && !z.promptSizePt) return ctx;
+  const role = z.promptRole ?? "prompt";
+  const own = { ...(z.promptFont ? { family: z.promptFont } : {}), ...(z.promptSizePt ? { sizePt: z.promptSizePt } : {}) };
+  return { ...ctx, typography: { ...ctx.typography, roles: { ...ctx.typography.roles, [role]: { ...ctx.typography.roles[role], ...own } } } };
+}
+
 /** One block as a page zone. */
 function blockZone(set: PromptSet, b: PromptBlock, surfaceOf: (b: PromptBlock) => { surface: SurfaceKind; treatment?: StationeryZone["treatment"] }, sequenceStarts?: Record<string, number>): StationeryZone {
   const headingStyle = {
@@ -103,7 +111,11 @@ function blockZone(set: PromptSet, b: PromptBlock, surfaceOf: (b: PromptBlock) =
       const base = { key: b.id, surface: "blank" as const, weight: 0, optional: true, lines: 0, minLines: 0 };
       if (b.textStyle === "body") {
         const body = [b.label.trim(), b.prompt?.trim()].filter(Boolean).join("\n");
-        return { ...base, label: "", ...(body ? { prompt: body } : {}), promptRole: "body", ...(b.headingAlign && b.headingAlign !== "left" ? { headingAlign: b.headingAlign } : {}) };
+        return {
+          ...base, label: "", ...(body ? { prompt: body } : {}), promptRole: "body", ...(b.headingAlign && b.headingAlign !== "left" ? { headingAlign: b.headingAlign } : {}),
+          // Its own size (and with it its font) only when the block sets a size: text saved without one prints as before.
+          ...(b.headingSizePt ? { promptSizePt: b.headingSizePt, ...(b.headingFont ? { promptFont: b.headingFont } : {}) } : {}),
+        };
       }
       return {
         ...base,
@@ -294,13 +306,14 @@ function measureOne(zone: StationeryZone, width: number, ctx: LayoutContext): Me
   const badge = zone.badge?.trim() ? badgeIn(ctx) : 0;
   const inner = Math.max(0, width - ins.l - ins.r - (badge ? badge + s.column : 0));
   const role = zone.labelRole ?? "sectionHeading", pRole = zone.promptRole ?? "prompt";
-  const promptLine = lineBoxIn(ctx.typography, pRole);
+  const pctx = promptCtx(ctx, zone);
+  const promptLine = lineBoxIn(pctx.typography, pRole);
   // A heading in its own font is measured in that font.
   // A heading in its own font or size is measured in it (the size is where fitting starts; it never overflows).
   const own = { ...(zone.headingFont ? { family: zone.headingFont } : {}), ...(zone.headingSizePt ? { sizePt: zone.headingSizePt } : {}) };
   const hctx = Object.keys(own).length ? { ...ctx, typography: { ...ctx.typography, roles: { ...ctx.typography.roles, [role]: { ...ctx.typography.roles[role], ...own } } } } : ctx;
   const heading = zone.label ? fitHeading(zone.label, role, { w: inner, h: 2 * lineBoxIn(hctx.typography, role) }, hctx) : null;
-  const promptLines = zone.prompt ? wrapText(zone.prompt, inner, ctx, pRole) : [];
+  const promptLines = zone.prompt ? wrapText(zone.prompt, inner, pctx, pRole) : [];
   // A line under the heading takes a block's space (half above it, half below).
   const headingH = heading ? heading.heightIn + (zone.headingRule ? s.block : 0) : 0;
   const promptH = promptLines.length * promptLine;
@@ -379,8 +392,9 @@ function splitOf(m: Measured, req: ZoneRequest, ctx: LayoutContext, width: numbe
   const rangeOf = (from: number, to: number, count: number) => ({ from, to, count, part: 0 });
   // Body text: the section IS its lines.
   if (z.promptRole === "body" && z.lines === 0 && m.promptLines.length && !m.headingH) {
-    const lines = m.promptLines, line = lineBoxIn(ctx.typography, "body");
-    const ends = paragraphEnds(z.prompt ?? "", inner, ctx);
+    const pctx = promptCtx(ctx, z);
+    const lines = m.promptLines, line = lineBoxIn(pctx.typography, "body");
+    const ends = paragraphEnds(z.prompt ?? "", inner, pctx);
     const sentence = (i: number) => /[.!?]["”’)\]]*$/.test(lines[i] ?? "");
     return {
       unit: "line", count: lines.length, minFirst: 2, minLast: 2, policy: "flow",
@@ -936,7 +950,9 @@ export function solveZonePages(spec: ZonePageSpec, ctx: LayoutContext, pageIndex
         const y = ty + m.headingH + (m.headingH ? s.block : 0);
         const pRole = z.promptRole ?? "prompt";
         const pt: TextNode = text(`${id}-prompt`, { x: tx, y, w: tw, h: m.promptH }, m.promptLines.join(" "), pRole, { component: "Text", vAlign: "top", wrap: true, align: z.headingAlign ?? "left" });
-        pt.fit = { sizePt: ctx.typography.roles[pRole].sizePt, lineHeight: ctx.typography.roles[pRole].lineHeight, lines: m.promptLines };
+        const own = promptCtx(ctx, z).typography.roles[pRole];
+        pt.fit = { sizePt: own.sizePt, lineHeight: own.lineHeight, lines: m.promptLines };
+        if (z.promptFont) pt.family = z.promptFont;
         nodes.push(pt);
       }
       const response = fixed ? inner : { x: inner.x, y: responseTop, w: inner.w, h: Math.max(0, responseH) };

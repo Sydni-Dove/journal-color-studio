@@ -170,6 +170,16 @@ function normalizeTypography(raw: unknown, d: CoverBrief["pageTypography"]): Cov
   };
 }
 
+/** A page's own content choice: only the parts it set. */
+function normalizeContent(c: Record<string, unknown>): Partial<import("../engines/coloringBook/book").PageContent> {
+  return {
+    ...(typeof c.title === "boolean" ? { title: c.title } : {}),
+    ...(c.scripture === "full" || c.scripture === "reference" || c.scripture === "none" ? { scripture: c.scripture } : {}),
+    ...(typeof c.lesson === "boolean" ? { lesson: c.lesson } : {}),
+    ...(typeof c.customText === "boolean" ? { customText: c.customText } : {}),
+  };
+}
+
 /** The cast, scenes, coloring defaults and coloring-cover choices (absent in collections saved before them). */
 function normalizeColoring(r: Record<string, unknown>, d: CoverBrief): Partial<CoverBrief> {
   const cast = (Array.isArray(r.cast) ? r.cast : []).flatMap((x) => {
@@ -191,9 +201,11 @@ function normalizeColoring(r: Record<string, unknown>, d: CoverBrief): Partial<C
       ...(THICK.includes(c.lineThickness as never) ? { lineThickness: c.lineThickness as (typeof THICK)[number] } : {}),
       ...(COMPLEX.includes(c.complexity as never) ? { complexity: c.complexity as (typeof COMPLEX)[number] } : {}),
       ...(OUTPUTS.includes(c.output as never) ? { output: c.output as (typeof OUTPUTS)[number] } : {}),
-      ...Object.fromEntries((["pageTitle", "scriptureRef", "verseText", "lessonText", "illustrationId", "illustrationName", "approvedAt", "rejectNotes"] as const).flatMap((k) => (optText(c[k]) ? [[k, c[k]]] : []))),
+      ...Object.fromEntries((["pageTitle", "scriptureRef", "verseText", "lessonText", "illustrationId", "illustrationName", "approvedAt", "rejectNotes", "customText", "verseApproved", "suggestedRef", "characters", "actions", "styleNotes"] as const).flatMap((k) => (optText(c[k]) ? [[k, c[k]]] : []))),
       ...(Number(c.illustrationW) > 0 && Number(c.illustrationH) > 0 ? { illustrationW: Number(c.illustrationW), illustrationH: Number(c.illustrationH) } : {}),
       ...(c.scriptureMode === "art" || c.scriptureMode === "page" ? { scriptureMode: c.scriptureMode as "art" | "page" } : {}),
+      ...(c.verseSource === "customer" || c.verseSource === "public-domain" ? { verseSource: c.verseSource as "customer" | "public-domain" } : {}),
+      ...(c.content && typeof c.content === "object" ? { content: normalizeContent(c.content as Record<string, unknown>) } : {}),
       ...(Number(c.attempts) > 0 ? { attempts: Math.round(Number(c.attempts)) } : {}),
       ...(c.checks && typeof c.checks === "object" ? { checks: Object.fromEntries(Object.entries(c.checks as Record<string, unknown>).filter(([, v]) => typeof v === "boolean")) as Record<string, boolean> } : {}),
     }];

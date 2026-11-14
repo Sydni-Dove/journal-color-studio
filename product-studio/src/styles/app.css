@@ -2497,3 +2497,59 @@ button.family-card:focus-visible {
 @media (max-width: 600px) {
   .assembled-preview { transform-origin: 0 0; }
 }
+
+/* ---- Coloring Book ------------------------------------------------------------------------------ */
+.family-card--featured { border-color: var(--ui-brand); box-shadow: 0 0 0 1px var(--ui-brand) inset; }
+
+.more-types { font-size: 15px; margin: 18px 0 8px; }
+.advanced-tools { margin-top: 8px; }
+.book-studio .book-name { max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.book-step { display: grid; gap: var(--ui-gap); }
+.book-h { font-size: 16px; margin: 0 0 8px; }
+.segmented--wrap { flex-wrap: wrap; border-radius: var(--ui-radius); }
+.content-switches { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; }
+.content-presets .btn[aria-pressed="true"] { background: var(--ui-brand); border-color: var(--ui-brand); color: #fff; }
+.format-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; }
+.format-card { display: grid; gap: 4px; padding: 10px 12px; border: 1px solid var(--ui-line); border-radius: var(--ui-radius); background: #fff; cursor: pointer; }
+.format-card input { justify-self: start; }
+.format-card--on { border-color: var(--ui-brand); box-shadow: 0 0 0 1px var(--ui-brand) inset; }
+.book-settings > summary { cursor: pointer; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; list-style: none; }
+.book-settings > summary .book-h { margin: 0; }
+.book-settings[open] > summary { margin-bottom: 8px; }
+.table-scroll { overflow-x: auto; max-width: 100%; }
+.import-table { border-collapse: collapse; font-size: 13px; min-width: 720px; }
+.import-table th, .import-table td { border-bottom: 1px solid var(--ui-line); padding: 6px 8px; text-align: left; vertical-align: top; }
+.import-table input { width: 100%; min-width: 140px; min-height: 36px; }
+.import-table__text { max-width: 260px; }
+.import-review { display: grid; gap: 8px; margin-top: 8px; }
+.book-pages { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
+.book-page-card { display: grid; gap: 6px; align-content: start; padding: 8px; border: 1px solid var(--ui-line); border-radius: var(--ui-radius); background: #fff; }
+.book-page-card__open { display: grid; gap: 6px; justify-items: center; border: 0; background: none; padding: 0; cursor: pointer; text-align: center; font: inherit; color: inherit; }
+.book-page-card .row { gap: 4px; }
+.book-chip { display: inline-block; justify-self: start; font-size: 12px; padding: 2px 8px; border-radius: 999px; background: #f2ece8; color: var(--ui-ink); }
+.book-chip--ok { background: #e3f1e8; color: var(--ui-ok); }
+.book-chip--todo { background: #fbeee0; color: var(--ui-warn); }
+.finished-page { margin: 0; display: grid; gap: 4px; justify-items: center; }
+.finished-page .page-thumb { box-shadow: 0 1px 6px rgba(0, 0, 0, 0.18); background: #fff; }
+.page-editor { display: grid; gap: var(--ui-gap); }
+.page-editor__nav { align-items: center; gap: 8px; flex-wrap: wrap; }
+.page-editor__grid { display: grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr); gap: 16px; align-items: start; }
+.page-editor__preview { position: sticky; top: 8px; display: grid; gap: 8px; justify-items: center; }
+.page-editor__fields { display: grid; gap: var(--ui-gap); min-width: 0; }
+.how-steps { margin: 4px 0; padding-left: 20px; display: grid; gap: 4px; font-size: 14px; }
+.scripture-editor { display: grid; gap: 8px; padding: 8px 0; border-top: 1px solid var(--ui-line); }
+.book-issues { max-width: 440px; }
+.ready-banner { border-left: 4px solid var(--ui-warn); }
+.ready-banner--ok { border-left-color: var(--ui-ok); }
+.missing-group h3 { font-size: 14px; margin: 12px 0 6px; }
+.missing-group .issue .btn { margin-top: 6px; margin-right: 6px; }
+.book-spread-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; justify-items: center; }
+.cover-preview-row { display: flex; justify-content: center; }
+.steps__status { align-self: center; }
+@media (max-width: 760px) {
+  .page-editor__grid { grid-template-columns: minmax(0, 1fr); }
+  .page-editor__preview { position: static; }
+  .page-editor__preview .page-thumb { max-width: 100%; }
+  .book-pages { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+  .book-spread-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+}

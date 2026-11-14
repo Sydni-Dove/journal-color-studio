@@ -123,6 +123,9 @@ export type StationeryZone = {
   headingRule?: boolean;
   headingFont?: string;
   headingSizePt?: number;
+  /** Body text with its own font and size (a Coloring Book page's verse and lesson); otherwise the body style's. */
+  promptFont?: string;
+  promptSizePt?: number;
   badge?: string;
   /** Page Composer: the section's visual treatment (semantic colors only). */
   frame?: import("./prompts").SectionFrame;

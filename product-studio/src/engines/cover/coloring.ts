@@ -187,6 +187,8 @@ export const REUSE_INSTRUCTION =
 
 /** The established characters, their references, and the reuse instruction. Only called when the collection has a cast. */
 function registryBlock(b: CoverBrief, cast: CastMember[]): string {
+  // A book without recurring characters: the people in each scene are drawn from the scene's own description.
+  if (!cast.length) return "CHARACTERS\nNo recurring characters in this book: draw the people and animals this scene describes, appropriate for the audience.";
   const refs = referenceImages(b, cast);
   const missing = b.useRefs && !(b.useGroupRef && b.groupRefName) ? cast.filter((c) => !c.refName).map((c) => c.name) : [];
   return [
@@ -258,7 +260,7 @@ ${registryBlock(b, cast)}
 SCENE
 Scene ${index + 1} of ${total}: ${scene.title}.
 ${scene.text.trim() || scene.title}
-Characters in this scene: ${cast.map((c) => c.name).join(", ")}. Show the actions, expressions and interactions this scene describes; the setting changes, the characters do not.${regen}${verse ? `
+${cast.length ? `Characters in this scene: ${cast.map((c) => c.name).join(", ")}. Show the actions, expressions and interactions this scene describes; the setting changes, the characters do not.` : "Show the actions, expressions and interactions this scene describes."}${scene.styleNotes?.trim() ? `\nArt notes for this scene: ${scene.styleNotes.trim()}` : ""}${regen}${verse ? `
 
 SCRIPTURE LETTERING
 Hand-letter this verse into the illustration, spelled exactly, word for word, with its reference:

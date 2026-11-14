@@ -3,7 +3,7 @@
 Read this first when picking up the work (any assistant or developer). Keep it current: update it in the same
 commit as any change to state, branches, rules or open decisions.
 
-_Last updated: 2026-11-14 — Product Studio four-step editor + uploaded artwork on `claude/guided-steps-artwork` (not merged; see below). Earlier: Phase 8 merged to `main` (89f054b) and live._
+_Last updated: 2026-11-14 — Coloring Book product workflow on `claude/coloring-book-studio` (not merged; see "Coloring Book"). Earlier: four-step editor + uploaded artwork on `claude/guided-steps-artwork`; Phase 8 merged to `main` (89f054b) and live._
 
 ## The two apps
 
@@ -23,6 +23,7 @@ that needs its own review.
 
 | Branch | State |
 | --- | --- |
+| `claude/coloring-book-studio` | Stacked on the three branches below it + `main`; Coloring Book product workflow (2026-11-14). **Not merged; needs approval.** |
 | `claude/guided-steps-artwork` | Four-step editor + uploaded artwork (2026-11-14). **Not merged; needs approval.** |
 | `main` | Phases 0–8 (Phase 8 merged 2026-10-15, 89f054b), paper-gold print fixes, Rose Marble gold. Production for both apps. |
 | `claude/phase8-ai-generation` | Phase 8 as reviewed; merged into `main`. Keep for reference; don't build on it. |
@@ -48,6 +49,21 @@ documents). **8.1 Develop original content** — approved, planning on its own b
 image upload; "design styles", not "recipes"). **10 Research and develop content** — future, paid tier.
 **11 Requirements Assistant** — reserved. Technical improvements (any time, not blocking a phase): self-hosted
 fonts (see Testing).
+
+## Coloring Book: a finished product (2026-11-14, branch `claude/coloring-book-studio` — review pending, not merged or deployed)
+
+Home now asks **What would you like to create?** (Coloring Book first; Children's Storybook and Workbook "Coming next";
+every existing product type still listed; Cover Studio and Generate with AI under **Advanced tools**). Coloring Book is
+one project in five steps — Book Setup, Characters, Interior Pages, Cover Design, Preview and Export — with
+context-aware settings (coloring-only on the interior, full color on the cover), optional page text (title, verse,
+lesson, custom text), Scripture that is detected, suggested (references only), pasted or fetched (public domain),
+approved per page and licence-checked, an outline importer with review, character create / import / prompt,
+finished-page previews from the print renderer, "What's missing?", and export through the existing print step.
+Details: `product-studio/docs/coloring-book.md`. Tests: `tests/coloring-book-product.test.tsx`,
+`tests/browser/coloring-book-product.browser.ts` (Gracious Kids: Jenny, Renae, Robby; Scene 1 "The Brave First Step").
+Findings worth a decision: ten single-sided scenes are 22 pages (KDP needs 24 — one drawing page or front matter fixes
+it); a book of full NIV verses exceeds Biblica's 25%-of-text free-use limit (permission, KJV/WEB, or references only).
+Two home-screen browser tests were updated for the new cards (counts; "Other / Custom Product").
 
 ## Cover Studio: four screens, coloring books (2026-11-14, branches — review pending, nothing merged or deployed)
 

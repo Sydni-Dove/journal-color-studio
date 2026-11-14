@@ -79,6 +79,20 @@ export type Scene = {
   /** Regenerations so far, and why the last image was rejected. */
   attempts?: number;
   rejectNotes?: string;
+  // Coloring Book (engines/coloringBook): what the finished page shows, and where its Scripture came from.
+  /** This page's own choice of title / Scripture / lesson / custom text (the book's when absent). */
+  content?: Partial<import("../coloringBook/book").PageContent>;
+  customText?: string;
+  /** When the customer approved this page's verse wording (it is printed in full only then). */
+  verseApproved?: string;
+  /** Where the wording came from: typed or pasted by the customer, or a public-domain text fetched for them. */
+  verseSource?: "customer" | "public-domain";
+  /** A suggested reference for a scene without one, waiting for the customer's approval. */
+  suggestedRef?: string;
+  /** Imported details kept with the scene (characters named, what they do, style notes). */
+  characters?: string;
+  actions?: string;
+  styleNotes?: string;
 };
 
 /**
@@ -151,6 +165,11 @@ export type CoverBrief = {
   verseVerified: boolean;
   /** Who adds the Scripture (scenes can choose their own). */
   scriptureMode: ScriptureMode;
+  /**
+   * Coloring Book: what every finished page shows (a page can choose its own). Absent in Cover Studio, where the
+   * page shows its title and the Scripture reference as before.
+   */
+  pageContent?: import("../coloringBook/book").PageContent;
   /** The scene batch as pasted or imported (editable), and the scenes split from it. */
   sceneSource: string;
   scenes: Scene[];
