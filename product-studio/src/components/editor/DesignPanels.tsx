@@ -167,6 +167,8 @@ export function LayoutPanel({ project, update, usage, nav, part = "layout" }: Pa
       )}
       {is.layout && usage.pageNumbers && <Check label="Page numbers" checked={o.showPageNumbers} onChange={(showPageNumbers) => set({ showPageNumbers })} />}
       {is.layout && usage.footer && <Check label="Footer with the product name" checked={o.showFooter} onChange={(showFooter) => set({ showFooter })} />}
+      {is.layout && usage.footer && <Check label="Border line across the top" checked={!!o.topBorder} onChange={(on) => set({ topBorder: on || undefined })} />}
+      {is.layout && usage.footer && <Check label="Shade the margin notes" checked={!!o.marginNoteShade} onChange={(on) => set({ marginNoteShade: on || undefined })} />}
       {is.layout && usage.spreadBehavior.supported && (
         <>
           <Segmented

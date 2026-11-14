@@ -148,6 +148,12 @@ export function pageFrame(
     h: g.safeRect.h - 2 * s.page,
   };
   const footerH = footerOn ? lineBoxIn(ctx.typography, "footer") : 0;
+  // Top border (Layout → "Border line across the top"): a line at the top margin; the content starts a header gap below it.
+  const border = !!ctx.options.topBorder;
+  if (border) {
+    area.y += s.headerGap;
+    area.h -= s.headerGap;
+  }
   // Facing pages share one header zone: a page grows its header to the one opposite it (never shrinks),
   // so the header rules and title bottoms line up across the open book.
   const headerH = opts.headerH > 0 && ctx.facingHeaderIn && ctx.facingHeaderIn > opts.headerH ? ctx.facingHeaderIn : opts.headerH;
@@ -165,6 +171,13 @@ export function pageFrame(
 
   const zones: TextZones = { header, footer, safe: g.safeRect, belowHeaderY: header.y + header.h + (opts.headerRule === false ? s.headerGap : 0) };
   const nodes: LayoutNode[] = [group(`p${pageIndex}-header`, "PageHeader", header)];
+  if (border) {
+    // With bleed, the line runs off both sides of the sheet (through the bleed); without, margin to margin.
+    const y = g.safeRect.y;
+    const x1 = g.bleed.left > 0 ? -g.bleed.left : g.safeRect.x, x2 = g.bleed.right > 0 ? g.trimWidthIn + g.bleed.right : g.safeRect.x + g.safeRect.w;
+    // A border is page artwork, not content: like a cover's fill it may cross the margins, the binding edge and the bleed.
+    nodes.push({ ...rule(`p${pageIndex}-top-border`, x1, y, x2, y, { strokePt: STUDIO_STROKES.headerRulePt, component: "Divider" }), functional: false });
+  }
   const diagnostics = stackDiagnostic(st, `p${pageIndex}-frame`, "Header + footer");
   if (footer) {
     nodes.push(group(`p${pageIndex}-footer`, "PageFooter", footer));
@@ -198,12 +211,15 @@ export function headerTitle(
 }
 
 /** Checklist rows: checkbox + writing line, row count solved from height. */
+/** Width of a checklist row's dated blank (inches): room for a handwritten date. */
+export const CHECKLIST_DATE_IN = 0.9;
+
 export function checklistRows(
   id: string,
   rect: Rect,
   ctx: LayoutContext,
   rowH = ctx.spacing.listRow,
-  opts: { marker?: "square" | "circle" | "none"; markerPosition?: "left" | "right"; lines?: boolean } = {},
+  opts: { marker?: "square" | "circle" | "none"; markerPosition?: "left" | "right"; lines?: boolean; dateLabel?: string } = {},
 ): { nodes: LayoutNode[]; rows: number; metrics: LayoutMetric[] } {
   const s = ctx.spacing;
   const rows = fitCount(rect.h, rowH);
@@ -214,7 +230,13 @@ export function checklistRows(
   const markerPosition = opts.markerPosition ?? "left";
   const reserve = marker === "none" ? 0 : s.checkbox + s.checkboxGap;
   const lineX0 = markerPosition === "left" ? rect.x + reserve : rect.x;
-  const lineX1 = markerPosition === "right" ? rect.x + rect.w - reserve : rect.x + rect.w;
+  const rowX1 = markerPosition === "right" ? rect.x + rect.w - reserve : rect.x + rect.w;
+  // Optional dated blank at the row's end ("by ______"): the label, then a short line; the writing line stops before it.
+  const dateLabel = opts.dateLabel?.trim();
+  const dateLineW = Math.min(CHECKLIST_DATE_IN, (rowX1 - lineX0) * 0.3);
+  const dateLabelW = dateLabel ? getLayoutMeasurer().measure(dateLabel, styleForRole(ctx.typography, "label")) : 0;
+  const dateW = dateLabel ? dateLabelW + s.checkboxGap + dateLineW : 0;
+  const lineX1 = dateLabel ? rowX1 - dateW - s.column : rowX1;
   const lineYs: number[] = [];
   for (let i = 0; i < rows; i++) {
     const rowTop = rect.y + i * rowH;
@@ -230,6 +252,11 @@ export function checklistRows(
       nodes.push(node);
     }
     lineYs.push(rowTop + rowH);
+    if (dateLabel) {
+      const dx = rowX1 - dateW;
+      nodes.push(text(`${id}-date${i}-label`, { x: dx, y: rowTop, w: dateLabelW, h: rowH }, dateLabel, "label", { component: "SectionHeader", vAlign: "bottom" }));
+      nodes.push(rule(`${id}-date${i}-line`, rowX1 - dateLineW, rowTop + rowH, rowX1, rowTop + rowH, { strokePt: ctx.pattern.lineWeightPt, component: "WritingLines" }));
+    }
   }
   if (rows > 0 && opts.lines !== false) {
     nodes.push({

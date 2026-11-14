@@ -110,6 +110,16 @@ export type LayoutOptions = {
   writingRowsPerDay: number;
   showPageNumbers: boolean;
   showFooter: boolean;
+  /**
+   * A border line across the top of every interior page, at the top margin. With bleed on it runs off
+   * both sides of the sheet (through the bleed); without bleed it runs margin to margin. Absent = none.
+   */
+  topBorder?: boolean;
+  /**
+   * Shade the margin beside each section that has a margin note: a pale band (the palette's
+   * decorHighlight) the height of the section, with the note inside it. Absent = no shading.
+   */
+  marginNoteShade?: boolean;
   /** Daily layout: ordered section keys. */
   dailySections: WordingKey[];
   /**
