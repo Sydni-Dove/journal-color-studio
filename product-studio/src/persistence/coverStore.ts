@@ -76,16 +76,21 @@ export const localCoverStore: CoverStore = {
 };
 
 /** The brief being worked on (not yet a saved collection): kept so a reload doesn't lose it. */
-export function loadDraft(): { brief: CoverBrief; items: CoverItem[]; direction: number; collectionId: string | null } | null {
+/** The draft: the brief, the set, the chosen direction and collection, and the screen in view (and the furthest reached). */
+export type CoverDraft = { brief: CoverBrief; items: CoverItem[]; direction: number; collectionId: string | null; step?: string; reached?: number };
+export function loadDraft(): CoverDraft | null {
   try {
     const d = JSON.parse(safeGet(DRAFT_KEY) ?? "null");
     if (!d || typeof d !== "object") return null;
-    return { brief: normalizeBrief(d.brief), items: normalizeItems(d.items), direction: clampDirection(d.direction), collectionId: typeof d.collectionId === "string" ? d.collectionId : null };
+    return {
+      brief: normalizeBrief(d.brief), items: normalizeItems(d.items), direction: clampDirection(d.direction), collectionId: typeof d.collectionId === "string" ? d.collectionId : null,
+      ...(typeof d.step === "string" ? { step: d.step } : {}), ...(Number.isFinite(d.reached) ? { reached: Math.max(0, Math.min(3, Math.round(d.reached))) } : {}),
+    };
   } catch {
     return null;
   }
 }
-export function saveDraft(d: { brief: CoverBrief; items: CoverItem[]; direction: number; collectionId: string | null }): void {
+export function saveDraft(d: CoverDraft): void {
   try {
     localStorage.setItem(DRAFT_KEY, JSON.stringify(d));
   } catch {
@@ -142,6 +147,12 @@ export function normalizeBrief(raw: unknown): CoverBrief {
     bleed: numOr(r.bleed, d.bleed), safe: numOr(r.safe, d.safe), medium: r.medium === "Digital" ? "Digital" : "Print", dpi: numOr(r.dpi, d.dpi),
     title: text(r.title, d.title), subtitle: text(r.subtitle, d.subtitle), etsyTitle: text(r.etsyTitle, d.etsyTitle), angle: text(r.angle, d.angle), tags: text(r.tags, d.tags),
     mockups: text(r.mockups, d.mockups), status: text(r.status, d.status),
+    // Saved before categories existed: a cover, with the other categories' details at their defaults.
+    category: r.category === "interior" || r.category === "character" || r.category === "collection" ? r.category : "cover",
+    typography: text(r.typography, d.typography),
+    pageKind: text(r.pageKind, d.pageKind), artUse: text(r.artUse, d.artUse), artPlacement: text(r.artPlacement, d.artPlacement), clearArea: text(r.clearArea, d.clearArea),
+    characters: text(r.characters, d.characters), ageGroup: text(r.ageGroup, d.ageGroup), expressions: text(r.expressions, d.expressions),
+    characterCount: Math.max(1, Math.min(12, Math.round(numOr(r.characterCount, d.characterCount)))), characterBackground: r.characterBackground === "scene" ? "scene" : "transparent", scene: text(r.scene, d.scene),
   };
 }
 

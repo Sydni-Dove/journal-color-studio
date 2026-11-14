@@ -6,6 +6,7 @@
  * alike); technical tools sit under Advanced.
  */
 import { useState, type ReactNode } from "react";
+import { StepFooter as SharedStepFooter, StepHeader as SharedStepHeader } from "./Steps";
 
 export type AreaId = "pages" | "data" | "layout" | "writing" | "add" | "artwork" | "style" | "setup" | "print" | "advanced";
 
@@ -130,52 +131,23 @@ export function useStep(projectId: string, start?: StepId, fresh = false): [Step
   return [state, go];
 }
 
-/** Step title, progress ("Step 2 of 4") and the steps themselves; any step can be opened (steps reached are ticked). */
+/** The editor's step header (shared component, components/editor/Steps.tsx). */
 export function StepHeader({ state, onGo }: { state: StepState; onGo: (s: StepId) => void }) {
-  const at = STEPS.findIndex((s) => s.id === state.step);
-  const step = STEPS[at];
-  return (
-    <div className="steps" data-step={step.id}>
-      <ol className="steps__bar" aria-label="Steps">
-        {STEPS.map((s, i) => {
-          const status = i === at ? "current" : i <= state.reached ? "done" : "todo";
-          return (
-            <li key={s.id} className={`steps__item steps__item--${status}`}>
-              <button type="button" className="steps__dot" aria-current={i === at ? "step" : undefined} onClick={() => onGo(s.id)} title={s.title} aria-label={`Step ${i + 1}: ${s.title}${status === "done" ? " (reached)" : status === "todo" ? " (not reached yet)" : ""}`}>
-                <span aria-hidden="true">{i < at || (status === "done" && i !== at) ? "✓" : i + 1}</span>
-                <span className="steps__label">{s.title}</span>
-              </button>
-            </li>
-          );
-        })}
-      </ol>
-      <p className="steps__count">Step {at + 1} of {STEPS.length}</p>
-      <h2 className="steps__title">{step.title}</h2>
-      <p className="hint steps__blurb">{step.blurb}</p>
-    </div>
-  );
+  return <SharedStepHeader steps={STEPS} current={state.step} reached={state.reached} onGo={onGo} />;
 }
 
-/** Back and Next, the same on every step. */
+/** Back and Next; the last step prints. */
 export function StepFooter({ state, onGo, onExport, canExport }: { state: StepState; onGo: (s: StepId) => void; onExport: () => void; canExport: boolean }) {
-  const at = STEPS.findIndex((s) => s.id === state.step);
-  const prev = STEPS[at - 1], next = STEPS[at + 1];
   return (
-    <div className="steps__nav" role="group" aria-label="Step navigation">
-      <button type="button" className="btn steps__nav-btn" disabled={!prev} onClick={() => prev && onGo(prev.id)} aria-label={prev ? `‹ Back: ${prev.title}` : "‹ Back"}>
-        <span>‹ Back</span>
-        {prev ? <span className="steps__nav-to">{prev.title}</span> : null}
-      </button>
-      {next ? (
-        <button type="button" className="btn btn--primary steps__nav-btn steps__nav-btn--next" onClick={() => onGo(next.id)} aria-label={`Next: ${next.title} ›`}>
-          <span>Next ›</span>
-          <span className="steps__nav-to">{next.title}</span>
-        </button>
-      ) : (
+    <SharedStepFooter
+      steps={STEPS}
+      current={state.step}
+      onGo={onGo}
+      finish={
         <button type="button" className="btn btn--primary" disabled={!canExport} onClick={onExport}>
           Print / Save PDF…
         </button>
-      )}
-    </div>
+      }
+    />
   );
 }

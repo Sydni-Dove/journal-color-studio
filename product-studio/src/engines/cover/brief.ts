@@ -7,7 +7,33 @@ import { DEFAULT_AVOID, DEFAULT_MOCKUPS, DEFAULT_SIZE, DEFAULT_STYLE, defaultBin
 
 export type CoverFormat = "front" | "wrap";
 
+/**
+ * What is being designed (the first screen): a cover, art for interior pages, children's character illustrations,
+ * or a coordinated collection. Briefs saved before categories existed are covers.
+ */
+export type CoverCategory = "cover" | "interior" | "character" | "collection";
+
 export type CoverBrief = {
+  category: CoverCategory;
+  /** Lettering direction; "Let the style decide" adds nothing to the prompt. */
+  typography: string;
+  // Interior page design
+  /** The kind of page the art is for ("Lined journal page", "Monthly calendar page"…). */
+  pageKind: string;
+  /** How the art is used on the page (one of ART_USES). */
+  artUse: string;
+  /** Where on the page the art sits ("Bottom right corner"…). */
+  artPlacement: string;
+  /** How much of the page is kept clear for the page's own lines, calendar and writing. */
+  clearArea: string;
+  // Children's character illustrations
+  characters: string;
+  ageGroup: string;
+  expressions: string;
+  characterCount: number;
+  /** "transparent": cut-out characters on a transparent background; "scene": a full illustrated scene. */
+  characterBackground: "transparent" | "scene";
+  scene: string;
   // Collection brief
   collection: string;
   theme: string;
@@ -59,6 +85,9 @@ export const DEFAULT_COVER_PALETTE = "neutral-cheetah-luxe";
 export function newBrief(over: Partial<CoverBrief> = {}): CoverBrief {
   const product: CoverProduct = "Journal";
   return {
+    category: "cover", typography: DEFAULT_TYPOGRAPHY,
+    pageKind: "Lined journal page", artUse: "Corner illustration", artPlacement: "Bottom right corner", clearArea: "Keep at least 75% of the page clear",
+    characters: "", ageGroup: "Ages 4–8", expressions: "happy, curious, praying, helping a friend", characterCount: 4, characterBackground: "transparent", scene: "",
     collection: "", theme: "", season: "", audience: "", scripture: "", imagery: "", avoid: DEFAULT_AVOID, style: DEFAULT_STYLE,
     palette: DEFAULT_COVER_PALETTE, colorPrimary: "#630000", colorAccent: "#E6A742", colorPaper: "#FDFDFD", colorText: "#1B1717",
     product, size: DEFAULT_SIZE[product], customW: 6, customH: 9, format: "front", binding: defaultBindingFor(product), printProfile: "generic-commercial",
@@ -67,6 +96,8 @@ export function newBrief(over: Partial<CoverBrief> = {}): CoverBrief {
     ...over,
   };
 }
+
+export const DEFAULT_TYPOGRAPHY = "Let the style decide";
 
 /** Choosing a product moves the size and binding to what that product usually is (the maker can change both after). */
 export function withProduct(b: CoverBrief, product: string): CoverBrief {

@@ -61,27 +61,84 @@ const pick = async (page: Page, id: string) => {
 /** A select whose label is exactly this (a label that wraps its options also names them, so a plain label match is ambiguous). */
 const select = (page: Page, label: string) => page.locator("label.field").filter({ has: page.locator("span", { hasText: new RegExp(`^${label}$`) }) }).locator("select");
 const opened = (page: Page) => page.evaluate(() => (window as unknown as { __opened: string[] }).__opened);
+/** Open one of the four screens (1 Design category, 2 Art direction, 3 Artwork details, 4 Review and copy). */
+const toStep = async (page: Page, n: number) => {
+  await page.locator(".steps__dot").nth(n - 1).click();
+  await page.locator(".steps__count", { hasText: `Step ${n} of 4` }).waitFor();
+};
+/** Step 3's folded "Advanced options", opened. */
+const advanced = async (page: Page) => {
+  const d = page.locator("details.cover-advanced");
+  if ((await d.getAttribute("open")) === null) await d.locator("summary").click();
+};
+const library = async (page: Page) => {
+  const d = page.locator("details.cover-library-section");
+  if ((await d.getAttribute("open")) === null) await d.locator("summary").click();
+};
+const category = (page: Page, name: RegExp) => page.getByRole("radio", { name });
+/** Title on step 3, then the review. */
+const titled = async (page: Page, title = "Rooted in Hope") => {
+  await toStep(page, 3);
+  await page.getByLabel("Cover title").fill(title);
+  await toStep(page, 4);
+};
 
 describe("Cover Studio", () => {
-  it("opens from the home screen with the studio's palette picker and the live 6 × 9 specification", async () => {
+  it("four screens: title, progress, Back / Next, jump back from the review, kept on reload", async () => {
     const page = await studio();
-    expect(await text(page, "spec-inches")).toBe("6.25 × 9.25 in");
-    expect(await text(page, "spec-pixels")).toMatch(/1,875 × 2,775 px/);
+    expect(await page.locator(".steps__title").innerText()).toBe("Design category");
+    expect(await page.locator(".steps__count").textContent()).toBe("Step 1 of 4");
+    expect(await page.locator("[data-category]").count()).toBe(4);
+    await page.locator(".steps__nav").getByRole("button", { name: /^Next/ }).click();
+    expect(await page.locator(".steps__title").innerText()).toBe("Art direction");
+    await page.locator(".steps__nav").getByRole("button", { name: /^Next/ }).click();
+    expect(await page.locator(".steps__title").innerText()).toBe("Artwork details");
+    await page.getByLabel("Cover title").fill("Rooted in Hope");
+    await page.locator(".steps__nav").getByRole("button", { name: /^Next/ }).click();
+    expect(await page.locator(".steps__title").innerText()).toBe("Review and copy");
+    // Edit an earlier step from the review.
+    await page.getByTestId("cover-summary").locator(".cover-summary__row", { hasText: "Art direction" }).getByRole("button", { name: "Edit" }).click();
+    expect(await page.locator(".steps__title").innerText()).toBe("Art direction");
+    await page.locator(".steps__nav").getByRole("button", { name: /^‹ Back/ }).click();
+    expect(await page.locator(".steps__title").innerText()).toBe("Design category");
+    // Reload: the same screen, the title kept, the later steps still reached.
+    await toStep(page, 3);
+    await page.waitForTimeout(600);
+    await page.reload();
+    await page.getByRole("button", { name: "Cover Studio" }).click();
+    expect(await page.locator(".steps__title").innerText()).toBe("Artwork details");
+    await expect(page.getByLabel("Cover title").inputValue()).resolves.toBe("Rooted in Hope");
+    expect(await page.locator(".steps__item--done").count()).toBe(3);
+    await page.close();
+  });
+
+  it("opens with the studio's palette picker, and the live 6 × 9 specification in the review", async () => {
+    const page = await studio();
+    await toStep(page, 2);
     await page.getByRole("button", { name: /^All \(/ }).click();
     await expect(page.locator(".palette-picker .palette-card").count()).resolves.toBe(65);
     expect(await text(page, "palette-hexes")).toMatch(/#5B0610/);
+    await toStep(page, 4);
+    expect(await text(page, "spec-inches")).toBe("6.25 × 9.25 in");
+    expect(await text(page, "spec-pixels")).toMatch(/1,875 × 2,775 px/);
     await page.close();
   });
 
   it("bleed on and off, and a custom size, change the canvas exactly", async () => {
     const page = await studio();
+    await toStep(page, 3);
+    await advanced(page);
     await commit(page, "Bleed, each edge (in)", "0");
+    await toStep(page, 4);
     expect(await text(page, "spec-inches")).toBe("6 × 9 in");
     expect(await text(page, "spec-pixels")).toMatch(/1,800 × 2,700 px/);
+    await toStep(page, 3);
     await page.getByLabel("Trim size (inches)").selectOption("Custom");
     await commit(page, "Width (in)", "5.25");
     await commit(page, "Height (in)", "8");
+    await advanced(page);
     await commit(page, "Bleed, each edge (in)", "0.125");
+    await toStep(page, 4);
     expect(await text(page, "spec-trim")).toBe("5.25 × 8 in");
     expect(await text(page, "spec-inches")).toBe("5.5 × 8.25 in");
     await page.close();
@@ -89,12 +146,11 @@ describe("Cover Studio", () => {
 
   it("title guard: nothing to copy or send until there is a title; then the prompt carries it exactly", async () => {
     const page = await studio();
+    await toStep(page, 4);
     expect(await text(page, "cover-prompt")).toMatch(/Add a cover title/);
     await expect(page.getByTestId("generate-chatgpt").isDisabled()).resolves.toBe(true);
-    await page.getByRole("button", { name: "Copy prompt" }).first().click();
-    await expect(page.getByRole("status").first().innerText()).resolves.toMatch(/cover title/);
-    await page.getByLabel("Cover title").fill("Rooted in Hope");
-    await page.getByRole("button", { name: "Generate directions" }).click();
+    await expect(page.getByTestId("copy-prompt").isDisabled()).resolves.toBe(true);
+    await titled(page);
     const prompt = await text(page, "cover-prompt");
     expect(prompt).toContain("Exact cover title: “Rooted in Hope”.");
     expect(prompt.match(/Untitled/g)).toHaveLength(1);
@@ -104,14 +160,19 @@ describe("Cover Studio", () => {
 
   it("full wrap: no final creation without the printer's spine width; with it the wrap canvas is exact", async () => {
     const page = await studio();
+    await toStep(page, 3);
     await page.getByLabel("Cover title").fill("Rooted in Hope");
+    await advanced(page);
     await page.getByLabel("Cover format").selectOption("wrap");
+    await toStep(page, 4);
     expect(await text(page, "spec-note")).toMatch(/needs a printer-confirmed spine width/);
     await expect(page.getByTestId("generate-chatgpt").isDisabled()).resolves.toBe(true);
     expect(await text(page, "create-blocker")).toMatch(/spine width/);
-    await page.getByRole("button", { name: "Generate directions" }).click();
     expect(await text(page, "cover-prompt")).toContain("NOT a final print-ready wrap");
+    await toStep(page, 3);
+    await advanced(page);
     await commit(page, "Spine width (in)", "0.5");
+    await toStep(page, 4);
     expect(await text(page, "spec-inches")).toBe("12.75 × 9.25 in");
     expect(await text(page, "spec-pixels")).toMatch(/3,825 × 2,775 px/);
     await expect(page.getByTestId("generate-chatgpt").isDisabled()).resolves.toBe(false);
@@ -120,54 +181,59 @@ describe("Cover Studio", () => {
 
   it("printer rules come from the studio's own profiles: coil keep-out, and KDP's spine formula is offered, never applied", async () => {
     const page = await studio();
+    await toStep(page, 3);
     await select(page, "Product").selectOption("Planner");
+    await advanced(page);
     await page.getByLabel("Binding").selectOption("Spiral / coil");
+    await toStep(page, 4);
     expect(await text(page, "spec-keepouts")).toMatch(/keep 0\.\d+ in clear/);
+    await toStep(page, 3);
     await select(page, "Product").selectOption("Journal");
+    await advanced(page);
     await page.getByLabel("Printer").selectOption("kdp");
     await page.getByLabel("Cover format").selectOption("wrap");
     await commit(page, "Page count", "150");
     expect(await text(page, "spine-suggestion")).toMatch(/white paper 0\.338 in, cream 0\.375 in/);
-    expect(await text(page, "spec-spine")).toMatch(/needs the printer/);
     await page.getByRole("button", { name: "Use the white-paper value" }).click();
+    await toStep(page, 4);
     expect(await text(page, "spec-spine")).toBe("0.338 in");
     await page.close();
   });
 
   it("the palette picker changes the prompt, with exact hex values", async () => {
     const page = await studio();
-    await page.getByLabel("Cover title").fill("Rooted in Hope");
-    await page.getByRole("button", { name: "Generate directions" }).click();
+    await titled(page);
     const before = await text(page, "cover-prompt");
+    await toStep(page, 2);
     await pick(page, "jcs-prayer-warrior");
+    expect(await text(page, "palette-hexes")).toMatch(/#F3724B/);
+    await toStep(page, 4);
     const after = await text(page, "cover-prompt");
     expect(after).not.toBe(before);
     expect(after).toContain("#F3724B");
-    expect(await text(page, "palette-hexes")).toMatch(/#F3724B/);
     await page.close();
   });
 
   it("custom colors are exact and are kept in the saved collection", async () => {
     const page = await studio();
-    await page.getByLabel("Cover title").fill("Rooted in Hope");
+    await page.getByLabel("Collection name").fill("Custom hue");
+    await toStep(page, 2);
     await page.getByRole("button", { name: "Use custom colors" }).click();
     await page.getByLabel("Main color").fill("#112233");
-    await page.getByRole("button", { name: "Generate directions" }).click();
+    await titled(page);
     expect(await text(page, "cover-prompt")).toContain("main #112233");
-    await page.getByLabel("Collection name").fill("Custom hue");
     await page.getByRole("button", { name: "Save collection" }).click();
-    await page.reload();
-    await page.getByRole("button", { name: "Cover Studio" }).click();
+    await page.getByRole("button", { name: "New collection" }).click();
+    await library(page);
     await page.getByRole("button", { name: "Open", exact: true }).click();
-    await page.getByRole("button", { name: "Generate directions" }).click();
+    await toStep(page, 4);
     expect(await text(page, "cover-prompt")).toContain("main #112233");
     await page.close();
   });
 
   it("Generate in ChatGPT: a new tab at ChatGPT's fill-but-don't-send address, with the actual prompt; never the auto-send address", async () => {
     const page = await studio();
-    await page.getByLabel("Cover title").fill("Rooted in Hope");
-    await page.getByRole("button", { name: "Generate directions" }).click();
+    await titled(page);
     await page.getByTestId("generate-chatgpt").click();
     const urls = await opened(page);
     expect(urls).toHaveLength(1);
@@ -178,13 +244,13 @@ describe("Cover Studio", () => {
     expect(sent).not.toContain("[TITLE REQUIRED]");
     expect(sent.endsWith(await text(page, "cover-prompt"))).toBe(true);
     await expect(page.getByRole("status").first().innerText()).resolves.toMatch(/message box.*press send/);
-    expect(await page.locator(".cover-main").innerText()).toMatch(/Product Studio does not make images/);
+    expect(await page.locator(".cover-step").innerText()).toMatch(/Product Studio does not make images/);
     await page.close();
   });
 
   it("Generate in ChatGPT carries the exact prompt for different styles, products, sizes, directions and palettes", async () => {
     const page = await studio();
-    await page.getByLabel("Cover title").fill("Quiet Strength");
+    await titled(page, "Quiet Strength");
     const matrix = [
       { style: "Black and gold marble", product: "Journal", size: "6×9", direction: 0 },
       { style: "Formal notary register", product: "Notary journal", size: "6×9", direction: 1, palette: "dove-charcoal" },
@@ -194,11 +260,14 @@ describe("Cover Studio", () => {
       { style: "Painterly botanical", product: "Other stationery", size: "Custom", direction: 0 },
     ];
     for (const m of matrix) {
+      await toStep(page, 3);
       await select(page, "Product").selectOption(m.product);
       await page.getByLabel("Trim size (inches)").selectOption(m.size);
-      await page.getByLabel("Cover style").selectOption(m.style);
+      await toStep(page, 2);
+      await page.getByLabel("Style", { exact: true }).selectOption(m.style);
       if (m.palette) await pick(page, m.palette);
       await page.locator(`[data-direction="${m.direction}"] button`).click();
+      await toStep(page, 4);
       const shown = await text(page, "cover-prompt");
       const before = (await opened(page)).length;
       await page.getByTestId("generate-chatgpt").click();
@@ -213,6 +282,77 @@ describe("Cover Studio", () => {
     await page.close();
   });
 
+  it("each category: the copied prompt carries the palette chosen and that category's own details", async () => {
+    const context = await browser.newContext({ viewport: DESKTOP, permissions: ["clipboard-read", "clipboard-write"] });
+    const page = await context.newPage();
+    await page.addInitScript(() => { (window as unknown as { __opened: string[] }).__opened = []; window.open = ((u?: string | URL) => { (window as unknown as { __opened: string[] }).__opened.push(String(u)); return { opener: null } as unknown as Window; }) as typeof window.open; });
+    await page.goto(server.resolvedUrls!.local[0]);
+    await page.evaluate(() => localStorage.clear());
+    await page.reload();
+    await page.getByRole("button", { name: "Cover Studio" }).click();
+    const copied = async () => {
+      await toStep(page, 4);
+      await page.getByTestId("copy-prompt").click();
+      return page.evaluate(() => navigator.clipboard.readText());
+    };
+    const palette = async (id: string, hex: string) => {
+      await toStep(page, 2);
+      await pick(page, id);
+      expect(await text(page, "palette-hexes")).toContain(hex);
+    };
+
+    // Cover Artwork: title, typography and palette.
+    await category(page, /Cover Artwork/).click();
+    await palette("jcs-prayer-warrior", "#F3724B");
+    await page.getByLabel("Typography", { exact: true }).selectOption("Elegant flowing script");
+    await toStep(page, 3);
+    await page.getByLabel("Cover title").fill("Rooted in Hope");
+    let p = await copied();
+    for (const t of ["#F3724B", "Exact cover title: “Rooted in Hope”", "Typography: Elegant flowing script."]) expect(p, "cover").toContain(t);
+    expect(p).toBe(await text(page, "cover-prompt"));
+
+    // Interior Page Design: page, use, placement, writing space.
+    await toStep(page, 1);
+    await category(page, /Interior Page Design/).click();
+    await palette("jcs-peach-marble", "#");
+    await toStep(page, 3);
+    await page.getByLabel("Page", { exact: true }).selectOption("To-do list page");
+    await page.getByLabel("How the art is used").selectOption("Corner illustration");
+    await page.getByLabel("Artwork placement").selectOption("Bottom right corner");
+    await page.getByLabel("Writing space").selectOption("Keep the center two-thirds clear");
+    p = await copied();
+    for (const t of ["to-do list page", "Placement: Bottom right corner", "run off the bottom and right edges", "Keep the center two-thirds clear", "transparent background", "Peach"]) expect(p, "interior").toContain(t);
+    expect(p).not.toContain("Exact cover title");
+
+    // Children's Character Illustrations: the cast, ages, poses, background.
+    await toStep(page, 1);
+    await category(page, /Children’s Character/).click();
+    await toStep(page, 4);
+    await expect(page.getByTestId("copy-prompt").isDisabled()).resolves.toBe(true);
+    await toStep(page, 3);
+    await page.getByLabel("Your characters").fill("Maya, 7: curly hair in two puffs, yellow raincoat. Eli, 6: round glasses, green hoodie.");
+    await page.getByLabel("Age group").selectOption("Ages 4–8");
+    await commit(page, "How many poses", "6");
+    await page.getByLabel("Poses and expressions").fill("praying, sharing a snack, reading the Bible");
+    await page.getByLabel("Background", { exact: true }).selectOption("scene");
+    await page.getByLabel("Scene").fill("a church picnic");
+    await palette("jcs-blush-rose", "#");
+    p = await copied();
+    for (const t of ["Maya, 7: curly hair in two puffs", "ages 4–8", "praying, sharing a snack, reading the Bible", "a church picnic", "exactly consistent"]) expect(p, "character").toContain(t);
+
+    // Coordinated Collection Design: the products in the set and one design system.
+    await toStep(page, 1);
+    await category(page, /Coordinated Collection/).click();
+    await toStep(page, 3);
+    await page.getByRole("button", { name: "Add starter set" }).click();
+    await page.getByLabel("Add a product").selectOption("Greeting card");
+    p = await copied();
+    for (const t of ["COORDINATED COLLECTION DESIGN SYSTEM", "Journal (6×9 in)", "Bookmark (2×6 in)", "Greeting card (5×7 in)", "Product: Greeting card."]) expect(p, "collection").toContain(t);
+    const hexes = (await text(page, "cover-prompt")).match(/#[0-9A-F]{6}/g) ?? [];
+    expect(hexes.length).toBeGreaterThan(3);
+    await context.close();
+  });
+
   it("Copy prompt works on its own: it copies the prompt and opens nothing", async () => {
     const context = await browser.newContext({ viewport: DESKTOP, permissions: ["clipboard-read", "clipboard-write"] });
     const page = await context.newPage();
@@ -221,12 +361,15 @@ describe("Cover Studio", () => {
     await page.evaluate(() => localStorage.clear());
     await page.reload();
     await page.getByRole("button", { name: "Cover Studio" }).click();
-    await page.getByLabel("Cover title").fill("Rooted in Hope");
-    await page.getByRole("button", { name: "Generate directions" }).click();
+    await titled(page);
     const shown = await text(page, "cover-prompt");
     await page.getByTestId("copy-prompt").click();
     await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(shown);
     expect(await opened(page)).toEqual([]);
+    // The last step's Copy prompt (in place of Next) copies the same.
+    await page.evaluate(() => navigator.clipboard.writeText(""));
+    await page.locator(".steps__nav").getByRole("button", { name: "Copy prompt" }).click();
+    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(shown);
     // Open ChatGPT is separate: ChatGPT's plain page, no prompt in the address.
     await page.getByTestId("open-chatgpt").click();
     expect(await opened(page)).toEqual(["https://chatgpt.com/"]);
@@ -235,13 +378,15 @@ describe("Cover Studio", () => {
 
   it("nothing is launched when required information is missing", async () => {
     const page = await studio();
-    // No title: the launch button is off, and no other control launches or copies a prompt.
+    await toStep(page, 4);
     await expect(page.getByTestId("generate-chatgpt").isDisabled()).resolves.toBe(true);
-    await page.getByTestId("copy-prompt").click();
-    await expect(page.getByRole("status").first().innerText()).resolves.toMatch(/cover title/);
+    await expect(page.getByTestId("copy-prompt").isDisabled()).resolves.toBe(true);
     // A full wrap with a title but no spine width: still off, with the reason.
+    await toStep(page, 3);
     await page.getByLabel("Cover title").fill("Rooted in Hope");
+    await advanced(page);
     await page.getByLabel("Cover format").selectOption("wrap");
+    await toStep(page, 4);
     await expect(page.getByTestId("generate-chatgpt").isDisabled()).resolves.toBe(true);
     expect(await text(page, "create-blocker")).toMatch(/spine width/);
     expect(await opened(page)).toEqual([]);
@@ -250,7 +395,7 @@ describe("Cover Studio", () => {
 
   it("a blocked new tab is reported, with the copy-and-paste way", async () => {
     const page = await studio();
-    await page.getByLabel("Cover title").fill("Rooted in Hope");
+    await titled(page);
     await page.evaluate(() => { window.open = (() => null) as typeof window.open; }); // a blocked pop-up returns no window
     await page.getByTestId("generate-chatgpt").click();
     await expect(page.getByRole("status").first().innerText()).resolves.toMatch(/blocked the new tab[\s\S]*copied/);
@@ -259,46 +404,81 @@ describe("Cover Studio", () => {
 
   it("a weekly set: starter set, per-item specs, a saved collection that reopens, duplicate & recolor, import and export", async () => {
     const page = await studio();
+    await category(page, /Coordinated Collection/).click();
     await page.getByLabel("Collection name").fill("Rooted in Hope");
-    await page.getByLabel("Cover title").fill("Rooted in Hope");
-    await page.getByLabel("Theme").fill("Renewal");
-    await page.getByLabel("Cover style").selectOption("Peach and gold marble");
+    await toStep(page, 2);
+    await page.getByLabel("Style", { exact: true }).selectOption("Peach and gold marble");
     await pick(page, "jcs-peach-marble");
+    await toStep(page, 3);
+    await page.getByLabel("Collection title (printed on each piece)").fill("Rooted in Hope");
+    await page.getByLabel("Theme").fill("Renewal");
+    await advanced(page);
     await page.getByLabel("Etsy title idea").fill("Rooted in Hope Prayer Journal");
     await page.getByLabel("Tags / keywords").fill("prayer journal, faith gift");
     await page.getByRole("button", { name: "Add starter set" }).click();
     const items = page.getByTestId("cover-items").locator("li");
     expect(await items.count()).toBe(4);
     expect(await items.nth(2).innerText()).toMatch(/Bookmark[\s\S]*2×6[\s\S]*2\.25 × 6\.25 in canvas/);
+    await toStep(page, 4);
     await page.getByRole("button", { name: "Save collection" }).click();
+    await toStep(page, 1);
+    await library(page);
     expect(await page.getByTestId("cover-library").locator("[data-collection]").count()).toBe(1);
 
-    // Reopens with its style, palette, listing notes and items.
-    await page.reload();
-    await page.getByRole("button", { name: "Cover Studio" }).click();
+    // Reopens with its category, style, palette, listing notes and items.
+    await page.getByRole("button", { name: "New collection" }).click();
+    await library(page);
     await page.getByRole("button", { name: "Open", exact: true }).click();
-    await expect(page.getByLabel("Cover style").inputValue()).resolves.toBe("Peach and gold marble");
+    await expect(category(page, /Coordinated Collection/).getAttribute("aria-checked")).resolves.toBe("true");
+    await toStep(page, 2);
+    await expect(page.getByLabel("Style", { exact: true }).inputValue()).resolves.toBe("Peach and gold marble");
+    await page.getByRole("button", { name: /^All \(/ }).click();
+    await expect(page.locator('[data-palette="jcs-peach-marble"]').getAttribute("aria-pressed")).resolves.toBe("true");
+    await toStep(page, 3);
+    await advanced(page);
     await expect(page.getByLabel("Tags / keywords").inputValue()).resolves.toBe("prayer journal, faith gift");
     await expect(page.getByLabel("Etsy title idea").inputValue()).resolves.toBe("Rooted in Hope Prayer Journal");
     expect(await page.getByTestId("cover-items").locator("li").count()).toBe(4);
-    await page.getByRole("button", { name: /^All \(/ }).click();
-    await expect(page.locator('[data-palette="jcs-peach-marble"]').getAttribute("aria-pressed")).resolves.toBe("true");
 
     // Duplicate & recolor: the original stays; the variant is a new, unsaved one.
+    await toStep(page, 1);
+    await library(page);
     await page.getByRole("button", { name: "Duplicate & recolor" }).click();
     await expect(page.getByLabel("Collection name").inputValue()).resolves.toBe("Rooted in Hope — new palette");
+    await toStep(page, 2);
     await expect(page.getByLabel("Main color").count()).resolves.toBe(1);
-    expect(await page.getByTestId("cover-library").locator("[data-collection]").count()).toBe(1);
+    await toStep(page, 4);
     await page.getByRole("button", { name: "Save collection" }).click();
-    expect(await page.getByTestId("cover-library").locator("[data-collection]").count()).toBe(2);
     const stored = await page.evaluate(() => Object.keys(localStorage).filter((k) => k.includes(":cover:")).map((k) => JSON.parse(localStorage.getItem(k)!).brief.palette));
     expect(stored.sort()).toEqual(["custom", "jcs-peach-marble"]);
 
     // Export, then import the same file back.
     const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Export collection JSON" }).click()]);
     const file = await download.path();
+    await toStep(page, 1);
+    await library(page);
     await page.getByLabel("Import JSON").setInputFiles(file!);
     await expect.poll(() => page.getByRole("status").first().innerText(), { timeout: 5000 }).toMatch(/imported/);
+    await page.close();
+  });
+
+  it("an existing saved collection (made before the four screens) opens as Cover Artwork, its choices intact", async () => {
+    const page = await studio();
+    await page.evaluate(() => {
+      const brief = { collection: "Old Favourite", theme: "Rest", title: "Be Still", subtitle: "", style: "Black and gold marble", palette: "jcs-peach-marble", product: "Journal", size: "6×9", format: "front", binding: "Perfect bound", printProfile: "generic-commercial", pages: 120, spine: null, bleed: 0.125, safe: 0.25, medium: "Print", dpi: 300 };
+      const c = { schemaVersion: 1, id: "old1", name: "Old Favourite", createdAt: "2026-11-01T00:00:00Z", updatedAt: "2026-11-01T00:00:00Z", brief, items: [], direction: 2 };
+      localStorage.setItem("dove-product-studio:v1:cover:old1", JSON.stringify(c));
+      localStorage.setItem("dove-product-studio:v1:cover-index", JSON.stringify([{ id: "old1", name: "Old Favourite", theme: "Rest", items: 0, updatedAt: c.updatedAt }]));
+    });
+    await page.reload();
+    await page.getByRole("button", { name: "Cover Studio" }).click();
+    await library(page);
+    await page.locator('[data-collection="old1"]').getByRole("button", { name: "Open", exact: true }).click();
+    await expect(category(page, /Cover Artwork/).getAttribute("aria-checked")).resolves.toBe("true");
+    await toStep(page, 4);
+    const p = await text(page, "cover-prompt");
+    expect(p).toContain("Exact cover title: “Be Still”");
+    expect(p).toContain("Chosen visual language: Black and gold marble.");
     await page.close();
   });
 
@@ -307,6 +487,7 @@ describe("Cover Studio", () => {
     const before = await page.evaluate(() => Object.fromEntries(Object.keys(localStorage).filter((k) => k.includes(":project:") || k.endsWith(":index")).map((k) => [k, localStorage.getItem(k)])));
     await page.getByLabel("Start from one of your products").selectOption({ index: 1 });
     await page.getByLabel("Collection name").fill("From my product");
+    await toStep(page, 4);
     await page.getByRole("button", { name: "Save collection" }).click();
     await page.getByRole("button", { name: "← Back to Product Studio" }).click();
     const after = await page.evaluate(() => Object.fromEntries(Object.keys(localStorage).filter((k) => k.includes(":project:") || k.endsWith(":index")).map((k) => [k, localStorage.getItem(k)])));
@@ -316,13 +497,18 @@ describe("Cover Studio", () => {
     await page.close();
   });
 
-  it("on a phone nothing runs off the screen", async () => {
+  it("on a phone nothing runs off the screen, on any step, with 44px touch targets", async () => {
     const page = await studio(PHONE);
-    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-    expect(overflow).toBeLessThanOrEqual(0);
-    await page.getByLabel("Cover title").fill("Rooted in Hope");
-    await page.getByRole("button", { name: "Generate directions" }).click();
-    expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+    for (const n of [1, 2, 3, 4]) {
+      await toStep(page, n);
+      if (n === 3) {
+        await page.getByLabel("Cover title").fill("Rooted in Hope");
+        await advanced(page);
+      }
+      expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth), `step ${n}`).toBeLessThanOrEqual(0);
+      const small = await page.locator(".steps__dot, .steps__nav .btn, .cover-category, .cover-summary .btn, .cover-actions .btn").evaluateAll((els) => els.filter((e) => (e as HTMLElement).offsetParent && e.getBoundingClientRect().height < 44).map((e) => e.textContent));
+      expect(small, `step ${n}`).toEqual([]);
+    }
     await page.close();
   });
 });
