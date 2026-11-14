@@ -92,6 +92,8 @@ export type ChecklistComponent = Base & {
   markerPosition?: "left" | "right";
   /** A writing line on each row (default true). */
   lines?: boolean;
+  /** A short dated blank at the end of each row, after this label. */
+  dateLabel?: string;
 };
 export type TableComponent = Base & {
   kind: "table";
@@ -100,7 +102,7 @@ export type TableComponent = Base & {
   columns: FieldDef[];
   rows: number;
   showHeader?: boolean;
-  rowSpace?: "compact" | "standard" | "spacious";
+  rowSpace?: "compact" | "standard" | "spacious" | "double";
   space: SpaceRequest;
   /** The columns' value types say what each holds, and widths follow from them (otherwise columns are equal and typed as text). */
   sizedByContent?: boolean;
@@ -174,7 +176,9 @@ export type ComponentPresentation = {
   /** Text: printed as body text rather than a heading. */
   bodyText?: boolean;
   /** Field group: each blank as a line or a box, by position. */
-  fieldStyles?: ("line" | "box")[];
+  fieldStyles?: ("line" | "box" | "check" | "check-line")[];
+  /** A short prompt or tip printed in the page's outer margin beside the section. */
+  marginNote?: string;
   /** Table: rule treatment (never changes table geometry). */
   tableBorders?: "grid" | "horizontal" | "minimal" | "none";
 };

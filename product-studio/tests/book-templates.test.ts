@@ -38,7 +38,7 @@ describe("Page type lists page layouts only", () => {
 
 describe("Full planners & books", () => {
   it("every book recipe is still offered — as a template, none deleted", () => {
-    expect(BOOK_TEMPLATES.map((t) => t.id).sort()).toEqual(["book-daily-planner", "book-meetings-with-god", "book-meetings-with-god-daily", "book-planner-journal", "planner-monthly-weekly"]);
+    expect(BOOK_TEMPLATES.map((t) => t.id).sort()).toEqual(["book-daily-planner", "book-hope-journal", "book-meetings-with-god", "book-meetings-with-god-daily", "book-planner-journal", "planner-monthly-weekly"]);
     // Each book structure the Book structure editor offers has a template that builds exactly it.
     for (const b of BOOK_PRESETS) {
       const s = noIds(b.build());
@@ -49,6 +49,7 @@ describe("Full planners & books", () => {
   it("plain names and one-line explanations — no recipe syntax, no long labels", () => {
     expect(Object.fromEntries(BOOK_TEMPLATES.map((t) => [t.id, [t.label, t.template!.summary]]))).toEqual({
       "book-daily-planner": ["Daily Planner + Meetings With God", "Includes monthly, weekly, daily and Meetings With God pages."],
+      "book-hope-journal": ["Hope Planner", "Undated. A spread for every hope, from Scripture and prayer to how God fulfilled it."],
       "book-meetings-with-god": ["Meetings With God Planner", "Monthly and weekly planning with Meetings With God journal pages."],
       "book-meetings-with-god-daily": ["Meetings With God Planner + Daily Pages", "Monthly, weekly, Meetings With God and journal pages, plus a page for every day."],
       "book-planner-journal": ["Monthly + Weekly Journal Planner", "Monthly planning, weekly planning and a journal page every week."],

@@ -51,7 +51,7 @@ export type PromptTable = {
 };
 
 /** Table row heights, as a share of the studio's list-row token. */
-export const TABLE_ROW_SCALE = { compact: 0.85, standard: 1, spacious: 1.35 } as const;
+export const TABLE_ROW_SCALE = { compact: 0.85, standard: 1, spacious: 1.35, double: 2 } as const;
 export type TableRowSpace = keyof typeof TABLE_ROW_SCALE;
 /**
  * A table set to fill the page stretches its rows evenly; rows never grow past
@@ -118,8 +118,9 @@ export function amountOf(lines: number | undefined): WritingAmount | undefined {
   return (Object.keys(WRITING_AMOUNTS) as WritingAmount[]).find((k) => WRITING_AMOUNTS[k] === lines);
 }
 
-/** An info-row blank: a writing line after the label, or an open box to write in. */
-export type InfoFieldStyle = "line" | "box";
+/** An info-row blank: a writing line after the label, an open box to write in, a check box to tick
+ * before the label, or a check box and then the label and its writing line ("☐ Fulfilled on ____"). */
+export type InfoFieldStyle = "line" | "box" | "check" | "check-line";
 /** Most blanks one info row offers (more are cramped on a journal page). */
 export const MAX_INFO_FIELDS = 3;
 
@@ -164,8 +165,19 @@ export type PromptBlock = {
   headingSizePt?: number;
   /** Sit beside the section above, as two columns (writing sections only). */
   beside?: boolean;
+  /**
+   * A short prompt or tip printed in the page's outer margin, level with this section — never inside
+   * its writing area. A page with any margin note keeps a margin column on its outer side (away from
+   * the binding; the right of an odd page and the left of an even one) and its sections take the rest.
+   */
+  marginNote?: string;
   /** Checklist / task list: a writing line on each row (default true). */
   taskLines?: boolean;
+  /**
+   * Checklist: a short dated blank at the end of every row, after this label ("By" prints
+   * "☐ ________  by ______"). Absent = none.
+   */
+  taskDate?: string;
   /** Spacer: how much open space. */
   spacer?: SpacerSize;
   /** List: its printed items, in order, and how they are marked. */

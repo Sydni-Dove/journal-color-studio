@@ -72,7 +72,8 @@ const RESPONSE_SURFACE: Record<ResponseStyle, SurfaceKind> = { ruled: "lined", b
  */
 export function blocksToZones(set: PromptSet, surfaceOf: (b: PromptBlock) => { surface: SurfaceKind; treatment?: StationeryZone["treatment"] }, sequenceStarts?: Record<string, number>): StationeryZone[] {
   const zones = set.blocks.map((b): StationeryZone => {
-    const zone = blockZone(set, b, surfaceOf, sequenceStarts);
+    const made = blockZone(set, b, surfaceOf, sequenceStarts);
+    const zone = b.marginNote?.trim() ? { ...made, marginNote: b.marginNote.trim() } : made;
     const frame = sectionFrameOf(set, b);
     return frame === "open" || zone.surface === "divider" || zone.surface === "spacer" ? zone : { ...zone, frame };
   });
@@ -121,7 +122,7 @@ function blockZone(set: PromptSet, b: PromptBlock, surfaceOf: (b: PromptBlock) =
       // Blanks keep their style by position; empty labels are skipped.
       const kept = (b.fields ?? []).map((f, i) => ({ f: f.trim(), style: b.fieldStyles?.[i] ?? "line" })).filter((x) => x.f);
       const fields = kept.length ? kept : [{ f: "Date", style: "line" as const }];
-      return { key: b.id, label: "", surface: "fill-in", weight: 0, optional: true, fields: fields.map((x) => x.f), ...(fields.some((x) => x.style === "box") ? { fieldStyles: fields.map((x) => x.style) } : {}) };
+      return { key: b.id, label: "", surface: "fill-in", weight: 0, optional: true, fields: fields.map((x) => x.f), ...(fields.some((x) => x.style !== "line") ? { fieldStyles: fields.map((x) => x.style) } : {}) };
     }
     case "divider":
       return { key: b.id, label: "", surface: "divider", weight: 0, optional: true };
@@ -154,7 +155,7 @@ function blockZone(set: PromptSet, b: PromptBlock, surfaceOf: (b: PromptBlock) =
     ...(lines === undefined && spaceOf(b) === "equal" ? { equal: true } : {}),
     surface: b.responseStyle ? RESPONSE_SURFACE[b.responseStyle] : own.surface,
     ...(b.responseStyle ? {} : own.treatment ? { treatment: own.treatment } : {}),
-    ...(b.responseStyle === "checkboxes" ? { taskMarker: b.taskMarker ?? "square", taskMarkerPosition: b.taskMarkerPosition ?? "left", ...(b.taskLines === false ? { taskLines: false } : {}) } : {}),
+    ...(b.responseStyle === "checkboxes" ? { taskMarker: b.taskMarker ?? "square", taskMarkerPosition: b.taskMarkerPosition ?? "left", ...(b.taskLines === false ? { taskLines: false } : {}), ...(b.taskDate?.trim() ? { taskDate: b.taskDate.trim() } : {}) } : {}),
     ...(b.responseStyle === "table"
       ? {
           table: {
@@ -320,7 +321,7 @@ function measure(zones: StationeryZone[], width: number, ctx: LayoutContext): Me
 function requestOne(m: Measured, ctx: LayoutContext, width: number): ZoneRequest {
   const ins = frameInsets(m.zone.frame, ctx);
   const inner = Math.max(0, width - ins.l - ins.r);
-  if (m.zone.surface === "fill-in") return { zone: m.zone, overheadIn: 0, fixedIn: fillInRows(m.zone.fields?.length ? m.zone.fields : [m.zone.label], inner, ctx).heightIn + ins.t + ins.b };
+  if (m.zone.surface === "fill-in") return { zone: m.zone, overheadIn: 0, fixedIn: fillInRows(m.zone.fields?.length ? m.zone.fields : [m.zone.label], inner, ctx, m.zone.fieldStyles).heightIn + ins.t + ins.b };
   if (m.zone.surface === "divider" || m.zone.surface === "spacer") return { zone: m.zone, overheadIn: 0, fixedIn: m.zone.heightIn ?? ctx.spacing.section };
   if (m.zone.surface === "list" || m.zone.surface === "record") {
     const units = flowUnits(m.zone, inner, ctx);
@@ -732,6 +733,27 @@ function composedHeader(id: string, h: GuidedHeader, body: Rect, ctx: LayoutCont
   return used + s.section;
 }
 
+/** Widest a margin-note column gets (inches), and the most of the page's width it may take. */
+export const MARGIN_NOTE_IN = 1.2;
+export const MARGIN_NOTE_SHARE = 0.2;
+/** Inset of a margin note inside its shaded band (inches). */
+export const MARGIN_SHADE_PAD_IN = 0.08;
+const hasMarginNotes = (zones: StationeryZone[]) => zones.some((z) => z.marginNote || z.pair?.some((h) => h.marginNote));
+
+/**
+ * The margin-note column of a page whose sections carry margin notes: a strip on the page's OUTER
+ * side — away from the binding; on unbound pages the right of an odd page and the left of an even one
+ * — and the body the sections keep. Notes are never drawn inside a section's writing area.
+ */
+export function marginColumn(body: Rect, ctx: LayoutContext, pageIndex: number): { column: Rect; body: Rect } {
+  const g = ctx.pages[pageIndex];
+  const w = Math.min(MARGIN_NOTE_IN, body.w * MARGIN_NOTE_SHARE);
+  const gap = ctx.spacing.column + ctx.spacing.block;
+  const outer = g.boundEdge === "left" ? "right" : g.boundEdge === "right" ? "left" : (ctx.pageNumbers[pageIndex] ?? 1) % 2 === 0 ? "left" : "right";
+  const column = { x: outer === "right" ? body.x + body.w - w : body.x, y: body.y, w, h: body.h };
+  return { column, body: { ...body, x: outer === "right" ? body.x : body.x + w + gap, w: Math.max(0, body.w - w - gap) } };
+}
+
 /** The page frame, header and (first page) instructions; returns the body left for the zones. */
 function frameOf(spec: ZonePageSpec, ctx: LayoutContext, pageIndex: number, first: boolean) {
   const frame = pageFrame(ctx, pageIndex, { headerH: spec.title ? STUDIO_PLANNER.weeklyTitle.valueIn : 0, headerRule: !!spec.title });
@@ -749,6 +771,9 @@ function frameOf(spec: ZonePageSpec, ctx: LayoutContext, pageIndex: number, firs
     nodes.push(text(`${id}-period`, { x: z.x, y: z.y, w: z.w, h: z.h - ctx.spacing.titleToRuleGap }, right, "label", { component: "PageHeader", align: "right", vAlign: "bottom" }));
   }
   let body: Rect = frame.body;
+  // Margin notes: the sections give up a column on the page's outer side.
+  let margin: Rect | null = null;
+  if (hasMarginNotes(spec.zones)) ({ column: margin, body } = marginColumn(body, ctx, pageIndex));
   // The page header: on the first page, or on every page of a page that continues (header.repeat).
   const header = first || spec.intro?.repeat === "every";
   if (header && spec.intro && isComposedHeader(spec.intro)) {
@@ -789,7 +814,7 @@ function frameOf(spec: ZonePageSpec, ctx: LayoutContext, pageIndex: number, firs
     const used = h + ctx.spacing.section;
     body = { ...body, y: body.y + used, h: Math.max(0, body.h - used) };
   }
-  return { nodes, diagnostics, body };
+  return { nodes, diagnostics, body, margin };
 }
 
 const pitchOf = (ctx: LayoutContext) => lineSpacingIn(ctx.pattern.kind === "blank" ? DEFAULT_FUNCTIONAL_PATTERN : ctx.pattern);
@@ -926,6 +951,20 @@ export function solveZonePages(spec: ZonePageSpec, ctx: LayoutContext, pageIndex
     res.zones.forEach((z, zi) => {
       const m = p.byZone.get(z.zone)!;
       const pad = frameInsets(z.zone.frame, ctx).b;
+      // The section's margin note: in the outer margin column, level with the section's top (first piece only).
+      const note = z.zone.range && z.zone.range.from > 0 ? undefined : z.zone.marginNote ?? z.zone.pair?.find((h) => h.marginNote)?.marginNote;
+      if (note && f.margin) {
+        // Optional pale band behind the note, the height of the section; the note sits inside it.
+        const shade = !!ctx.options.marginNoteShade;
+        const pad = shade ? MARGIN_SHADE_PAD_IN : 0;
+        if (shade) nodes.push({ ...box(`${spec.idPrefix}${pi}-${z.zone.key}-margin-shade`, { x: f.margin.x, y: z.rect.y, w: f.margin.w, h: z.rect.h }, { component: "Divider", stroke: null, fill: "decorHighlight" }), functional: false });
+        const tw = f.margin.w - pad * 2;
+        const lines = wrapText(note, tw, ctx, "prompt");
+        const h = lines.length * lineBoxIn(ctx.typography, "prompt");
+        const nt: TextNode = text(`${spec.idPrefix}${pi}-${z.zone.key}-margin-note`, { x: f.margin.x + pad, y: z.rect.y + pad, w: tw, h }, lines.join(" "), "prompt", { component: "Text", vAlign: "top", wrap: true });
+        nt.fit = { sizePt: ctx.typography.roles.prompt.sizePt, lineHeight: ctx.typography.roles.prompt.lineHeight, lines };
+        nodes.push(nt);
+      }
       if (m.halves) {
         // Side by side: both columns share the band; their writing starts on the same line.
         const half = halfWidthIn(z.rect.w, ctx);

@@ -5,6 +5,8 @@ import type { ProjectData } from "../../types/document";
 import { addCollection, COLLECTION_STARTERS } from "../../engines/data/data";
 import { withDevotionalStructure } from "../devotionalStructures";
 import { BOOK_PRESETS, dailyPlannerBook, meetingsWithGodBook, section, step, withCovers } from "../bookRecipes";
+import { HOPE_JOURNAL_SETTINGS, HOPE_SPREADS, hopeJournalBook } from "../hopeJournal";
+import type { ProjectPatch } from "../products/projectFactory";
 import { PROMPT_STARTERS, type PromptSet } from "../../types/prompts";
 import { STATIONERY_RECIPES, stationeryLayoutId } from "../stationery/catalog";
 import type { StationeryRecipe } from "../../types/stationery";
@@ -40,11 +42,14 @@ export type RecipePreset = {
   /** A product made from its own content starts with these (empty) lists; its pages are made from them. */
   content?: () => ProjectData;
   layoutOptions?: Partial<LayoutOptions>;
+  /** Other product settings a template starts with (ruling, row height, colors). Size, binding and dates stay the maker's. */
+  project?: ProjectPatch;
   /**
    * Set on a complete book (a multi-section recipe that makes the whole
    * product). Those are offered as full product templates — not as a page
    * type — with a plain name, a one-line summary and the page layouts to
-   * show as a preview (in order; `#1` names the right-hand page of a spread)
+   * show as a preview (in order; `#1` names the right-hand page of a spread;
+   * `@id` names a page by its book step, for books whose pages share one layout)
    * — the card shows `card`, or the first two.
    */
   template?: { summary: string; preview: string[]; card?: string[] };
@@ -296,6 +301,21 @@ RECIPE_PRESETS.push(...STATIONERY_PRESETS);
 RECIPE_PRESETS.push(CUSTOM_PAGE_PRESET);
 RECIPE_PRESETS.push(GUIDED_LINED_PRESET);
 RECIPE_PRESETS.push(...INVENTORY_PRESETS);
+
+/**
+ * HOPE PLANNER (presets/hopeJournal.ts): the interior only. Undated; a title page, How to Use, a facing
+ * left + right page per hope, a Fulfilled Hopes Index and a blank last page. The cover artwork is supplied separately.
+ */
+RECIPE_PRESETS.push({
+  id: "book-hope-journal",
+  label: "Hope Planner",
+  productTypes: ["journal"],
+  needsCalendar: false,
+  build: ({ count }) => ({ items: [], ordering: "sequential", structure: hopeJournalBook(count > 1 ? count : HOPE_SPREADS) }),
+  layoutOptions: { showPageNumbers: false, topBorder: true, marginNoteShade: true },
+  project: HOPE_JOURNAL_SETTINGS,
+  template: { summary: "Undated. A spread for every hope, from Scripture and prayer to how God fulfilled it.", preview: ["@hope-left", "@hope-right", "@hope-how-to", "@hope-index", "@hope-cover"] },
+});
 
 /** Page types for a product: single page layouts only — complete books are templates (below). */
 export function recipePresetsFor(t: ProductType): RecipePreset[] {
