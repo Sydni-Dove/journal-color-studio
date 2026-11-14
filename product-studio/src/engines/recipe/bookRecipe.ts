@@ -399,7 +399,7 @@ export function expandBook(structure: BookNode[], ctx: BookContext): ExpandedRec
     if (seen.has(base)) diagnostics.push({ severity: "error", itemId: step.id, message: `"${title}" is generated twice for ${subtitle ?? periodKey(period)}.` });
     seen.add(base);
     const starts = recordStarts(promptSet, sequences);
-    const module = { type: step.module, title, subtitle, prompts: step.prompts ?? modulePrompts(step.module, kind), ...(promptSet ? { promptSet } : {}), ...(step.cover ? { cover: step.cover } : {}), ...(starts ? { sequenceStarts: starts } : {}) };
+    const module = { type: step.module, title, subtitle, prompts: step.prompts ?? modulePrompts(step.module, kind), ...(promptSet ? { promptSet } : {}), ...(step.cover ? { cover: step.cover } : {}), ...(step.cards ? { cards: step.cards } : {}), ...(starts ? { sequenceStarts: starts } : {}) };
     // Prompts that don't fit one page continue on more pages (single-page layouts only).
     const flow = n === 1 ? Math.max(1, ctx.flowPages?.(step.layoutId, module) ?? 1) : 1;
     for (let part = 0; part < n * flow; part++) {

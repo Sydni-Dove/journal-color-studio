@@ -221,7 +221,8 @@
         "lines",
         "items",
         "marker",
-        "size"
+        "size",
+        "cards"
        ],
        "properties": {
         "id": {
@@ -239,7 +240,9 @@
           "list",
           "records",
           "divider",
-          "spacer"
+          "spacer",
+          "drawing",
+          "cards"
          ]
         },
         "label": {
@@ -332,6 +335,7 @@
           "bullet",
           "number",
           "checkbox",
+          "circle",
           null
          ]
         },
@@ -346,6 +350,55 @@
           "large",
           null
          ]
+        },
+        "cards": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+           "title",
+           "subtitle",
+           "front",
+           "back"
+          ],
+          "properties": {
+           "title": {
+            "type": "string"
+           },
+           "subtitle": {
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "front": {
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "back": {
+            "type": "array",
+            "items": {
+             "type": "object",
+             "additionalProperties": false,
+             "required": [
+              "label",
+              "text"
+             ],
+             "properties": {
+              "label": {
+               "type": "string"
+              },
+              "text": {
+               "type": "string"
+              }
+             }
+            }
+           }
+          }
+         }
         }
        }
       }

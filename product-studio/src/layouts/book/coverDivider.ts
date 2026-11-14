@@ -222,7 +222,8 @@ function field(g: PageGeometry, opt: CoverDividerSettings, surface: SolvedPage["
   if (surface) return [];
   const media = { x: -g.trimOffset.x, y: -g.trimOffset.y, w: g.mediaWidthIn, h: g.mediaHeightIn };
   // Artwork, not content: it is meant to run through the bleed and the binding edge.
-  return [{ ...box("cover-solid-bg", media, { fill: opt.solidColor ?? "primary" }), functional: false }];
+  // A field of color only: no outline (an outline in the border color showed as a hairline at the page edge).
+  return [{ ...box("cover-solid-bg", media, { fill: opt.solidColor ?? "primary", stroke: null }), functional: false }];
 }
 /**
  * The panel behind the wording on a library surface (Journal Color Studio's

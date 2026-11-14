@@ -68,7 +68,7 @@ export function Checkbox({ node }: { node: CheckboxNode }) {
 }
 
 export function Divider({ node }: { node: RuleNode }) {
-  return <line x1={node.x1} y1={node.y1} x2={node.x2} y2={node.y2} style={strokeStyle(node.color)} strokeWidth={ptToIn(node.strokePt)} data-node={node.id} />;
+  return <line x1={node.x1} y1={node.y1} x2={node.x2} y2={node.y2} style={strokeStyle(node.color)} strokeWidth={ptToIn(node.strokePt)} strokeDasharray={node.dashIn?.join(" ")} data-node={node.id} />;
 }
 
 // ─── Text primitive (HTML, positioned in inches) ───────────────────────────

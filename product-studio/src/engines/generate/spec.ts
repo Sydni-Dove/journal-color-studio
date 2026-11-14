@@ -17,7 +17,9 @@ import type { ValueType } from "../../types/document";
 
 export type SpecValueType = Exclude<ValueType, "computed">;
 export type SpecField = { label: string; valueType: SpecValueType };
-export type SpecComponentKind = "heading" | "text" | "fields" | "writing" | "checklist" | "table" | "list" | "records" | "divider" | "spacer";
+export type SpecComponentKind = "heading" | "text" | "fields" | "writing" | "checklist" | "table" | "list" | "records" | "divider" | "spacer" | "drawing" | "cards";
+/** One card of a card sheet: its front (title, subtitle, a line at the foot) and its back (labelled parts). */
+export type SpecCard = { title: string; subtitle: string | null; front: string | null; back: { label: string; text: string }[] };
 /** Who wrote a piece of wording: the maker (verified to be in what they wrote) or the AI (a suggestion). */
 export type Source = "user" | "suggested";
 export type SpecComponent = {
@@ -35,8 +37,10 @@ export type SpecComponent = {
   fillPage: boolean;
   lines: number | null;
   items: string[];
-  marker: "bullet" | "number" | "checkbox" | null;
+  marker: "bullet" | "number" | "checkbox" | "circle" | null;
   size: "small" | "medium" | "large" | null;
+  /** A card sheet's cards (kind "cards"; [] otherwise). */
+  cards: SpecCard[];
 };
 export type SpecSection = {
   id: string;
@@ -78,7 +82,7 @@ export type CheckedSpec = {
 export class SpecError extends Error {}
 
 export const SIZES: PageSize[] = ["5.5x8.5", "6x9", "7x9", "8x10", "8.5x11", "a5", "a4"];
-const KINDS: SpecComponentKind[] = ["heading", "text", "fields", "writing", "checklist", "table", "list", "records", "divider", "spacer"];
+const KINDS: SpecComponentKind[] = ["heading", "text", "fields", "writing", "checklist", "table", "list", "records", "divider", "spacer", "drawing", "cards"];
 const VALUE_TYPES: SpecValueType[] = ["text", "longText", "number", "currency", "date", "time", "quantity", "boolean", "choice", "signature", "reference"];
 /** Blank copies of a fill-in log the AI described as "one page per entry" but gave no entries for. */
 const BLANK_COPIES = 10;
@@ -98,7 +102,7 @@ export function minimumPages(spec: Pick<DocSpec, "sections" | "entries">): numbe
 export const tooManyPages = (n: number, exact = false) =>
   `This document would have ${exact ? "" : "at least "}${n.toLocaleString("en-US")} pages; a document can have at most ${MAX_DOCUMENT_PAGES}. Lower the number of copies or entries, or split it into more than one document.`;
 
-export const LIMITS = { sections: 30, components: 40, copies: 500, tableRows: 200, columns: 10, recordFields: 12, records: 60, listItems: 80, entries: 1000, entryFields: 12, lines: 60 };
+export const LIMITS = { sections: 30, components: 40, copies: 500, tableRows: 200, columns: 10, recordFields: 12, records: 60, listItems: 80, entries: 1000, entryFields: 12, lines: 60, cards: 120, cardParts: 8 };
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
 const str = (v: unknown) => (typeof v === "string" ? v : "");
@@ -131,6 +135,19 @@ function flagsIn(text: string, where: string, aiWrote: boolean): Flag[] {
   if (aiWrote && ref) out.push({ kind: "reference", text: sentenceWith(text, ref), where });
   return out;
 }
+
+// ─── Cards ──────────────────────────────────────────────────────────────────
+
+/** A card sheet's cards as the AI gave them, kept to what prints (a title; labelled back parts with words). */
+function cardsIn(v: unknown): SpecCard[] {
+  return (Array.isArray(v) ? v : []).filter(isObj).slice(0, LIMITS.cards).flatMap((c) => {
+    if (!nonEmpty(c.title)) return [];
+    const back = (Array.isArray(c.back) ? c.back : []).filter(isObj).filter((p) => nonEmpty(p.label) || nonEmpty(p.text)).slice(0, LIMITS.cardParts).map((p) => ({ label: str(p.label).trim().slice(0, 60), text: str(p.text).slice(0, 2000) }));
+    return [{ title: str(c.title).trim().slice(0, 80), subtitle: nonEmpty(c.subtitle) ? str(c.subtitle).trim().slice(0, 80) : null, front: nonEmpty(c.front) ? str(c.front).trim().slice(0, 200) : null, back }];
+  });
+}
+/** The wording a card prints. */
+export const cardWords = (cards: SpecCard[]) => cards.flatMap((c) => [c.title, c.subtitle, c.front, ...c.back.flatMap((p) => [p.label, p.text])]).filter((x): x is string => !!x && !!x.trim());
 
 // ─── Checking ───────────────────────────────────────────────────────────────
 
@@ -246,7 +263,7 @@ export function checkSpec(raw: unknown, input: { description: string; content?: 
       if (blankField) {
         from = null;
         if (kind !== "fields") {
-          components.push({ id: uid(c.id, `${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 24)}-${ci + 1}`), kind: "fields", label: null, text: null, source: "suggested", fromEntryField: null, fields: [{ label: blankField.label, valueType: blankField.valueType }], rows: null, numbered: false, fillPage: false, lines: null, items: [], marker: null, size: null });
+          components.push({ id: uid(c.id, `${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 24)}-${ci + 1}`), kind: "fields", label: null, text: null, source: "suggested", fromEntryField: null, fields: [{ label: blankField.label, valueType: blankField.valueType }], rows: null, numbered: false, fillPage: false, lines: null, items: [], marker: null, size: null, cards: [] });
           continue;
         }
       }
@@ -267,16 +284,19 @@ export function checkSpec(raw: unknown, input: { description: string; content?: 
         fillPage: !!c.fillPage && (kind === "table" || kind === "records"),
         lines: typeof c.lines === "number" ? int(c.lines, 1, LIMITS.lines, 4) : null,
         items,
-        marker: c.marker === "number" || c.marker === "checkbox" ? c.marker : c.marker === "bullet" ? "bullet" : null,
+        marker: c.marker === "number" || c.marker === "checkbox" || c.marker === "circle" ? c.marker : c.marker === "bullet" ? "bullet" : null,
         size: c.size === "small" || c.size === "large" ? c.size : c.size === "medium" ? "medium" : null,
+        cards: kind === "cards" ? cardsIn(c.cards) : [],
       };
+      if (kind === "cards" && Array.isArray(c.cards) && c.cards.length > LIMITS.cards) problems.push({ level: "adjusted", message: `${what}: only the first ${LIMITS.cards} cards were kept.` });
       if (kind === "table" && fieldsIn.length > LIMITS.columns) problems.push({ level: "adjusted", message: `${what}: a table has at most ${LIMITS.columns} columns here; the rest (${fieldsIn.slice(LIMITS.columns).map((f) => f.label).join(", ")}) were left out — add them as another table if you need them.` });
       // What each kind needs to print anything.
       const empty =
         (kind === "heading" && !comp.text && !comp.label && !from) ||
         (kind === "text" && !comp.text && !from) ||
         ((kind === "fields" || kind === "table" || kind === "records") && !comp.fields.length) ||
-        (kind === "list" && !comp.items.length && !from);
+        (kind === "list" && !comp.items.length && !from) ||
+        (kind === "cards" && !comp.cards.length);
       if (empty) {
         problems.push({ level: "left-out", message: `${what} (${kind}) had nothing to print, so it was left out.` });
         continue;
@@ -287,7 +307,7 @@ export function checkSpec(raw: unknown, input: { description: string; content?: 
       else if (comp.source === "user") {
         // The wording it prints as its own (a text part's label is a heading over it); a blank part (writing space,
         // divider) has none to be theirs.
-        const words = [comp.text, kind === "heading" ? comp.label : null, ...comp.items, ...comp.fields.map((f) => f.label)].filter((x): x is string => !!x);
+        const words = [comp.text, kind === "heading" ? comp.label : null, ...comp.items, ...comp.fields.map((f) => f.label), ...cardWords(comp.cards)].filter((x): x is string => !!x);
         if (!words.length || words.some((w) => !isTheirs(w))) {
           comp.source = "suggested";
           notVerbatim.push(what);
@@ -295,6 +315,8 @@ export function checkSpec(raw: unknown, input: { description: string; content?: 
       }
       const aiText = [comp.label, comp.text, ...comp.items, ...comp.fields.map((f) => f.label)].filter((x): x is string => !!x).join(" \n");
       flags.push(...flagsIn(aiText, what, comp.source === "suggested"));
+      // Each card is checked on its own, so every Scripture the AI put on a card is listed to verify.
+      comp.cards.forEach((card, k) => flags.push(...flagsIn(cardWords([card]).join(" \n"), `${what}, card ${k + 1} (“${card.title}”)`, comp.source === "suggested")));
       components.push(comp);
     }
     if (rawComps.length > LIMITS.components) problems.push({ level: "adjusted", message: `${where}: only the first ${LIMITS.components} parts were kept.` });
@@ -332,7 +354,7 @@ export function checkSpec(raw: unknown, input: { description: string; content?: 
 /** Wording the maker's content holds, in everything the proposal marks as theirs (and their entries). */
 function placedText(spec: DocSpec): string {
   const out: string[] = [];
-  for (const s of spec.sections) for (const c of s.components) if (c.source === "user") out.push(c.label ?? "", c.text ?? "", ...c.items);
+  for (const s of spec.sections) for (const c of s.components) if (c.source === "user") out.push(c.label ?? "", c.text ?? "", ...c.items, ...cardWords(c.cards));
   if (spec.entries?.source === "user") {
     for (const r of spec.entries.records) for (const v of r.values) out.push(v.value);
     // A per-entry page's title prints each entry's own values ("Day {day}: {title}" → "Day 1: Morning Light").

@@ -30,7 +30,9 @@ const PAID_DAILY_CAP = Number(Deno.env.get("PAID_DAILY_CAP")) || 50;
 const isPaid = (user: { app_metadata?: Record<string, unknown> }) => user.app_metadata?.plan === "paid";
 const FUNCTION_NAME = "generate-document";
 const MODELS = ["gpt-4.1-mini", "gpt-4o-mini"];
-const VERSION = "generate-document-2026-10-15-spec-v4-plans";
+const VERSION = "generate-document-2026-11-14-spec-v5-lessons-scripture-cards";
+/** Bible translations the maker can choose for Scripture the AI quotes (product-studio/src/presets/scripture.ts). */
+const TRANSLATIONS = ["NIV", "KJV"] as const;
 
 const SYSTEM = `You design printable documents for Product Studio, a studio for print-ready journals, workbooks, logs, forms, planners and similar products. You return a document specification (the JSON schema given); the studio lays out, paginates and prints it with its own engines. Never think in coordinates or pixels.
 
@@ -40,10 +42,12 @@ What you can use (components):
 - writing: writing space under an optional heading (label) and prompt (text); lines = how many writing lines, or null to fill the space left on the page.
 - checklist: rows with check boxes (items = printed items; empty = blank rows to fill in; lines = how many rows).
 - table: columns (fields: label + valueType saying what each column holds), rows = number of rows; numbered = number the rows across the whole document; fillPage = rows fill each page.
-- list: a printed list (items, marker bullet / number / checkbox).
+- list: a printed list (items, marker bullet / number / checkbox / circle). Use marker "circle" for answer choices a child circles or colors in ("Which would you do?").
 - records: repeating blank record cards (fields = the blanks on each card; rows = cards per page; numbered; fillPage = as many as fit on each page).
 - divider, spacer (size).
-Anything else (images, charts, formulas, QR codes, signatures pads, colors, fonts) is not available: describe the need in notes instead.
+- drawing: an outlined blank box to draw in, under an optional heading (label) and prompt (text, e.g. "Draw a time you shared"); lines = its height in writing-line heights (8–20 is a good size), or null to fill the rest of the page.
+- cards: cards to print on cardstock and cut apart (a card sheet: dashed cutting guides, 4 per page, each page of fronts followed by its page of backs for double-sided printing). cards = the cards, each with title (front), subtitle (optional, under the title), front (an optional short line at the foot of the front, such as a Scripture reference) and back (labelled parts top to bottom, such as Meaning, Scripture, Bible example, Talk about it, Try it). Keep each back short: about 60 words in all. rows = cards per page (4, 6 or 8; null = 4). text = an optional short label inside the picture box on the front ("Draw it!"). A cards part prints on its own pages; put it in a section of its own.
+Anything else (images and illustrations, charts, formulas, QR codes, signature pads, colors, fonts) is not available: describe the need in notes instead. A drawing box or a card's picture space is where a picture can go.
 
 Sections are the document's kinds of pages, in order. repeat.mode: "once"; "copies" with count (how many copies of that page); or "per-entry": the page repeats once for each entry of the entries list (devotional days, lessons, clients, items, sessions…) and its components print an entry's field with fromEntryField (the field key). A per-entry section's title may contain {fieldKey} (and {#} for the entry's number), e.g. "Day {day}: {title}". Set startOnRightPage only when each repetition must open on a right-hand page. repeat.count is the number of copies for "copies" and 1 otherwise.
 - Use "per-entry" only when there are entries to repeat over (the maker's, or ones they asked you to write). A log, record book or journal they will fill in by hand (one page per plant, client, visit, day…) is a section with "copies" and labelled blanks, not per-entry with an empty list; set entries to null.
@@ -55,11 +59,12 @@ The maker's wording is theirs:
 - A section holding their wording prints once: never repeat it with "copies" (that would print their words again on every copy). When they give some days, lessons or items of a longer series, put the ones they gave in entries with a per-entry section, and say in notes that they can add the rest in Your content.
 - Blanks they typed (___) are places to write: keep their wording, underscores included; the studio turns each into writing lines.
 - Everything you write yourself (titles, labels, prompts, suggestions) has source "suggested".
-- Do not invent content entries (days, lessons, readings) unless they ask you to write content; prefer labelled blanks and writing space they will fill in.
+- Write content (lessons, teaching, devotions, scenarios, questions, prayers, card text) only when the maker asks you to write it or describes content they want written. Then write it in full, warm, plain and accurate, at the reading level of the audience they name; put repeating content (lessons, days, sessions) in entries with a per-entry section, with source "suggested". When they don't ask for written content, prefer labelled blanks and writing space they will fill in.
 
 Accuracy and safety:
 - Never claim the document is legally, regulatorily or professionally compliant or approved, and never say it satisfies any law or standard.
-- Never invent citations, Scripture references, statistics, laws, regulations or quotations. If a record must meet legal or regulatory requirements, provide the labelled blanks they asked for and add a note that the requirements must be verified for their jurisdiction.
+- Scripture: when the maker asks for Scripture, or the content they asked you to write calls for it, cite real passages that truly say what you use them for, and quote from the translation given below. Quote a verse only if you know its exact wording in that translation, word for word, then give the reference and the translation's abbreviation in parentheses, e.g. "Love is patient, love is kind." 1 Corinthians 13:4 (NIV). If you are not certain of the exact wording, give the reference only (e.g. "Read Galatians 5:22–23."). Keep quoted Scripture to well under a quarter of the document's text and under 500 verses in all. Never attribute words to the Bible that it does not contain.
+- Never invent other citations, statistics, laws, regulations or quotations. If a record must meet legal or regulatory requirements, provide the labelled blanks they asked for and add a note that the requirements must be verified for their jurisdiction.
 
 Page: choose page.size, orientation and binding for how it will be used (a wide table suits landscape; a bound book suits a journal; loose pages suit forms) and explain the choice in page.why.
 notes: list your assumptions, and any conflicting instructions and how you resolved them.
@@ -80,7 +85,7 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return reply({ error: "Method not allowed" }, 405);
   const auth = await authenticate(req);
   if (!auth) return reply({ error: "Sign in to generate a document." }, 401);
-  let body: { description?: unknown; content?: unknown; check?: unknown };
+  let body: { description?: unknown; content?: unknown; check?: unknown; translation?: unknown };
   try { body = await req.json(); } catch { return reply({ error: "Invalid request." }, 400); }
   const raw = Deno.env.get("OPENAI_API_KEY");
   // A pasted secret can carry spaces, quotes or a line break: never part of a real key.
@@ -111,14 +116,16 @@ Deno.serve(async (req) => {
   const { error: logError } = await auth.client.from("edge_usage_logs").insert({ user_id: auth.user.id, function_name: FUNCTION_NAME, units: 1 });
   if (logError) return reply({ error: "Usage logging failed; no AI request was sent." }, 500);
 
-  const user = `What the maker wants:\n${description.trim()}${content.trim() ? `\n\nThe maker's own content — use it exactly as written, placed where it belongs:\n<<<\n${content}\n>>>` : ""}`;
+  const translation = TRANSLATIONS.find((t) => t === body.translation) ?? "NIV";
+  const user = `What the maker wants:\n${description.trim()}\n\nBible translation for any Scripture you quote: ${translation}.${content.trim() ? `\n\nThe maker's own content — use it exactly as written, placed where it belongs:\n<<<\n${content}\n>>>` : ""}`;
   let lastError = "";
   for (const model of MODELS) {
     try {
       const r = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        signal: AbortSignal.timeout(90_000),
+        // Written lessons take longer than an outline of blanks.
+        signal: AbortSignal.timeout(140_000),
         body: JSON.stringify({
           model,
           temperature: 0.2,

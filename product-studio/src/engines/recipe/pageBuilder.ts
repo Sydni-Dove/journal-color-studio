@@ -231,6 +231,15 @@ export function addDivider(nodes: BookNode[], title = "Section", tab = true): Bo
   return insertBeforeEnd(nodes, newStepWith("divider-page", { type: "once" }, { title, cover: tab ? { tab: { show: true, style: "rounded" } } : {} }));
 }
 
+/**
+ * A card sheet (cards to cut apart, layouts/book/cardSheet.ts), starting on a right-hand page so in a
+ * bound or double-sided book each page of fronts has its page of backs behind it.
+ */
+export function addCardSheet(nodes: BookNode[]): BookNode[] {
+  const back = ["What it means", "Scripture", "Example", "Talk about it", "Try it"].map((label) => ({ label, text: "" }));
+  return insertBeforeEnd(nodes, newStepWith("custom", { type: "once" }, { layoutId: "card-sheet", title: "Cards", start: "recto", cards: { cards: [1, 2, 3, 4].map((n) => ({ title: `Card ${n}`, back })), artLabel: "Draw it!" } }));
+}
+
 export function addPageOfType(nodes: BookNode[], module: PageModuleType): BookNode[] {
   return insertBeforeEnd(nodes, newStep(module));
 }
