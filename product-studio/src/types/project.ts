@@ -227,6 +227,8 @@ export type ProductProject = {
   pageDesigns?: PageDesign[];
   /** The product's own data: collections of typed entries (engines/data/data.ts). Absent until the first collection. */
   data?: import("./document").ProjectData;
+  /** Uploaded artwork and where it is used (types/artwork.ts). Absent until the first image is added. */
+  artwork?: import("./artwork").ProjectArtwork;
   activeVariantId: string | null;
   origin: ProjectOrigin;
 

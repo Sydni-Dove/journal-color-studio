@@ -1,5 +1,6 @@
 import { migrateLayers } from "../themes/layers";
 import { normalizeData } from "../engines/data/data";
+import { normalizeArtwork } from "../engines/artwork/place";
 import { copyName } from "./copyNames";
 import type { DecorativeTheme } from "../types/theme";
 /**
@@ -53,7 +54,9 @@ export function migrate(raw: unknown): ProductProject | null {
     // than guessed at.
     return null;
   }
-  const migrated = migrateLayers(migrateDecoration(p));
+  const layered = migrateLayers(migrateDecoration(p));
+  // Uploaded artwork keeps its images and placements; only its shape is repaired (absent stays absent).
+  const migrated = layered.artwork === undefined ? layered : { ...layered, artwork: normalizeArtwork(layered.artwork) };
   // Product data keeps every value; only its shape is repaired (absent stays absent).
   if (migrated.data === undefined) return migrated;
   return { ...migrated, data: normalizeData(migrated.data) };

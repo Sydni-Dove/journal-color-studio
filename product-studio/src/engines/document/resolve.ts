@@ -38,6 +38,7 @@ import { getCalendar } from "../calendar/calendar";
 import { getLayoutMeasurer } from "../typography/textMeasure";
 import { resolveTrim, type ResolvedTrim } from "../geometry/dimensions";
 import { computePageGeometry } from "../geometry/pageGeometry";
+import { placeArtwork, reservedBand, withReservedBand, type PageArt } from "../artwork/place";
 import { expandRecipe, recipeSteps, type ExpandedRecipe } from "../recipe/recipe";
 import { sectionPageOrientationOf } from "../../layouts/planner/plannerOptions";
 import { normalizeDecoration } from "../../themes/decorationPlan";
@@ -209,9 +210,15 @@ export function resolveDocument(input: ProductProject): ResolvedDocument {
     const pageKey = (pages: PageGeometry[]) => JSON.stringify(pages.map((g) => [g.safeRect, g.trimWidthIn, g.trimHeightIn]));
     const measuredOn = (pages: PageGeometry[]) => {
       const fits = pages.map((page) => ({ page, spacing, typography, options: project.layoutOptions, pattern: project.functionalPattern }));
-      const flowKey = JSON.stringify([recipeKey, pageKey(pages), project.productType, spacing, project.typography, project.layoutOptions, project.functionalPattern, getLayoutMeasurer().id]);
+      // A page with a dedicated illustration area is measured in the room the area leaves it.
+      const bands = JSON.stringify(project.artwork?.placements.filter((x) => x.use === "illustration" && x.placement === "area") ?? []);
+      const flowKey = JSON.stringify([recipeKey, pageKey(pages), project.productType, spacing, project.typography, project.layoutOptions, project.functionalPattern, getLayoutMeasurer().id, bands]);
       return recipeCache.get(flowKey, () =>
-        expandRecipe(project.recipe, { ...base, flowPages: (id, module) => Math.max(...fits.map((f) => getLayout(id).flowPages?.({ ...f, module }) ?? 1)) }),
+        expandRecipe(project.recipe, {
+          ...base,
+          flowPages: (id, module, itemId) =>
+            Math.max(...fits.map((f) => getLayout(id).flowPages?.({ ...f, page: itemId ? withReservedBand(f.page, reservedBand(project.artwork, itemId, f.page.safeRect.h)) : f.page, module }) ?? 1)),
+        }),
       );
     };
     // The gutter only grows with the page count, and more continuation pages only follow from a narrower page,
@@ -257,6 +264,16 @@ export function resolveDocument(input: ProductProject): ResolvedDocument {
 }
 
 export function geometryFor(doc: ResolvedDocument, page: PageInstance | Pick<PageInstance, "side">, index?: number): PageGeometry {
+  const g = fullGeometryFor(doc, page, index);
+  // A page with a dedicated illustration area is laid out in the room the area leaves (engines/artwork/place.ts).
+  if (!("layoutId" in page) || page.filler || !doc.project.artwork) return g;
+  const band = reservedBand(doc.project.artwork, page.recipeItemId, g.safeRect.h);
+  if (!band.top && !band.bottom) return g;
+  return geometryCache.get(JSON.stringify(["band", g.trimWidthIn, g.trimHeightIn, g.side, g.safe, g.mediaWidthIn, g.mediaHeightIn, band]), () => withReservedBand(g, band));
+}
+
+/** The page's geometry before any dedicated illustration area is taken out (where page artwork is placed). */
+export function fullGeometryFor(doc: ResolvedDocument, page: PageInstance | Pick<PageInstance, "side">, index?: number): PageGeometry {
   const p = doc.project.production;
   const trim = "layoutId" in page ? trimForPage(doc, page, index) : doc.trim;
   const key = JSON.stringify([trim.widthIn, trim.heightIn, trim.orientation, p, doc.project.productType, doc.recipe.pageCount, page.side, doc.duplex]);
@@ -452,6 +469,43 @@ export function recipeLayouts(doc: ResolvedDocument): { layout: LayoutDefinition
 }
 
 /** Composition (regions + protected content) of a page — what the renderer and validation both use. */
+/** A printed page's place among the pages made from the same Pages-list item (0-based, fillers skipped). */
+const ordinals = new WeakMap<ExpandedRecipe, number[]>();
+export function pageOrdinal(doc: ResolvedDocument, index: number): number {
+  let list = ordinals.get(doc.recipe);
+  if (!list) {
+    const seen = new Map<string, number>();
+    list = doc.recipe.pages.map((p) => {
+      if (p.filler) return -1;
+      const n = seen.get(p.recipeItemId) ?? 0;
+      seen.set(p.recipeItemId, n + 1);
+      return n;
+    });
+    ordinals.set(doc.recipe, list);
+  }
+  return list[index] ?? 0;
+}
+
+/** Cover pages (front or back cover): the pages cover artwork can go on. */
+export const isCoverPage = (page: PageInstance) => page.module?.type === "cover-page" || page.module?.type === "back-cover";
+
+/** The uploaded artwork this printed page draws, placed (the one answer preview, thumbnails and print all use). */
+const NO_ART: PageArt[] = [];
+const artCache = new WeakMap<ResolvedDocument, Map<number, PageArt[]>>();
+export function artworkFor(doc: ResolvedDocument, index: number): PageArt[] {
+  const page = doc.recipe.pages[index];
+  if (!page || page.filler || !doc.project.artwork?.placements.length) return NO_ART;
+  let byPage = artCache.get(doc);
+  if (!byPage) artCache.set(doc, (byPage = new Map()));
+  let out = byPage.get(index);
+  if (!out) {
+    out = placeArtwork(doc.project.artwork, { item: page.recipeItemId, nth: pageOrdinal(doc, index), side: page.side, cover: isCoverPage(page) }, fullGeometryFor(doc, page, index));
+    if (!out.length) out = NO_ART;
+    byPage.set(index, out);
+  }
+  return out;
+}
+
 export function compositionFor(doc: ResolvedDocument, index: number): Composition {
   return resolveComposition(contentGeometryFor(doc, doc.recipe.pages[index], index), solvePage(doc, index), doc.typography, doc.spacing);
 }

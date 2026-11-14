@@ -23,7 +23,8 @@ import { LayoutAssistant } from "./LayoutAssistant";
 import { withDevotionalStructure } from "../../presets/devotionalStructures";
 import { refitAfterEdit } from "../../engines/recipe/fitRows";
 import { DesignPresetsPanel } from "./DesignPresetsPanel";
-import { AreaList, AreaView, useArea, type AreaId } from "./Areas";
+import { AreaList, AreaView, StepFooter, StepHeader, STEPS, stepOfArea, useArea, useStep, type AreaId, type StepId } from "./Areas";
+import { ArtworkPanel } from "./ArtworkPanel";
 import { ThisPageHeading, AddToPageHint } from "./ThisPage";
 import { pageInfo } from "../../engines/document/pageInfo";
 import { findPalette } from "../../presets/themes/palettes";
@@ -216,7 +217,21 @@ export function Editor({ project, onChange, onBack, saveStatus, cloudLabel }: Pr
   }, [doc, pendingPage]);
   // A product made from its own content opens on that content while it has none yet (add the days first).
   const awaitingContent = !!project.data?.collections.length && project.data.collections.every((c) => !c.records.length) && !!project.recipe.structure?.some((n) => n.kind === "group" && n.entries);
-  const [area, setArea] = useArea(project.productType === "custom" ? "add" : awaitingContent ? "data" : undefined);
+  const startArea: AreaId | undefined = project.productType === "custom" ? "add" : awaitingContent ? "data" : undefined;
+  const [areaChoice, setAreaChoice] = useArea(startArea);
+  // The four steps: the open area always belongs to the step in view.
+  const [stepState, goStepRaw] = useStep(project.id, startArea ? stepOfArea(startArea) : undefined, project.createdAt === project.updatedAt);
+  const step = STEPS.find((s) => s.id === stepState.step)!;
+  const singleArea = step.areas.length === 1 || step.id === "export";
+  const area: AreaId | null = areaChoice && step.areas.includes(areaChoice) ? areaChoice : singleArea ? step.areas[0] : null;
+  const goStep = (id: StepId) => {
+    goStepRaw(id);
+    setAreaChoice(null);
+  };
+  const setArea = (a: AreaId | null) => {
+    if (a && stepOfArea(a) !== stepState.step) goStepRaw(stepOfArea(a));
+    setAreaChoice(a);
+  };
   const currentItemId = doc?.recipe.pages[current]?.recipeItemId;
   const summaries: Partial<Record<AreaId, string>> = doc
     ? {
@@ -224,7 +239,8 @@ export function Editor({ project, onChange, onBack, saveStatus, cloudLabel }: Pr
         data: dataSummary(project.data),
         // A product can have no pages yet (a devotional list with no entries, an empty page list).
         layout: doc.recipe.pages[current] ? `This page: ${pageInfo(doc, current).typeLabel}` : "No pages yet",
-        style: findPalette(project.colors.paletteId)?.label ?? "Colors, background, decorations and typography",
+        style: findPalette(project.colors.paletteId)?.label ?? "Colors, fonts, covers, background and decorations",
+        artwork: project.artwork?.placements.length ? `${project.artwork.placements.length} use${project.artwork.placements.length === 1 ? "" : "s"} of your artwork` : undefined,
         setup: `${SIZE_PRESETS.find((z) => z.id === project.dimensions.sizePresetId)?.label ?? "Custom size"} · ${BINDING_PROFILES[project.production.bindingType]?.label ?? project.production.bindingType}`,
         print: check ? (check.errorCount ? `${check.errorCount} to fix before printing` : check.warningCount ? `${check.warningCount} to check` : "This page checks out") : undefined,
       }
@@ -257,10 +273,11 @@ export function Editor({ project, onChange, onBack, saveStatus, cloudLabel }: Pr
 
       <div className="editor" style={{ "--ui-panel-w": `${panel.width}px` } as CSSProperties}>
         <aside className="panel" aria-label="Product controls">
+          <StepHeader state={stepState} onGo={goStep} />
           {area === null ? (
-            <AreaList summaries={summaries} onOpen={setArea} />
+            <AreaList summaries={summaries} onOpen={setArea} only={step.areas} />
           ) : (
-            <AreaView id={area} onBack={() => setArea(null)}>
+            <AreaView id={area} onBack={step.areas.length > 1 ? () => setAreaChoice(null) : undefined} backLabel={step.title}>
               {area === "pages" && doc && usage && (
                 <>
                   <PlannerSetupPanel nav={nav} project={project} update={update} doc={doc} usage={usage} />
@@ -319,6 +336,20 @@ export function Editor({ project, onChange, onBack, saveStatus, cloudLabel }: Pr
                   <LayoutPanel nav={nav} project={project} update={update} usage={usage} part="add" />
                   <AddToPageHint doc={doc} current={current} usage={usage} />
                 </>
+              )}
+              {area === "artwork" && doc && (
+                <ArtworkPanel
+                  project={project}
+                  update={update}
+                  doc={doc}
+                  current={current}
+                  onGoTo={setIndex}
+                  onEditCoverWording={() => {
+                    const i = doc.recipe.pages.findIndex((p) => !p.filler && (p.module?.type === "cover-page" || p.module?.type === "back-cover"));
+                    if (i >= 0) setIndex(i);
+                    setArea("layout");
+                  }}
+                />
               )}
               {area === "style" && doc && usage && (
                   <>
@@ -382,6 +413,8 @@ export function Editor({ project, onChange, onBack, saveStatus, cloudLabel }: Pr
               )}
             </AreaView>
           )}
+          {step.id === "export" && area === "print" && <AreaList summaries={summaries} onOpen={setArea} only={["advanced"]} />}
+          <StepFooter state={stepState} onGo={goStep} onExport={() => setExporting(true)} canExport={!!doc} />
         </aside>
 
         <PanelResizer width={panel.width} onChange={panel.set} onReset={panel.reset} />

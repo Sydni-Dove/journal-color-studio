@@ -4,7 +4,7 @@
  * transform on top of physical inches; it never changes page geometry.
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { geometryFor, solvePage, type ResolvedDocument } from "../../engines/document/resolve";
+import { artworkFor, geometryFor, solvePage, type ResolvedDocument } from "../../engines/document/resolve";
 import { CSS_PX_PER_IN } from "../../engines/units/units";
 import { PrintablePage } from "../../primitives/PrintablePage";
 import { DebugOverlay, type DebugFlags } from "../debug/DebugOverlay";
@@ -170,6 +170,7 @@ export function PagePreview({ doc, index, onIndex, debug, issueIds }: Props) {
                   background={doc.background}
                   spacing={doc.spacing}
                   mode="editor"
+                  art={artworkFor(doc, i)}
                   overlay={<DebugOverlay geometry={geos[k]} nodes={solved.nodes} flags={debug} issueIds={issueIds} />}
                 />
               );

@@ -3,7 +3,7 @@
 Read this first when picking up the work (any assistant or developer). Keep it current: update it in the same
 commit as any change to state, branches, rules or open decisions.
 
-_Last updated: 2026-10-15 — Phase 8 merged to `main` (89f054b) and live; Edge Function v8 deployed; Phase 8.1 being planned on `claude/phase8.1-develop-content`._
+_Last updated: 2026-11-14 — Product Studio four-step editor + uploaded artwork on `claude/guided-steps-artwork` (not merged; see below). Earlier: Phase 8 merged to `main` (89f054b) and live._
 
 ## The two apps
 
@@ -23,6 +23,7 @@ that needs its own review.
 
 | Branch | State |
 | --- | --- |
+| `claude/guided-steps-artwork` | Four-step editor + uploaded artwork (2026-11-14). **Not merged; needs approval.** |
 | `main` | Phases 0–8 (Phase 8 merged 2026-10-15, 89f054b), paper-gold print fixes, Rose Marble gold. Production for both apps. |
 | `claude/phase8-ai-generation` | Phase 8 as reviewed; merged into `main`. Keep for reference; don't build on it. |
 | `claude/phase8.1-develop-content` | Phase 8.1 (Develop original content): planning, then development. **Not to be merged or deployed without approval.** |
@@ -114,6 +115,75 @@ fonts (see Testing).
   timed out through the Supabase MCP tool (deletes don't run from the cloud session; reads/inserts do). Delete it in
   the Supabase dashboard → Authentication → Users → `ps-livecheck-20261015@example.com`; its 5 usage rows go with it
   (`edge_usage_logs_user_id_fkey` is ON DELETE CASCADE). Expected afterwards: 11 users, 40 usage rows.
+
+## Four-step editor and uploaded artwork (2026-11-14; branch `claude/guided-steps-artwork`, not merged)
+
+Production Product Studio (`dove-product-studio`, Vercel) deploys from `main` (09c63c9 on 2026-11-14). This branch
+starts there and changes Product Studio only (`product-studio/`); Journal Color Studio files are untouched.
+
+**Four steps.** The editor's existing areas are grouped in the order a product is made, with a step title,
+"Step N of 4", a progress bar of the four steps (any step can be opened; steps reached are ticked) and the same
+Back / Next on every step (`components/editor/Areas.tsx` `STEPS`, `useStep`, `StepHeader`, `StepFooter`):
+1. Product setup: Page setup (product type shown, size, orientation, binding, printer).
+2. Pages and content: Pages, Your content, Page layout, Writing, Add to page.
+3. Artwork and style: **Artwork** (new) and Style (colors, fonts, covers, background, decorations).
+4. Preview and export: Print & export (page check, Print / Save PDF), Advanced.
+No control was removed. The step in view and the furthest step reached are remembered per project in this
+browser (`dove-product-studio:v1:workflow:<id>`); a new product opens on step 1, one already being made on step 2;
+a Custom Page still opens on Add to page. The work itself saves with the project as before.
+
+**Uploaded artwork** (`types/artwork.ts`, `engines/artwork/place.ts`, `engines/artwork/store.ts`,
+`primitives/ArtLayer.tsx`, `components/editor/ArtworkPanel.tsx`). Upload PNG, JPG or WebP (checked by its bytes,
+up to 40 MB / 12,000 px), then use it as:
+- **Cover**: on the chosen cover page(s), to the trim plus the printer's bleed; "Finished cover, as is" (only the
+  artwork prints) or "Add title over artwork" (the cover's own title and wording, edited as before, in palette,
+  light or dark ink).
+- **Page background**: this page only, every page of a kind, or any chosen pages; whole page to the edge, or
+  inside the margins (clear of trim and the binding gutter); opacity.
+- **Page illustration**: *corner* (over the page, inside the print-safe area; size, nudge, mirrored to the outer
+  edge on left-hand pages) or *own area* (a band at the top or bottom: the page's content — lesson text,
+  calendars, writing space — is laid out in the room left, and flowing content continues on more pages; this goes
+  through `geometryFor` and the flow measurement in `resolve.ts`, so measuring and drawing agree).
+- **Art made to run off the page.** When a transparent PNG is added, the edges its design is cut along are
+  found (`findCutEdges`: opaque pixels along an edge). A new illustration from art cut along the bottom (and a
+  side) is anchored there with "Run off the page edge": flush with the media edge, out into the bleed, so it
+  prints to the trimmed edge instead of stopping short inside the margin. Mirrored onto a left-hand page it moves
+  to the outer edge and is flipped, so its cut sides still face out. Backgrounds can be mirrored the same way.
+Fill-and-crop or show-whole, zoom, position, Replace, Remove; print resolution shown per use (300+ ppi sharp).
+**One placement function** feeds the preview, thumbnails and print (`artworkFor`), so they always match.
+
+**Where images are kept.** The project stores only the artwork's id (SHA-256 of the file), name, type and size
+plus its placements; the file itself is kept byte for byte (a transparent PNG stays transparent) in this browser's
+IndexedDB (`dove-product-studio-artwork`). It survives reopening and reloads on that device. **Online saving
+copies the placements but not the image files**: on another device the pages show "Artwork not on this device"
+and export names the missing image until it is added again (Replace). Making images follow the project online
+needs a Supabase Storage bucket and policies — a schema change that needs Sydni's approval. Deleting a project
+doesn't yet delete its images from the device.
+
+**Tests (2026-11-14).** Typecheck clean. Unit: all existing tests unchanged and passing, golden print snapshots
+unchanged, plus `tests/artwork.test.tsx` (16): placement math, cover to bleed, background on selected pages,
+corner art inside the safe area and mirrored, safe backgrounds clear of the gutter, own-area reflow, save and
+reload, old projects unchanged, file reading, and identical images and positions in preview and print.
+Browser: `tests/browser/artwork-workflow.browser.ts` (3): steps (Back / Next, jump back, reload) on an existing
+saved project; a full-cover JPEG, a WebP background on selected pages and a transparent PNG corner
+illustration, reopened and printed — the print tree draws the same images at the same places as the preview and
+the PNG is still RGBA; iPhone 390 / 430 with no sideways scroll and 44px touch targets. `tests/browser/areas.ts`
+`openArea` now opens the area's step first. Full browser suite on this branch: 165/165 after one existing test
+(`cover-divider` "cover surface") was changed to scroll the cover picker into view first: its thumbnails load as
+they scroll into view, and the step header now places three of them below the fold (it passes on `main` without
+the scroll; real use is unaffected).
+
+**Tried with Sydni's To-Do List "Dots and Stripes" artwork (2026-11-14).** 6 × 9 coil journal, bleed on: cover art
+as a full cover with the title over it; the calendar art behind the month; the interior art behind every To Do
+page, mirrored on left-hand pages; the transparent corner art on the Notes pages (cut edges found as bottom and
+right, so it ran off the page at the outer bottom corner automatically, flipped on left-hand pages). Reopened and
+exported to PDF with the same placement. Notes for the art: 1800 × 2700 is 6 × 9 at 300 ppi, but with ⅛" bleed the
+page is 6.125 × 9.25, so it prints at about 290 ppi (the studio says "may print a little soft"); 1838 × 2775 px
+gives a full 300 ppi with bleed. The calendar art is landscape (11 × 8.5); on a portrait page "Fill and crop" shows
+only one corner of it, so use it on landscape monthly pages or choose "Show the whole image".
+
+**Stationery Cover Prompt Generator.** Not in this repository on any branch, not in either Vercel project, and
+not in claude.ai artifacts as of 2026-11-14; its source is needed before it can be organized into four screens.
 
 ## AI content: research and creative development (assessed 2026-10-15, not built)
 

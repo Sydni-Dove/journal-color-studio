@@ -3,7 +3,7 @@
  * exact PrintablePage the editor uses. Print CSS hides the editor.
  */
 import { createPortal } from "react-dom";
-import { geometryFor, solvePage, type ResolvedDocument } from "../../engines/document/resolve";
+import { artworkFor, geometryFor, solvePage, type ResolvedDocument } from "../../engines/document/resolve";
 import type { PrintPlan } from "../../engines/print/printPlan";
 import { PrintablePage } from "../../primitives/PrintablePage";
 import type { PageGeometry } from "../../types/geometry";
@@ -58,6 +58,7 @@ export function PrintSheets({ doc, plan }: { doc: ResolvedDocument; plan: PrintP
             background={doc.background}
             spacing={doc.spacing}
             mode="print"
+            art={artworkFor(doc, i)}
           />
         </div>
         );

@@ -32,7 +32,7 @@ export type RecipeContext = {
   layoutPeriod?: (layoutId: string) => "none" | "month" | "week" | "day";
   layoutLabel?: (layoutId: string) => string;
   /** Pages one instance of a single-page layout needs (content that continues on another page). Default 1. */
-  flowPages?: (layoutId: string, module?: import("../../types/recipe").PageModuleContent) => number;
+  flowPages?: (layoutId: string, module?: import("../../types/recipe").PageModuleContent, itemId?: string) => number;
   /** The product's content lists: sections that repeat per entry read them (never stored in the recipe). */
   data?: import("../../types/document").ProjectData;
 };
@@ -201,7 +201,7 @@ export function expandRecipe(recipe: ProductRecipe, ctx: RecipeContext): Expande
     const starts = recordStarts(u.item.promptSet, sequences);
     const module: PageModuleContent | undefined = u.item.promptSet ? { type: "guided", title: u.item.title ?? "Guided Page", prompts: [], promptSet: u.item.promptSet, ...(starts ? { sequenceStarts: starts } : {}) } : undefined;
     // Content that doesn't fit one page continues on more pages (single-page layouts only).
-    const flow = u.pages === 1 && !u.physicalSheets ? Math.max(1, ctx.flowPages?.(u.item.layoutId, module) ?? 1) : 1;
+    const flow = u.pages === 1 && !u.physicalSheets ? Math.max(1, ctx.flowPages?.(u.item.layoutId, module, u.item.id) ?? 1) : 1;
     for (let part = 0; part < u.pages * flow; part++) {
       pages.push({
         key: `${u.item.id}:${pk}${u.pages === 2 ? `:${part}` : part > 0 ? `~${part}` : ""}`,
