@@ -1,3 +1,4 @@
+import type { ScriptureReview } from "../scripture/scripture-review.js";
 import type { ElementPosition, SemanticTextKey } from "./layout";
 import type { BindingType } from "./binding";
 import type { CalendarSettings } from "./calendar";
@@ -182,6 +183,7 @@ export type ProjectOrigin =
   | { kind: "dove-command-center"; requestId: string; returnUrl?: string };
 
 export type ProductProject = {
+  scripturePermissions?: { collection: ScriptureReview; product: ScriptureReview };
   schemaVersion: number;
   id: string;
   name: string;
