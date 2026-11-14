@@ -1163,7 +1163,8 @@ button.family-card:focus-visible {
 .prompt-editor > *, .prompt-block__body > * { min-width: 0; }
 .prompt-editor select, .prompt-editor input, .prompt-editor textarea { max-width: 100%; min-width: 0; }
 .prompt-editor .field, .prompt-editor .row { min-width: 0; }
-.prompt-editor .prompt-list > li, .prompt-block, .prompt-block > summary { min-width: 0; }
+.prompt-editor .row { flex-wrap: wrap; }
+.prompt-list > li, .prompt-block, .prompt-block > summary { min-width: 0; }
 .prompt-list { grid-template-columns: minmax(0, 1fr); }
 
 /* A newer build is deployed than this tab is running */
@@ -2043,11 +2044,13 @@ button.family-card:focus-visible {
 .ai-section-head > .field { min-width: 0; }
 .ai-section-head select, .ai-section-head input { width: 100%; min-width: 0; box-sizing: border-box; }
 .ai-wizard select { max-width: 100%; text-overflow: ellipsis; }
-.ai-wizard .ai-part .ai-wizard .ai-part .row > strong, .ai-wizard .ai-part .hint { overflow-wrap: anywhere; }
+.ai-wizard .ai-part .row { flex-wrap: wrap; }
+.ai-wizard .ai-part .row > strong, .ai-wizard .ai-part .hint { overflow-wrap: anywhere; }
 .ai-wizard input, .ai-wizard textarea, .ai-wizard select { min-height: 44px; }
 @media (max-width: 600px) {
   .ai-section-head { grid-template-columns: minmax(0, 1fr); }
-  .ai-review }
+  .ai-review .row { flex-wrap: wrap; }
+}
 
 /* iPhone Safari zooms into any field with text under 16px, and stays zoomed: the page then runs past both
    edges of the screen (fields cut off left and right). The studio's 15px text is fine on desktop; on phones
@@ -2474,4 +2477,23 @@ button.family-card:focus-visible {
 @media (max-width: 600px) {
   .cover-tab { flex: 1 1 calc(50% - 6px); font-size: 14px; padding: 6px 8px; }
   .cast-card { flex-direction: column; }
+}
+
+/* ── Coloring book: registry, scene review, assembled preview ── */
+.cast-registry { border: 0; margin: 0; padding: 0; min-width: 0; display: grid; gap: 6px; }
+.cast-registry:disabled input, .cast-registry:disabled textarea { background: #f6f3f1; color: var(--ui-ink); }
+.cast-switches { gap: 16px; }
+.scene-card--approved { border-color: #2e7d32; box-shadow: inset 4px 0 0 #2e7d32; }
+.scene-work { display: grid; gap: 10px; }
+.illustration-check { display: grid; gap: 10px; }
+.consistency { border: 1px solid var(--ui-line); border-radius: var(--ui-radius); padding: 8px 12px; display: grid; gap: 2px; }
+.consistency legend { font-weight: 700; color: var(--ui-brand); padding: 0 4px; }
+.assembled-preview { position: relative; max-width: 100%; border: 1px solid var(--ui-line); background: #fff; overflow: hidden; }
+.assembled-preview--art .ps-text { visibility: hidden; }
+.assembled-preview__overlay { position: absolute; inset: 0; pointer-events: none; }
+.assembled-preview__overlay .safe-text { position: absolute; background: rgba(46, 125, 50, 0.12); outline: 1px dashed #2e7d32; }
+.assembled-preview__overlay .safe-gutter { position: absolute; background: rgba(154, 59, 59, 0.10); outline: 1px dashed #9a3b3b; }
+.ref-files { display: grid; gap: 6px; }
+@media (max-width: 600px) {
+  .assembled-preview { transform-origin: 0 0; }
 }

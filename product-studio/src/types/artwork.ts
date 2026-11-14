@@ -82,10 +82,13 @@ export type BackgroundArtwork = {
   /** 0.05–1. */
   opacity: number;
   /**
-   * bleed  the whole page, past the trim where the printer allows bleed (never into a gutter that can't bleed)
-   * safe   inside the print-safe area (clear of the binding gutter and trim)
+   * bleed   the whole page, past the trim where the printer allows bleed (never into a gutter that can't bleed)
+   * safe    inside the print-safe area (clear of the binding gutter and trim)
+   * region  a given box on the page (a coloring page's illustration area, clear of its text and the gutter)
    */
-  extent: "bleed" | "safe";
+  extent: "bleed" | "safe" | "region";
+  /** extent "region": the box the image is fitted into, in trim inches (a coloring page's illustration area). */
+  region?: { x: number; y: number; w: number; h: number };
   /** On left-hand pages, flip the image left to right, so art made for the outer edge stays there (away from the binding). */
   mirror?: boolean;
 };

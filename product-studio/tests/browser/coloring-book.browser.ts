@@ -99,7 +99,7 @@ describe("She Is Gracious — Ballet Coloring Book", () => {
       const card = page.locator(".cast-card").last();
       await card.getByLabel("Character name").fill(d.name);
       await page.getByLabel(`${d.name}: description`).fill(d.description);
-      await page.getByLabel(`${d.name}: traits`).fill(d.traits);
+      await page.getByLabel(`${d.name}: always keep`).fill(d.traits);
       await page.getByTestId(`ref-${d.name}`).setInputFiles(await dancerPng(page, d.color, `${d.name.toLowerCase().replace("í", "i")}-reference.png`));
       await expect.poll(() => page.locator(`[data-cast="${d.name}"] .cast-thumb img`).count()).toBe(1);
     }
@@ -134,19 +134,20 @@ describe("She Is Gracious — Ballet Coloring Book", () => {
     const prompts: string[] = [];
     for (const n of [1, 2]) {
       await page.getByTestId(`copy-scene-${n}`).click();
-      await expect.poll(() => clipboard(page)).toContain(`SCENE ${n}:`);
+      await expect.poll(() => clipboard(page)).toContain(`Scene ${n} of 2:`);
       prompts.push(await clipboard(page));
     }
-    await page.locator('[data-scene-review="2"]').getByRole("button", { name: "Preview prompt" }).click();
+    await page.locator('[data-scene-review="2"]').getByRole("button", { name: "Open scene" }).click();
     expect(await page.getByTestId("scene-prompt-2").innerText()).toBe(prompts[1]);
     const refs = "amara-reference.png, lucia-reference.png, grace-reference.png";
     for (const p of prompts) {
-      for (const d of DANCERS) expect(p).toContain(`- ${d.name}: ${d.description}`);
-      expect(p).toContain(`Attach these reference images with this prompt: ${refs}.`);
-      expect(p).toContain("Black outlines on a pure white background. No color");
+      for (const d of DANCERS) expect(p).toContain(`. ${d.name}:`);
+      for (const d of DANCERS) expect(p).toContain(`Notes: ${d.description}`);
+      expect(p).toContain(`Attached reference images (use them as the visual identity anchors): ${refs}.`);
+      expect(p).toContain("Pure white background. Bold, clean black outlines.");
       expect(p).not.toMatch(HEX); // black and white: no palette colors in the interior pages
-      expect(p).toContain("Leave a clean, empty band for the title and the NIV verse");
-      expect(p).toContain("do not show several views");
+      expect(p).not.toMatch(/empty band|title field/i);
+      expect(p).toContain("One scene only. No character sheets, multiple views, or alternate compositions.");
     }
     expect(prompts[0]).toContain("thick, bold lines (about 2 pt)");
     expect(prompts[0]).toContain("Illustration complexity: simple:");
@@ -182,7 +183,7 @@ describe("She Is Gracious — Ballet Coloring Book", () => {
     const attach = await page.getByTestId("attach-list").innerText();
     for (const f of refs.split(", ")) expect(attach).toContain(f);
     const cover = await page.getByTestId("cover-prompt").innerText();
-    for (const d of DANCERS) expect(cover).toContain(`- ${d.name}: ${d.description}`);
+    for (const d of DANCERS) expect(cover).toContain(`. ${d.name}:`);
     expect(cover).toContain(`Attach these reference images with this prompt: ${refs}.`);
     expect(cover).toContain("full-color storybook painting");
     for (const h of paletteHexes) expect(cover).toContain(h.toUpperCase());

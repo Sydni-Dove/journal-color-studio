@@ -16,6 +16,12 @@ import { fmt, resolveCoverSpec } from "./spec";
 
 const HEX = /^#[0-9a-f]{6}$/i;
 
+/**
+ * Added after the generator's own wording (2026-11-14): image generators drew the stated canvas size onto a cover
+ * ("2625 × 3375 px" printed under the art). The only change from the generator's prompt.
+ */
+export const NEVER_DRAW_SIZES = "Every measurement in this prompt is an instruction only: never draw numbers, sizes, pixel counts or labels on the image.";
+
 /** The palette as the prompt describes it: its exact hex colors, in the order they matter, and what each is for. */
 export type PaletteSummary = {
   name: string;
@@ -102,7 +108,7 @@ TYPE & CONTENT
 Exact cover title: “${title}”. Subtitle: “${b.subtitle}”. Scripture or phrase: “${b.scripture}”. Give the title visual priority; make supporting text clearly secondary. Use a display serif, expressive script, or modern sans only where it serves the selected style. Never insert “Untitled,” extra verses, fake author names, or filler text. If image rendering cannot reproduce the wording accurately, leave a clean title area and provide a separate exact text-overlay plan.
 
 PRODUCTION GEOMETRY
-Product: ${product}. Finished trim: ${fmt(w)} × ${fmt(h)} inches${wrap ? " per panel" : ""}. Format: ${wrap ? "flat back + spine + front spread" : "front only"}. Outer bleed: ${fmt(bleed)} inches per edge. Target canvas: ${fmt(cw)} × ${fmt(ch)} inches; ${Math.round(cw * dpi)} × ${Math.round(ch * dpi)} pixels at ${dpi} DPI. Keep all title and important details ${spec.safeText}. Delivery: ${b.medium}. Binding: ${b.binding}. Page count: ${b.pages || "not applicable"}. ${wrap ? "Spine: " + (sp ? fmt(sp) + " inches; keep text clear of the folds." : "Spine width is unconfirmed; this concept is NOT a final print-ready wrap.") : "No spine on this canvas."} Do not draw crop marks, a fake binding, or a 3D book. If the image tool cannot output these exact pixels, create the best proportional artwork and state the actual pixel size; do not claim it is print-ready.
+Product: ${product}. Finished trim: ${fmt(w)} × ${fmt(h)} inches${wrap ? " per panel" : ""}. Format: ${wrap ? "flat back + spine + front spread" : "front only"}. Outer bleed: ${fmt(bleed)} inches per edge. Target canvas: ${fmt(cw)} × ${fmt(ch)} inches; ${Math.round(cw * dpi)} × ${Math.round(ch * dpi)} pixels at ${dpi} DPI. Keep all title and important details ${spec.safeText}. Delivery: ${b.medium}. Binding: ${b.binding}. Page count: ${b.pages || "not applicable"}. ${wrap ? "Spine: " + (sp ? fmt(sp) + " inches; keep text clear of the folds." : "Spine width is unconfirmed; this concept is NOT a final print-ready wrap.") : "No spine on this canvas."} Do not draw crop marks, a fake binding, or a 3D book. If the image tool cannot output these exact pixels, create the best proportional artwork and state the actual pixel size; do not claim it is print-ready. ${NEVER_DRAW_SIZES}
 
 QUALITY GATES
 Avoid: ${b.avoid || "generic scenery and decorative filler"}. No generic sunrise, mountains, stacked books, clip-art foliage, antique parchment, ornate corner decoration, or random gold flourish unless explicitly requested above. No watermark. Maintain readable contrast. ${notary ? "For this notary product, keep a precise professional appearance and do not imply a government endorsement or invent a jurisdiction." : "For this faith-based product, do not add crosses, doves, or other religious symbols unless requested."}

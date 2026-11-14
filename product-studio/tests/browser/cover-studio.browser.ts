@@ -342,7 +342,7 @@ describe("Cover Studio", () => {
     await page.getByLabel("Scenes text").fill("1. Puddle jumping\nMaya jumps in a puddle, laughing.\n\n2. Sharing a snack\nMaya shares her apple with a friend.");
     await page.getByRole("button", { name: "Split into scenes" }).click();
     p = await copied();
-    for (const t of ["SCENE 1: Puddle jumping", "SCENE 2: Sharing a snack", "- Maya: a 7-year-old with curly hair", "Black outlines on a pure white background"]) expect(p, "character").toContain(t);
+    for (const t of ["Scene 1 of 2: Puddle jumping.", "Scene 2 of 2: Sharing a snack.", "Notes: a 7-year-old with curly hair", "Pure white background. Bold, clean black outlines."]) expect(p, "character").toContain(t);
     expect(p).not.toMatch(/#[0-9A-F]{6}/i);
 
     // Coordinated Collection Design: the products in the set and one design system.

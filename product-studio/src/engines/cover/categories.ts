@@ -12,7 +12,7 @@ import { DEFAULT_TYPOGRAPHY, type CoverBrief, type CoverCategory, type CoverItem
 import { GENERIC_STYLE_GUIDE, STARTER_SET, STYLE_GUIDES } from "./guides";
 import { createBlocker, paletteSpec, promptBlocker, promptFor, setPrompts } from "./prompt";
 import { fmt, resolveCoverSpec } from "./spec";
-import { allScenePrompts, coloringCoverBlocker, coloringCoverPrompt } from "./coloring";
+import { allScenePrompts, coloringCoverBlocker, coloringCoverPrompt, sceneBlocker } from "./coloring";
 
 export const CATEGORIES: { id: CoverCategory; title: string; blurb: string }[] = [
   { id: "cover", title: "Cover Artwork", blurb: "A finished front cover or full wrap for one product, with its title." },
@@ -131,7 +131,11 @@ export function categoryPrompt(b: CoverBrief, direction: number, items: CoverIte
 /** Why the category's prompt can't be built yet (null = it can). */
 export function categoryBlocker(b: CoverBrief): string | null {
   if (b.category === "interior") return null;
-  if (b.category === "character") return b.scenes.length || b.characters.trim() || b.cast.length ? null : "Add your characters (Cast) or your scenes first.";
+  if (b.category === "character") {
+    if (b.scenes.length) return sceneBlocker(b);
+    if (b.characters.trim()) return null; // a character sheet from the written description
+    return b.cast.length ? "Add your scenes: paste or import them under Scenes." : "Add your characters (Cast) or your scenes first.";
+  }
   if (b.category === "coloring-cover") return coloringCoverBlocker(b);
   return promptBlocker(b);
 }

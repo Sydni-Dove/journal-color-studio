@@ -8,6 +8,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { newBrief, withProduct, type CoverBrief, type CoverCategory, type CoverCollection, type CoverItem } from "../../engines/cover/brief";
 import { ApprovePanel, CastPanel, ColoringCoverCards, ColoringStyleControls, CoverCards, LayoutPanel, ScenesPanel, SceneReview, RefThumb, styleDefaults } from "./ColoringPanels";
 import { castFor, outputLabel as PAGE_OUTPUT_LABEL, referenceImages } from "../../engines/cover/coloring";
+import { assembleColoringBook } from "../../engines/cover/assemble";
 import { briefFromProject } from "../../engines/cover/fromProject";
 import {
   COVER_BINDINGS, COVER_PRODUCTS, COVER_SIZES, COVER_STATUSES, DEFAULT_SIZE, DIRECTIONS, DPI_CHOICES, STARTER_SET, STYLE_GROUPS, STYLE_GUIDES, STYLE_HINT_FALLBACK, isWrapProduct, type CoverProduct,
@@ -56,6 +57,8 @@ type Props = {
   projects: ProjectSummary[];
   loadProject: (id: string) => ProductProject | null;
   store?: CoverStore;
+  /** Saves a new product and opens it in the editor (the assembled coloring book). */
+  onCreateProject?: (p: ProductProject) => void;
 };
 
 const TIPS = {
@@ -72,7 +75,7 @@ function download(name: string, body: string, type: string) {
   setTimeout(() => URL.revokeObjectURL(url), 500);
 }
 
-export function CoverStudio({ onBack, projects, loadProject, store = localCoverStore }: Props) {
+export function CoverStudio({ onBack, projects, loadProject, store = localCoverStore, onCreateProject }: Props) {
   const draft = useRef(loadDraft()).current;
   const [brief, setBrief] = useState<CoverBrief>(draft?.brief ?? newBrief());
   const [items, setItems] = useState<CoverItem[]>(draft?.items ?? []);
@@ -565,7 +568,7 @@ export function CoverStudio({ onBack, projects, loadProject, store = localCoverS
         {shownStep === "cast" && (
           <section className="cover-step" aria-label="Cast and references">
             <Field label="Age group"><select value={brief.ageGroup} aria-label="Age group" onChange={(e) => set({ ageGroup: e.target.value })}>{AGE_GROUPS.map((k) => <option key={k}>{k}</option>)}</select></Field>
-            <CastPanel brief={brief} set={set} productImages={productImages} />
+            <CastPanel brief={brief} set={set} productImages={productImages} copy={copy} />
             <details className="section cover-advanced">
               <summary>Character sheet without scenes</summary>
               <div className="section-body">
@@ -601,6 +604,16 @@ export function CoverStudio({ onBack, projects, loadProject, store = localCoverS
           <section className="cover-step" aria-label="Page layout">
             <LayoutPanel brief={brief} set={set} />
             {printSetup}
+            <div className="cover-two">
+              <Field label="Binding">
+                <select value={brief.binding} aria-label="Binding" onChange={(e) => set({ binding: e.target.value })}>{COVER_BINDINGS.map((x) => <option key={x}>{x}</option>)}</select>
+              </Field>
+              <div className="field">
+                <span className="field-label">&nbsp;</span>
+                <label className="check"><input type="checkbox" checked={brief.blankBacks} onChange={(e) => set({ blankBacks: e.target.checked })} /><span>Print each picture on its own sheet (blank backs)</span></label>
+              </div>
+            </div>
+            <p className="hint">{brief.scenes.length} scene{brief.scenes.length === 1 ? "" : "s"} make {brief.scenes.length * (brief.blankBacks ? 2 : 1)} pages. Perfect binding and KDP need at least 24: add a title page and other front matter in Product Studio, or choose spiral binding.</p>
             <details className="section cover-advanced">
               <summary>Advanced options</summary>
               <div className="section-body">
@@ -711,7 +724,22 @@ export function CoverStudio({ onBack, projects, loadProject, store = localCoverS
             <dl className="cover-summary" data-testid="cover-summary">
               {steps.filter((x) => x.id !== "review").map((x) => summaryRow(x.title, stepSummary(x.id), x.id))}
             </dl>
-            {isCharacter && brief.scenes.length > 0 && <SceneReview brief={brief} copy={copy} onEdit={() => go("scenes")} />}
+            {isCharacter && brief.scenes.length > 0 && (
+              <SceneReview
+                brief={brief}
+                set={set}
+                copy={copy}
+                say={say}
+                onEdit={() => go("scenes")}
+                onAssemble={
+                  onCreateProject &&
+                  (() => {
+                    const assets = brief.scenes.flatMap((s) => (s.illustrationId ? [{ id: s.illustrationId, name: s.illustrationName ?? "illustration", mime: "image/png" as const, widthPx: s.illustrationW ?? 1, heightPx: s.illustrationH ?? 1, hasAlpha: false, bytes: 0, addedAt: new Date().toISOString() }] : []));
+                    onCreateProject(assembleColoringBook(brief, brief.scenes, assets));
+                  })
+                }
+              />
+            )}
             <div className="cover-panel">
               <div className="cover-panel__top"><div><div className="eyebrow">{categoryTitle(cat)}</div><h2>{isCharacter && brief.scenes.length ? `All ${brief.scenes.length} scene prompts` : "Your prompt"}</h2></div></div>
               {isColoringCover && !catBlocked && (

@@ -60,7 +60,13 @@ Stacked review branches, each containing the one before:
    images; scene batches; coloring style (black outlines default, Hybrid optional, line thickness, complexity,
    per-scene overrides); five page outputs with a live space estimate; NIV room for the verse; artwork-only vs complete
    concept; compare-and-approve. Details: `product-studio/docs/cover-studio.md`. Merging 4 brings 1–3 with it.
-Tested with *She Is Gracious — Ballet Coloring Book* (`tests/browser/coloring-book.browser.ts`). Still manual: a
+Tested with *She Is Gracious — Ballet Coloring Book* (`tests/browser/coloring-book.browser.ts`).
+**Coloring page fixes (2026-11-14, same branch):** clean eight-part scene prompts with no typography, banners or
+drawn measurements; a character registry reused in every scene; references copied/downloaded as real image files;
+per-scene illustration check, previews, consistency checklist, approval and regeneration; page assembly in Product
+Studio (8.5 × 11, 300 DPI, 0.25 in margins, 0.5 in gutter, blank backs); optional Scripture lettered into the
+artwork once verified. Details: `product-studio/docs/cover-studio.md`. Regression: `tests/coloring-book.test.tsx`,
+`tests/browser/gracious-kids.browser.ts`. Still manual: a
 signed-in ChatGPT run; checking real generated covers against the references (the approval is the maker's); the verse
 wording and permission (`codex/scripture-permissions-review` is a separate, unmerged review); reference images live on
 one device (no online copy yet).

@@ -28,10 +28,21 @@ export type TextPlacement = "top" | "bottom" | "top-and-bottom" | "none";
 export type CastMember = {
   id: string;
   name: string;
-  /** Who they are and how they look. */
+  /** Other notes: who they are, personality, anything not covered below. */
   description: string;
   /** Distinctive traits always preserved. */
   traits: string;
+  // The registry: what makes this character recognisable in every scene.
+  age?: string;
+  face?: string;
+  /** Hair texture and hairstyle. */
+  hair?: string;
+  hairAccessories?: string;
+  proportions?: string;
+  /** Signature clothing. */
+  clothing?: string;
+  /** Distinctive accessories (glasses, a necklace…). */
+  accessories?: string;
   /** An uploaded reference image (engines/artwork/store id) and its file name, if any. */
   refId?: string;
   refName?: string;
@@ -50,7 +61,36 @@ export type Scene = {
   lineThickness?: LineThickness;
   complexity?: Complexity;
   output?: PageOutput;
+  // Page text, typeset by Product Studio during page assembly (never sent to the image generator).
+  pageTitle?: string;
+  scriptureRef?: string;
+  /** Verse wording, used on the page only once its wording and permission are verified. */
+  verseText?: string;
+  lessonText?: string;
+  /** Who adds the Scripture on this page (the collection's choice when absent). */
+  scriptureMode?: ScriptureMode;
+  // The generated illustration for this scene, its pixel size, the consistency check and approval.
+  illustrationId?: string;
+  illustrationName?: string;
+  illustrationW?: number;
+  illustrationH?: number;
+  checks?: Record<string, boolean>;
+  approvedAt?: string;
+  /** Regenerations so far, and why the last image was rejected. */
+  attempts?: number;
+  rejectNotes?: string;
 };
+
+/**
+ * Who adds a page's Scripture:
+ *   page  Product Studio, as editable text at page assembly (default)
+ *   art   the image generator letters the verse into the artwork, in hollow outline letters to color (a Scripture
+ *         coloring page). Only with the exact wording entered and verified.
+ */
+export type ScriptureMode = "page" | "art";
+
+/** Page typography: applied only when Product Studio assembles the pages; never part of an image prompt. */
+export type PageTypography = { titleFont: string; scriptureFont: string; align: "left" | "center" | "right"; titleSizePt: number };
 
 export type CoverBrief = {
   category: CoverCategory;
@@ -82,6 +122,22 @@ export type CoverBrief = {
   /** The cast members in the cover (and in scenes that don't choose their own). */
   castSelected: string[];
   keepConsistent: boolean;
+  /** Established characters are locked: their registry can't be edited until unlocked, and every scene reuses them. */
+  castLocked: boolean;
+  /** Use the saved reference images (listed in prompts, offered to copy or download for the image generator). */
+  useRefs: boolean;
+  // Illustration styling (sent to the image generator)
+  illustrationStyle: string;
+  proportions: string;
+  hairClothingDetail: string;
+  backgroundDensity: string;
+  coloringArea: string;
+  /** Binding gutter kept clear (inches); the safe zone is the outer margin. */
+  gutter: number;
+  /** Each picture on its own sheet: a blank page after every scene, so markers don't bleed through (scenes fall on right-hand pages). */
+  blankBacks: boolean;
+  // Page typography (Product Studio only)
+  pageTypography: PageTypography;
   // Coloring pages (collection defaults; a scene can override thickness, complexity and output)
   coloringStyle: ColoringStyle;
   lineThickness: LineThickness;
@@ -93,6 +149,8 @@ export type CoverBrief = {
   translation: string;
   /** The verse wording and its permission are verified; until then the prompt leaves room and draws no verse words. */
   verseVerified: boolean;
+  /** Who adds the Scripture (scenes can choose their own). */
+  scriptureMode: ScriptureMode;
   /** The scene batch as pasted or imported (editable), and the scenes split from it. */
   sceneSource: string;
   scenes: Scene[];
@@ -162,8 +220,10 @@ export function newBrief(over: Partial<CoverBrief> = {}): CoverBrief {
     category: "cover", typography: DEFAULT_TYPOGRAPHY,
     pageKind: "Lined journal page", artUse: "Corner illustration", artPlacement: "Bottom right corner", clearArea: "Keep at least 75% of the page clear",
     characters: "", ageGroup: "Ages 4–8", expressions: "happy, curious, praying, helping a friend", characterCount: 4, characterBackground: "transparent", scene: "",
-    cast: [], useGroupRef: false, castSelected: [], keepConsistent: true,
-    coloringStyle: "outline", lineThickness: "Medium", complexity: "Moderate", output: "coloring-page", textPlacement: "bottom", coverage: 70, translation: "NIV", verseVerified: false,
+    cast: [], useGroupRef: false, castSelected: [], keepConsistent: true, castLocked: false, useRefs: true,
+    illustrationStyle: "Clean storybook line art", proportions: "Natural child proportions", hairClothingDetail: "Moderate", backgroundDensity: "Light", coloringArea: "Medium", gutter: 0.5, blankBacks: true,
+    pageTypography: { titleFont: "Playfair Display", scriptureFont: "Lato", align: "center", titleSizePt: 24 },
+    coloringStyle: "outline", lineThickness: "Medium", complexity: "Moderate", output: "coloring-page", textPlacement: "bottom", coverage: 70, translation: "NIV", verseVerified: false, scriptureMode: "page",
     sceneSource: "", scenes: [],
     coverOutput: "artwork-only", coverColor: "", coverComposition: "", titlePlacement: "", coverBackground: "", illustrationScale: "", starterScene: "",
     collection: "", theme: "", season: "", audience: "", scripture: "", imagery: "", avoid: DEFAULT_AVOID, style: DEFAULT_STYLE,

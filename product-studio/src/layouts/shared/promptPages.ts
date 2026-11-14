@@ -103,7 +103,7 @@ function blockZone(set: PromptSet, b: PromptBlock, surfaceOf: (b: PromptBlock) =
       const base = { key: b.id, surface: "blank" as const, weight: 0, optional: true, lines: 0, minLines: 0 };
       if (b.textStyle === "body") {
         const body = [b.label.trim(), b.prompt?.trim()].filter(Boolean).join("\n");
-        return { ...base, label: "", ...(body ? { prompt: body } : {}), promptRole: "body" };
+        return { ...base, label: "", ...(body ? { prompt: body } : {}), promptRole: "body", ...(b.headingAlign && b.headingAlign !== "left" ? { headingAlign: b.headingAlign } : {}) };
       }
       return {
         ...base,

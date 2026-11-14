@@ -10,7 +10,7 @@ import { newBrief, withProduct, type CoverBrief, type CoverItem } from "../src/e
 import { briefFromProject } from "../src/engines/cover/fromProject";
 import { CHATGPT_HOME, CHATGPT_URL_MAX, chatgptPromptUrl, fitsInAddress, launchChatGpt } from "../src/engines/cover/launch";
 import { DIRECTIONS, STARTER_SET, STYLE_GROUPS, STYLE_GUIDES } from "../src/engines/cover/guides";
-import { createBlocker, handoffPrompt, paletteColors, paletteSpec, promptBlocker, promptFor, setPrompts } from "../src/engines/cover/prompt";
+import { NEVER_DRAW_SIZES, createBlocker, handoffPrompt, paletteColors, paletteSpec, promptBlocker, promptFor, setPrompts } from "../src/engines/cover/prompt";
 import { fmt, resolveCoverSpec, specLine } from "../src/engines/cover/spec";
 import {
   duplicateAndRecolor, exportCollectionJson, importedPaletteId, loadDraft, localCoverStore, newCollection, normalizeBrief, parseCollectionFile, saveDraft,
@@ -46,7 +46,8 @@ describe("prompts keep the generator's wording", () => {
   for (const g of GOLDEN_PROMPTS) {
     it(`${g.name}: identical to the generator's own prompt`, () => {
       const brief = normalizeBrief(g.brief);
-      expect(promptFor(brief, g.dir, g.item)).toBe(g.expected);
+      // The generator's prompt word for word, plus the one sentence added after a generated cover printed its own pixel size.
+      expect(promptFor(brief, g.dir, g.item)).toBe(g.expected.replace("do not claim it is print-ready.", `do not claim it is print-ready. ${NEVER_DRAW_SIZES}`));
     });
   }
 

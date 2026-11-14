@@ -162,6 +162,14 @@ const optText = (v: unknown): string | undefined => (typeof v === "string" && v 
 const THICK = ["Thin", "Medium", "Thick"] as const, COMPLEX = ["Simple", "Moderate", "Detailed"] as const;
 const OUTPUTS = ["coloring-page", "illustration", "worksheet", "drawing-page", "reference-sheet"] as const;
 
+function normalizeTypography(raw: unknown, d: CoverBrief["pageTypography"]): CoverBrief["pageTypography"] {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  return {
+    titleFont: text(r.titleFont, d.titleFont), scriptureFont: text(r.scriptureFont, d.scriptureFont),
+    align: r.align === "left" || r.align === "right" ? r.align : "center", titleSizePt: Math.max(10, Math.min(72, numOr(r.titleSizePt, d.titleSizePt))),
+  };
+}
+
 /** The cast, scenes, coloring defaults and coloring-cover choices (absent in collections saved before them). */
 function normalizeColoring(r: Record<string, unknown>, d: CoverBrief): Partial<CoverBrief> {
   const cast = (Array.isArray(r.cast) ? r.cast : []).flatMap((x) => {
@@ -170,7 +178,7 @@ function normalizeColoring(r: Record<string, unknown>, d: CoverBrief): Partial<C
     return [{
       id: c.id, name: text(c.name, ""), description: text(c.description, ""), traits: text(c.traits, ""),
       ...(optText(c.refId) ? { refId: optText(c.refId), refName: optText(c.refName) } : {}),
-      ...Object.fromEntries((["pose", "expression", "outfit", "hairstyle"] as const).flatMap((k) => (optText(c[k]) ? [[k, c[k]]] : []))),
+      ...Object.fromEntries((["pose", "expression", "outfit", "hairstyle", "age", "face", "hair", "hairAccessories", "proportions", "clothing", "accessories"] as const).flatMap((k) => (optText(c[k]) ? [[k, c[k]]] : []))),
     }];
   });
   const ids = new Set(cast.map((c) => c.id));
@@ -183,16 +191,24 @@ function normalizeColoring(r: Record<string, unknown>, d: CoverBrief): Partial<C
       ...(THICK.includes(c.lineThickness as never) ? { lineThickness: c.lineThickness as (typeof THICK)[number] } : {}),
       ...(COMPLEX.includes(c.complexity as never) ? { complexity: c.complexity as (typeof COMPLEX)[number] } : {}),
       ...(OUTPUTS.includes(c.output as never) ? { output: c.output as (typeof OUTPUTS)[number] } : {}),
+      ...Object.fromEntries((["pageTitle", "scriptureRef", "verseText", "lessonText", "illustrationId", "illustrationName", "approvedAt", "rejectNotes"] as const).flatMap((k) => (optText(c[k]) ? [[k, c[k]]] : []))),
+      ...(Number(c.illustrationW) > 0 && Number(c.illustrationH) > 0 ? { illustrationW: Number(c.illustrationW), illustrationH: Number(c.illustrationH) } : {}),
+      ...(c.scriptureMode === "art" || c.scriptureMode === "page" ? { scriptureMode: c.scriptureMode as "art" | "page" } : {}),
+      ...(Number(c.attempts) > 0 ? { attempts: Math.round(Number(c.attempts)) } : {}),
+      ...(c.checks && typeof c.checks === "object" ? { checks: Object.fromEntries(Object.entries(c.checks as Record<string, unknown>).filter(([, v]) => typeof v === "boolean")) as Record<string, boolean> } : {}),
     }];
   });
   return {
-    cast, useGroupRef: r.useGroupRef === true, keepConsistent: r.keepConsistent !== false,
+    cast, useGroupRef: r.useGroupRef === true, keepConsistent: r.keepConsistent !== false, castLocked: r.castLocked === true, useRefs: r.useRefs !== false,
+    illustrationStyle: text(r.illustrationStyle, d.illustrationStyle), proportions: text(r.proportions, d.proportions), hairClothingDetail: text(r.hairClothingDetail, d.hairClothingDetail),
+    backgroundDensity: text(r.backgroundDensity, d.backgroundDensity), coloringArea: text(r.coloringArea, d.coloringArea), gutter: Math.max(0, Math.min(2, numOr(r.gutter, d.gutter))), blankBacks: r.blankBacks !== false,
+    pageTypography: normalizeTypography(r.pageTypography, d.pageTypography),
     ...(optText(r.groupRefId) ? { groupRefId: optText(r.groupRefId), groupRefName: optText(r.groupRefName) } : {}),
     castSelected: Array.isArray(r.castSelected) ? r.castSelected.filter((i): i is string => typeof i === "string" && ids.has(i)) : cast.map((c) => c.id),
     coloringStyle: r.coloringStyle === "hybrid" ? "hybrid" : "outline",
     lineThickness: oneOf(r.lineThickness, THICK, d.lineThickness), complexity: oneOf(r.complexity, COMPLEX, d.complexity), output: oneOf(r.output, OUTPUTS, d.output),
     textPlacement: oneOf(r.textPlacement, ["top", "bottom", "top-and-bottom", "none"] as const, d.textPlacement),
-    coverage: Math.max(20, Math.min(100, Math.round(numOr(r.coverage, d.coverage)))), translation: text(r.translation, d.translation), verseVerified: r.verseVerified === true,
+    coverage: Math.max(20, Math.min(100, Math.round(numOr(r.coverage, d.coverage)))), translation: text(r.translation, d.translation), verseVerified: r.verseVerified === true, scriptureMode: r.scriptureMode === "art" ? "art" : "page",
     sceneSource: text(r.sceneSource, ""), scenes,
     coverOutput: r.coverOutput === "complete-concept" ? "complete-concept" : "artwork-only",
     coverColor: text(r.coverColor, ""), coverComposition: text(r.coverComposition, ""), titlePlacement: text(r.titlePlacement, ""), coverBackground: text(r.coverBackground, ""),

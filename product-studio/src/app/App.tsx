@@ -204,7 +204,7 @@ export function App() {
     return (
       <>
         {banner}
-        <CoverStudio onBack={() => setView({ kind: "list" })} projects={projects} loadProject={(id) => store.load(id)} />
+        <CoverStudio onBack={() => setView({ kind: "list" })} projects={projects} loadProject={(id) => store.load(id)} onCreateProject={open} />
       </>
     );
   if (view.kind === "edit") {

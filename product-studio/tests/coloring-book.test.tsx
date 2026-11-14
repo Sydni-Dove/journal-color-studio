@@ -1,16 +1,25 @@
 /**
- * Cover Studio for coloring books: scene batches, the saved cast and its reference images, coloring style
- * (outlines vs hybrid, line thickness, complexity, per-scene overrides), page outputs and layout, the coloring book
- * cover that uses the same cast, and suggested-direction cards that respect what the maker typed.
+ * Cover Studio for coloring books.
+ *
+ * Gracious Kids regression (ten ballet scenes, three established ballerinas, girls ages 8–12). The registry follows
+ * the three girls in Sydni's own Gracious Kids art: box braids with gold cuffs and hoops, loose curls with a pink bow
+ * headband, a dark top bun. Every scene prompt reuses the same registry and references, carries the scene's own
+ * activity, asks for a text-free black-and-white illustration with unoutlined white space for Product Studio's text,
+ * and never carries typography, cover style guides, banners, boxes, measurements to draw, or "empty band / title
+ * field" wording. Product Studio assembles the page (title, Scripture, gutter, margins) at 8.5 × 11 in, 300 DPI,
+ * 2550 × 3300 px. Also: a collection with no saved characters, and one with uploaded references.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { newBrief, type CastMember, type CoverBrief, type Scene } from "../src/engines/cover/brief";
 import {
-  applyColoringCard, applyCoverCard, castFor, coloringCoverPrompt, referenceImages, scenePrompt, spaceEstimate, splitScenes,
+  NO_TEXT_RULE, REUSE_INSTRUCTION, applyColoringCard, applyCoverCard, castDesignPrompt, castFor, coloringCoverPrompt, referenceFiles, referenceImages, scenePrompt, spaceEstimate, splitScenes,
 } from "../src/engines/cover/coloring";
+import { artRegion, assembleColoringBook, illustrationPlacement, pageBlocks, verseLine } from "../src/engines/cover/assemble";
 import { categoryBlocker, categoryCreateBlocker, categoryPrompt } from "../src/engines/cover/categories";
 import { paletteColors } from "../src/engines/cover/prompt";
 import { normalizeBrief } from "../src/persistence/coverStore";
+import { artworkFor, geometryFor, resolveDocument, solvePage } from "../src/engines/document/resolve";
+import type { ArtworkAsset } from "../src/types/artwork";
 
 beforeEach(() => {
   const m = new Map<string, string>();
@@ -19,186 +28,341 @@ beforeEach(() => {
 
 let n = 0;
 const id = () => `s${++n}`;
-const DANCERS: CastMember[] = [
-  { id: "amara", name: "Amara", description: "a 7-year-old ballerina with dark brown skin, a high bun of tight coils and a pink leotard", traits: "round face, dimples, tight coily hair", refId: "a1", refName: "amara-reference.png" },
-  { id: "lucia", name: "Lucía", description: "a 6-year-old dancer with light olive skin and long wavy hair in a low ponytail", traits: "freckles, wavy hair, small nose", refId: "l1", refName: "lucia-reference.png" },
-  { id: "grace", name: "Grace", description: "an 8-year-old dancer with fair skin and red hair in two braids, round glasses", traits: "glasses, freckles, braids", refId: "g1", refName: "grace-reference.png" },
+
+export const BALLERINAS: CastMember[] = [
+  {
+    id: "braids", name: "Braids", age: "about 10", face: "heart-shaped face, light freckles across the cheeks, bright almond eyes, warm smile", hair: "long box braids, the top half gathered into a bun",
+    hairAccessories: "gold cuffs on several braids", proportions: "tallest of the three, long arms and legs", clothing: "short-sleeved leotard with a tulle tutu and a bow at the waist",
+    accessories: "small hoop earrings", traits: "box braids with cuffs, hoop earrings, freckles", description: "graceful and confident", refId: "ref-braids", refName: "braids-reference.png",
+  },
+  {
+    id: "curls", name: "Curls", age: "about 9", face: "round face, freckles, big round eyes, wide smile", hair: "voluminous loose curls in a high ponytail",
+    hairAccessories: "bow headband", proportions: "medium height, slight build", clothing: "wrap cardigan over a leotard, tights", accessories: "none",
+    traits: "high curly ponytail, bow headband, freckles", description: "cheerful, claps for her friends", refId: "ref-curls", refName: "curls-reference.png",
+  },
+  {
+    id: "bun", name: "Bun", age: "about 9", face: "oval face, rosy cheeks, gentle smile", hair: "dark straight hair in a neat top bun with loose wisps at the temples",
+    hairAccessories: "none", proportions: "petite, the smallest of the three", clothing: "short-sleeved dance dress over tights", accessories: "none",
+    traits: "top bun with side wisps, petite", description: "quiet and thoughtful", refId: "ref-bun", refName: "bun-reference.png",
+  },
 ];
-function gracious(over: Partial<CoverBrief> = {}): CoverBrief {
-  const scenes: Scene[] = [
-    { id: "sc1", title: "Warm-up at the barre", text: "The three dancers stretch side by side at the barre, smiling at each other.", lineThickness: "Thick", complexity: "Simple" },
-    { id: "sc2", title: "Opening night bow", text: "On stage under the lights, the three dancers take a bow together, holding hands.", lineThickness: "Thin", complexity: "Detailed" },
-  ];
+
+/** The ten-scene ballet collection, each scene with its own activity. */
+export const GRACIOUS_SCENES: Scene[] = [
+  ["Warm-up at the barre", "The three girls stretch side by side at the barre in the dance studio, smiling at each other."],
+  ["Lacing ballet shoes", "The girls sit on a bench lacing their ballet slippers; Braids helps Bun tie a bow."],
+  ["Practicing pliés", "In a row in front of the studio mirror, the girls practice pliés with their arms in second position."],
+  ["Helping a friend up", "Bun has slipped; Braids and Curls kneel to help her up, kind and encouraging."],
+  ["Costume fitting", "Backstage, the girls try on their recital tutus and twirl beside a rack of costumes."],
+  ["Praying before the recital", "The three girls hold hands in a circle backstage and bow their heads to pray before the show."],
+  ["Opening night", "On stage under soft lights, the three dancers perform a graceful arabesque together."],
+  ["The final bow", "At the end of the recital the girls hold hands and take a bow as the curtain begins to close."],
+  ["Flowers for the dancers", "After the show, the girls receive small bouquets of flowers and hug each other."],
+  ["Celebration", "The friends laugh and jump for joy in the empty studio."],
+].map(([title, text], i) => ({ id: `g${i + 1}`, title, text, scriptureRef: "Proverbs 31:25" }));
+const ACTIVITY = ["barre", "lacing", "pliés", "help her up", "tutus", "pray", "arabesque", "take a bow", "bouquets", "jump for joy"];
+
+function graciousKids(over: Partial<CoverBrief> = {}): CoverBrief {
   return newBrief({
-    category: "character", collection: "She Is Gracious — Ballet Coloring Book", title: "She Is Gracious", subtitle: "A Ballet Coloring Book", scripture: "Proverbs 31:25",
-    palette: "jcs-blush-rose", product: "Workbook", size: "8.5×11", cast: DANCERS, castSelected: DANCERS.map((d) => d.id), scenes, ...over,
+    category: "character", collection: "Gracious Kids — Ballet Coloring Book", title: "She Is Gracious", audience: "girls ages 8–12", ageGroup: "Ages 8–12",
+    palette: "jcs-blush-rose", product: "Workbook", size: "8.5×11", bleed: 0, safe: 0.25, gutter: 0.5, dpi: 300, binding: "Perfect bound",
+    cast: BALLERINAS, castSelected: BALLERINAS.map((d) => d.id), castLocked: true, scenes: GRACIOUS_SCENES,
+    // Cover settings that used to leak into the interior pages: they must not appear in any scene prompt.
+    style: "Soft watercolor typography", typography: "Elegant flowing script", ...over,
   });
 }
 const HEX = /#[0-9A-F]{6}/i;
+/** Wording that made ChatGPT draw banners, frames and text boxes, or that belongs to typography and cover styles. */
+const FORBIDDEN = [/empty band/i, /title field/i, /finished (coloring )?page with/i, /with a title and (a )?Scripture/i, /display lettering/i, /centered white/i, /watercolor typography/i, /Elegant flowing script/i, /No saved characters/i, /typograph/i, /translucent lavender/i];
+
+describe("Gracious Kids regression: ten scenes, the same three ballerinas", () => {
+  const b = graciousKids();
+  const prompts = b.scenes.map((s, i) => scenePrompt(b, s, i));
+  it("every scene uses the same three established ballerinas, with their identifying features and reference images", () => {
+    expect(prompts).toHaveLength(10);
+    for (const p of prompts) {
+      for (const c of BALLERINAS) {
+        expect(p).toContain(`. ${c.name}: Age`);
+        for (const f of [c.face!, c.hair!, c.proportions!, c.clothing!]) expect(p).toContain(f);
+        if (c.hairAccessories !== "none") expect(p).toContain(c.hairAccessories!);
+        expect(p).toContain(`Reference image: ${c.refName}`);
+      }
+      expect(p).toContain(REUSE_INSTRUCTION);
+      expect(p).toContain("Attached reference images (use them as the visual identity anchors): braids-reference.png, curls-reference.png, bun-reference.png.");
+    }
+  });
+  it("each scene depicts its own activity", () => {
+    prompts.forEach((p, i) => {
+      expect(p).toContain(`Scene ${i + 1} of 10: ${GRACIOUS_SCENES[i].title}.`);
+      const scene = p.split("\nSCENE\n")[1].split("\nCOLORING STYLE\n")[0];
+      expect(scene).toContain(ACTIVITY[i]);
+      GRACIOUS_SCENES.forEach((other, j) => j !== i && expect(scene).not.toContain(other.text));
+    });
+  });
+  it("the eight sections, in order", () => {
+    for (const p of prompts) {
+      const at = ["COLLECTION\n", "\nCHARACTERS\n", "\nSCENE\n", "\nCOLORING STYLE\n", "\nCOMPOSITION\n", "\nRESTRICTIONS\n", "\nPRODUCTION\n", "\nOUTPUT\n"].map((h) => p.indexOf(h));
+      expect(at.every((x) => x >= 0)).toBe(true);
+      expect([...at].sort((x, y) => x - y)).toEqual(at);
+    }
+  });
+  it("no banners, frames, text boxes, titles, Scripture or drawn measurements; no typography or cover styles", () => {
+    for (const p of prompts) {
+      expect(p).toContain(NO_TEXT_RULE);
+      for (const f of FORBIDDEN) expect(p, String(f)).not.toMatch(f);
+      expect(p).not.toContain("Proverbs 31:25");
+      expect(p).not.toContain("Playfair");
+      expect(p).toContain("never draw numbers, sizes, pixel counts or labels on the image");
+    }
+  });
+  it("black and white only: no color, gradients, grayscale, shadows or watercolor", () => {
+    for (const p of prompts) {
+      expect(p).toContain("Pure white background. Bold, clean black outlines. Closed coloring shapes. No shading, no grayscale, no color, no gradients, no watercolor washes, no shadows");
+      expect(p).not.toMatch(HEX);
+    }
+  });
+  it("appropriate for girls ages 8–12", () => {
+    for (const p of prompts) {
+      expect(p).toContain("Audience: girls ages 8–12");
+      expect(p).toContain("Age-appropriate for girls ages 8–12: modest clothing");
+    }
+  });
+  it("one scene per image, and the white space Product Studio's text needs, in pixels of the 2550 × 3300 canvas", () => {
+    for (const p of prompts) {
+      expect(p).toContain("One scene only. No character sheets, multiple views, or alternate compositions.");
+      expect(p).toContain("2550 × 3300 px canvas");
+      expect(p).toContain("8.5 × 11-inch, 300-DPI print canvas (2550 × 3300 pixels)");
+      expect(p).toMatch(/the bottom \d+ px are where Product Studio places the page text/);
+      expect(p).toContain("the left and right 150 px keep the outer margin and binding gutter clear");
+    }
+  });
+});
+
+describe("Product Studio assembles the page: editable title and Scripture, 8.5 × 11, margins and gutter", () => {
+  const b = graciousKids();
+  const doc = resolveDocument(assembleColoringBook(b));
+  it("each picture on its own right-hand page with a blank back: twenty 8.5 × 11 portrait pages, 0.25 in outer margins and a 0.5 in binding gutter", () => {
+    expect(doc.recipe.pages.filter((p) => !p.filler)).toHaveLength(20);
+    const scenePages = doc.recipe.pages.filter((p) => p.recipeItemId.startsWith("scene-"));
+    expect(scenePages).toHaveLength(10);
+    expect(scenePages.every((p) => p.side === "recto")).toBe(true);
+    const backs = doc.recipe.pages.map((p, i) => [p, i] as const).filter(([p]) => p.recipeItemId.startsWith("back-"));
+    expect(backs.every(([, i]) => solvePage(doc, i).nodes.every((x) => x.type !== "text"))).toBe(true);
+    expect(resolveDocument(assembleColoringBook({ ...b, blankBacks: false })).recipe.pages.filter((p) => !p.filler)).toHaveLength(10);
+    doc.recipe.pages.forEach((p, i) => {
+      const g = geometryFor(doc, p, i);
+      expect([g.trimWidthIn, g.trimHeightIn, g.mediaWidthIn, g.mediaHeightIn]).toEqual([8.5, 11, 8.5, 11]);
+      expect(g.safe.top).toBeCloseTo(0.25);
+      expect(g.safe.bottom).toBeCloseTo(0.25);
+      const inside = p.side === "verso" ? g.safe.right : g.safe.left, outside = p.side === "verso" ? g.safe.left : g.safe.right;
+      expect(inside).toBeCloseTo(0.5);
+      expect(outside).toBeCloseTo(0.25);
+    });
+  });
+  it("each page carries its editable title and Scripture reference as text; the verse words wait for verification", () => {
+    doc.recipe.pages.forEach((p, i) => {
+      if (p.filler || !p.recipeItemId.startsWith("scene-")) return;
+      const texts = solvePage(doc, i).nodes.filter((x) => x.type === "text").map((x) => (x as { text: string }).text);
+      const k = GRACIOUS_SCENES.findIndex((s) => `scene-${s.id}` === p.recipeItemId);
+      expect(texts).toContain(GRACIOUS_SCENES[k].title);
+      expect(texts).toContain("Proverbs 31:25 (NIV)");
+      const verse = solvePage(doc, i).nodes.find((x) => x.type === "text" && (x as { text: string }).text === "Proverbs 31:25 (NIV)") as { align?: string };
+      expect(verse.align).toBe("center");
+    });
+    expect(verseLine({ ...b, verseVerified: true }, { ...GRACIOUS_SCENES[0], verseText: "She is clothed with strength and dignity." })).toBe("She is clothed with strength and dignity. Proverbs 31:25 (NIV)");
+    expect(verseLine(b, { ...GRACIOUS_SCENES[0], verseText: "She is clothed with strength and dignity." })).toBe("Proverbs 31:25 (NIV)");
+  });
+  it("typography is applied only here, at assembly", () => {
+    const blocks = pageBlocks({ ...b, pageTypography: { titleFont: "Great Vibes", scriptureFont: "Lato", align: "left", titleSizePt: 30 } }, GRACIOUS_SCENES[0]);
+    expect(blocks.find((x) => x.id === "title")).toMatchObject({ headingFont: "Great Vibes", headingSizePt: 30, headingAlign: "left" });
+  });
+  it("the illustration area is clear of the text, inside the margins and clear of the gutter on either side", () => {
+    const r = artRegion(b, GRACIOUS_SCENES[0]);
+    expect(r.rect.x).toBeCloseTo(0.5);
+    expect(r.rect.x + r.rect.w).toBeCloseTo(8);
+    expect(r.px).toMatchObject({ left: 150, right: 2400 });
+    expect(r.bottomTextPx).toBeGreaterThan(0);
+    const i = doc.recipe.pages.findIndex((p) => p.recipeItemId === "scene-g1");
+    const textTop = Math.min(...solvePage(doc, i).nodes.filter((x) => x.type === "text").map((x) => (x as { rect: { y: number } }).rect.y));
+    expect(r.rect.y + r.rect.h).toBeLessThanOrEqual(textTop + 1e-6);
+  });
+  it("a page-canvas image (2550 × 3300) fills the page; any other size is fitted whole into the illustration area, never stretched or cropped", () => {
+    const exact: ArtworkAsset = { id: "il-1", name: "scene1.png", mime: "image/png", widthPx: 2550, heightPx: 3300, hasAlpha: false, bytes: 1, addedAt: "" };
+    const square: ArtworkAsset = { id: "il-2", name: "scene2.png", mime: "image/png", widthPx: 1024, heightPx: 1024, hasAlpha: false, bytes: 1, addedAt: "" };
+    const scenes = [{ ...GRACIOUS_SCENES[0], illustrationId: exact.id, illustrationW: 2550, illustrationH: 3300 }, { ...GRACIOUS_SCENES[1], illustrationId: square.id, illustrationW: 1024, illustrationH: 1024 }];
+    const d = resolveDocument(assembleColoringBook(b, scenes, [exact, square]));
+    const a0 = artworkFor(d, d.recipe.pages.findIndex((p) => p.recipeItemId === "scene-g1"))[0];
+    expect(a0.box).toEqual({ x: 0, y: 0, w: 8.5, h: 11 });
+    expect(a0.draw).toEqual({ x: 0, y: 0, w: 8.5, h: 11 });
+    const a1 = artworkFor(d, d.recipe.pages.findIndex((p) => p.recipeItemId === "scene-g2"))[0];
+    const region = artRegion(b, scenes[1]).rect;
+    expect(a1.draw.w).toBeCloseTo(a1.draw.h);
+    expect(a1.draw.w).toBeLessThanOrEqual(region.w + 1e-9);
+    expect(a1.draw.h).toBeLessThanOrEqual(region.h + 1e-9);
+    expect(a1.draw.x).toBeGreaterThanOrEqual(0.5 - 1e-9);
+    expect(a1.draw.x + a1.draw.w).toBeLessThanOrEqual(8 + 1e-9);
+    expect(illustrationPlacement(b, scenes[1])).toMatchObject({ extent: "region", fit: "fit" });
+  });
+});
+
+describe("no saved characters yet", () => {
+  const b = graciousKids({ cast: [], castSelected: [], castLocked: false, characters: "Three ballet friends, ages 9 to 11, with clearly different hair and personalities." });
+  it("scenes wait for the cast; a cast-design prompt comes first; never “No saved characters”", () => {
+    expect(categoryBlocker(b)).toMatch(/Create your cast before the first scene/);
+    const p = castDesignPrompt(b);
+    expect(p).toContain("Three ballet friends, ages 9 to 11");
+    expect(p).toContain("front, three-quarter, side and back views");
+    expect(p).toContain("character registry");
+    expect(p).not.toMatch(/No saved characters/);
+  });
+});
+
+describe("uploaded references", () => {
+  const b = graciousKids();
+  it("the reference files (id + name) are what the studio copies or downloads for the image generator", () => {
+    expect(referenceFiles(b, castFor(b)).map((f) => [f.id, f.name])).toEqual([["ref-braids", "braids-reference.png"], ["ref-curls", "curls-reference.png"], ["ref-bun", "bun-reference.png"]]);
+    const group = { ...b, useGroupRef: true, groupRefId: "grp", groupRefName: "ballerinas-group.png" };
+    expect(referenceFiles(group, castFor(group))).toEqual([{ id: "grp", name: "ballerinas-group.png", who: "Group" }]);
+    expect(scenePrompt(group, b.scenes[0], 0)).toContain("Attached reference images (use them as the visual identity anchors): ballerinas-group.png.");
+  });
+  it("turning references off keeps the descriptions and drops the images", () => {
+    const off = { ...b, useRefs: false };
+    expect(referenceFiles(off, castFor(off))).toEqual([]);
+    const p = scenePrompt(off, b.scenes[0], 0);
+    expect(p).not.toContain("reference.png");
+    expect(p).toContain(BALLERINAS[0].face!);
+  });
+  it("a character without a reference image is named and described in full", () => {
+    const p = scenePrompt({ ...b, cast: b.cast.map((c) => (c.id === "bun" ? { ...c, refId: undefined, refName: undefined } : c)) }, b.scenes[0], 0);
+    expect(p).toContain("No reference image yet for Bun: follow the description above exactly.");
+  });
+});
+
+describe("regenerate a scene, keeping the characters", () => {
+  it("the prompt says why the last image was rejected and keeps the same registry", () => {
+    const b = graciousKids();
+    const p = scenePrompt(b, { ...b.scenes[0], attempts: 1, rejectNotes: "Curls' bow headband was missing" }, 0);
+    expect(p).toContain("REGENERATION (attempt 2): the previous image was not approved because: Curls' bow headband was missing.");
+    expect(p).toContain(REUSE_INSTRUCTION);
+  });
+});
 
 describe("scene batches", () => {
   it("splits at numbered headings, keeping each heading as the title", () => {
     const s = splitScenes("1. Warm-up at the barre\nThe dancers stretch.\n\n2. Opening night\nThey bow.\nTogether.\n\nScene 3: Backstage\nGiggles.", id);
     expect(s.map((x) => [x.title, x.text])).toEqual([["Warm-up at the barre", "The dancers stretch."], ["Opening night", "They bow.\nTogether."], ["Backstage", "Giggles."]]);
-    const md = splitScenes("## 1 The studio\nMirrors.\n## 2 The recital\nLights.", id);
-    expect(md.map((x) => x.title)).toEqual(["The studio", "The recital"]);
   });
-  it("without numbered headings, splits at blank lines (title from the first sentence)", () => {
-    const s = splitScenes("The girls tie their ribbons. They are ready.\n\n\nThey leap across the stage.", id);
-    expect(s.map((x) => x.title)).toEqual(["The girls tie their ribbons.", "They leap across the stage."]);
-    expect(s[0].text).toBe("The girls tie their ribbons. They are ready.");
+  it("without numbered headings, splits at blank lines", () => {
+    expect(splitScenes("The girls tie their ribbons. They are ready.\n\n\nThey leap across the stage.", id).map((x) => x.title)).toEqual(["The girls tie their ribbons.", "They leap across the stage."]);
   });
   it("a numbered heading with its words on the next line still gets a title", () => {
-    const s = splitScenes("1.\nAmara spins.\n\n2.\nLucía jumps.", id);
-    expect(s.map((x) => x.title)).toEqual(["Amara spins.", "Lucía jumps."]);
+    expect(splitScenes("1.\nAmara spins.\n\n2.\nLucía jumps.", id).map((x) => x.title)).toEqual(["Amara spins.", "Lucía jumps."]);
   });
 });
 
-describe("interior scenes stay black and white, with their own thickness and complexity", () => {
-  const b = gracious();
-  const [one, two] = b.scenes.map((s, i) => scenePrompt(b, s, i));
-  it("every scene inherits the saved cast and names the reference images to attach", () => {
-    for (const p of [one, two]) {
-      for (const d of DANCERS) expect(p).toContain(`- ${d.name}:`);
-      expect(p).toContain("Attach these reference images with this prompt: amara-reference.png, lucia-reference.png, grace-reference.png.");
-      expect(p).toContain("Keep these characters exactly consistent");
-    }
+describe("line art settings", () => {
+  const b = graciousKids({ scenes: [{ ...GRACIOUS_SCENES[0], lineThickness: "Thick", complexity: "Simple" }, { ...GRACIOUS_SCENES[1], lineThickness: "Thin", complexity: "Detailed" }] });
+  it("per-scene overrides, collection defaults otherwise (Medium, Moderate)", () => {
+    expect(scenePrompt(b, b.scenes[0], 0)).toContain("thick, bold lines (about 2 pt)");
+    expect(scenePrompt(b, b.scenes[1], 1)).toContain("Illustration complexity: detailed:");
+    expect(scenePrompt(b, GRACIOUS_SCENES[2], 2)).toContain("medium lines (about 1 pt)");
+    expect(scenePrompt(b, GRACIOUS_SCENES[2], 2)).toContain("Illustration complexity: moderate:");
   });
-  it("black outlines on white, no palette colors", () => {
-    for (const p of [one, two]) {
-      expect(p).toContain("Black outlines on a pure white background. No color, no gray shading");
-      expect(p).not.toMatch(HEX);
-    }
+  it("illustration styling is part of the prompt: style, proportions, hair and clothing detail, background, coloring areas", () => {
+    const p = scenePrompt({ ...b, illustrationStyle: "Modern cartoon line art", proportions: "Natural child proportions", hairClothingDetail: "Detailed", backgroundDensity: "Minimal", coloringArea: "Large" }, b.scenes[0], 0);
+    for (const t of ["Modern cartoon line art", "natural child proportions", "detailed hair and clothing detail", "minimal background", "large coloring areas"]) expect(p).toContain(t);
   });
-  it("scene 1 is Thick + Simple, scene 2 is Thin + Detailed", () => {
-    expect(one).toContain("thick, bold lines (about 2 pt)");
-    expect(one).toContain("Illustration complexity: simple:");
-    expect(two).toContain("thin, fine lines (about 0.5 pt)");
-    expect(two).toContain("Illustration complexity: detailed:");
-  });
-  it("collection defaults apply where a scene doesn't override (Medium, Moderate)", () => {
-    const p = scenePrompt(b, { id: "x", title: "Snack time", text: "…" }, 2);
-    expect(p).toContain("medium lines (about 1 pt)");
-    expect(p).toContain("Illustration complexity: moderate:");
-  });
-  it("hybrid is an explicit choice: palette on borders and accents only, the shapes stay white", () => {
+  it("hybrid is an explicit choice: palette accents only, the shapes stay white", () => {
     const h = scenePrompt({ ...b, coloringStyle: "hybrid" }, b.scenes[0], 0);
-    expect(h).toContain("Hybrid · colored accents only");
     expect(h).toContain("every shape a child colors stays white");
     for (const hex of paletteColors(b)) expect(h).toContain(hex);
   });
-  it("a scene can use only some of the cast", () => {
-    const p = scenePrompt(b, { ...b.scenes[0], castIds: ["amara"] }, 0);
-    expect(p).toContain("- Amara:");
-    expect(p).not.toContain("- Grace:");
-    expect(p).toContain("Attach these reference images with this prompt: amara-reference.png.");
-  });
-});
-
-describe("page outputs and layout", () => {
-  const b = gracious();
-  const s = b.scenes[0];
-  it("finished coloring page: room for the title and an NIV verse, no verse words until verified", () => {
-    const p = scenePrompt({ ...b, output: "coloring-page" }, s, 0);
-    expect(b.translation).toBe("NIV");
-    expect(p).toContain("Leave a clean, empty band for the title and the NIV verse");
-    expect(p).toContain("Do not draw any words");
-    expect(p).toContain("once their wording and permission are verified");
-    expect(scenePrompt({ ...b, verseVerified: true }, s, 0)).not.toContain("once their wording and permission are verified");
-  });
-  it("text-free illustration, worksheet with empty text areas, drawing page", () => {
-    expect(scenePrompt({ ...b, output: "illustration" }, s, 0)).toContain("No words, letters, numbers");
-    expect(scenePrompt({ ...b, output: "worksheet" }, s, 0)).toContain("EMPTY text areas");
-    expect(scenePrompt({ ...b, output: "drawing-page" }, s, 0)).toContain("large, empty framed area");
-  });
   it("only a reference sheet asks for several views", () => {
-    for (const o of ["coloring-page", "illustration", "worksheet", "drawing-page"] as const) {
-      const p = scenePrompt({ ...b, output: o }, s, 0);
-      expect(p, o).toContain("do not show several views");
-      expect(p, o).not.toContain("three-quarter");
-    }
-    const r = scenePrompt({ ...b, output: "reference-sheet" }, s, 0);
-    expect(r).toContain("front, three-quarter, side and back views");
-    expect(r).not.toContain("do not show several views");
+    expect(scenePrompt({ ...b, output: "reference-sheet" }, b.scenes[0], 0)).toContain("front, three-quarter, side and back views");
+    for (const o of ["coloring-page", "illustration", "worksheet", "drawing-page"] as const) expect(scenePrompt({ ...b, output: o }, b.scenes[0], 0)).toContain("One scene only.");
   });
-  it("live estimate of space left: coverage and text placement change it", () => {
-    const base = spaceEstimate({ ...b, output: "coloring-page", coverage: 60, textPlacement: "bottom" });
-    expect(base.ok).toBe(true);
-    expect(base.leftH).toBeCloseTo(base.usableH - base.artH - 1.5 - 0.2, 6);
-    const full = spaceEstimate({ ...b, output: "coloring-page", coverage: 95 });
-    expect(full.ok).toBe(false);
-    expect(full.summary).toMatch(/Over by/);
-    expect(spaceEstimate({ ...b, output: "illustration", coverage: 100 }).textH).toBe(0);
+  it("the live estimate of space left still works", () => {
+    expect(spaceEstimate({ ...b, output: "coloring-page", coverage: 95 }).ok).toBe(false);
   });
 });
 
-describe("the coloring book cover uses the same cast", () => {
-  const b = applyColoringCard(gracious({ category: "coloring-cover" }), "storybook");
+describe("the coloring book cover uses the same cast, in full color", () => {
+  const b = applyColoringCard(graciousKids({ category: "coloring-cover" }), "storybook");
   const p = coloringCoverPrompt(b);
-  it("Full-Color Storybook: full color, the palette, the three dancers and their reference images", () => {
+  it("Full-Color Storybook with the palette, the three ballerinas and their references", () => {
     expect(p).toContain("full-color storybook painting");
     for (const hex of paletteColors(b)) expect(p).toContain(hex);
-    for (const d of DANCERS) expect(p).toContain(`- ${d.name}:`);
-    expect(p).toContain("Attach these reference images with this prompt: amara-reference.png, lucia-reference.png, grace-reference.png.");
-    expect(p).toContain("only the cover is in color");
-    expect(referenceImages(b, castFor(b))).toEqual(["amara-reference.png", "lucia-reference.png", "grace-reference.png"]);
+    for (const c of BALLERINAS) expect(p).toContain(`. ${c.name}: Age`);
+    expect(p).toContain("Attach these reference images with this prompt: braids-reference.png, curls-reference.png, bun-reference.png.");
+    expect(referenceImages(b, castFor(b))).toHaveLength(3);
   });
-  it("only the selected cast is used; the group image replaces the individual ones when chosen", () => {
-    const two = coloringCoverPrompt({ ...b, castSelected: ["amara", "grace"] });
-    expect(two).not.toContain("- Lucía:");
-    expect(two).toContain("amara-reference.png, grace-reference.png.");
-    const group = coloringCoverPrompt({ ...b, groupRefId: "grp", groupRefName: "dancers-group.png", useGroupRef: true });
-    expect(group).toContain("Attach these reference images with this prompt: dancers-group.png.");
-    expect(group).not.toContain("amara-reference.png");
-  });
-  it("individual changes keep faces, hair texture and proportions", () => {
-    const c = coloringCoverPrompt({ ...b, cast: b.cast.map((d) => (d.id === "amara" ? { ...d, pose: "mid-pirouette", outfit: "a sparkly recital tutu" } : d)) });
-    expect(c).toContain("In this image: pose mid-pirouette; outfit a sparkly recital tutu.");
-    expect(c).toContain("the same facial features, hair texture, skin tone, proportions and distinctive traits");
-  });
-  it("artwork only draws no words (title set in Product Studio); a complete concept letters the exact title", () => {
+  it("artwork only: no plaque, banner or empty box for the title, and no drawn measurements", () => {
     expect(p).toContain("Artwork only: draw NO title, words or letters");
+    expect(p).toContain("no plaque, banner, ribbon, frame, cartouche or empty box");
+    expect(p).toContain("never draw numbers, sizes, pixel counts or labels on the image");
     expect(coloringCoverPrompt({ ...b, coverOutput: "complete-concept" })).toContain("letter the exact title “She Is Gracious”");
   });
-  it("a paperback wrap needs the printer's spine width before it can be handed off", () => {
-    const wrap = { ...b, product: "Workbook", format: "wrap" as const, spine: null };
-    expect(categoryCreateBlocker(wrap)).toMatch(/spine width/);
-    expect(categoryCreateBlocker({ ...wrap, spine: 0.25 })).toBeNull();
-    expect(categoryBlocker({ ...b, title: "" })).toMatch(/title/);
+  it("only the selected cast; cover-only changes; a wrap needs the printer's spine", () => {
+    expect(coloringCoverPrompt({ ...b, castSelected: ["braids", "bun"] })).not.toContain(". Curls:");
+    expect(coloringCoverPrompt({ ...b, cast: b.cast.map((c) => (c.id === "braids" ? { ...c, pose: "mid-pirouette" } : c)) })).toContain("On the cover: pose mid-pirouette.");
+    expect(categoryCreateBlocker({ ...b, format: "wrap", spine: null })).toMatch(/spine width/);
   });
-  it("the interior scenes stay black and white while the cover is full color", () => {
-    const interior = categoryPrompt({ ...b, category: "character" }, 0, []);
-    expect(interior).toContain("Black outlines on a pure white background");
-    expect(interior).not.toMatch(HEX);
+  it("interiors stay black and white while the cover is color", () => {
+    expect(categoryPrompt({ ...b, category: "character" }, 0, [])).not.toMatch(HEX);
     expect(categoryPrompt(b, 0, [])).toMatch(HEX);
   });
 });
 
-describe("suggested direction cards respect what was typed", () => {
-  it("a coloring cover card fills empty fields and keeps typed ones; switching cards replaces only card wording", () => {
-    const typed = gracious({ category: "coloring-cover", titlePlacement: "title in a ribbon banner" });
-    const a = applyColoringCard(typed, "watercolor");
-    expect(a.titlePlacement).toBe("title in a ribbon banner");
-    expect(a.coverColor).toMatch(/soft watercolor/);
-    const b = applyColoringCard(a, "cartoon");
-    expect(b.coverColor).toMatch(/bright cartoon/);
-    expect(b.titlePlacement).toBe("title in a ribbon banner");
-    expect(b.starterScene).toBe("the characters mid-celebration, full of joy");
+describe("cards and saving", () => {
+  it("cards respect typed fields", () => {
+    expect(applyColoringCard(graciousKids({ category: "coloring-cover", titlePlacement: "title across the top" }), "watercolor").titlePlacement).toBe("title across the top");
+    expect(applyCoverCard(newBrief({ imagery: "a lighthouse" }), "botanical")!.brief.imagery).toBe("a lighthouse");
   });
-  it("cover artwork cards set style and composition, and imagery only when empty", () => {
-    const r = applyCoverCard(newBrief({ imagery: "a lighthouse" }), "botanical")!;
-    expect(r.brief.style).toBe("Painterly botanical");
-    expect(r.brief.imagery).toBe("a lighthouse");
-    expect(r.direction).toBe(3);
-    expect(applyCoverCard(newBrief(), "botanical")!.brief.imagery).toMatch(/olive branch/);
+  it("the registry, scene approvals, illustrations and styling survive saving; old briefs get the defaults", () => {
+    const b = graciousKids({
+      scenes: [{ ...GRACIOUS_SCENES[0], illustrationId: "il", illustrationName: "s1.png", illustrationW: 2550, illustrationH: 3300, checks: { faces: true }, approvedAt: "2026-11-14T00:00:00.000Z", attempts: 2, rejectNotes: "hoops missing", lessonText: "Be kind" }],
+      useRefs: false, illustrationStyle: "Modern cartoon line art", backgroundDensity: "Full", pageTypography: { titleFont: "Great Vibes", scriptureFont: "Lato", align: "left", titleSizePt: 28 },
+    });
+    expect(normalizeBrief(JSON.parse(JSON.stringify(b)))).toEqual(b);
+    const old = normalizeBrief({ title: "Old" });
+    expect([old.castLocked, old.useRefs, old.gutter, old.illustrationStyle, old.lineThickness, old.complexity]).toEqual([false, true, 0.5, "Clean storybook line art", "Medium", "Moderate"]);
   });
 });
 
-describe("saving", () => {
-  it("cast, scenes and coloring choices survive saving and reopening; old briefs get the defaults", () => {
-    const b = applyColoringCard(gracious({ coloringStyle: "hybrid", coverage: 65, textPlacement: "top-and-bottom", useGroupRef: true, groupRefId: "grp", groupRefName: "g.png", coverApproved: "2026-11-14T00:00:00.000Z" }), "hybrid");
-    expect(normalizeBrief(JSON.parse(JSON.stringify(b)))).toEqual(b);
-    const old = normalizeBrief({ title: "Old" });
-    expect([old.coloringStyle, old.lineThickness, old.complexity, old.output, old.translation, old.keepConsistent, old.cast.length]).toEqual(["outline", "Medium", "Moderate", "coloring-page", "NIV", true, 0]);
+describe("Scripture coloring pages: the verse drawn into the artwork, only when chosen and verified", () => {
+  const verse = "She is clothed with strength and dignity; she can laugh at the days to come.";
+  const scene = { ...GRACIOUS_SCENES[5], verseText: verse, scriptureMode: "art" as const };
+  it("not verified yet: that scene waits, with the reason; the other scenes go ahead", () => {
+    const b = graciousKids({ scenes: [scene] });
+    expect(categoryBlocker(b)).toMatch(/Scene 1: the verse is to be drawn into the artwork: tick “Verse wording and permission verified” first/);
+    expect(categoryBlocker(graciousKids({ verseVerified: true, scenes: [{ ...scene, verseText: "" }] }))).toMatch(/enter its exact wording/);
+    const mixed = graciousKids({ scenes: [GRACIOUS_SCENES[0], scene] });
+    expect(categoryBlocker(mixed)).toBeNull();
+    const all = categoryPrompt(mixed, 0, []);
+    expect(all).toContain("Scene 1 of 2: Warm-up at the barre.");
+    expect(all).not.toContain("Scene 2 of 2:");
+    expect(all).toContain("(Not included yet: scene 2, the verse is to be drawn into the artwork");
+  });
+  it("verified: the exact verse, in hollow outline letters to color, with no banner or box; Product Studio adds only the title", () => {
+    const b = graciousKids({ verseVerified: true, scenes: [scene] });
+    expect(categoryBlocker(b)).toBeNull();
+    const p = scenePrompt(b, scene, 0);
+    expect(p).toContain(`“${verse}” — Proverbs 31:25 (NIV)`);
+    expect(p).toContain("hollow outline letters");
+    expect(p).toContain("No banner, ribbon, scroll, plaque or box behind or around the words.");
+    expect(p).toContain("The only lettering in the image is this Scripture verse");
+    expect(p).toContain("write out the lettered verse exactly as drawn");
+    for (const f of [/empty band/i, /title field/i, /No saved characters/i, /typograph/i]) expect(p).not.toMatch(f);
+    // The assembled page doesn't typeset the verse a second time.
+    const texts = pageBlocks(b, scene).map((x) => x.label);
+    expect(texts).toContain(GRACIOUS_SCENES[5].title);
+    expect(texts.join(" ")).not.toContain("Proverbs 31:25");
+  });
+  it("the collection default is Product Studio; one scene can choose the artwork", () => {
+    const b = graciousKids({ verseVerified: true, scenes: [GRACIOUS_SCENES[0], scene] });
+    expect(scenePrompt(b, b.scenes[0], 0)).toContain(NO_TEXT_RULE);
+    expect(scenePrompt(b, b.scenes[1], 1)).toContain("SCRIPTURE LETTERING");
+    const all = graciousKids({ verseVerified: true, scriptureMode: "art", scenes: [{ ...GRACIOUS_SCENES[0], verseText: verse }] });
+    expect(scenePrompt(all, all.scenes[0], 0)).toContain("SCRIPTURE LETTERING");
   });
 });

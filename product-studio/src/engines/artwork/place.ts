@@ -152,7 +152,7 @@ export function placeArtwork(art: ProjectArtwork | undefined, page: { item: stri
       cover = { key: p.id, assetId: a.id, use: "cover", box, draw: drawRect(box, a.widthPx, a.heightPx, p.fit, p.crop), opacity: 1, coverMode: p.mode, titleColor: p.titleColor ?? "palette" };
     } else if (p.use === "background") {
       if (!targets(p.targets, page.item, page.nth)) continue;
-      const box = p.extent === "safe" ? safe : mediaBox(g);
+      const box = p.extent === "region" && p.region ? { x: g.trimOffset.x + p.region.x, y: g.trimOffset.y + p.region.y, w: p.region.w, h: p.region.h } : p.extent === "safe" ? safe : mediaBox(g);
       // Mirrored: the image is flipped inside its box, and so is the crop, so the chosen part shows on the outer edge.
       const flip = !!p.mirror && page.side === "verso";
       const crop = flip ? { ...p.crop, x: 1 - p.crop.x } : p.crop;

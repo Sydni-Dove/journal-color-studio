@@ -16,6 +16,7 @@ import type { CastMember, Complexity, CoverBrief, LineThickness, PageOutput, Sce
 import { DIRECTIONS, GENERIC_STYLE_GUIDE, STYLE_GUIDES } from "./guides";
 import { paletteSpec } from "./prompt";
 import { fmt, resolveCoverSpec } from "./spec";
+import { artRegion, pageCanvas, type ArtRegion } from "./assemble";
 
 export const LINE_THICKNESS: { value: LineThickness; label: string; pt: number; words: string }[] = [
   { value: "Thin", label: "Thin", pt: 0.5, words: "thin, fine lines (about 0.5 pt) for colored pencils and older children" },
@@ -116,16 +117,33 @@ export function spaceEstimate(b: CoverBrief, output: PageOutput = b.output): Spa
   return { pageW, pageH, usableW, usableH, artH, textH, gap, leftH, ok, summary };
 }
 
-// ---- Prompt pieces ------------------------------------------------------------------------------
+// ---- Illustration styling (sent to the image generator) ----------------------------------------
+// Page typography (title and Scripture fonts, alignment, size, lesson text, placement) is NOT here: Product Studio
+// applies it when it assembles the page (engines/cover/assemble.ts), and it never reaches an image prompt.
+
+export const ILLUSTRATION_STYLES = ["Clean storybook line art", "Classic coloring-book line art", "Modern cartoon line art", "Gentle realistic line art", "Whimsical hand-drawn line art"] as const;
+export const PROPORTIONS = ["Natural child proportions", "Slightly stylized (a little larger heads)", "Cute and rounded (larger heads, small bodies)"] as const;
+export const DETAIL_LEVELS = ["Simple", "Moderate", "Detailed"] as const;
+export const BACKGROUND_DENSITY: { value: string; words: string }[] = [
+  { value: "Minimal", words: "minimal background: a floor line or a few simple props" },
+  { value: "Light", words: "a light background: a few setting details that frame the characters" },
+  { value: "Full", words: "a full background: the whole setting drawn, still in open, colorable shapes" },
+];
+export const COLORING_AREAS: { value: string; words: string }[] = [
+  { value: "Large", words: "large coloring areas, easy for younger hands" },
+  { value: "Medium", words: "medium coloring areas" },
+  { value: "Small", words: "smaller coloring areas for patient, older colorists" },
+];
 
 export function coloringStyleLine(b: CoverBrief, thickness: LineThickness, complexity: Complexity): string {
   const line = LINE_THICKNESS.find((x) => x.value === thickness)!.words;
   const detail = COMPLEXITY.find((x) => x.value === complexity)!.words;
+  const area = COLORING_AREAS.find((x) => x.value === b.coloringArea)?.words ?? b.coloringArea;
   const color =
     b.coloringStyle === "hybrid"
-      ? `Hybrid · colored accents only: use the palette (${paletteSpec(b).replace(/^Use the exact /, "").replace(/ Preserve the palette.*$/, "")}) ONLY for the page border and a few small accents; every shape a child colors stays white, with black outlines.`
-      : "Black outlines on a pure white background. No color, no gray shading, no gradients and no filled black areas (except tiny details such as pupils). Every shape closed, so it can be colored.";
-  return `COLORING STYLE\n${color}\nLine thickness: ${line}. Illustration complexity: ${detail}.`;
+      ? `Hybrid · colored accents only: black outlines on a pure white background; the palette (${paletteSpec(b).replace(/^Use the exact /, "").replace(/ Preserve the palette.*$/, "")}) is used ONLY for a few small accents; every shape a child colors stays white. No gradients, grayscale, shadows or watercolor washes.`
+      : "Pure white background. Bold, clean black outlines. Closed coloring shapes. No shading, no grayscale, no color, no gradients, no watercolor washes, no shadows, no hatching and no filled black areas (tiny details such as pupils may be solid black).";
+  return `COLORING STYLE\n${color}\nLine thickness: ${line}. Illustration complexity: ${detail}. Coloring areas: ${area}.`;
 }
 
 /** The cast members a scene (or the cover) uses: its own choice, else the collection's selection, else the whole cast. */
@@ -136,72 +154,176 @@ export function castFor(b: CoverBrief, ids?: string[]): CastMember[] {
 
 /** The reference images to attach with a prompt, by file name: the group image when chosen, else each character's own. */
 export function referenceImages(b: CoverBrief, cast: CastMember[]): string[] {
+  if (!b.useRefs) return [];
   if (b.useGroupRef && b.groupRefName) return [b.groupRefName];
   return cast.flatMap((c) => (c.refName ? [c.refName] : []));
 }
 
-function castBlock(b: CoverBrief, cast: CastMember[], heading = "CHARACTERS"): string {
-  if (!cast.length) return `${heading}\nNo saved characters: draw the scene's people simply, warm and age-appropriate.`;
+/** The reference images as stored files (id + name), for copying or downloading them to hand to the image generator. */
+export function referenceFiles(b: CoverBrief, cast: CastMember[]): { id: string; name: string; who: string }[] {
+  if (!b.useRefs) return [];
+  if (b.useGroupRef && b.groupRefId) return [{ id: b.groupRefId, name: b.groupRefName ?? "group-reference", who: "Group" }];
+  return cast.flatMap((c) => (c.refId ? [{ id: c.refId, name: c.refName ?? `${c.name}-reference`, who: c.name }] : []));
+}
+
+/** One character's registry entry as prompt text. */
+export function registryLine(c: CastMember, n: number, withRef: boolean): string {
+  const parts: string[] = [];
+  const add = (label: string, v?: string) => v?.trim() && parts.push(`${label}: ${v.trim()}`);
+  add("Age", c.age);
+  add("Face", c.face);
+  add("Hair", c.hair);
+  add("Hair accessories", c.hairAccessories);
+  add("Body proportions", c.proportions);
+  add("Signature clothing", c.clothing);
+  add("Distinctive accessories", c.accessories);
+  add("Always keep", c.traits);
+  add("Notes", c.description);
+  return `${n}. ${c.name}${parts.length ? ": " + parts.join("; ") : ""}.${withRef && c.refName ? ` Reference image: ${c.refName}.` : ""}`.replace(/\.\./g, ".");
+}
+
+export const REUSE_INSTRUCTION =
+  "Reuse the exact established characters from this collection. Preserve facial features, hairstyle, hair accessories, body proportions, and signature clothing. Change only the expressions, poses, and actions required by this scene. Do not redesign or replace characters.";
+
+/** The established characters, their references, and the reuse instruction. Only called when the collection has a cast. */
+function registryBlock(b: CoverBrief, cast: CastMember[]): string {
   const refs = referenceImages(b, cast);
-  const lines = cast.map((c) => {
-    const changes = (["pose", "expression", "outfit", "hairstyle"] as const).filter((k) => c[k]).map((k) => `${k} ${c[k]}`);
-    const keep = c.traits ? `Always keep: ${c.traits}.` : "";
-    return `- ${c.name}: ${c.description}${c.description.endsWith(".") ? "" : "."} ${keep}${changes.length ? ` In this image: ${changes.join("; ")}.` : ""}${!b.useGroupRef && c.refName ? ` Reference image: ${c.refName}.` : ""}`.replace(/\s+/g, " ").trim();
-  });
-  const consistent = b.keepConsistent
-    ? "Keep these characters exactly consistent with the attached reference images and the interior pages: the same facial features, hair texture, skin tone, proportions and distinctive traits. Only the pose, expression, outfit or hairstyle listed for this image may change."
-    : "Use the characters as described; small differences from the references are acceptable.";
-  return `${heading}\n${lines.join("\n")}\n${consistent}${refs.length ? `\nAttach these reference images with this prompt: ${refs.join(", ")}.` : ""}`;
+  const missing = b.useRefs && !(b.useGroupRef && b.groupRefName) ? cast.filter((c) => !c.refName).map((c) => c.name) : [];
+  return [
+    "CHARACTERS",
+    "Established characters for this collection:",
+    ...cast.map((c, i) => registryLine(c, i + 1, b.useRefs && !(b.useGroupRef && b.groupRefName))),
+    REUSE_INSTRUCTION,
+    refs.length ? `Attached reference images (use them as the visual identity anchors): ${refs.join(", ")}.` : "",
+    missing.length ? `No reference image yet for ${missing.join(", ")}: follow the description above exactly.` : "",
+  ].filter(Boolean).join("\n");
 }
 
-function outputBlock(b: CoverBrief, output: PageOutput, cast: CastMember[], scene: Scene): string {
-  const place = TEXT_PLACEMENTS.find((x) => x.value === b.textPlacement)!.label.toLowerCase();
-  switch (output) {
-    case "coloring-page":
-      return `OUTPUT: a finished coloring page with a title and a Scripture verse.
-Leave a clean, empty band for the title and the ${b.translation} verse (${place}). Do not draw any words, letters or verse text: the title “${scene.title}” and the verse${b.scripture ? ` (${b.scripture})` : ""} are typeset in Product Studio${b.verseVerified ? "" : " once their wording and permission are verified"}.`;
-    case "illustration":
-      return "OUTPUT: a text-free illustration. No words, letters, numbers, labels or signs anywhere in the image.";
-    case "worksheet":
-      return `OUTPUT: a Bible lesson worksheet. A smaller illustration of the scene, and clearly framed, EMPTY text areas (${place}) for questions, answers and the lesson: leave every box blank; Product Studio fills them with editable text. Draw no words.`;
-    case "drawing-page":
-      return `OUTPUT: a drawing page. A small starter illustration from the scene and a large, empty framed area for the child's own drawing. Leave a band (${place}) for the instruction, typeset in Product Studio. Draw no words.`;
-    case "reference-sheet":
-      return `OUTPUT: a character reference sheet. Show ${cast.length ? cast.map((c) => c.name).join(", ") : "each character"} in front, three-quarter, side and back views, plus three facial expressions each, evenly spaced on one sheet, in the same outline style. No scene background and no words.`;
-  }
+/** The words a coloring page must never contain in its image (Product Studio adds all text afterwards). */
+export const NO_TEXT_RULE =
+  "Generate only the illustration. Do not include text, lettering, words, numbers, title banners, scripture boxes, frames, borders, ribbons intended for text, or decorative text containers. Reserve unobstructed white space for Product Studio to add editable titles, Scripture, and lesson content during page assembly. This white space must have no visible outline or boundary.";
+
+/** Why scene prompts can't be built yet (null = they can): a collection's scenes need its cast first. */
+export function sceneBlocker(b: CoverBrief): string | null {
+  if (!b.cast.length) return "Create your cast before the first scene: add your characters under Cast & references (or copy the cast-design prompt there to have them designed first).";
+  // A scene whose verse isn't ready waits on its own; the batch is blocked only when no scene is ready.
+  const waiting = b.scenes.map((s, i) => [i, verseArtBlocker(b, s)] as const).filter(([, why]) => why);
+  if (b.scenes.length && waiting.length === b.scenes.length) return `Scene ${waiting[0][0] + 1}: ${waiting[0][1]}`;
+  return null;
 }
 
-/** The prompt for one scene: the collection's settings, the scene's overrides, its cast and its page. */
-export function scenePrompt(b: CoverBrief, scene: Scene, index = 0): string {
+/** A verse to be lettered into the artwork needs its exact wording, entered and verified (image tools misspell lettering). */
+export function verseArtBlocker(b: CoverBrief, s: Scene): string | null {
+  if ((s.scriptureMode ?? b.scriptureMode) !== "art") return null;
+  if (!s.verseText?.trim() || !(s.scriptureRef || b.scripture).trim()) return "the verse is to be drawn into the artwork: enter its exact wording and reference first.";
+  if (!b.verseVerified) return "the verse is to be drawn into the artwork: tick “Verse wording and permission verified” first.";
+  return null;
+}
+
+/** The verse the image generator letters into a Scripture coloring page (null = Product Studio adds the Scripture). */
+export function letteredVerse(b: CoverBrief, s: Scene): { words: string; ref: string } | null {
+  if ((s.scriptureMode ?? b.scriptureMode) !== "art" || verseArtBlocker(b, s)) return null;
+  return { words: s.verseText!.trim(), ref: `${(s.scriptureRef || b.scripture).trim()} (${b.translation})` };
+}
+
+/** The no-text rule, or, on a Scripture coloring page, the one exception: the verse, lettered exactly. */
+function textRule(verse: { words: string; ref: string } | null): string {
+  if (!verse) return NO_TEXT_RULE;
+  return `The only lettering in the image is this Scripture verse, as part of the coloring art. Do not include any other text, words, numbers, title banners, scripture boxes, frames, borders, ribbons intended for text, or decorative text containers. Reserve unobstructed white space for Product Studio to add the editable title during page assembly. This white space must have no visible outline or boundary.`;
+}
+
+/** The prompt for one scene, in the collection's structure: collection, characters, scene, style, composition, restrictions, production, output. */
+export function scenePrompt(b: CoverBrief, scene: Scene, index = 0, region?: ArtRegion): string {
   const output = scene.output ?? b.output;
   const thickness = scene.lineThickness ?? b.lineThickness;
   const complexity = scene.complexity ?? b.complexity;
   const cast = castFor(b, scene.castIds);
-  const spec = resolveCoverSpec({ ...b, format: "front" });
-  const est = spaceEstimate(b, output);
-  const style = `${b.style}. ${STYLE_GUIDES[b.style] || GENERIC_STYLE_GUIDE}`;
-  const single = output === "reference-sheet" ? "" : "\nOne single image of this one scene: do not show several views, a turnaround or a character sheet.";
-  return `Create ${output === "reference-sheet" ? "a character reference sheet" : `scene ${index + 1} of a children's coloring book`}: ${b.collection || b.title || "a children's coloring book"}${b.audience ? `, for ${b.audience}` : ` (${b.ageGroup.toLowerCase()})`}.
+  const page = pageCanvas(b);
+  const r = region ?? artRegion(b, scene);
+  const total = Math.max(b.scenes.length, index + 1);
+  const bg = BACKGROUND_DENSITY.find((x) => x.value === b.backgroundDensity)?.words ?? b.backgroundDensity;
+  const sheet = output === "reference-sheet";
+  const verse = sheet ? null : letteredVerse(b, scene);
+  const white: string[] = [];
+  if (r.topTextPx) white.push(`the top ${r.topTextPx} px`);
+  if (r.bottomTextPx) white.push(`the bottom ${r.bottomTextPx} px`);
+  const regen = scene.attempts
+    ? `\nREGENERATION (attempt ${scene.attempts + 1}): the previous image was not approved${scene.rejectNotes?.trim() ? ` because: ${scene.rejectNotes.trim()}` : ""}. Fix that, and keep exactly the same established characters.`
+    : "";
+  return `COLLECTION
+${b.collection || b.title || "Children's coloring book"}. Audience: ${b.audience || b.ageGroup}. Established illustration style: ${b.illustrationStyle}; ${b.proportions.toLowerCase()}; ${b.hairClothingDetail.toLowerCase()} hair and clothing detail; ${bg}.
 
-SCENE ${index + 1}: ${scene.title}
-${scene.text || scene.title}${single}
+${registryBlock(b, cast)}
 
-${castBlock(b, cast)}
+SCENE
+Scene ${index + 1} of ${total}: ${scene.title}.
+${scene.text.trim() || scene.title}
+Characters in this scene: ${cast.map((c) => c.name).join(", ")}. Show the actions, expressions and interactions this scene describes; the setting changes, the characters do not.${regen}${verse ? `
+
+SCRIPTURE LETTERING
+Hand-letter this verse into the illustration, spelled exactly, word for word, with its reference:
+“${verse.words}” — ${verse.ref}
+Use large, hollow outline letters with black outlines and white insides that children can color, placed as part of the design inside the artwork area. No banner, ribbon, scroll, plaque or box behind or around the words. Check every word and its spelling against the text above.` : ""}
 
 ${coloringStyleLine(b, thickness, complexity)}
-Visual language for the line art: ${style}
 
-${outputBlock(b, output, cast, scene)}
+COMPOSITION
+${sheet
+    ? `A character reference sheet: ${cast.map((c) => c.name).join(", ")} each in front, three-quarter, side and back views plus three facial expressions, evenly spaced on one sheet. No scene background.`
+    : "One scene only. No character sheets, multiple views, or alternate compositions."} Keep all artwork inside x ${r.px.left}–${r.px.right} px and y ${r.px.top}–${r.px.bottom} px of the ${r.canvas.pxW} × ${r.canvas.pxH} px canvas; everything outside it stays pure, unobstructed white${white.length ? ` (${white.join(" and ")} are where Product Studio places the page text` : " ("}${white.length ? "; " : ""}the left and right ${r.px.left} px keep the outer margin and binding gutter clear). Preserve unobstructed white space where the final layout requires it.
 
-PAGE
-${fmt(spec.trimW)} × ${fmt(spec.trimH)} inch page, ${Math.round(spec.trimW * b.dpi)} × ${Math.round(spec.trimH * b.dpi)} pixels at ${b.dpi} DPI, portrait. Keep every line at least ${fmt(b.safe)} inches inside the page edge. The illustration takes about ${b.coverage}% of the safe area (${fmt(est.usableW)} × ${fmt(est.artH)} inches).
+RESTRICTIONS
+${textRule(verse)} ${verse ? "No" : "No Scripture text,"} watermarks, signatures, or unnecessary borders. Age-appropriate for ${b.audience || b.ageGroup.toLowerCase()}: modest clothing, kind and joyful expressions.${b.avoid ? ` Avoid: ${b.avoid}.` : ""}
 
-QUALITY GATES
-Age-appropriate, warm and kind; respectful, diverse representation. No watermark, signature or frame unless asked.${b.avoid ? ` Avoid: ${b.avoid}.` : ""} After the image, state its pixel size and confirm it has no text.`;
+PRODUCTION
+Portrait illustration intended for assembly onto an ${fmt(page.trimW)} × ${fmt(page.trimH)}-inch, ${page.dpi}-DPI print canvas (${page.pxW} × ${page.pxH} pixels). If the tool cannot output exactly ${page.pxW} × ${page.pxH} pixels, keep the portrait ${fmt(page.trimW)}:${fmt(page.trimH)} proportion and state the actual size; do not claim a higher resolution than the image has. Every measurement in this prompt is an instruction only: never draw numbers, sizes, pixel counts or labels on the image.
+
+OUTPUT
+${verse ? "One standalone illustration asset with the verse lettered in. Product Studio adds the editable title afterward. After the image, state its pixel size and write out the lettered verse exactly as drawn, so it can be proofread." : "One standalone illustration asset. Product Studio adds all editable text afterward. After the image, state its pixel size and confirm it contains no text."}`;
 }
 
+/** Every ready scene's prompt (a scene waiting for its verse wording is left out, and listed at the end). */
 export function allScenePrompts(b: CoverBrief): string {
-  return b.scenes.map((s, i) => scenePrompt(b, s, i)).join("\n\n━━━━━━━━━━━━━━━━━━━━\n\n");
+  const ready = b.scenes.map((s, i) => [s, i] as const).filter(([s]) => !verseArtBlocker(b, s));
+  const waiting = b.scenes.map((s, i) => [i, verseArtBlocker(b, s)] as const).filter(([, why]) => why);
+  const all = ready.map(([s, i]) => scenePrompt(b, s, i)).join("\n\n━━━━━━━━━━━━━━━━━━━━\n\n");
+  return waiting.length ? `${all}\n\n(Not included yet: ${waiting.map(([i, why]) => `scene ${i + 1}, ${why}`).join("; ")})` : all;
+}
+
+/**
+ * Before the first scene, when no characters exist yet: a prompt to design the cast as a reference sheet, from
+ * the collection's notes ("Your characters"). Its result becomes the group reference image and the registry.
+ */
+export function castDesignPrompt(b: CoverBrief): string {
+  const who = b.characters.trim() || `${b.characterCount} recurring children for ${b.collection || "this coloring book"}`;
+  return `COLLECTION
+${b.collection || b.title || "Children's coloring book"}. Audience: ${b.audience || b.ageGroup}. Illustration style: ${b.illustrationStyle}; ${b.proportions.toLowerCase()}.
+
+CHARACTERS TO DESIGN
+${who}
+Design each as an original, recognisable character: a clear age, face, hair texture and hairstyle, hair accessories, body proportions, signature clothing and one distinctive accessory, all different enough to tell apart at a glance in black-and-white line art.
+
+COMPOSITION
+A character reference sheet: each character in front, three-quarter, side and back views plus three facial expressions, evenly spaced on one sheet, with the character's name under each. No scene background.
+
+${coloringStyleLine(b, b.lineThickness, b.complexity)}
+
+OUTPUT
+One reference sheet. After the image, list each character with the age, face, hair, hair accessories, proportions, signature clothing and accessories you drew, so they can be saved in the collection's character registry.`;
+}
+
+/** Cast lines for the coloring book cover (a pose, outfit or hairstyle set for the cover applies to the cover only). */
+function coverCastBlock(b: CoverBrief, cast: CastMember[]): string {
+  if (!cast.length) return "COVER CAST\nThis collection has no established characters yet: draw the children simply, warm and age-appropriate.";
+  const refs = referenceImages(b, cast);
+  const lines = cast.map((c, i) => {
+    const changes = (["pose", "expression", "outfit", "hairstyle"] as const).filter((k) => c[k]).map((k) => `${k} ${c[k]}`);
+    return `${registryLine(c, i + 1, b.useRefs && !(b.useGroupRef && b.groupRefName))}${changes.length ? ` On the cover: ${changes.join("; ")}.` : ""}`;
+  });
+  const consistent = b.keepConsistent
+    ? "Keep these characters exactly consistent with the attached reference images and the interior pages: the same facial features, hair texture, skin tone, proportions and distinctive traits. Only the pose, expression, outfit or hairstyle listed for the cover may change."
+    : "Use the characters as described; small differences from the references are acceptable.";
+  return `COVER CAST (use only these characters, exactly as in the interior)\n${lines.join("\n")}\n${consistent}${refs.length ? `\nAttach these reference images with this prompt: ${refs.join(", ")}.` : ""}`;
 }
 
 // ---- Suggested directions (cards) ---------------------------------------------------------------
@@ -290,13 +412,13 @@ Scene: ${b.starterScene || "the characters together"}.
 Palette: ${paletteSpec(b)}
 Visual language: ${b.style}. ${STYLE_GUIDES[b.style] || GENERIC_STYLE_GUIDE}
 
-${castBlock(b, cast, "COVER CAST (use only these characters, exactly as in the interior)")}
+${coverCastBlock(b, cast)}
 
 TEXT
-${artOnly ? `Artwork only: draw NO title, words or letters. Keep the title area (${b.titlePlacement || "top third"}) calm and clear; the title${b.scripture ? ", the verse" : ""} and any other text are added as editable text in Product Studio.` : `Complete cover concept: letter the exact title “${b.title.trim()}”${b.subtitle ? ` and subtitle “${b.subtitle}”` : ""}. Never insert “Untitled” or filler text. Final editable text is set in Product Studio.`}
+${artOnly ? `Artwork only: draw NO title, words or letters. Keep the title area (${b.titlePlacement || "top third"}) as open, uncluttered background (sky, wall or soft color) with no plaque, banner, ribbon, frame, cartouche or empty box; the title${b.scripture ? ", the verse" : ""} and any other text are added as editable text in Product Studio.` : `Complete cover concept: letter the exact title “${b.title.trim()}”${b.subtitle ? ` and subtitle “${b.subtitle}”` : ""}. Never insert “Untitled” or filler text. Final editable text is set in Product Studio.`}
 
 PRODUCTION GEOMETRY
-Finished trim: ${fmt(spec.trimW)} × ${fmt(spec.trimH)} inches${wrap ? " per panel" : ""}. Outer bleed: ${fmt(spec.bleed)} inches per edge. Target canvas: ${fmt(spec.canvasW)} × ${fmt(spec.canvasH)} inches; ${spec.pxW} × ${spec.pxH} pixels at ${spec.dpi} DPI. Keep faces, the title area and important details ${spec.safeText}. ${wrap ? (spec.spine ? `Spine: ${fmt(spec.spine)} inches (printer-confirmed); keep text clear of the folds.` : "Spine width is unconfirmed; this concept is NOT a final print-ready wrap.") : "No spine on this canvas."} No mockup, no 3D book, no crop marks.
+Finished trim: ${fmt(spec.trimW)} × ${fmt(spec.trimH)} inches${wrap ? " per panel" : ""}. Outer bleed: ${fmt(spec.bleed)} inches per edge. Target canvas: ${fmt(spec.canvasW)} × ${fmt(spec.canvasH)} inches; ${spec.pxW} × ${spec.pxH} pixels at ${spec.dpi} DPI. Keep faces, the title area and important details ${spec.safeText}. ${wrap ? (spec.spine ? `Spine: ${fmt(spec.spine)} inches (printer-confirmed); keep text clear of the folds.` : "Spine width is unconfirmed; this concept is NOT a final print-ready wrap.") : "No spine on this canvas."} No mockup, no 3D book, no crop marks. Every measurement in this prompt is an instruction only: never draw numbers, sizes, pixel counts or labels on the image.
 
 QUALITY GATES
 Warm, joyful, age-appropriate; respectful, diverse representation. No watermark.${b.avoid ? ` Avoid: ${b.avoid}.` : ""} After the image, state its pixel size and list any text that must be typeset.`;
