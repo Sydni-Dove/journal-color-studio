@@ -1,5 +1,5 @@
 import type { ColorPalette, ColorTokens } from "../../types/tokens";
-import { JCS_PALETTES_ADAPTED } from "../../design-library/palettes";
+import { JCS_COVER_ONLY_ADAPTED, JCS_PALETTES_ADAPTED } from "../../design-library/palettes";
 
 /**
  * Dove Expressions brand colors — defined independently inside Product Studio
@@ -109,6 +109,12 @@ PALETTES.push(
   // Approved Journal Color Studio palettes and color families (one-way snapshot).
   ...JCS_PALETTES_ADAPTED,
 );
+
+/**
+ * The palettes the Cover Studio offers: every product palette, plus the Journal Color Studio Prayer Journal / Prayer Warrior /
+ * Warring Woman ones (kept out of PALETTES so no product's color picker changes).
+ */
+export const COVER_PALETTES: ColorPalette[] = [...PALETTES, ...JCS_COVER_ONLY_ADAPTED];
 
 export function findPalette(id: string): ColorPalette {
   return PALETTES.find((p) => p.id === id) ?? PALETTES[0];

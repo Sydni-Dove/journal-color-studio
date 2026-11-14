@@ -28,21 +28,21 @@ function pushRecent(id: string) {
   }
 }
 
-export function PalettePicker({ value, onPick }: { value: string; onPick: (id: string) => void }) {
-  const current = PALETTES.find((p) => p.id === value);
+export function PalettePicker({ value, onPick, palettes = PALETTES }: { value: string; onPick: (id: string) => void; /** The palettes to offer (default: every product palette). */ palettes?: ColorPalette[] }) {
+  const current = palettes.find((p) => p.id === value);
   const [filter, setFilter] = useState<Filter>(() => (current?.brandPalette ? "dove" : current ? familyOf(current) : "dove"));
   const recent = readRecent();
   const list = useMemo(() => {
     const ok = (p: ColorPalette) =>
       filter === "all" ? true : filter === "dove" ? !!p.brandPalette : filter === "recent" ? recent.includes(p.id) : familyOf(p) === filter;
-    const l = PALETTES.filter(ok);
+    const l = palettes.filter(ok);
     return filter === "recent" ? recent.map((id) => l.find((p) => p.id === id)).filter((p): p is ColorPalette => !!p) : l;
-  }, [filter, recent.join()]);
+  }, [filter, recent.join(), palettes]);
   const chips: { id: Filter; label: string }[] = [
     ...(recent.length ? [{ id: "recent" as Filter, label: "Recent" }] : []),
     { id: "dove", label: "Dove Expressions" },
     ...COLOR_FAMILIES.map((f) => ({ id: f as Filter, label: f })),
-    { id: "all", label: `All (${PALETTES.length})` },
+    { id: "all", label: `All (${palettes.length})` },
   ];
   return (
     <div className="palette-picker">
