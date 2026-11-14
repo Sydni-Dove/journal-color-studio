@@ -15,7 +15,7 @@ import { useMemo, useState } from "react";
 import { resolveDocument, type ResolvedDocument } from "../../engines/document/resolve";
 import { removeNode, structureFromItems, updateNode } from "../../engines/recipe/bookEdit";
 import {
-  addDaily, addDivider, addEndCover, addFrontCover, addMonthly, addPageOfType, addToEachMonth, addToEachWeek, addWeekly, addYearly,
+  addCardSheet, addDaily, addDivider, addEndCover, addFrontCover, addMonthly, addPageOfType, addToEachMonth, addToEachWeek, addWeekly, addYearly,
   BUILDER_CATEGORIES, builderRows, categoryOf, primaryCategories, stepPeriod, WEEKLY_JOURNAL, type BuilderCategory, type BuilderRow, type WeeklyJournalKind,
 } from "../../engines/recipe/pageBuilder";
 import { getLayout } from "../../layouts/registry";
@@ -212,6 +212,7 @@ function Category({ cat, rows, allRows, edit, onEdit, doc, structure, project }:
             <button type="button" className="btn" onClick={() => add((n) => addPageOfType(n, "lined-journal"))}>+ Journal page</button>
             <button type="button" className="btn" onClick={() => add((n) => addPageOfType(n, "guided"))}>+ Prompts + writing space</button>
             <button type="button" className="btn" onClick={() => add((n) => addPageOfType(n, "custom"))}>+ Custom page</button>
+            <button type="button" className="btn" onClick={() => add((n) => addCardSheet(n))}>+ Card sheet</button>
           </>
         )}
         {cat === "notes" && <button type="button" className="btn" onClick={() => add((n) => addPageOfType(n, "notes"))}>+ Notes page</button>}

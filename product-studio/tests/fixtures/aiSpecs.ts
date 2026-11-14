@@ -8,7 +8,7 @@ import type { DocSpec, SpecComponent, SpecSection } from "../../src/engines/gene
 
 let n = 0;
 export function part(kind: SpecComponent["kind"], x: Partial<SpecComponent> = {}): SpecComponent {
-  return { id: `c${++n}`, kind, label: null, text: null, source: "suggested", fromEntryField: null, fields: [], rows: null, numbered: false, fillPage: false, lines: null, items: [], marker: null, size: null, ...x };
+  return { id: `c${++n}`, kind, label: null, text: null, source: "suggested", fromEntryField: null, fields: [], rows: null, numbered: false, fillPage: false, lines: null, items: [], marker: null, size: null, cards: [], ...x };
 }
 const f = (label: string, valueType: SpecComponent["fields"][number]["valueType"] = "text") => ({ label, valueType });
 export function section(id: string, title: string, components: SpecComponent[], x: Partial<SpecSection> = {}): SpecSection {

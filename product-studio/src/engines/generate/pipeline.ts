@@ -12,10 +12,11 @@ import { resolveDocument } from "../document/resolve";
 import { projectFromSpec } from "./convert";
 import { checkSpec, MAX_DOCUMENT_PAGES, minimumPages, tooManyPages, unplacedContent, type CheckedSpec, type DocSpec } from "./spec";
 import type { ProductProject } from "../../types/project";
+import { DEFAULT_TRANSLATION } from "../../presets/scripture";
 
 /** Ask the Edge Function for a proposal (raw: the studio checks it next). */
-export async function requestSpec(description: string, content: string): Promise<string> {
-  const { data, error } = await supabase().functions.invoke("generate-document", { body: { description, content } });
+export async function requestSpec(description: string, content: string, translation: string = DEFAULT_TRANSLATION): Promise<string> {
+  const { data, error } = await supabase().functions.invoke("generate-document", { body: { description, content, translation } });
   if (error) {
     const res = "context" in error ? (error as { context?: unknown }).context : null;
     const detail = res instanceof Response ? await res.clone().json().catch(() => null) : null;

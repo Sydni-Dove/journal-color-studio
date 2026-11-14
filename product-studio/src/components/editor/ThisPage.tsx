@@ -36,7 +36,7 @@ export function ThisPageHeading({ doc, current, onDuplicate }: { doc: ResolvedDo
 export function AddToPageHint({ doc, current, usage }: { doc: ResolvedDocument; current: number; usage: ProjectUsage }) {
   const p = doc.recipe.pages[current];
   if (!p) return null;
-  const hasSections = p.layoutId === "guided-page" || p.layoutId.startsWith("stationery:");
+  const hasSections = p.layoutId === "guided-page" || p.layoutId === "card-sheet" || p.layoutId.startsWith("stationery:");
   if (hasSections || usage.sidebar.supported || usage.dailySections) return null;
   const cover = p.layoutId === "cover-page" || p.layoutId === "back-cover-page" || p.layoutId === "divider-page";
   return (

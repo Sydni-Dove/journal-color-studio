@@ -4,6 +4,8 @@
  * becomes an ordinary product made of the studio's own components, and the
  * studio's engines measure, paginate and draw it. Every check reads solved pages.
  */
+import { NIV_NOTICE } from "../src/presets/scripture";
+import type { BookStep } from "../src/types/recipe";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { checkSpec, MAX_DOCUMENT_PAGES, minimumPages, SpecError, unplacedContent, type DocSpec } from "../src/engines/generate/spec";
@@ -348,3 +350,78 @@ describe("page limit and server rules (Phase 8 review)", () => {
     expect(fn.indexOf("edge_usage_logs\").insert")).toBeLessThan(fn.indexOf("api.openai.com/v1/chat/completions"));
   });
 });
+
+describe("lessons, Scripture, drawing boxes, circle-one choices and cards", () => {
+  const card = (title: string, ref: string) => ({ title, subtitle: "Spiritual gift", front: ref, back: [{ label: "Meaning", text: `${title} helps others.` }, { label: "Scripture", text: `“We have different gifts, according to the grace given to each of us.” Romans 12:6 (NIV)` }] });
+  const spec: DocSpec = {
+    title: "Growing Good Fruit", summary: "", page: { size: "8.5x11", orientation: "portrait", binding: "loose", why: "" }, entries: null, notes: [],
+    sections: [
+      section("lesson", "Lesson 1: Love — Caring for Others", [
+        part("text", { label: "Learn It", text: "“Love is patient, love is kind.” 1 Corinthians 13:4 (NIV)" }),
+        part("list", { label: "Choose It: What would you do?", items: ["Take a deep breath", "Tell a grown-up", "Grab the toy back"], marker: "circle" }),
+        part("drawing", { label: "Draw it", text: "Draw a time you helped someone.", lines: 12 }),
+      ]),
+      section("cards", "God Can Use Me! cards", [part("cards", { label: "Gift cards", text: "Draw it!", cards: [card("Encouragement", "Romans 12:8"), card("Teaching", "Romans 12:7"), card("Mercy", "Romans 12:8"), card("Giving", "Romans 12:8"), card("Serving", "1 Peter 4:10")] })]),
+    ],
+  };
+  const checked = checkSpec(spec, { description: "A kids' Bible activity journal with lessons and Scripture, and gift cards." });
+
+  it("the parts are kept, and every Scripture the AI wrote is listed to check, card by card", () => {
+    const kinds = checked.spec.sections.flatMap((s) => s.components.map((c) => c.kind));
+    expect(kinds).toEqual(["text", "list", "drawing", "cards"]);
+    expect(checked.spec.sections[0].components[1].marker).toBe("circle");
+    expect(checked.spec.sections[1].components[0].cards).toHaveLength(5);
+    const refs = checked.flags.filter((f) => f.kind === "reference").map((f) => f.where);
+    expect(refs.some((w) => /part 1/.test(w))).toBe(true);
+    expect(refs.filter((w) => /card \d/.test(w))).toHaveLength(5);
+  });
+
+  it("a cards part with no cards, or cards with no title, is left out and said so", () => {
+    const c = checkSpec({ ...spec, sections: [section("x", "Cards", [part("cards", { cards: [{ title: " ", subtitle: null, front: null, back: [] }] }), part("text", { text: "Hello" })])] }, { description: "Cards please" });
+    expect(c.spec.sections[0].components.map((x) => x.kind)).toEqual(["text"]);
+    expect(c.problems.some((p) => p.level === "left-out" && /cards/.test(p.message))).toBe(true);
+  });
+
+  it("builds: the lesson page with a circle-one list and an outlined drawing box, card sheets after it, and the NIV notice", () => {
+    const project = projectFromSpec(checked);
+    const steps = project.recipe.structure!.filter((n): n is BookStep => n.kind === "step");
+    expect(steps.map((s) => s.layoutId)).toEqual(["guided-page", "card-sheet"]);
+    const blocks = steps[0].promptSet!.blocks;
+    expect(blocks.find((b) => b.kind === "list")!.listMarker).toBe("circle");
+    const box = blocks.find((b) => b.responseStyle === "blank")!;
+    expect(box).toMatchObject({ label: "Draw it", prompt: "Draw a time you helped someone.", frame: "outline", space: "fixed", lineCount: 12 });
+    expect(blocks.at(-1)!.prompt).toBe(NIV_NOTICE);
+    expect(steps[1].start).toBe("recto");
+    // The notice fits the lesson page: it doesn't add a page.
+    expect(resolveDocument(project).recipe.pages.filter((p) => p.recipeItemId === steps[0].id)).toHaveLength(1);
+    expect(steps[1].cards!.cards.map((c) => c.title)).toEqual(["Encouragement", "Teaching", "Mercy", "Giving", "Serving"]);
+    expect(steps[1].cards!.artLabel).toBe("Draw it!");
+    // 5 cards: two pages of fronts, each with its page of backs.
+    const doc = resolveDocument(project);
+    expect(doc.recipe.pages.filter((p) => p.layoutId === "card-sheet")).toHaveLength(4);
+  });
+
+  it("no NIV quoted, no notice; KJV and the maker's own notice are left alone", () => {
+    const kjv = checkSpec({ ...spec, sections: [section("l", "Lesson", [part("text", { text: "“Charity suffereth long.” 1 Corinthians 13:4 (KJV)" })])] }, { description: "A lesson" });
+    expect(JSON.stringify(projectFromSpec(kjv).recipe.structure)).not.toContain("Biblica");
+    const own = checkSpec({ ...spec, sections: [section("l", "Lesson", [part("text", { text: "“Love is patient.” 1 Corinthians 13:4 (NIV)" }), part("text", { text: NIV_NOTICE })])] }, { description: "A lesson" });
+    expect(JSON.stringify(projectFromSpec(own).recipe.structure).split("Biblica").length - 1).toBe(1);
+  });
+
+  it("cards only: the NIV notice gets a page of its own at the front", () => {
+    const only = checkSpec({ ...spec, sections: [spec.sections[1]] }, { description: "Gift cards" });
+    const steps = projectFromSpec(only).recipe.structure!.filter((n): n is BookStep => n.kind === "step");
+    expect(steps.map((s) => s.layoutId)).toEqual(["guided-page", "card-sheet"]);
+    expect(steps[0].promptSet!.blocks[0].prompt).toBe(NIV_NOTICE);
+  });
+
+  it("a full first page: the notice goes on a short page at the front, never onto a page of its own after it", () => {
+    const full = checkSpec({ ...spec, sections: [section("l", "Lesson", [part("text", { text: "“Love is patient, love is kind.” 1 Corinthians 13:4 (NIV)" }), part("drawing", { label: "Draw it", text: "Draw it.", lines: 28 })])] }, { description: "A lesson" });
+    const project = projectFromSpec(full);
+    const steps = project.recipe.structure!.filter((n): n is BookStep => n.kind === "step");
+    expect(steps.map((s) => s.title)).toEqual(["Scripture Quotations", "Lesson"]);
+    expect(steps[0].promptSet!.blocks[0].prompt).toBe(NIV_NOTICE);
+    expect(resolveDocument(project).recipe.pages).toHaveLength(2);
+  });
+});
+

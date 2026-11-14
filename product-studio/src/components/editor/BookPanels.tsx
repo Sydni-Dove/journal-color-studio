@@ -12,6 +12,7 @@ import { PageThumb } from "../preview/PageThumb";
 import { thumbHeight, usePhone } from "../../utils/usePhone";
 import { designNameTaken, savePageDesign } from "../../engines/recipe/pageDesigns";
 import { PromptEditor, type PromptFit } from "./PromptEditor";
+import { CardSheetEditor } from "./CardSheetEditor";
 import { sectionLineCounts, sectionPages } from "../../layouts/shared/promptPages";
 import { promptSetFromList } from "../../types/prompts";
 import { layoutAvailability, solvePage, type ResolvedDocument } from "../../engines/document/resolve";
@@ -201,6 +202,11 @@ export function StepFields({ s, siblings, scope, props, parts }: { s: BookStep; 
         </>
       )}
       {has("cover") && (s.module === "cover-page" || s.module === "back-cover" || s.module === "divider-page") && <CoverDividerControls step={s} set={set} colors={doc.colors} titleFont={doc.typography.fonts.cover} onTitleFont={(cover) => update((p) => ({ ...p, typography: { ...p.typography, fonts: { ...p.typography.fonts, cover }, roleOverrides: { ...p.typography.roleOverrides, coverTitle: { ...p.typography.roleOverrides.coverTitle, ...luxeTitleStyle(cover) } } } }))} applyPreset={() => update((p) => ({ ...p, colors: { paletteId: NEUTRAL_LUXE_ID, overrides: {} }, typography: { ...p.typography, fonts: { ...p.typography.fonts, cover: LUXE_TITLE_FONT }, roleOverrides: { ...p.typography.roleOverrides, coverTitle: { ...p.typography.roleOverrides.coverTitle, ...luxeTitleStyle(LUXE_TITLE_FONT) }, coverSubtitle: { ...p.typography.roleOverrides.coverSubtitle, ...LUXE_SUBTITLE_STYLE } } } }))}/>}
+      {has("sections") && s.layoutId === "card-sheet" && (
+        <div className="composer" data-testid="card-sheet">
+          <CardSheetEditor value={s.cards} onChange={(cards) => set({ cards })} />
+        </div>
+      )}
       {has("sections") && guided && (() => {
         const editor = (
           <PromptEditor

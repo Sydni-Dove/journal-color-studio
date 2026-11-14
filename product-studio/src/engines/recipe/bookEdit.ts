@@ -92,6 +92,7 @@ const MODULE_FOR_LAYOUT: Record<string, BookStep["module"]> = {
   "journal-lined": "lined-journal",
   "notes-page": "notes",
   "guided-page": "custom",
+  "card-sheet": "custom",
 };
 
 function cadenceOf(r: RepeatRule): RecipeCadence {
