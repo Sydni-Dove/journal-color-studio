@@ -39,6 +39,45 @@ const req = (id: string) => REQUESTS.find((x) => x.id === id)!;
 const saved = (page: Page) => page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("dove-product-studio:v1:project:")).map((k) => JSON.parse(localStorage.getItem(k)!)));
 
 describe("Generate with AI", () => {
+  it("upload a document: Word and PDF text go into Your own wording word for word, after what's there, and are sent with the request", async () => {
+    const r = req("devotional");
+    const page = await studio({ spec: JSON.stringify(r.spec) });
+    const sent: string[] = [];
+    page.on("request", (q) => { if (q.url().includes("/functions/v1/generate-document")) sent.push(q.postData() ?? ""); });
+    const fx = (n: string) => new URL(`../fixtures/uploads/${n}`, import.meta.url).pathname;
+    await page.getByLabel("Your own wording").fill("My intro line.");
+    await page.getByLabel("Upload a document").setInputFiles(fx("lesson.docx"));
+    await page.getByTestId("ai-uploaded").waitFor();
+    const afterWord = await page.getByLabel("Your own wording").inputValue();
+    expect(afterWord.startsWith("My intro line.\n\nGrowing Good Fruit\n\nLesson 1: Love — Caring for Others")).toBe(true);
+    expect(afterWord).toContain("Read Galatians 5:22–23. “Love” is the first fruit & it’s listed first.");
+    expect(afterWord).toContain("- Learn It");
+    await expect(page.getByTestId("ai-uploaded").textContent()).resolves.toMatch(/lesson\.docx/);
+    // A PDF, read by PDF.js in its own worker in the built app.
+    await page.getByLabel("Upload a document").setInputFiles(fx("lesson.pdf"));
+    await expect.poll(() => page.getByLabel("Your own wording").inputValue(), { timeout: 15_000 }).toContain("Lesson 2: Love - Loving When It's Difficult");
+    await expect(page.getByTestId("ai-uploaded").textContent()).resolves.toMatch(/1 page has no text/);
+    // Files it can't read say what to do.
+    await page.getByLabel("Upload a document").setInputFiles({ name: "old.doc", mimeType: "application/msword", buffer: Buffer.from("x") });
+    await expect(page.getByRole("alert").textContent()).resolves.toMatch(/save it as \.docx/);
+    // The count, and the request carries the uploaded wording exactly.
+    await expect(page.getByTestId("ai-content-count").textContent()).resolves.toMatch(/of 60,000 characters/);
+    await page.getByLabel("Describe your document").fill(r.description);
+    await page.getByRole("button", { name: "Propose an outline" }).click();
+    await page.getByRole("heading", { name: "Review the outline" }).waitFor();
+    expect(JSON.parse(sent[0]).content).toBe(await (async () => afterWord + "\n\n" + "Growing Good Fruit\n\nLesson 1: Love - Caring for Others\nRead Galatians 5:22-23 and talk about it.\nLearn It. See It. Choose It.\n\nLesson 2: Love - Loving When It's Difficult")());
+    await page.context().close();
+  }, 60_000);
+
+  it("wording over one proposal's limit: the count warns and Propose is off", async () => {
+    const page = await studio({ spec: "{}" });
+    await page.getByLabel("Describe your document").fill("A long children's activity journal from my manuscript.");
+    await page.getByLabel("Your own wording").fill("x".repeat(60_001));
+    await expect(page.getByTestId("ai-content-count").textContent()).resolves.toMatch(/60,001 of 60,000 characters\. That's more than one proposal can take/);
+    await expect(page.getByRole("button", { name: "Propose an outline" }).isDisabled()).resolves.toBe(true);
+    await page.context().close();
+  }, 60_000);
+
   it("a devotional from the maker's own days: their words marked and kept exactly, the outline edited, the product created, saved and reopened", async () => {
     const r = req("devotional");
     const page = await studio({ spec: JSON.stringify(r.spec) });

@@ -11,6 +11,10 @@ import { SIZES, type CheckedSpec, type DocSpec, type PageSize, type SpecComponen
 import type { ProductProject } from "../../types/project";
 import { PageThumb } from "../preview/PageThumb";
 import { resolveDocument } from "../../engines/document/resolve";
+import { extractDocumentText, UPLOAD_ACCEPT, UploadError } from "../../engines/import/documentText";
+
+/** The most of the maker's own wording one proposal takes (the same limit as the generate-document function). */
+export const MAX_CONTENT_CHARS = 60000;
 
 const SIZE_LABEL: Record<PageSize, string> = { "5.5x8.5": "5.5 × 8.5 in", "6x9": "6 × 9 in", "7x9": "7 × 9 in", "8x10": "8 × 10 in", "8.5x11": "8.5 × 11 in (Letter)", a5: "A5", a4: "A4" };
 const BINDING_LABEL: Record<DocSpec["page"]["binding"], string> = { book: "Bound book", spiral: "Spiral", stapled: "Stapled booklet", loose: "Loose pages" };
@@ -158,6 +162,26 @@ export function AiDocumentWizard({ onCreate, onCancel, signedIn = true, account 
   const [checked, setChecked] = useState<CheckedSpec | null>(null);
   const [spec, setSpec] = useState<DocSpec | null>(null);
   const [alt, setAlt] = useState<string | null>(null);
+  // Document upload into Your own wording: the file's text, word for word (engines/import/documentText.ts).
+  const [reading, setReading] = useState(false);
+  const [uploaded, setUploaded] = useState<{ name: string; chars: number; notes: string[] } | null>(null);
+  const [uploadError, setUploadError] = useState("");
+  const upload = async (file: File | undefined) => {
+    if (!file || reading) return;
+    setUploadError("");
+    setReading(true);
+    try {
+      const got = await extractDocumentText(file);
+      // Added after anything already typed or uploaded, never in place of it.
+      setContent((c) => (c.trim() ? `${c.trimEnd()}\n\n${got.text}` : got.text));
+      setUploaded({ name: got.name, chars: got.text.length, notes: got.notes });
+    } catch (e) {
+      setUploadError(e instanceof UploadError ? e.message : `“${file.name}” couldn't be read. Try saving it again as .docx or .txt.`);
+    } finally {
+      setReading(false);
+    }
+  };
+  const tooLong = content.length > MAX_CONTENT_CHARS;
 
   const generate = async () => {
     if (busy) return; // one request at a time
@@ -220,9 +244,34 @@ export function AiDocumentWizard({ onCreate, onCancel, signedIn = true, account 
           <span>Your own wording (optional)</span>
           <textarea className="data-textarea" rows={6} value={content} aria-label="Your own wording" placeholder="Paste questions, instructions, days or entries you've already written. They're used exactly as you wrote them." onChange={(e) => setContent(e.target.value)} />
         </label>
+        <div className="row ai-upload">
+          <label className="btn" aria-disabled={reading}>
+            {reading ? "Reading the document…" : "Upload a document"}
+            <input
+              type="file"
+              accept={UPLOAD_ACCEPT}
+              aria-label="Upload a document"
+              style={{ display: "none" }}
+              disabled={reading}
+              onChange={(e) => { void upload(e.target.files?.[0]); e.target.value = ""; }}
+            />
+          </label>
+          <span className="hint">Word (.docx), PDF, or text (.txt, .md). Its text goes into Your own wording, word for word, after anything already there.</span>
+        </div>
+        {uploaded && (
+          <div className="hint" data-testid="ai-uploaded">
+            <p>Added the text of “{uploaded.name}” ({uploaded.chars.toLocaleString("en-US")} characters). Check it above before you continue.</p>
+            {uploaded.notes.length > 0 && <ul>{uploaded.notes.map((n) => <li key={n}>{n}</li>)}</ul>}
+          </div>
+        )}
+        {uploadError && <p className="data-issue" role="alert">{uploadError}</p>}
+        <p className={tooLong ? "data-issue" : "hint"} data-testid="ai-content-count">
+          {content.length.toLocaleString("en-US")} of {MAX_CONTENT_CHARS.toLocaleString("en-US")} characters
+          {tooLong ? ". That's more than one proposal can take. Split it into one product, or a few lessons, at a time." : ""}
+        </p>
         <p className="hint">The AI suggests structure and wording; your own wording is kept word for word. Nothing it suggests is checked against laws or regulations — verify anything that must be.</p>
         <div className="row">
-          <button className="btn btn--primary" disabled={busy || description.trim().length < 10} onClick={() => void generate()}>{busy ? "Proposing an outline…" : "Propose an outline"}</button>
+          <button className="btn btn--primary" disabled={busy || reading || tooLong || description.trim().length < 10} onClick={() => void generate()}>{busy ? "Proposing an outline…" : "Propose an outline"}</button>
         </div>
         {error && <p className="data-issue" role="alert">{error}</p>}
           </>
