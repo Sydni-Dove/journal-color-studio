@@ -87,7 +87,8 @@ export type PromptBlockKind = "prompt" | "heading" | "info" | "divider" | "space
 /** A printed list item; `level` 0 = top level, 1 = nested under the item before it, … */
 export type ListItem = { text: string; level?: number };
 /** How a printed list marks its items. Numbers count per level ("1." / "a." / "i."), across page breaks. */
-export type ListMarker = "bullet" | "number" | "checkbox";
+/** List markers: "checkbox" a box to tick; "circle" an empty circle to fill in ("circle one" answer choices). */
+export type ListMarker = "bullet" | "number" | "checkbox" | "circle";
 /**
  * A repeating record's numbering: "No. 1", "No. 2", … across the whole product.
  * Records with the same `sequence` share one count (default: the section's own id,

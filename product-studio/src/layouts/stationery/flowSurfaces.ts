@@ -30,7 +30,7 @@ export function listMarkers(items: ListItem[], marker: ListMarker): string[] {
     counters.length = level + 1;
     counters[level] = (counters[level] ?? 0) + 1;
     if (marker === "bullet") return level % 2 ? "◦" : "•";
-    if (marker === "checkbox") return "";
+    if (marker === "checkbox" || marker === "circle") return "";
     const n = counters[level];
     return level % 3 === 0 ? `${n}.` : level % 3 === 1 ? `${alpha(n)}.` : `${ROMAN[n - 1] ?? n}.`;
   });
@@ -46,7 +46,7 @@ export function measureList(zone: StationeryZone, width: number, ctx: LayoutCont
   const m = getLayoutMeasurer().measure, st = styleForRole(ctx.typography, "body");
   const line = lineBoxIn(ctx.typography, "body");
   const box = Math.min(line * 0.8, 0.16);
-  const markerIn = marker === "checkbox" ? box + ctx.spacing.checkboxGap : Math.max(...markers.map((x) => m(x, st)), m("99.", st)) + ctx.spacing.checkboxGap;
+  const markerIn = marker === "checkbox" || marker === "circle" ? box + ctx.spacing.checkboxGap : Math.max(...markers.map((x) => m(x, st)), m("99.", st)) + ctx.spacing.checkboxGap;
   const gap = ctx.spacing.block / 2;
   return {
     items: items.map((it, i) => {
@@ -76,9 +76,10 @@ export function drawList(id: string, rect: Rect, zone: StationeryZone, ctx: Layo
   for (let i = from; i < to; i++) {
     const it = lay.items[i];
     const x = rect.x + it.indentIn;
-    if ((zone.listMarker ?? "bullet") === "checkbox") {
+    const marker = zone.listMarker ?? "bullet";
+    if (marker === "checkbox" || marker === "circle") {
       const s = Math.min(line * 0.8, 0.16);
-      nodes.push(box(`${id}-i${i}-box`, { x, y: y + (line - s) / 2, w: s, h: s }, { component: "Checkbox", strokePt: Math.max(0.5, ctx.pattern.lineWeightPt) }));
+      nodes.push(box(`${id}-i${i}-box`, { x, y: y + (line - s) / 2, w: s, h: s }, { component: "Checkbox", strokePt: Math.max(0.5, ctx.pattern.lineWeightPt), ...(marker === "circle" ? { radiusIn: s / 2 } : {}) }));
     } else {
       nodes.push(text(`${id}-i${i}-marker`, { x, y, w: it.markerIn, h: line }, it.marker, "body", { component: "Text", vAlign: "top" }));
     }

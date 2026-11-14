@@ -115,6 +115,8 @@ export type BookStep = {
   subtitle?: string;
   /** Cover / divider page settings (absent on other pages and legacy projects). */
   cover?: CoverDividerSettings;
+  /** Card sheet pages (layout "card-sheet"): the cards and how they print. */
+  cards?: CardSheetContent;
   /** Prompt overrides for guided pages (saved before prompt blocks; still read). */
   prompts?: string[];
   /** Prompt + response blocks for guided pages (wins over `prompts`). */
@@ -147,6 +149,35 @@ export type BookGroup = {
 export type BookNode = BookStep | BookGroup;
 
 /** Module content handed to the layout (title for the period + prompts). */
+/**
+ * CARD SHEET (layout "card-sheet") — cards to print and cut apart: 4, 6 or 8 to a page in two
+ * columns, each page of fronts followed by its page of backs (placed so each back prints behind its
+ * front when the sheet is printed on both sides), with dashed cutting guides and trim marks.
+ */
+export type CardSheetContent = {
+  cards: CardContent[];
+  /** Cards on each page: 4 (2 × 2, default), 6 (2 × 3) or 8 (2 × 4). */
+  perSheet?: 4 | 6 | 8;
+  /** A page of backs after each page of fronts (default true). */
+  doubleSided?: boolean;
+  /** How the printer turns the paper for the second side: on its long edge (default) or short edge. */
+  flip?: "long-edge" | "short-edge";
+  /** The front's picture space: a framed box to draw in or attach art to (default), or none. */
+  frontArt?: "box" | "none";
+  /** Small label at the top of each picture box ("Draw it!"). */
+  artLabel?: string;
+};
+
+/** One card: its front (title, optional subtitle and line at the foot) and its back (labelled parts). */
+export type CardContent = {
+  title: string;
+  subtitle?: string;
+  /** A short line at the foot of the front (a Scripture reference, "Ask: …"). */
+  front?: string;
+  /** The back, top to bottom: each part's label ("Scripture") and text. */
+  back: { label: string; text: string }[];
+};
+
 export type PageModuleContent = {
   type: PageModuleType;
   title: string;
@@ -157,6 +188,8 @@ export type PageModuleContent = {
   promptSet?: import("./prompts").PromptSet;
   /** Cover / divider page settings (absent on other pages). */
   cover?: CoverDividerSettings;
+  /** Card sheet pages (layout "card-sheet"): the cards and how they print. */
+  cards?: CardSheetContent;
   /**
    * Record sections: the number this instance's first record gets, by section id —
    * assigned in book order by the recipe, so numbering runs across the whole product.

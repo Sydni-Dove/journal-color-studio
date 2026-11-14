@@ -120,7 +120,7 @@ export type ListComponent = Base & {
   label: string;
   prompt?: string;
   items: { text: string; level?: number }[];
-  marker: "bullet" | "number" | "checkbox";
+  marker: "bullet" | "number" | "checkbox" | "circle";
 };
 /**
  * A repeating record: one record template drawn `count` times — notary

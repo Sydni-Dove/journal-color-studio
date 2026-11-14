@@ -11,11 +11,16 @@ import { SIZES, type CheckedSpec, type DocSpec, type PageSize, type SpecComponen
 import type { ProductProject } from "../../types/project";
 import { PageThumb } from "../preview/PageThumb";
 import { resolveDocument } from "../../engines/document/resolve";
+import { extractDocumentText, UPLOAD_ACCEPT, UploadError } from "../../engines/import/documentText";
+import { DEFAULT_TRANSLATION, TRANSLATIONS, type TranslationId } from "../../presets/scripture";
+
+/** The most of the maker's own wording one proposal takes (the same limit as the generate-document function). */
+export const MAX_CONTENT_CHARS = 60000;
 
 const SIZE_LABEL: Record<PageSize, string> = { "5.5x8.5": "5.5 × 8.5 in", "6x9": "6 × 9 in", "7x9": "7 × 9 in", "8x10": "8 × 10 in", "8.5x11": "8.5 × 11 in (Letter)", a5: "A5", a4: "A4" };
 const BINDING_LABEL: Record<DocSpec["page"]["binding"], string> = { book: "Bound book", spiral: "Spiral", stapled: "Stapled booklet", loose: "Loose pages" };
 const KIND_LABEL: Record<SpecComponent["kind"], string> = {
-  heading: "Heading", text: "Text", fields: "Fill-in blanks", writing: "Writing space", checklist: "Checklist", table: "Table", list: "List", records: "Record cards", divider: "Divider", spacer: "Space",
+  heading: "Heading", text: "Text", fields: "Fill-in blanks", writing: "Writing space", checklist: "Checklist", table: "Table", list: "List", records: "Record cards", divider: "Divider", spacer: "Space", drawing: "Drawing box", cards: "Card sheet",
 };
 const EXAMPLES = [
   "A 30-day prayer journal: each day has a Scripture to copy out, what I sense God saying, and a prayer.",
@@ -52,7 +57,13 @@ function Part({ c, i, n, set, remove, shift }: { c: SpecComponent; i: number; n:
           <input type="text" value={c.kind === "heading" ? (c.text ?? c.label ?? "") : (c.label ?? "")} onChange={(e) => set(c.kind === "heading" ? { ...c, text: e.target.value, label: null } : { ...c, label: e.target.value || null })} />
         </label>
       )}
-      {(c.kind === "text" || c.kind === "writing") && !c.fromEntryField && (
+      {c.kind === "cards" && (
+        <div className="hint" data-testid="ai-cards">
+          <p>{c.cards.length} card{c.cards.length === 1 ? "" : "s"}, each with a front and a back, printed to cut apart. Edit each card's wording after creating (Pages → the card sheet).</p>
+          <ol>{c.cards.slice(0, 12).map((k, j) => <li key={j}><strong>{k.title}</strong>{k.back.length ? ` · back: ${k.back.map((p) => p.label).filter(Boolean).join(", ")}` : ""}</li>)}{c.cards.length > 12 && <li>…and {c.cards.length - 12} more</li>}</ol>
+        </div>
+      )}
+      {(c.kind === "text" || c.kind === "writing" || c.kind === "drawing") && !c.fromEntryField && (
         <label className="field">
           <span>{c.kind === "text" ? "Text" : "Prompt (optional)"}</span>
           <textarea className="data-textarea" rows={c.kind === "text" ? 4 : 2} value={c.text ?? ""} onChange={(e) => set({ ...c, text: e.target.value || null })} />
@@ -127,7 +138,7 @@ function OutlineSection({ s, i, n, spec, set, remove, shift }: { s: SpecSection;
         <button
           type="button"
           className="btn"
-          onClick={() => set({ ...s, components: [...s.components, { id: `${s.id}-added-${s.components.length + 1}`, kind: "writing", label: "Notes", text: null, source: "suggested", fromEntryField: null, fields: [], rows: null, numbered: false, fillPage: false, lines: 6, items: [], marker: null, size: null }] })}
+          onClick={() => set({ ...s, components: [...s.components, { id: `${s.id}-added-${s.components.length + 1}`, kind: "writing", label: "Notes", text: null, source: "suggested", fromEntryField: null, fields: [], rows: null, numbered: false, fillPage: false, lines: 6, items: [], marker: null, size: null, cards: [] }] })}
         >
           + Add writing space
         </button>
@@ -153,18 +164,40 @@ const tidy = (spec: DocSpec): DocSpec => ({
 export function AiDocumentWizard({ onCreate, onCancel, signedIn = true, account }: { onCreate: (p: ProductProject) => void; onCancel: () => void; signedIn?: boolean; account?: ReactNode }) {
   const [description, setDescription] = useState("");
   const [content, setContent] = useState("");
+  // The Bible translation any Scripture the AI writes is quoted from.
+  const [translation, setTranslation] = useState<TranslationId>(DEFAULT_TRANSLATION);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [checked, setChecked] = useState<CheckedSpec | null>(null);
   const [spec, setSpec] = useState<DocSpec | null>(null);
   const [alt, setAlt] = useState<string | null>(null);
+  // Document upload into Your own wording: the file's text, word for word (engines/import/documentText.ts).
+  const [reading, setReading] = useState(false);
+  const [uploaded, setUploaded] = useState<{ name: string; chars: number; notes: string[] } | null>(null);
+  const [uploadError, setUploadError] = useState("");
+  const upload = async (file: File | undefined) => {
+    if (!file || reading) return;
+    setUploadError("");
+    setReading(true);
+    try {
+      const got = await extractDocumentText(file);
+      // Added after anything already typed or uploaded, never in place of it.
+      setContent((c) => (c.trim() ? `${c.trimEnd()}\n\n${got.text}` : got.text));
+      setUploaded({ name: got.name, chars: got.text.length, notes: got.notes });
+    } catch (e) {
+      setUploadError(e instanceof UploadError ? e.message : `“${file.name}” couldn't be read. Try saving it again as .docx or .txt.`);
+    } finally {
+      setReading(false);
+    }
+  };
+  const tooLong = content.length > MAX_CONTENT_CHARS;
 
   const generate = async () => {
     if (busy) return; // one request at a time
     setError("");
     setBusy(true);
     try {
-      const raw = await requestSpec(description, content);
+      const raw = await requestSpec(description, content, translation);
       const c = checkProposal(raw, description, content);
       setChecked(c);
       setSpec(c.spec);
@@ -220,9 +253,40 @@ export function AiDocumentWizard({ onCreate, onCancel, signedIn = true, account 
           <span>Your own wording (optional)</span>
           <textarea className="data-textarea" rows={6} value={content} aria-label="Your own wording" placeholder="Paste questions, instructions, days or entries you've already written. They're used exactly as you wrote them." onChange={(e) => setContent(e.target.value)} />
         </label>
-        <p className="hint">The AI suggests structure and wording; your own wording is kept word for word. Nothing it suggests is checked against laws or regulations — verify anything that must be.</p>
+        <div className="row ai-upload">
+          <label className="btn" aria-disabled={reading}>
+            {reading ? "Reading the document…" : "Upload a document"}
+            <input
+              type="file"
+              accept={UPLOAD_ACCEPT}
+              aria-label="Upload a document"
+              style={{ display: "none" }}
+              disabled={reading}
+              onChange={(e) => { void upload(e.target.files?.[0]); e.target.value = ""; }}
+            />
+          </label>
+          <span className="hint">Word (.docx), PDF, or text (.txt, .md). Its text goes into Your own wording, word for word, after anything already there.</span>
+        </div>
+        {uploaded && (
+          <div className="hint" data-testid="ai-uploaded">
+            <p>Added the text of “{uploaded.name}” ({uploaded.chars.toLocaleString("en-US")} characters). Check it above before you continue.</p>
+            {uploaded.notes.length > 0 && <ul>{uploaded.notes.map((n) => <li key={n}>{n}</li>)}</ul>}
+          </div>
+        )}
+        {uploadError && <p className="data-issue" role="alert">{uploadError}</p>}
+        <p className={tooLong ? "data-issue" : "hint"} data-testid="ai-content-count">
+          {content.length.toLocaleString("en-US")} of {MAX_CONTENT_CHARS.toLocaleString("en-US")} characters
+          {tooLong ? ". That's more than one proposal can take. Split it into one product, or a few lessons, at a time." : ""}
+        </p>
+        <label className="field">
+          <span>Bible translation for Scripture the AI writes</span>
+          <select aria-label="Bible translation" value={translation} onChange={(e) => setTranslation(e.target.value as TranslationId)}>
+            {(Object.keys(TRANSLATIONS) as TranslationId[]).map((t) => <option key={t} value={t}>{TRANSLATIONS[t].label}</option>)}
+          </select>
+        </label>
+        <p className="hint">The AI suggests structure and wording, and writes lessons, teaching and Scripture when you ask it to. Your own wording is kept word for word. Every Scripture reference it writes is listed for you to check against the Bible before printing: it quotes from memory and can get a word wrong. Nothing it suggests is checked against laws or regulations.</p>
         <div className="row">
-          <button className="btn btn--primary" disabled={busy || description.trim().length < 10} onClick={() => void generate()}>{busy ? "Proposing an outline…" : "Propose an outline"}</button>
+          <button className="btn btn--primary" disabled={busy || reading || tooLong || description.trim().length < 10} onClick={() => void generate()}>{busy ? "Proposing an outline…" : "Propose an outline"}</button>
         </div>
         {error && <p className="data-issue" role="alert">{error}</p>}
           </>

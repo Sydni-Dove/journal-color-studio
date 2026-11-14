@@ -78,6 +78,7 @@ const LAYOUT_CATEGORY: Record<string, PageCategory> = {
   "journal-lined": "journal",
   "notes-page": "notes",
   "guided-page": "journal",
+  "card-sheet": "worksheet",
 };
 
 /** Book purposes (modules) whose page is identified by what it is for, not by its layout. */

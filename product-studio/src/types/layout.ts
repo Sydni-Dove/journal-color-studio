@@ -137,6 +137,8 @@ export type RuleNode = NodeBase & {
   y2: number;
   strokePt: number;
   color: ColorToken;
+  /** A dashed line: dash and gap lengths (inches). Absent = solid. */
+  dashIn?: [number, number];
 };
 
 /** Structural grouping — bounds only (debug + validation). */

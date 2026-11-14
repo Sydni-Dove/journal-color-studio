@@ -12,12 +12,14 @@ import { createProject } from "../../presets/products/projectFactory";
 import { PRODUCT_TYPES } from "../../presets/products/productTypes";
 import { PRINT_PROFILES } from "../../presets/printProfiles/printProfiles";
 import { refitPageFilling } from "../recipe/fitRows";
+import { resolveDocument } from "../document/resolve";
 import type { BindingType } from "../../types/binding";
 import type { ProjectData } from "../../types/document";
 import type { PromptBlock, PromptSet } from "../../types/prompts";
 import type { BookNode, BookStep } from "../../types/recipe";
 import type { ProductProject } from "../../types/project";
-import type { CheckedSpec, DocSpec, SpecComponent, SpecSection } from "./spec";
+import { cardWords, normWords, type CheckedSpec, type DocSpec, type SpecComponent, type SpecSection } from "./spec";
+import { NIV_NOTICE, quotesNiv } from "../../presets/scripture";
 
 const BINDING: Record<DocSpec["page"]["binding"], { type: BindingType; product: "notebook" | "worksheet" }> = {
   book: { type: "perfect-bound", product: "notebook" },
@@ -88,7 +90,34 @@ function blocksOf(c: SpecComponent, keyOf: (field: string) => string | undefined
       return [{ id, kind: "divider", label: "" }];
     case "spacer":
       return [{ id, kind: "spacer", label: "", spacer: c.size ?? "medium" }];
+    case "drawing":
+      // A drawing box: an outlined blank space under its heading and prompt, a set height or the rest of the page.
+      return [{ id, label: c.label ?? "", ...(c.text && !bound ? { prompt: spaced(c.text) } : {}), responseStyle: "blank", frame: "outline", ...(c.lines ? { space: "fixed" as const, lineCount: c.lines, minLines: Math.min(2, c.lines) } : { space: "fill" as const }) }];
+    case "cards":
+      // Cards print on card sheet pages of their own (projectFromSpec).
+      return [];
   }
+}
+
+/** A cards part as a card sheet page: 4, 6 or 8 to a page, each page of fronts then its page of backs. */
+function cardStep(s: SpecSection, c: SpecComponent): BookStep {
+  const perSheet = c.rows === 6 || c.rows === 8 ? c.rows : 4;
+  const artLabel = c.text?.trim() && c.text.trim().length <= 40 ? c.text.trim() : undefined;
+  return {
+    kind: "step",
+    id: `gen-${s.id}-${c.id}`,
+    module: "custom",
+    layoutId: "card-sheet",
+    cadence: { type: "once" },
+    title: c.label?.trim() || s.title,
+    // In a double-sided or bound product, fronts on a right-hand page put each page of backs behind them.
+    start: "recto",
+    cards: {
+      cards: c.cards.map((k) => ({ title: k.title, ...(k.subtitle ? { subtitle: k.subtitle } : {}), ...(k.front ? { front: k.front } : {}), back: k.back.map((p) => ({ ...p })) })),
+      ...(perSheet !== 4 ? { perSheet } : {}),
+      ...(artLabel ? { artLabel } : {}),
+    },
+  };
 }
 
 const pageStep = (s: SpecSection, set: PromptSet, cadence: BookStep["cadence"], title = s.title): BookStep => ({
@@ -125,18 +154,56 @@ function entriesData(spec: DocSpec): { data?: ProjectData; collectionId?: string
   return { data, collectionId: id, keyOf: (k) => keys.get(k) };
 }
 
-/** The product a checked proposal describes — every part editable in the studio. */
+/** Whether a proposal quotes the NIV and doesn't already carry Biblica's notice. */
+function needsNivNotice(spec: DocSpec): boolean {
+  const allText = spec.sections.flatMap((s) => [s.title, ...s.components.flatMap((c) => [c.label, c.text, ...c.items, ...cardWords(c.cards)])]).filter(Boolean).join("\n");
+  const entryText = spec.entries?.records.flatMap((r) => r.values.map((v) => v.value)).join("\n") ?? "";
+  return quotesNiv(`${allText}\n${entryText}`) && !normWords(allText).includes(normWords(NIV_NOTICE));
+}
+
+/**
+ * The product a checked proposal describes — every part editable in the studio. Scripture quoted from
+ * the NIV gets Biblica's notice: at the foot of the first page when it fits there, otherwise on a short
+ * page of its own at the front (it never pushes the first page onto another page).
+ */
 export function projectFromSpec(checked: CheckedSpec): ProductProject {
+  if (!needsNivNotice(checked.spec)) return build(checked, "none").project;
+  const onFirst = build(checked, "first-page");
+  if (!onFirst.noticeStep) return build(checked, "own-page").project;
+  const pagesOf = (p: ProductProject) => resolveDocument(p).recipe.pages.filter((x) => x.recipeItemId === onFirst.noticeStep).length;
+  return pagesOf(onFirst.project) === pagesOf(build(checked, "none").project) ? onFirst.project : build(checked, "own-page").project;
+}
+
+function build(checked: CheckedSpec, mode: "none" | "first-page" | "own-page"): { project: ProductProject; noticeStep?: string } {
   const { spec } = checked;
   const { data, collectionId, keyOf } = entriesData(spec);
   const structure: BookNode[] = [];
+  let notice = mode === "first-page";
+  let noticeStep: string | undefined;
   for (const s of spec.sections) {
-    const set: PromptSet = { blocks: s.components.flatMap((c) => blocksOf(c, keyOf)) };
+    const pageParts = s.components.filter((c) => c.kind !== "cards");
+    const blocks = pageParts.flatMap((c) => blocksOf(c, keyOf));
+    if (notice && blocks.length) {
+      blocks.push({ id: `${s.id}-niv-notice`, kind: "heading", textStyle: "body", label: "", prompt: NIV_NOTICE });
+      notice = false;
+      noticeStep = `gen-${s.id}`;
+    }
+    const set: PromptSet = { blocks };
+    const cards = s.components.filter((c) => c.kind === "cards" && c.cards.length);
+    if (!blocks.length) {
+      // A section of cards only: its card sheets, nothing else.
+      for (const c of cards) structure.push(cardStep(s, c));
+      continue;
+    }
     if (s.repeat.mode === "per-entry" && collectionId) {
       // Once per entry, in the list's order: the section reads each entry's fields (and `{field}` in its title).
       structure.push({ kind: "group", id: `gen-${s.id}-each`, label: s.title, entries: { collectionId }, children: [pageStep(s, set, { type: "once" })] });
     } else structure.push(pageStep(s, set, s.repeat.mode === "copies" && s.repeat.count > 1 ? { type: "copies", count: s.repeat.count } : { type: "once" }));
+    for (const c of cards) structure.push(cardStep(s, c));
   }
+  // The notice on a page of its own at the front (it didn't fit the first page, or there is no page but cards).
+  if (mode === "own-page" || notice)
+    structure.unshift({ kind: "step", id: "gen-niv-notice", module: "worksheet", layoutId: "guided-page", cadence: { type: "once" }, title: "Scripture Quotations", promptSet: { blocks: [{ id: "gen-niv-notice-text", kind: "heading", textStyle: "body", label: "", prompt: NIV_NOTICE }] } });
   // The maker's own content the proposal didn't place is kept, word for word, on a page of its own.
   if (checked.unplaced.length)
     structure.push({
@@ -153,5 +220,5 @@ export function projectFromSpec(checked: CheckedSpec): ProductProject {
     recipe: { items: [], ordering: "sequential", structure },
     layoutOptions: { showPageNumbers: b.type !== "none" },
   });
-  return refitPageFilling(data ? { ...project, data } : project);
+  return { project: refitPageFilling(data ? { ...project, data } : project), noticeStep };
 }
