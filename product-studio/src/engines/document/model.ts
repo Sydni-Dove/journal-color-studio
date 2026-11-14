@@ -59,6 +59,7 @@ function presentationOf(b: PromptBlock): ComponentPresentation {
   if (b.beside !== undefined) p.beside = b.beside;
   if (b.kind === "heading" && b.textStyle === "body") p.bodyText = true;
   if (b.fieldStyles !== undefined) p.fieldStyles = b.fieldStyles;
+  if (b.marginNote !== undefined) p.marginNote = b.marginNote;
   if (b.table?.borders !== undefined) p.tableBorders = b.table.borders;
   return p;
 }
@@ -90,6 +91,7 @@ export function blockToComponent(b: PromptBlock): DocComponent {
           ...(b.taskMarker !== undefined ? { marker: b.taskMarker } : {}),
           ...(b.taskMarkerPosition !== undefined ? { markerPosition: b.taskMarkerPosition } : {}),
           ...(b.taskLines !== undefined ? { lines: b.taskLines } : {}),
+          ...(b.taskDate !== undefined ? { dateLabel: b.taskDate } : {}),
         };
       if (b.responseStyle === "table") {
         const t = b.table ?? { columns: [], rows: 0 };
@@ -145,6 +147,7 @@ export function componentToBlock(c: DocComponent, p: ComponentPresentation = {})
     ...(p.headingFont !== undefined ? { headingFont: p.headingFont } : {}),
     ...(p.headingSizePt !== undefined ? { headingSizePt: p.headingSizePt } : {}),
     ...(p.beside !== undefined ? { beside: p.beside } : {}),
+    ...(p.marginNote !== undefined ? { marginNote: p.marginNote } : {}),
     ...(c.binding ? { content: { mode: c.binding.mode, key: c.binding.key } } : {}),
   };
   switch (c.kind) {
@@ -161,7 +164,7 @@ export function componentToBlock(c: DocComponent, p: ComponentPresentation = {})
     case "checklist":
       return {
         id: c.id, label: c.label, ...(c.prompt !== undefined ? { prompt: c.prompt } : {}), responseStyle: "checkboxes", ...spaceToBlock(c.space),
-        ...(c.marker !== undefined ? { taskMarker: c.marker } : {}), ...(c.markerPosition !== undefined ? { taskMarkerPosition: c.markerPosition } : {}), ...(c.lines !== undefined ? { taskLines: c.lines } : {}), ...style,
+        ...(c.marker !== undefined ? { taskMarker: c.marker } : {}), ...(c.markerPosition !== undefined ? { taskMarkerPosition: c.markerPosition } : {}), ...(c.lines !== undefined ? { taskLines: c.lines } : {}), ...(c.dateLabel !== undefined ? { taskDate: c.dateLabel } : {}), ...style,
       };
     case "table":
       return {

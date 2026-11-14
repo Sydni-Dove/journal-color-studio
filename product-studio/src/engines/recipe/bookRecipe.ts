@@ -401,7 +401,7 @@ export function expandBook(structure: BookNode[], ctx: BookContext): ExpandedRec
     const starts = recordStarts(promptSet, sequences);
     const module = { type: step.module, title, subtitle, prompts: step.prompts ?? modulePrompts(step.module, kind), ...(promptSet ? { promptSet } : {}), ...(step.cover ? { cover: step.cover } : {}), ...(starts ? { sequenceStarts: starts } : {}) };
     // Prompts that don't fit one page continue on more pages (single-page layouts only).
-    const flow = n === 1 ? Math.max(1, ctx.flowPages?.(step.layoutId, module) ?? 1) : 1;
+    const flow = n === 1 ? Math.max(1, ctx.flowPages?.(step.layoutId, module, step.id) ?? 1) : 1;
     for (let part = 0; part < n * flow; part++) {
       pages.push({
         key: n === 2 ? `${base}:${part}` : part > 0 ? `${base}~${part}` : base,

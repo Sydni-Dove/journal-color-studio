@@ -109,10 +109,14 @@ export type StationeryZone = {
   equal?: boolean;
   /** Fixed-height surfaces (divider, spacer): their height in inches. */
   heightIn?: number;
+  /** Page Composer: a short prompt or tip printed in the page's outer margin, level with the section. */
+  marginNote?: string;
   /** Fill-in surfaces: each blank's style, by position (default: a line). */
   fieldStyles?: import("./prompts").InfoFieldStyle[];
   /** Checklist surfaces: a writing line on each row (default true). */
   taskLines?: boolean;
+  /** Checklist surfaces: a short dated blank at the end of each row, after this label. */
+  taskDate?: string;
   /** Page Composer: a number in a soft circle beside the heading. */
   /** Heading alignment, a line under the heading, and its own font (Page Composer sections). */
   headingAlign?: "left" | "center" | "right";

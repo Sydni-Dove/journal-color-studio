@@ -35,6 +35,7 @@ export function projectFromTemplate(t: RecipePreset, c: Choice, calendar?: { sta
     name: `${size?.label ?? c.sizeId} ${t.label}`,
     dimensions: { sizePresetId: c.sizeId, orientation: size?.defaultOrientation ?? "portrait" },
     production: { bindingType: binding.bindingType, boundEdge: binding.boundEdge ?? b.defaultBoundEdge ?? undefined, printProfileId: profile.id, includeBleed: false, duplex: b.boundEdgeMode === "book-spine" },
+    ...t.project,
     recipe: t.build({ count: 1, sheets: 1 }),
     calendar: { startDate: calendar?.startDate ?? `${c.year}-01-01`, endDate: calendar?.endDate ?? `${c.year}-12-31`, weekStart: c.weekStart, sixRowMonths: true },
     layoutOptions: t.layoutOptions,
@@ -45,6 +46,7 @@ export function projectFromTemplate(t: RecipePreset, c: Choice, calendar?: { sta
 export function previewPages(doc: ResolvedDocument, keys: string[]): number[] {
   return keys
     .map((k) => {
+      if (k.startsWith("@")) return doc.recipe.pages.findIndex((p) => !p.filler && p.recipeItemId === k.slice(1));
       const [layoutId, part] = k.split("#");
       return doc.recipe.pages.findIndex((p) => !p.filler && p.layoutId === layoutId && (part == null || p.spreadPart === +part));
     })

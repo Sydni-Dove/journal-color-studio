@@ -3,7 +3,8 @@ import { TechnicalDetails } from "../help/visuals";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ResolvedDocument } from "../../engines/document/resolve";
 import { planPrint } from "../../engines/print/printPlan";
-import { compositionFor, contentGeometryFor, solvePage } from "../../engines/document/resolve";
+import { artworkFor, compositionFor, contentGeometryFor, solvePage } from "../../engines/document/resolve";
+import { ensureArtworkLoaded } from "../../engines/artwork/store";
 import { coverSurfaceColors, coverSurfaceTheme } from "../../design-library/coverSurfaces";
 import { rasterRequests } from "../../themes/decorationPlan";
 import { prepareRasters } from "../../themes/recolor";
@@ -127,6 +128,14 @@ export function ExportDialog({ doc, usage, currentIndex, fontsReady, onClose, on
         return rasterRequests([page], coverSurfaceTheme(surface.assetId), coverSurfaceColors(surface.assetId, surface.ownColors, doc.colors));
       });
       await prepareRasters([...rasterRequests(pages, doc.background, doc.colors), ...rasterRequests(pages, doc.decorative, doc.colors), ...surfaces]);
+      // Uploaded artwork on the printed pages must be on this device and loaded.
+      const artIds = [...new Set([...new Set(plan.sequence)].flatMap((i) => artworkFor(doc, i).map((a) => a.assetId)))];
+      const missing = await ensureArtworkLoaded(artIds);
+      if (missing.length) {
+        const names = missing.map((id) => doc.project.artwork?.assets.find((a) => a.id === id)?.name ?? "artwork");
+        setPrepError(`Artwork isn't on this device: ${names.join(", ")}. Add it again under Artwork and style → Artwork, then print.`);
+        return;
+      }
       setPrinting(true);
     } catch (e) {
       setPrepError(`Decoration could not be prepared: ${(e as Error).message}`);

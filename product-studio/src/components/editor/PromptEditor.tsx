@@ -60,7 +60,7 @@ const STYLE_LABEL: Record<ResponseStyle | "own", string> = {
 };
 const AMOUNT_LABEL: Record<WritingAmount, string> = { compact: "Compact", standard: "Standard", spacious: "Spacious" };
 const TEXT_STYLE_LABEL: Record<HeadingTextStyle, string> = { title: "Page title", heading: "Section heading", body: "Body text" };
-const ROW_SPACE_LABEL: Record<TableRowSpace, string> = { compact: "Compact", standard: "Standard", spacious: "Spacious" };
+const ROW_SPACE_LABEL: Record<TableRowSpace, string> = { compact: "Compact", standard: "Standard", spacious: "Spacious", double: "Double (two lines)" };
 const FRAME_LABEL: Record<SectionFrame, string> = { open: "Open (no border)", divider: "Line below", outline: "Soft outline", panel: "Filled panel", rounded: "Rounded panel", rule: "Line at left" };
 
 /** How the current sections fit: pages each time, a plain problem when they can't, and the lines each section gets. */
@@ -243,7 +243,7 @@ function Pieces({ disabled, onAdd }: { disabled: boolean; onAdd: (label: string,
 function InfoFields({ b, putBlock }: { b: PromptBlock; putBlock: (id: string, patch: Partial<PromptBlock>) => void }) {
   const fields = (b.fields ?? []).slice(0, MAX_INFO_FIELDS);
   const styles = fields.map((_, i) => b.fieldStyles?.[i] ?? "line");
-  const put = (f: string[], st: InfoFieldStyle[]) => putBlock(b.id, { fields: f, fieldStyles: st.some((x) => x === "box") ? st : undefined });
+  const put = (f: string[], st: InfoFieldStyle[]) => putBlock(b.id, { fields: f, fieldStyles: st.some((x) => x !== "line") ? st : undefined });
   return (
     <div className="info-fields">
       {fields.map((f, i) => (
@@ -254,7 +254,7 @@ function InfoFields({ b, putBlock }: { b: PromptBlock; putBlock: (id: string, pa
           <Segmented<InfoFieldStyle>
             label={`Blank ${i + 1} is`}
             value={styles[i]}
-            options={[{ value: "line", label: "A line" }, { value: "box", label: "A box" }]}
+            options={[{ value: "line", label: "A line" }, { value: "box", label: "A box" }, { value: "check", label: "A check box" }, { value: "check-line", label: "A check box + a line" }]}
             onChange={(v) => put(fields, styles.map((x, k) => (k === i ? v : x)))}
           />
           {fields.length > 1 && (
@@ -595,6 +595,9 @@ export function PromptEditor({
                     <Field label="Prompt (optional)">
                       <textarea rows={2} value={b.prompt ?? ""} placeholder="e.g. What obedience, action, or posture does this word call for?" onChange={(e) => putBlock(b.id, { prompt: e.target.value || undefined })} />
                     </Field>
+                    <Field label="Note in the margin (optional)">
+                      <input type="text" value={b.marginNote ?? ""} placeholder="e.g. Write it plainly." onChange={(e) => putBlock(b.id, { marginNote: e.target.value || undefined })} />
+                    </Field>
                     <Field label="Number in a circle (optional)">
                       <input type="text" value={b.badge ?? ""} maxLength={3} placeholder="e.g. 1" onChange={(e) => putBlock(b.id, { badge: e.target.value || undefined })} />
                     </Field>
@@ -655,6 +658,9 @@ export function PromptEditor({
                           options={[{ value: "on", label: "On" }, { value: "off", label: "Off" }]}
                           onChange={(v) => putBlock(b.id, { taskLines: v === "off" ? false : undefined })}
                         />
+                        <Field label="Date at the end of each row (optional)">
+                          <input type="text" value={b.taskDate ?? ""} placeholder="e.g. By" onChange={(e) => putBlock(b.id, { taskDate: e.target.value || undefined })} />
+                        </Field>
                       </>
                     )}
                     {b.responseStyle === "table" && (

@@ -15,7 +15,7 @@ import type { StationeryZone, SurfaceKind } from "../../types/stationery";
 import { TABLE_MAX_STRETCH } from "../../types/prompts";
 import { getLayoutMeasurer, styleForRole } from "../../engines/typography/textMeasure";
 import { checklistRows, fitHeading, HEADING_MIN_PT, writingSurface } from "../shared/components";
-import { box, group, lineBoxIn, rule, text } from "../shared/nodes";
+import { box, checkbox, group, lineBoxIn, rule, text } from "../shared/nodes";
 import type { LayoutContext } from "../shared/types";
 import { drawList, drawRecords } from "./flowSurfaces";
 
@@ -44,14 +44,16 @@ export const MIN_BLANK_IN = 0.9;
  * label whole and every blank at least MIN_BLANK_IN; the rest wrap to another
  * row (never squeezed, never overlapping).
  */
-export function fillInRows(fields: string[], width: number, ctx: LayoutContext): { perRow: number; rows: number; heightIn: number } {
+export function fillInRows(fields: string[], width: number, ctx: LayoutContext, styles?: StationeryZone["fieldStyles"]): { perRow: number; rows: number; heightIn: number } {
   const gap = ctx.spacing.column + ctx.spacing.block;
-  const need = (f: string) => measureW(ctx, f, "label") + ctx.spacing.checkboxGap + MIN_BLANK_IN;
+  // A check-box blank needs its box and its label; every other blank its label and room to write.
+  const tick = ctx.spacing.checkbox + ctx.spacing.checkboxGap;
+  const need = (f: string, i: number) => measureW(ctx, f, "label") + (styles?.[i] === "check" ? tick : ctx.spacing.checkboxGap + MIN_BLANK_IN + (styles?.[i] === "check-line" ? tick : 0));
   const n = Math.max(1, fields.length);
   let perRow = n;
   while (perRow > 1) {
     const w = (width - gap * (perRow - 1)) / perRow;
-    if (fields.every((f) => need(f) <= w + 1e-6)) break;
+    if (fields.every((f, i) => need(f, i) <= w + 1e-6)) break;
     perRow--;
   }
   const rows = Math.ceil(n / perRow);
@@ -167,22 +169,35 @@ function table(id: string, rect: Rect, zone: StationeryZone, ctx: LayoutContext)
 function fillIn(id: string, rect: Rect, zone: StationeryZone, ctx: LayoutContext): SurfaceResult {
   const fields = zone.fields?.length ? zone.fields : [zone.label];
   const gap = ctx.spacing.column + ctx.spacing.block;
-  const { perRow } = fillInRows(fields, rect.w, ctx);
+  const { perRow } = fillInRows(fields, rect.w, ctx, zone.fieldStyles);
   const rowH = fillInIn(ctx);
   const w = (rect.w - gap * (perRow - 1)) / perRow;
   const nodes: LayoutNode[] = [group(id, "Section", rect)];
   fields.forEach((f, i) => {
-    const x = rect.x + (i % perRow) * (w + gap);
+    const style = zone.fieldStyles?.[i];
+    let x = rect.x + (i % perRow) * (w + gap);
+    const x1 = x + w;
     const y = rect.y + Math.floor(i / perRow) * (rowH + ctx.spacing.block);
-    const lw = Math.min(w * 0.5, measureW(ctx, f, "label"));
+    if (style === "check" || style === "check-line") {
+      // A box to tick before the label, standing on the row's writing line.
+      const cb = ctx.spacing.checkbox;
+      nodes.push(checkbox(`${id}-f${i}-check`, { x, y: y + rowH - cb, w: cb, h: cb }));
+      x += cb + ctx.spacing.checkboxGap;
+      if (style === "check") {
+        // Nothing to write: the label only.
+        nodes.push(text(`${id}-f${i}-label`, { x, y, w: Math.max(0, x1 - x), h: rowH }, f, "label", { component: "SectionHeader", vAlign: "bottom" }));
+        return;
+      }
+    }
+    const lw = Math.min((x1 - x) * 0.5, measureW(ctx, f, "label"));
     nodes.push(text(`${id}-f${i}-label`, { x, y, w: lw, h: rowH }, f, "label", { component: "SectionHeader", vAlign: "bottom" }));
     const lx = x + lw + ctx.spacing.checkboxGap;
     if (zone.fieldStyles?.[i] === "box") {
       // An open box to write in, the height of the row, after the label.
       const inset = ctx.spacing.labelToBorderInset / 2;
-      nodes.push(box(`${id}-f${i}-box`, { x: lx, y: y + inset, w: x + w - lx, h: rowH - inset }, { component: "WritingLines", stroke: ctx.pattern.color, strokePt: ctx.pattern.lineWeightPt, radiusIn: 0.04 }));
+      nodes.push(box(`${id}-f${i}-box`, { x: lx, y: y + inset, w: x1 - lx, h: rowH - inset }, { component: "WritingLines", stroke: ctx.pattern.color, strokePt: ctx.pattern.lineWeightPt, radiusIn: 0.04 }));
     } else {
-      nodes.push(rule(`${id}-f${i}-line`, lx, y + rowH, x + w, y + rowH, { strokePt: ctx.pattern.lineWeightPt, component: "WritingLines" }));
+      nodes.push(rule(`${id}-f${i}-line`, lx, y + rowH, x1, y + rowH, { strokePt: ctx.pattern.lineWeightPt, component: "WritingLines" }));
     }
   });
   return empty(nodes);
@@ -216,7 +231,7 @@ export const SURFACES: Record<SurfaceKind, SurfaceRenderer> = {
   reflection: (id, rect, _z, ctx) => empty(lined(id, rect, ctx)),
   prayer: (id, rect, _z, ctx) => empty(lined(id, rect, ctx)),
   scripture,
-  checkbox: (id, rect, z, ctx) => empty(checklistRows(id, rect, ctx, undefined, { marker: z.taskMarker, markerPosition: z.taskMarkerPosition, lines: z.taskLines }).nodes),
+  checkbox: (id, rect, z, ctx) => empty(checklistRows(id, rect, ctx, undefined, { marker: z.taskMarker, markerPosition: z.taskMarkerPosition, lines: z.taskLines, dateLabel: z.taskDate }).nodes),
   "fill-in": fillIn,
   table,
   "dot-grid": (id, rect, _z, ctx) => empty([group(id, "NotesArea", rect), ...fillWritingRegion(`${id}-dots`, rect, { ...ctx.pattern, kind: "dot-grid", gridPreset: ctx.pattern.kind === "dot-grid" ? ctx.pattern.gridPreset : "dot-5mm" })]),
