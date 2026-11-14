@@ -9,11 +9,25 @@
  * product-studio/src/engines/generate/docSpecSchema.json) through structured outputs; the studio
  * checks it again before anything is built. No coordinates, no rendering: structure and wording only.
  *
+ * Two modes (Phase 8.1). "structure" (default; a request without `mode` is exactly Phase 8's): pages, blanks and the
+ * maker's own wording, no written content. "develop": the AI also writes original content (at most
+ * MAX_DEVELOPED_ENTRIES entries a request; a longer series continues in batches), with the same rule that the maker's
+ * wording is used exactly. Both count as one of the day's proposals.
+ *
+ * Every model call's real token use and estimated cost is recorded in ai_generation_costs (written with the service
+ * role only; users can't read or change it) so pricing can be judged later. It never blocks a request.
+ *
  * { check: true } answers whether the key is configured and accepted, without generating anything.
  */
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import schema from "./schema.json" with { type: "json" };
+
+/**
+ * Develop mode's answer format: the same schema, except the list of entries is required (not nullable) — live
+ * testing found the model answering "develop" with entries: null and a note claiming the lessons were written.
+ */
+const developSchema = { ...schema, properties: { ...schema.properties, entries: (schema.properties.entries as { anyOf: unknown[] }).anyOf[0] } };
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
@@ -24,15 +38,46 @@ function minimumPages(spec: { sections?: { repeat?: { mode?: string; count?: num
   const perEntry = Math.max(1, spec.entries?.records?.length ?? 0);
   return (spec.sections ?? []).reduce((n, s) => n + (s.repeat?.mode === "per-entry" ? perEntry : s.repeat?.mode === "copies" ? Math.max(1, Math.round(Number(s.repeat?.count) || 1)) : 1), 0);
 }
+/** A quantity the description asks for that alone passes the page limit (same rule as requestedOverLimit in spec.ts). */
+const QUANTITY = /\b(\d{1,3}(?:,\d{3})+|\d+)\s*(?:-\s*)?(copies|copy|pages|page|days|day|entries|entry|sheets|sheet|lessons|lesson|sessions|session|worksheets|worksheet|weeks|week|logs|log|forms|form)\b/gi;
+function requestedOverLimit(description: string): { n: number; text: string } | null {
+  let best: { n: number; text: string } | null = null;
+  for (const m of description.matchAll(QUANTITY)) {
+    const n = Number(m[1].replace(/,/g, ""));
+    if (n > MAX_DOCUMENT_PAGES && (!best || n > best.n)) best = { n, text: m[0] };
+  }
+  return best;
+}
 const FREE_DAILY_CAP = 5;
 const PAID_DAILY_CAP = Number(Deno.env.get("PAID_DAILY_CAP")) || 50;
 /** The plan comes from app_metadata, which only the server can write (user_metadata is user-editable: never trust it here). */
 const isPaid = (user: { app_metadata?: Record<string, unknown> }) => user.app_metadata?.plan === "paid";
 const FUNCTION_NAME = "generate-document";
+/** Structure only (unchanged since Phase 8): the current model, then its backup. */
 const MODELS = ["gpt-4.1-mini", "gpt-4o-mini"];
-const VERSION = "generate-document-2026-11-14-spec-v5-lessons-scripture-cards";
-/** Bible translations the maker can choose for Scripture the AI quotes (product-studio/src/presets/scripture.ts). */
+/**
+ * Develop original content (approved 2026-10-15 after the model comparison): gpt-4.1, and gpt-4.1-mini only when gpt-4.1
+ * is genuinely unavailable (an availability error — rate limit, server error, model unavailable, timeout or network),
+ * never because an answer's content was weak. A fallback is reported to the maker and recorded.
+ */
+const DEVELOP_MODELS = ["gpt-4.1", "gpt-4.1-mini"];
+/** An HTTP status that means the model can't be used right now (not a problem with the request or its content). */
+const unavailable = (status: number) => status === 404 || status === 408 || status === 409 || status === 429 || status >= 500;
+const VERSION = "generate-document-2026-11-14-spec-v14-scripture-cards";
+/** Bible translations the maker can choose for Scripture the AI quotes (product-studio/src/presets/scripture.ts). NIV: Biblica allows up to 500 verses, under 25% of the text, with its notice (the studio adds it). */
 const TRANSLATIONS = ["NIV", "KJV"] as const;
+/** The most entries one "develop" request writes (same as MAX_DEVELOPED_ENTRIES in product-studio/src/engines/generate/spec.ts). */
+const MAX_DEVELOPED_ENTRIES = 6;
+/**
+ * Output ceiling for a develop request (tokens): about 8,000 words — never an open-ended bill, and short enough to
+ * finish inside the Edge Function's ~150 s limit. Structure only is unchanged.
+ */
+const DEVELOP_MAX_TOKENS = 12_000;
+/** Time one develop call may take (structure: 90 s as before), and how long a failed first call may have taken for the backup model to still be tried. */
+const DEVELOP_TIMEOUT_MS = 135_000;
+const RETRY_WITHIN_MS = 30_000;
+/** Estimated USD per 1M tokens (input, output) — for the cost record only; tokens are the source of truth. Prices as of 2026-10. */
+const PRICES: Record<string, [number, number]> = { "gpt-4.1": [2, 8], "gpt-4.1-mini": [0.4, 1.6], "gpt-4o-mini": [0.15, 0.6] };
 
 const SYSTEM = `You design printable documents for Product Studio, a studio for print-ready journals, workbooks, logs, forms, planners and similar products. You return a document specification (the JSON schema given); the studio lays out, paginates and prints it with its own engines. Never think in coordinates or pixels.
 
@@ -46,7 +91,7 @@ What you can use (components):
 - records: repeating blank record cards (fields = the blanks on each card; rows = cards per page; numbered; fillPage = as many as fit on each page).
 - divider, spacer (size).
 - drawing: an outlined blank box to draw in, under an optional heading (label) and prompt (text, e.g. "Draw a time you shared"); lines = its height in writing-line heights (8–20 is a good size), or null to fill the rest of the page.
-- cards: cards to print on cardstock and cut apart (a card sheet: dashed cutting guides, 4 per page, each page of fronts followed by its page of backs for double-sided printing). cards = the cards, each with title (front), subtitle (optional, under the title), front (an optional short line at the foot of the front, such as a Scripture reference) and back (labelled parts top to bottom, such as Meaning, Scripture, Bible example, Talk about it, Try it). Keep each back short: about 60 words in all. rows = cards per page (4, 6 or 8; null = 4). text = an optional short label inside the picture box on the front ("Draw it!"). A cards part prints on its own pages; put it in a section of its own.
+- cards: cards to print on cardstock and cut apart (a card sheet: dashed cutting guides, 4 per page, each page of fronts followed by its page of backs for double-sided printing). cards = the cards, each with title (front), subtitle (optional, under the title), front (an optional short line at the foot of the front, such as a Scripture reference) and back (labelled parts top to bottom, such as Meaning, Scripture, Bible example, Talk about it, Try it). Keep each back short: about 60 words in all. rows = cards per page (4, 6 or 8; null = 4). text = an optional short label inside the picture box on the front ("Draw it!"). A cards part prints on its own pages; put it in a section of its own. Every other component has cards [].
 Anything else (images and illustrations, charts, formulas, QR codes, signature pads, colors, fonts) is not available: describe the need in notes instead. A drawing box or a card's picture space is where a picture can go.
 
 Sections are the document's kinds of pages, in order. repeat.mode: "once"; "copies" with count (how many copies of that page); or "per-entry": the page repeats once for each entry of the entries list (devotional days, lessons, clients, items, sessions…) and its components print an entry's field with fromEntryField (the field key). A per-entry section's title may contain {fieldKey} (and {#} for the entry's number), e.g. "Day {day}: {title}". Set startOnRightPage only when each repetition must open on a right-hand page. repeat.count is the number of copies for "copies" and 1 otherwise.
@@ -63,12 +108,86 @@ The maker's wording is theirs:
 
 Accuracy and safety:
 - Never claim the document is legally, regulatorily or professionally compliant or approved, and never say it satisfies any law or standard.
-- Scripture: when the maker asks for Scripture, or the content they asked you to write calls for it, cite real passages that truly say what you use them for, and quote from the translation given below. Quote a verse only if you know its exact wording in that translation, word for word, then give the reference and the translation's abbreviation in parentheses, e.g. "Love is patient, love is kind." 1 Corinthians 13:4 (NIV). If you are not certain of the exact wording, give the reference only (e.g. "Read Galatians 5:22–23."). Keep quoted Scripture to well under a quarter of the document's text and under 500 verses in all. Never attribute words to the Bible that it does not contain.
+- Scripture: when the maker asks for Scripture, or the content they asked you to write calls for it, cite real passages that truly say what you use them for, and quote from the translation given in the request. Quote a verse only if you know its exact wording in that translation, word for word, then give the reference and the translation's abbreviation in parentheses, e.g. "Love is patient, love is kind." 1 Corinthians 13:4 (NIV). If you are not certain of the exact wording, give the reference only (e.g. "Read Galatians 5:22–23."). Keep quoted Scripture to well under a quarter of the document's text and under 500 verses in all. Never attribute words to the Bible that it does not contain.
 - Never invent other citations, statistics, laws, regulations or quotations. If a record must meet legal or regulatory requirements, provide the labelled blanks they asked for and add a note that the requirements must be verified for their jurisdiction.
+
+Page limit: a document can have at most 800 pages in all. That is the studio's to handle, not yours: always build every section the maker asked for at the full quantity they asked for (for example a daily page for three years is a section with "copies" and count 1095). Never lower a quantity, leave a section out, or describe pages in notes instead of building them to stay under the limit. The studio explains the limit and lets the maker choose to reduce the quantity or split the document.
 
 Page: choose page.size, orientation and binding for how it will be used (a wide table suits landscape; a bound book suits a journal; loose pages suit forms) and explain the choice in page.why.
 notes: list your assumptions, and any conflicting instructions and how you resolved them.
 Give every section and component a short unique id. Fill every property: use null, [] or false when a property doesn't apply.`;
+
+/** "Develop original content": replaces the one line that says not to write content, and adds how to write it. */
+const NO_CONTENT = `- Write content (lessons, teaching, devotions, scenarios, questions, prayers, card text) only when the maker asks you to write it or describes content they want written. Then write it in full, warm, plain and accurate, at the reading level of the audience they name; put repeating content (lessons, days, sessions) in entries with a per-entry section, with source "suggested". When they don't ask for written content, prefer labelled blanks and writing space they will fill in.`;
+function developRules(entryCount: number | null, batch: Batch | null): string {
+  const asked = batch ? batch.count : entryCount;
+  return `- The maker asked you to DEVELOP ORIGINAL CONTENT: write the content itself, not only the structure. Put the series (days, lessons, sessions, exercises, activities) in entries with source "suggested" — one entry each, with a field for each part (for example title, scripture, teaching, reflection question, activity, prayer) — and a per-entry section that prints the fields with fromEntryField. A one-off passage you write (an introduction, instructions) is a text component with source "suggested". In this mode "entries" is never null: it holds every entry you write, and each value is the finished wording itself (whole sentences a reader will read), not a heading or a description of what should go there. Notes describe what you wrote; they never replace writing it. Each lesson / day / session is ONE record in entries.records — never a section of its own. Shape (shortened):
+"entries": {"name": "Lessons", "fields": [{"key": "title", "label": "Title", "valueType": "text"}, {"key": "verse", "label": "Bible verse", "valueType": "reference"}, {"key": "teaching", "label": "Teaching", "valueType": "longText"}], "records": [{"values": [{"key": "title", "value": "…the lesson's title…"}, {"key": "verse", "value": "…reference…"}, {"key": "teaching", "value": "…the full teaching, in sentences…"}]}, …one record per lesson…], "source": "suggested"}
+and one section with repeat.mode "per-entry" whose components print each field (fromEntryField "title", "verse", "teaching"…) plus any writing space.
+- Write at most ${MAX_DEVELOPED_ENTRIES} entries in this answer${asked ? `; the maker asked for ${asked}` : ""}. If the request needs more (for example a 40-day study), write the first ones, and say in notes how many remain and that they can be written as the next batch. Never shorten or cut off an entry to fit more: fewer complete entries are better than more partial ones.
+- Write each part in the form the maker asks for: a "story" is a complete short story of 8 to 10 sentences (about 140 words) with a named character, a real situation, a meaningful decision and its consequence — not a definition; give every story a different main character's name, never one already used in the series; never put a Scripture reference or citation inside a story (the reference has its own field); reflection questions are about this story (at least one names its main character and asks about what they did) and an activity is something practical to actually do that practises the same trait, with what to use and how; an "activity" is something to actually do, with what to use and how; for children, use words they read themselves. Unless the maker says otherwise: a teaching passage of about 120–250 words; questions, prompts and prayers of one to three sentences — unless the maker asks otherwise. Keep the whole answer under about 7,000 words: if the entries asked for wouldn't fit complete, write fewer and say in notes how many remain for the next batch.
+- Everything you write is original. Do not reproduce existing devotionals, curricula, books, sermons or song lyrics.
+- The maker's own wording still comes first: use it exactly (source "user"), never rewrite, merge into or "improve" it, and build your content around it.
+- Scripture: connect content to Scripture by reference (Book chapter:verse) only when you are confident the reference exists and fits; if unsure, give the theme without a reference. Quote verse text only from the translation given in the request, only when you know its exact wording word for word, keep quotations short, and name the translation after the reference, e.g. "Love is patient, love is kind." (1 Corinthians 13:4, NIV). If you are not certain of the exact wording, give the reference only. Never invent or paraphrase a verse and present it as a quotation.
+- No outside research: no statistics, historical or scientific claims, quotations of people, or citations of books, articles or websites. Write from Scripture and general knowledge only, and never claim alignment with any curriculum, standard or denomination.${batch ? `
+
+THIS REQUEST CONTINUES A LIST ALREADY WRITTEN: "${batch.name}". Write entries ${batch.from} to ${batch.from + batch.count - 1} (${batch.count} entries) of that list, in entries, with exactly these fields (same keys): ${batch.fields.map((f) => `${f.key} (${f.label})`).join(", ")}. Continue the series in order; do not repeat what is already written${batch.previous.length ? ` (recent entries: ${batch.previous.map((p) => `"${p}"`).join("; ")})` : ""}. Keep the same sections as a per-entry page that prints these fields.` : ""}`;
+}
+
+/**
+ * A developed answer that didn't develop anything: no entries, too few, or entries too thin to be real content
+ * (headings only). Returns what's missing, to ask the AI once more; null when it's complete. (Entries with no page
+ * printing them are kept: the studio adds that page itself — the content isn't thrown away.)
+ */
+const norm = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+function developGap(raw: string, wanted: number, previous: string[] = []): string | null {
+  let spec: { entries?: { records?: { values?: { value?: string }[] }[] } | null; sections?: { repeat?: { mode?: string }; components?: { fromEntryField?: string | null }[] }[] };
+  try { spec = JSON.parse(raw); } catch { return null; }
+  const records = spec.entries?.records ?? [];
+  if (!records.length) return `"entries" is ${spec.entries ? "empty" : "null"}: none of the ${wanted} entries were written. Write every entry in full in "entries".`;
+  const need = Math.min(wanted, 3);
+  if (records.length < need) return `only ${records.length} of the ${wanted} entries were written. Write at least ${need}, each complete.`;
+  const thin = records.filter((r) => (r.values ?? []).reduce((n, v) => n + (v.value ?? "").trim().length, 0) < 250).length;
+  // A next batch that repeats what's already written (the first value of each entry is its name).
+  const before = new Set(previous.map(norm));
+  const repeats = records.map((r) => (r.values ?? [])[0]?.value ?? "").filter((t) => before.has(norm(t)));
+  if (repeats.length && repeats.length >= records.length / 2) return `${repeats.length} of the ${records.length} entries repeat ones already written (${repeats.join(", ")}). Write NEW entries on different themes, continuing the series.`;
+  if (thin > records.length / 2) return `${thin} of the ${records.length} entries are only headings or a few words. Write each entry's parts in full (the teaching, activity, questions and prayer as real sentences).`;
+  return null;
+}
+
+type Batch = { name: string; fields: { key: string; label: string; valueType: string }[]; from: number; count: number; previous: string[]; verses: string[]; names: string[] };
+const clean = (v: unknown, max: number) => (typeof v === "string" ? v.replace(/[\u0000-\u001f"`<>]/g, " ").replace(/\s+/g, " ").trim().slice(0, max) : "");
+/** A batch request, checked: only short, plain names and keys reach the prompt. null = not a valid batch. */
+function readBatch(v: unknown): Batch | null {
+  if (!v || typeof v !== "object") return null;
+  const b = v as Record<string, unknown>;
+  const from = Number(b.from), count = Number(b.count);
+  if (!Number.isInteger(from) || from < 1 || from > 1000 || !Number.isInteger(count) || count < 1 || count > MAX_DEVELOPED_ENTRIES) return null;
+  const fields = (Array.isArray(b.fields) ? b.fields : []).slice(0, 12).flatMap((f) => {
+    const x = (f ?? {}) as Record<string, unknown>;
+    const key = typeof x.key === "string" && /^[a-z0-9_]{1,40}$/.test(x.key) ? x.key : "";
+    const label = clean(x.label, 60);
+    return key && label ? [{ key, label, valueType: clean(x.valueType, 20) || "text" }] : [];
+  });
+  const name = clean(b.name, 80);
+  if (!fields.length || !name) return null;
+  const list = (x: unknown, n: number, max: number) => (Array.isArray(x) ? x : []).slice(-n).map((p) => clean(p, max)).filter(Boolean);
+  return { name, fields, from, count, previous: list(b.previous, 40, 100), verses: list(b.verses, 60, 40), names: list(b.names, 60, 30) };
+}
+
+/** Records a model call's real usage and estimated cost (service role; best effort — never blocks or fails a request). */
+async function recordCost(row: { user_id: string; mode: string; model: string; usage: { prompt_tokens?: number; completion_tokens?: number } | undefined; outcome: string }) {
+  const url = Deno.env.get("SUPABASE_URL"), service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !service || !row.usage) return;
+  const input = row.usage.prompt_tokens ?? 0, output = row.usage.completion_tokens ?? 0;
+  const [pi, po] = PRICES[row.model] ?? [0, 0];
+  const { error } = await createClient(url, service).from("ai_generation_costs").insert({
+    user_id: row.user_id, function_name: FUNCTION_NAME, mode: row.mode, model: row.model,
+    prompt_tokens: input, completion_tokens: output, estimated_cost_usd: Number(((input * pi + output * po) / 1e6).toFixed(6)), outcome: row.outcome,
+  });
+  if (error) console.error("cost record failed", error.message);
+}
 
 async function authenticate(req: Request) {
   const header = req.headers.get("Authorization") || "";
@@ -85,7 +204,7 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return reply({ error: "Method not allowed" }, 405);
   const auth = await authenticate(req);
   if (!auth) return reply({ error: "Sign in to generate a document." }, 401);
-  let body: { description?: unknown; content?: unknown; check?: unknown; translation?: unknown };
+  let body: { description?: unknown; content?: unknown; check?: unknown; mode?: unknown; entryCount?: unknown; batch?: unknown; translation?: unknown };
   try { body = await req.json(); } catch { return reply({ error: "Invalid request." }, 400); }
   const raw = Deno.env.get("OPENAI_API_KEY");
   // A pasted secret can carry spaces, quotes or a line break: never part of a real key.
@@ -104,6 +223,19 @@ Deno.serve(async (req) => {
   const content = typeof body.content === "string" ? body.content : "";
   if (description.trim().length < 10 || description.length > 6000 || content.length > 60000)
     return reply({ error: "Describe the document in 10–6,000 characters; your own content must be under 60,000 characters." }, 400);
+  // A quantity that clearly can't fit one document: answered before anything is counted or sent (free), so the
+  // maker can choose to reduce it or split the document.
+  const tooMany = requestedOverLimit(description);
+  if (tooMany)
+    return reply({ error: `“${tooMany.text}” is more than one document can hold: a document can have at most ${MAX_DOCUMENT_PAGES} pages. Reduce the quantity, or split it into more than one document. None of today's proposals was used.`, code: "page-limit", requested: tooMany.n, max: MAX_DOCUMENT_PAGES, version: VERSION }, 422);
+  // Mode: absent = Structure only (Phase 8's request). Anything else is checked before any usage is counted.
+  if (body.mode !== undefined && body.mode !== "structure" && body.mode !== "develop") return reply({ error: "Unknown generation mode." }, 400);
+  const develop = body.mode === "develop";
+  const entryCount = body.entryCount === undefined || body.entryCount === null ? null : Number(body.entryCount);
+  if (entryCount !== null && (!develop || !Number.isInteger(entryCount) || entryCount < 1 || entryCount > MAX_DEVELOPED_ENTRIES))
+    return reply({ error: `Ask for 1–${MAX_DEVELOPED_ENTRIES} entries at a time; longer series are written in batches.` }, 400);
+  const batch = body.batch === undefined ? null : readBatch(body.batch);
+  if (body.batch !== undefined && (!develop || !batch)) return reply({ error: "That next-batch request couldn't be read." }, 400);
   if (!key) return reply({ error: "Document generation isn't set up yet (the OpenAI key is missing)." }, 503);
 
   const day = new Date(); day.setUTCHours(0, 0, 0, 0);
@@ -116,35 +248,84 @@ Deno.serve(async (req) => {
   const { error: logError } = await auth.client.from("edge_usage_logs").insert({ user_id: auth.user.id, function_name: FUNCTION_NAME, units: 1 });
   if (logError) return reply({ error: "Usage logging failed; no AI request was sent." }, 500);
 
+  const system = develop ? SYSTEM.replace(NO_CONTENT, developRules(entryCount, batch)) : SYSTEM;
+  const mode = develop ? "develop" : "structure";
+  // Develop: the story form is asked in the request itself, next to the per-lesson ask — the comparison showed a length
+  // rule in the system prompt alone was ignored (gpt-4.1: 12 of 12 stories in 100–180 words with this wording).
+  const storyAsk = develop ? `\n\nFor every entry that tells a story: write a full mini-story of 8 to 10 sentences (about 140 words) — name a child, set the scene, show what tempts or troubles them, the choice they make, what happens next, and how it ends, showing the trait through what they do. Never fewer than 8 sentences. Each story has a different child's name. No Scripture reference inside the story. At least one reflection question names the story's main character and asks about what they did; the activity lets the reader practise the same trait.` : "";
+  // The Bible translation for any Scripture quoted (the maker's choice; NIV when absent).
   const translation = TRANSLATIONS.find((t) => t === body.translation) ?? "NIV";
-  const user = `What the maker wants:\n${description.trim()}\n\nBible translation for any Scripture you quote: ${translation}.${content.trim() ? `\n\nThe maker's own content — use it exactly as written, placed where it belongs:\n<<<\n${content}\n>>>` : ""}`;
+  const user = `What the maker wants:\n${description.trim()}\n\nBible translation for any Scripture you quote: ${translation}.${content.trim() ? `\n\nThe maker's own content — use it exactly as written, placed where it belongs:\n<<<\n${content}\n>>>` : ""}${storyAsk}${batch ? `\n\nTHIS IS A NEXT BATCH. Entries 1–${batch.from - 1} of "${batch.name}" are already written:\n${batch.previous.map((p, i) => `${batch.from - batch.previous.length + i}. ${p}`).join("\n")}\nWrite entries ${batch.from}–${batch.from + batch.count - 1} only: ${batch.count} NEW entries on themes not covered above (any examples in the description above are already used). Never repeat a title or theme from the list — nor a close synonym of one (for example Truthfulness after Honesty, Thankfulness after Gratitude) — and use Scripture references not used in the entries above.${batch.verses.length ? `\nScripture references already used (do not use any of these again): ${batch.verses.join("; ")}.` : ""}${batch.names.length ? `\nChildren's names already used (give every new story a different name): ${batch.names.join(", ")}.` : ""}` : ""}`;
   let lastError = "";
-  for (const model of MODELS) {
+  const started = Date.now();
+  // Develop: one more attempt when the answer didn't actually write the content (same proposal; counted once).
+  let retry: { role: "assistant" | "user"; content: string }[] = [];
+  const wanted = batch?.count ?? entryCount ?? 6;
+  // Which model answered, and whether it was the backup because the first was unavailable (shown to the maker).
+  let fallback: { from: string; to: string; reason: string } | null = null;
+  for (let i = 0, models = [...(develop ? DEVELOP_MODELS : MODELS)]; i < models.length; i++) {
+    const model = models[i];
+    if (develop && i > 0 && model !== models[0] && !fallback) fallback = { from: models[0], to: model, reason: lastError.slice(0, 120) };
+    // A slow failure leaves no time for a second full call before the function's own limit: report it instead.
+    if (i > 0 && !retry.length && Date.now() - started > RETRY_WITHIN_MS) break;
     try {
       const r = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        // Written lessons take longer than an outline of blanks.
-        signal: AbortSignal.timeout(140_000),
+        // A develop call (or its retry) gets only the time left before the function's own ~150 s limit.
+        signal: AbortSignal.timeout(develop ? Math.max(10_000, Math.min(DEVELOP_TIMEOUT_MS, 140_000 - (Date.now() - started))) : Math.max(10_000, 140_000 - (Date.now() - started))),
         body: JSON.stringify({
           model,
-          temperature: 0.2,
-          response_format: { type: "json_schema", json_schema: { name: "document_spec", strict: true, schema } },
-          messages: [{ role: "system", content: SYSTEM }, { role: "user", content: user }],
+          // Develop writes prose: a little more varied wording, and a fixed output ceiling.
+          temperature: develop ? 0.5 : 0.2,
+          ...(develop ? { max_tokens: DEVELOP_MAX_TOKENS } : {}),
+          response_format: { type: "json_schema", json_schema: { name: "document_spec", strict: true, schema: develop ? developSchema : schema } },
+          messages: [{ role: "system", content: system }, { role: "user", content: user }, ...retry],
         }),
       });
       const result = await r.json().catch(() => null);
-      if (!r.ok) { lastError = result?.error?.message ?? `HTTP ${r.status}`; continue; }
+      if (!r.ok) {
+        lastError = result?.error?.message ?? `HTTP ${r.status}`;
+        // Develop moves to the backup model only when the model itself is unavailable; a rejected request stops here.
+        if (develop && !unavailable(r.status)) break;
+        continue;
+      }
       const message = result?.choices?.[0]?.message;
-      if (message?.refusal) return reply({ error: `The AI declined: ${message.refusal}` }, 422);
-      if (typeof message?.content !== "string") { lastError = "no content"; continue; }
-      // Checked here, not only in the studio: a proposal past the page limit is never handed back.
+      const cost = (outcome: string) => recordCost({ user_id: auth.user.id, mode, model, usage: result?.usage, outcome: fallback && model === fallback.to ? `${outcome} (fallback)` : outcome });
+      if (message?.refusal) { await cost("refused"); return reply({ error: `The AI declined: ${message.refusal}` }, 422); }
+      // Cut off at the output ceiling: the outline isn't complete, so it isn't handed back half-written.
+      if (result?.choices?.[0]?.finish_reason === "length") {
+        await cost("too-long");
+        return reply({ error: `That was more than one request can write. Ask for fewer entries (for example 10), then write the rest with “Write the next batch”.`, version: VERSION }, 422);
+      }
+      // No content is a failed answer, not an unavailable model: Develop doesn't hand it to the backup model.
+      if (typeof message?.content !== "string") { lastError = "no content"; if (develop) break; continue; }
+      const gap = develop ? developGap(message.content, wanted, batch?.previous ?? []) : null;
+      // An incomplete answer comes back fast (it wrote little): retried only while there's time for a full one.
+      if (gap && !retry.length && Date.now() - started < 45_000) {
+        await cost("incomplete-retried");
+        retry = [{ role: "assistant", content: message.content }, { role: "user", content: `Your answer is incomplete: ${gap} Return the complete document specification again.` }];
+        models.splice(i + 1, 0, model);
+        continue;
+      }
+      // Still incomplete after the retry: handed back anyway (it was paid for and counted) with what's missing, so the
+      // maker sees what was written and decides — never thrown away.
+      if (gap) {
+        await cost("incomplete");
+        return reply({ spec: message.content, model, version: VERSION, incomplete: gap, ...(fallback ? { fallback } : {}) });
+      }
+      // Counted here, not only in the studio, so a proposal past the limit is recorded and comes back marked.
       let pages = 0;
       try { pages = minimumPages(JSON.parse(message.content)); } catch { /* not JSON: the studio reports it */ }
-      if (pages > MAX_DOCUMENT_PAGES)
-        return reply({ error: `That proposal would have at least ${pages.toLocaleString("en-US")} pages; a document can have at most ${MAX_DOCUMENT_PAGES}. Ask for fewer copies, days or pages, or split it into more than one document.`, version: VERSION }, 422);
-      return reply({ spec: message.content, model, version: VERSION });
+      await cost(pages > MAX_DOCUMENT_PAGES ? "too-many-pages" : "ok");
+      // Past the limit after the AI answered (the proposal was paid for and counted): handed back with the limit, so
+      // the studio can offer the maker's choices (reduce or split) instead of losing it. The studio never builds an
+      // outline past the limit (buildFromOutline checks before laying anything out).
+      if (pages > MAX_DOCUMENT_PAGES) return reply({ spec: message.content, model, version: VERSION, pageLimit: { pages, max: MAX_DOCUMENT_PAGES }, ...(fallback ? { fallback } : {}) });
+      return reply({ spec: message.content, model, version: VERSION, ...(fallback ? { fallback } : {}) });
     } catch (e) {
+      // Network failure or timeout: the model couldn't be reached — the one case besides an availability status where
+      // Develop tries the backup model.
       lastError = e instanceof Error ? e.message : String(e);
     }
   }
