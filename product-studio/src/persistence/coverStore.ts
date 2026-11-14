@@ -148,11 +148,57 @@ export function normalizeBrief(raw: unknown): CoverBrief {
     title: text(r.title, d.title), subtitle: text(r.subtitle, d.subtitle), etsyTitle: text(r.etsyTitle, d.etsyTitle), angle: text(r.angle, d.angle), tags: text(r.tags, d.tags),
     mockups: text(r.mockups, d.mockups), status: text(r.status, d.status),
     // Saved before categories existed: a cover, with the other categories' details at their defaults.
-    category: r.category === "interior" || r.category === "character" || r.category === "collection" ? r.category : "cover",
+    category: r.category === "interior" || r.category === "character" || r.category === "collection" || r.category === "coloring-cover" ? r.category : "cover",
     typography: text(r.typography, d.typography),
     pageKind: text(r.pageKind, d.pageKind), artUse: text(r.artUse, d.artUse), artPlacement: text(r.artPlacement, d.artPlacement), clearArea: text(r.clearArea, d.clearArea),
     characters: text(r.characters, d.characters), ageGroup: text(r.ageGroup, d.ageGroup), expressions: text(r.expressions, d.expressions),
     characterCount: Math.max(1, Math.min(12, Math.round(numOr(r.characterCount, d.characterCount)))), characterBackground: r.characterBackground === "scene" ? "scene" : "transparent", scene: text(r.scene, d.scene),
+    ...normalizeColoring(r, d),
+  };
+}
+
+const oneOf = <T extends string>(v: unknown, list: readonly T[], d: T): T => (list.includes(v as T) ? (v as T) : d);
+const optText = (v: unknown): string | undefined => (typeof v === "string" && v ? v : undefined);
+const THICK = ["Thin", "Medium", "Thick"] as const, COMPLEX = ["Simple", "Moderate", "Detailed"] as const;
+const OUTPUTS = ["coloring-page", "illustration", "worksheet", "drawing-page", "reference-sheet"] as const;
+
+/** The cast, scenes, coloring defaults and coloring-cover choices (absent in collections saved before them). */
+function normalizeColoring(r: Record<string, unknown>, d: CoverBrief): Partial<CoverBrief> {
+  const cast = (Array.isArray(r.cast) ? r.cast : []).flatMap((x) => {
+    const c = (x ?? {}) as Record<string, unknown>;
+    if (typeof c.id !== "string") return [];
+    return [{
+      id: c.id, name: text(c.name, ""), description: text(c.description, ""), traits: text(c.traits, ""),
+      ...(optText(c.refId) ? { refId: optText(c.refId), refName: optText(c.refName) } : {}),
+      ...Object.fromEntries((["pose", "expression", "outfit", "hairstyle"] as const).flatMap((k) => (optText(c[k]) ? [[k, c[k]]] : []))),
+    }];
+  });
+  const ids = new Set(cast.map((c) => c.id));
+  const scenes = (Array.isArray(r.scenes) ? r.scenes : []).flatMap((x) => {
+    const c = (x ?? {}) as Record<string, unknown>;
+    if (typeof c.id !== "string") return [];
+    return [{
+      id: c.id, title: text(c.title, ""), text: text(c.text, ""),
+      ...(Array.isArray(c.castIds) ? { castIds: c.castIds.filter((i): i is string => typeof i === "string" && ids.has(i)) } : {}),
+      ...(THICK.includes(c.lineThickness as never) ? { lineThickness: c.lineThickness as (typeof THICK)[number] } : {}),
+      ...(COMPLEX.includes(c.complexity as never) ? { complexity: c.complexity as (typeof COMPLEX)[number] } : {}),
+      ...(OUTPUTS.includes(c.output as never) ? { output: c.output as (typeof OUTPUTS)[number] } : {}),
+    }];
+  });
+  return {
+    cast, useGroupRef: r.useGroupRef === true, keepConsistent: r.keepConsistent !== false,
+    ...(optText(r.groupRefId) ? { groupRefId: optText(r.groupRefId), groupRefName: optText(r.groupRefName) } : {}),
+    castSelected: Array.isArray(r.castSelected) ? r.castSelected.filter((i): i is string => typeof i === "string" && ids.has(i)) : cast.map((c) => c.id),
+    coloringStyle: r.coloringStyle === "hybrid" ? "hybrid" : "outline",
+    lineThickness: oneOf(r.lineThickness, THICK, d.lineThickness), complexity: oneOf(r.complexity, COMPLEX, d.complexity), output: oneOf(r.output, OUTPUTS, d.output),
+    textPlacement: oneOf(r.textPlacement, ["top", "bottom", "top-and-bottom", "none"] as const, d.textPlacement),
+    coverage: Math.max(20, Math.min(100, Math.round(numOr(r.coverage, d.coverage)))), translation: text(r.translation, d.translation), verseVerified: r.verseVerified === true,
+    sceneSource: text(r.sceneSource, ""), scenes,
+    coverOutput: r.coverOutput === "complete-concept" ? "complete-concept" : "artwork-only",
+    coverColor: text(r.coverColor, ""), coverComposition: text(r.coverComposition, ""), titlePlacement: text(r.titlePlacement, ""), coverBackground: text(r.coverBackground, ""),
+    illustrationScale: text(r.illustrationScale, ""), starterScene: text(r.starterScene, ""),
+    ...(optText(r.finishedCoverId) ? { finishedCoverId: optText(r.finishedCoverId), finishedCoverName: optText(r.finishedCoverName) } : {}),
+    ...(optText(r.coverApproved) ? { coverApproved: optText(r.coverApproved) } : {}),
   };
 }
 

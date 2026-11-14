@@ -339,11 +339,16 @@ describe("the screen: four steps", () => {
     saveDraft({ brief, items, direction: 0, collectionId: null, step, reached: 3 });
     return renderToStaticMarkup(<CoverStudio onBack={() => {}} projects={[]} loadProject={() => null} />);
   };
-  it("step 1 · Design category: the four categories, and the saved collections", () => {
-    const html = screen("category");
+  it("step 1 · Collection, under the category tabs (with the coloring book cover), and the saved collections", () => {
+    const html = screen("collection");
     expect(html).toContain("Step 1 of 4");
-    for (const t of ["Cover Artwork", "Interior Page Design", "Children’s Character Illustrations", "Coordinated Collection Design", "Your saved collections"]) expect(html).toContain(t);
-    expect((html.match(/data-category="/g) ?? []).length).toBe(4);
+    for (const t of ["Cover Artwork", "Coloring Book Cover", "Interior Page Design", "Children’s Character Illustrations", "Coordinated Collection Design", "Your saved collections"]) expect(html).toContain(t);
+    expect((html.match(/role="tab"/g) ?? []).length).toBe(5);
+    // The step title and Back / Next come right after the tabs.
+    expect(html.indexOf('class="steps__nav"')).toBeGreaterThan(html.indexOf('role="tablist"'));
+    expect(html.indexOf('class="steps__nav"')).toBeLessThan(html.indexOf('class="cover-step"'));
+    // A draft saved on the old first screen ("category") opens on Collection.
+    expect(screen("category")).toContain("Step 1 of 4");
     expect(html).toContain("‹ Back");
     expect(html).toContain("Next ›");
   });
@@ -364,7 +369,8 @@ describe("the screen: four steps", () => {
     expect(cover).toMatch(/<details class="section cover-advanced"><summary>Advanced options/);
     expect(cover).toContain("Bleed, each edge (in)");
     expect(screen("details", newBrief({ category: "interior" }))).toContain("Artwork placement");
-    expect(screen("details", newBrief({ category: "character" }))).toContain("Your characters");
+    expect(screen("cast", newBrief({ category: "character" }))).toContain("Your characters");
+    expect(screen("scenes", newBrief({ category: "character" }))).toContain("Split into scenes");
     expect(screen("details", newBrief({ category: "collection" }))).toContain("Products in the set");
   });
   it("step 4 · Review and copy: the complete prompt, the live specification, Edit for every earlier step", () => {
@@ -380,7 +386,7 @@ describe("the screen: four steps", () => {
     const cover = screen("review");
     expect(cover).toContain("Add a cover title: the prompt never uses a placeholder title.");
     expect(cover).toMatch(/data-testid="generate-chatgpt"[^>]*disabled|disabled[^>]*data-testid="generate-chatgpt"/);
-    expect(screen("review", newBrief({ category: "character" }))).toContain("Describe your characters");
+    expect(screen("review", newBrief({ category: "character" }))).toContain("Add your characters (Cast) or your scenes first.");
   });
 });
 
@@ -410,7 +416,7 @@ describe("the four categories' prompts carry the palette and the category's own 
     for (const t of ["Maya, 7: curly hair in two puffs, yellow raincoat.", "ages 4–8", "praying, sharing a snack", "6 separate character illustrations", "exactly consistent", "transparent background"]) expect(p).toContain(t);
     for (const h of hexes) expect(p).toContain(h);
     expect(categoryPrompt({ ...b, characterBackground: "scene", scene: "a church picnic" }, 0, [])).toContain("a church picnic");
-    expect(categoryBlocker({ ...b, characters: " " })).toMatch(/Describe your characters/);
+    expect(categoryBlocker({ ...b, characters: " " })).toMatch(/Add your characters/);
   });
   it("coordinated collection: one design system, then every product in the set (the starter set if none)", () => {
     const b = titled({ category: "collection", palette: pal.id, typography: "Modern clean sans-serif" });

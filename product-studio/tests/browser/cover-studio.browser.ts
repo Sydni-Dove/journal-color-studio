@@ -61,10 +61,10 @@ const pick = async (page: Page, id: string) => {
 /** A select whose label is exactly this (a label that wraps its options also names them, so a plain label match is ambiguous). */
 const select = (page: Page, label: string) => page.locator("label.field").filter({ has: page.locator("span", { hasText: new RegExp(`^${label}$`) }) }).locator("select");
 const opened = (page: Page) => page.evaluate(() => (window as unknown as { __opened: string[] }).__opened);
-/** Open one of the four screens (1 Design category, 2 Art direction, 3 Artwork details, 4 Review and copy). */
+/** Open one of the category's screens (for a cover: 1 Collection, 2 Art direction, 3 Artwork details, 4 Review and copy). */
 const toStep = async (page: Page, n: number) => {
   await page.locator(".steps__dot").nth(n - 1).click();
-  await page.locator(".steps__count", { hasText: `Step ${n} of 4` }).waitFor();
+  await page.locator(".steps__count", { hasText: new RegExp(`^Step ${n} of`) }).waitFor();
 };
 /** Step 3's folded "Advanced options", opened. */
 const advanced = async (page: Page) => {
@@ -75,7 +75,7 @@ const library = async (page: Page) => {
   const d = page.locator("details.cover-library-section");
   if ((await d.getAttribute("open")) === null) await d.locator("summary").click();
 };
-const category = (page: Page, name: RegExp) => page.getByRole("radio", { name });
+const category = (page: Page, name: RegExp) => page.getByRole("tab", { name });
 /** Title on step 3, then the review. */
 const titled = async (page: Page, title = "Rooted in Hope") => {
   await toStep(page, 3);
@@ -84,11 +84,15 @@ const titled = async (page: Page, title = "Rooted in Hope") => {
 };
 
 describe("Cover Studio", () => {
-  it("four screens: title, progress, Back / Next, jump back from the review, kept on reload", async () => {
+  it("tabs, then the step title and Back / Next at the top; jump back from the review; kept on reload", async () => {
     const page = await studio();
-    expect(await page.locator(".steps__title").innerText()).toBe("Design category");
+    expect(await page.locator(".steps__title").innerText()).toBe("Collection");
     expect(await page.locator(".steps__count").textContent()).toBe("Step 1 of 4");
-    expect(await page.locator("[data-category]").count()).toBe(4);
+    expect(await page.locator('[role="tab"]').count()).toBe(5);
+    // Back / Next sit at the top, directly under the tabs and the step title.
+    const y = async (sel: string) => (await page.locator(sel).first().boundingBox())!.y;
+    expect(await y(".steps__nav")).toBeLessThan(await y(".cover-step"));
+    expect(await y(".steps__nav")).toBeGreaterThan(await y(".cover-tabs"));
     await page.locator(".steps__nav").getByRole("button", { name: /^Next/ }).click();
     expect(await page.locator(".steps__title").innerText()).toBe("Art direction");
     await page.locator(".steps__nav").getByRole("button", { name: /^Next/ }).click();
@@ -100,7 +104,7 @@ describe("Cover Studio", () => {
     await page.getByTestId("cover-summary").locator(".cover-summary__row", { hasText: "Art direction" }).getByRole("button", { name: "Edit" }).click();
     expect(await page.locator(".steps__title").innerText()).toBe("Art direction");
     await page.locator(".steps__nav").getByRole("button", { name: /^‹ Back/ }).click();
-    expect(await page.locator(".steps__title").innerText()).toBe("Design category");
+    expect(await page.locator(".steps__title").innerText()).toBe("Collection");
     // Reload: the same screen, the title kept, the later steps still reached.
     await toStep(page, 3);
     await page.waitForTimeout(600);
@@ -291,7 +295,8 @@ describe("Cover Studio", () => {
     await page.reload();
     await page.getByRole("button", { name: "Cover Studio" }).click();
     const copied = async () => {
-      await toStep(page, 4);
+      await page.locator(".steps__dot").last().click();
+      await page.locator(".steps__title", { hasText: "Review and copy" }).waitFor();
       await page.getByTestId("copy-prompt").click();
       return page.evaluate(() => navigator.clipboard.readText());
     };
@@ -324,21 +329,21 @@ describe("Cover Studio", () => {
     for (const t of ["to-do list page", "Placement: Bottom right corner", "run off the bottom and right edges", "Keep the center two-thirds clear", "transparent background", "Peach"]) expect(p, "interior").toContain(t);
     expect(p).not.toContain("Exact cover title");
 
-    // Children's Character Illustrations: the cast, ages, poses, background.
-    await toStep(page, 1);
+    // Children's Character Illustrations: a saved character and a scene batch; the pages stay black and white.
     await category(page, /Children’s Character/).click();
-    await toStep(page, 4);
+    await page.locator(".steps__dot").last().click();
     await expect(page.getByTestId("copy-prompt").isDisabled()).resolves.toBe(true);
     await toStep(page, 3);
-    await page.getByLabel("Your characters").fill("Maya, 7: curly hair in two puffs, yellow raincoat. Eli, 6: round glasses, green hoodie.");
+    await page.getByRole("button", { name: "Add a character" }).click();
+    await page.getByLabel("Character name").fill("Maya");
+    await page.getByLabel("Maya: description").fill("a 7-year-old with curly hair in two puffs and a yellow raincoat");
     await page.getByLabel("Age group").selectOption("Ages 4–8");
-    await commit(page, "How many poses", "6");
-    await page.getByLabel("Poses and expressions").fill("praying, sharing a snack, reading the Bible");
-    await page.getByLabel("Background", { exact: true }).selectOption("scene");
-    await page.getByLabel("Scene").fill("a church picnic");
-    await palette("jcs-blush-rose", "#");
+    await toStep(page, 4);
+    await page.getByLabel("Scenes text").fill("1. Puddle jumping\nMaya jumps in a puddle, laughing.\n\n2. Sharing a snack\nMaya shares her apple with a friend.");
+    await page.getByRole("button", { name: "Split into scenes" }).click();
     p = await copied();
-    for (const t of ["Maya, 7: curly hair in two puffs", "ages 4–8", "praying, sharing a snack, reading the Bible", "a church picnic", "exactly consistent"]) expect(p, "character").toContain(t);
+    for (const t of ["SCENE 1: Puddle jumping", "SCENE 2: Sharing a snack", "- Maya: a 7-year-old with curly hair", "Black outlines on a pure white background"]) expect(p, "character").toContain(t);
+    expect(p).not.toMatch(/#[0-9A-F]{6}/i);
 
     // Coordinated Collection Design: the products in the set and one design system.
     await toStep(page, 1);
@@ -429,7 +434,7 @@ describe("Cover Studio", () => {
     await page.getByRole("button", { name: "New collection" }).click();
     await library(page);
     await page.getByRole("button", { name: "Open", exact: true }).click();
-    await expect(category(page, /Coordinated Collection/).getAttribute("aria-checked")).resolves.toBe("true");
+    await expect(category(page, /Coordinated Collection/).getAttribute("aria-selected")).resolves.toBe("true");
     await toStep(page, 2);
     await expect(page.getByLabel("Style", { exact: true }).inputValue()).resolves.toBe("Peach and gold marble");
     await page.getByRole("button", { name: /^All \(/ }).click();
@@ -474,7 +479,7 @@ describe("Cover Studio", () => {
     await page.getByRole("button", { name: "Cover Studio" }).click();
     await library(page);
     await page.locator('[data-collection="old1"]').getByRole("button", { name: "Open", exact: true }).click();
-    await expect(category(page, /Cover Artwork/).getAttribute("aria-checked")).resolves.toBe("true");
+    await expect(category(page, /Cover Artwork/).getAttribute("aria-selected")).resolves.toBe("true");
     await toStep(page, 4);
     const p = await text(page, "cover-prompt");
     expect(p).toContain("Exact cover title: “Be Still”");
@@ -506,7 +511,7 @@ describe("Cover Studio", () => {
         await advanced(page);
       }
       expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth), `step ${n}`).toBeLessThanOrEqual(0);
-      const small = await page.locator(".steps__dot, .steps__nav .btn, .cover-category, .cover-summary .btn, .cover-actions .btn").evaluateAll((els) => els.filter((e) => (e as HTMLElement).offsetParent && e.getBoundingClientRect().height < 44).map((e) => e.textContent));
+      const small = await page.locator(".steps__dot, .steps__nav .btn, .cover-tab, .cover-category, .cover-summary .btn, .cover-actions .btn").evaluateAll((els) => els.filter((e) => (e as HTMLElement).offsetParent && e.getBoundingClientRect().height < 44).map((e) => e.textContent));
       expect(small, `step ${n}`).toEqual([]);
     }
     await page.close();

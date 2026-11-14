@@ -1163,8 +1163,7 @@ button.family-card:focus-visible {
 .prompt-editor > *, .prompt-block__body > * { min-width: 0; }
 .prompt-editor select, .prompt-editor input, .prompt-editor textarea { max-width: 100%; min-width: 0; }
 .prompt-editor .field, .prompt-editor .row { min-width: 0; }
-.prompt-editor .row { flex-wrap: wrap; }
-.prompt-list > li, .prompt-block, .prompt-block > summary { min-width: 0; }
+.prompt-editor .prompt-list > li, .prompt-block, .prompt-block > summary { min-width: 0; }
 .prompt-list { grid-template-columns: minmax(0, 1fr); }
 
 /* A newer build is deployed than this tab is running */
@@ -2044,13 +2043,11 @@ button.family-card:focus-visible {
 .ai-section-head > .field { min-width: 0; }
 .ai-section-head select, .ai-section-head input { width: 100%; min-width: 0; box-sizing: border-box; }
 .ai-wizard select { max-width: 100%; text-overflow: ellipsis; }
-.ai-wizard .ai-part .row { flex-wrap: wrap; }
-.ai-wizard .ai-part .row > strong, .ai-wizard .ai-part .hint { overflow-wrap: anywhere; }
+.ai-wizard .ai-part .ai-wizard .ai-part .row > strong, .ai-wizard .ai-part .hint { overflow-wrap: anywhere; }
 .ai-wizard input, .ai-wizard textarea, .ai-wizard select { min-height: 44px; }
 @media (max-width: 600px) {
   .ai-section-head { grid-template-columns: minmax(0, 1fr); }
-  .ai-review .row { flex-wrap: wrap; }
-}
+  .ai-review }
 
 /* iPhone Safari zooms into any field with text under 16px, and stays zoomed: the page then runs past both
    edges of the screen (fields cut off left and right). The studio's 15px text is fine on desktop; on phones
@@ -2439,4 +2436,42 @@ button.family-card:focus-visible {
   .cover-categories { grid-template-columns: 1fr; }
   .cover-summary__row { grid-template-columns: minmax(0, 1fr) auto; }
   .cover-summary__row dd { grid-column: 1 / -1; grid-row: 2; }
+}
+
+/* ── Cover Studio: tabs, cast, scenes, coloring ── */
+.cover-tabs { display: flex; flex-wrap: wrap; gap: 6px; border-bottom: 1px solid var(--ui-line); padding-bottom: 8px; }
+.cover-tab {
+  min-height: 44px;
+  padding: 6px 14px;
+  border: 1px solid var(--ui-line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ui-ink);
+  font-weight: 600;
+  cursor: pointer;
+}
+.cover-tab--on { background: var(--ui-brand); border-color: var(--ui-brand); color: #fff; }
+.cover-tab:focus-visible { outline: 2px solid var(--ui-brand); outline-offset: 2px; }
+.cover-tabs__blurb { margin: 0; }
+.cover-studio--steps .steps__nav { position: static; margin-top: 0; border-top: 0; border-bottom: 1px solid var(--ui-line); padding: 4px 0 10px; }
+.cast-list, .scene-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.cast-card, .scene-card { display: flex; gap: 12px; align-items: flex-start; padding: 12px; background: #fff; border: 1px solid var(--ui-line); border-radius: var(--ui-radius); }
+.scene-card { display: grid; }
+.cast-card__body { display: grid; gap: 6px; flex: 1; min-width: 0; }
+.cast-card__pick strong { color: var(--ui-brand); }
+.cast-thumb { flex: none; }
+.cast-changes summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; }
+.scene-card__head { display: grid; gap: 2px; }
+.scene-overrides { align-items: end; }
+.direction-cards, .output-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; }
+.coloring-style__row { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.line-sample { flex: none; border-radius: 6px; }
+.compare { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.compare figure { margin: 0; display: grid; gap: 4px; justify-items: center; }
+.compare figcaption { font-size: 13px; color: var(--ui-muted); }
+.attach-list { display: grid; gap: 6px; margin-bottom: 8px; }
+.attach-item { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; }
+@media (max-width: 600px) {
+  .cover-tab { flex: 1 1 calc(50% - 6px); font-size: 14px; padding: 6px 8px; }
+  .cast-card { flex-direction: column; }
 }

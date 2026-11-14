@@ -11,7 +11,46 @@ export type CoverFormat = "front" | "wrap";
  * What is being designed (the first screen): a cover, art for interior pages, children's character illustrations,
  * or a coordinated collection. Briefs saved before categories existed are covers.
  */
-export type CoverCategory = "cover" | "interior" | "character" | "collection";
+export type CoverCategory = "cover" | "coloring-cover" | "interior" | "character" | "collection";
+
+/** Coloring pages: black outlines on white (default), or colored accents only (borders and accents in the palette; the shapes children color stay white). */
+export type ColoringStyle = "outline" | "hybrid";
+export type LineThickness = "Thin" | "Medium" | "Thick";
+export type Complexity = "Simple" | "Moderate" | "Detailed";
+/** What one interior page is. Only a reference sheet asks for several views of a character. */
+export type PageOutput = "coloring-page" | "illustration" | "worksheet" | "drawing-page" | "reference-sheet";
+export type TextPlacement = "top" | "bottom" | "top-and-bottom" | "none";
+
+/**
+ * One character of the collection's saved cast. `traits` are what never changes (face, hair texture, proportions,
+ * distinctive features); pose, expression, outfit and hairstyle may change per image when set.
+ */
+export type CastMember = {
+  id: string;
+  name: string;
+  /** Who they are and how they look. */
+  description: string;
+  /** Distinctive traits always preserved. */
+  traits: string;
+  /** An uploaded reference image (engines/artwork/store id) and its file name, if any. */
+  refId?: string;
+  refName?: string;
+  pose?: string;
+  expression?: string;
+  outfit?: string;
+  hairstyle?: string;
+};
+
+/** One scene of a batch: its text, which cast members are in it (all selected when absent), and its own overrides. */
+export type Scene = {
+  id: string;
+  title: string;
+  text: string;
+  castIds?: string[];
+  lineThickness?: LineThickness;
+  complexity?: Complexity;
+  output?: PageOutput;
+};
 
 export type CoverBrief = {
   category: CoverCategory;
@@ -34,6 +73,41 @@ export type CoverBrief = {
   /** "transparent": cut-out characters on a transparent background; "scene": a full illustrated scene. */
   characterBackground: "transparent" | "scene";
   scene: string;
+  // Cast & references (shared by every scene and the coloring book cover in the collection)
+  cast: CastMember[];
+  /** An approved group image of the cast, used in place of the individual images when chosen. */
+  groupRefId?: string;
+  groupRefName?: string;
+  useGroupRef: boolean;
+  /** The cast members in the cover (and in scenes that don't choose their own). */
+  castSelected: string[];
+  keepConsistent: boolean;
+  // Coloring pages (collection defaults; a scene can override thickness, complexity and output)
+  coloringStyle: ColoringStyle;
+  lineThickness: LineThickness;
+  complexity: Complexity;
+  output: PageOutput;
+  textPlacement: TextPlacement;
+  /** Share of the safe area the illustration takes, in percent. */
+  coverage: number;
+  translation: string;
+  /** The verse wording and its permission are verified; until then the prompt leaves room and draws no verse words. */
+  verseVerified: boolean;
+  /** The scene batch as pasted or imported (editable), and the scenes split from it. */
+  sceneSource: string;
+  scenes: Scene[];
+  // Coloring book cover
+  coverOutput: "artwork-only" | "complete-concept";
+  coverColor: string;
+  coverComposition: string;
+  titlePlacement: string;
+  coverBackground: string;
+  illustrationScale: string;
+  starterScene: string;
+  /** The finished cover, uploaded to compare with the interior references, and the maker's approval. */
+  finishedCoverId?: string;
+  finishedCoverName?: string;
+  coverApproved?: string;
   // Collection brief
   collection: string;
   theme: string;
@@ -88,6 +162,10 @@ export function newBrief(over: Partial<CoverBrief> = {}): CoverBrief {
     category: "cover", typography: DEFAULT_TYPOGRAPHY,
     pageKind: "Lined journal page", artUse: "Corner illustration", artPlacement: "Bottom right corner", clearArea: "Keep at least 75% of the page clear",
     characters: "", ageGroup: "Ages 4–8", expressions: "happy, curious, praying, helping a friend", characterCount: 4, characterBackground: "transparent", scene: "",
+    cast: [], useGroupRef: false, castSelected: [], keepConsistent: true,
+    coloringStyle: "outline", lineThickness: "Medium", complexity: "Moderate", output: "coloring-page", textPlacement: "bottom", coverage: 70, translation: "NIV", verseVerified: false,
+    sceneSource: "", scenes: [],
+    coverOutput: "artwork-only", coverColor: "", coverComposition: "", titlePlacement: "", coverBackground: "", illustrationScale: "", starterScene: "",
     collection: "", theme: "", season: "", audience: "", scripture: "", imagery: "", avoid: DEFAULT_AVOID, style: DEFAULT_STYLE,
     palette: DEFAULT_COVER_PALETTE, colorPrimary: "#630000", colorAccent: "#E6A742", colorPaper: "#FDFDFD", colorText: "#1B1717",
     product, size: DEFAULT_SIZE[product], customW: 6, customH: 9, format: "front", binding: defaultBindingFor(product), printProfile: "generic-commercial",

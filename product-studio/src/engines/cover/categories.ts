@@ -12,11 +12,13 @@ import { DEFAULT_TYPOGRAPHY, type CoverBrief, type CoverCategory, type CoverItem
 import { GENERIC_STYLE_GUIDE, STARTER_SET, STYLE_GUIDES } from "./guides";
 import { createBlocker, paletteSpec, promptBlocker, promptFor, setPrompts } from "./prompt";
 import { fmt, resolveCoverSpec } from "./spec";
+import { allScenePrompts, coloringCoverBlocker, coloringCoverPrompt } from "./coloring";
 
 export const CATEGORIES: { id: CoverCategory; title: string; blurb: string }[] = [
   { id: "cover", title: "Cover Artwork", blurb: "A finished front cover or full wrap for one product, with its title." },
+  { id: "coloring-cover", title: "Coloring Book Cover", blurb: "A full-color cover for a coloring book, made with the same characters as its interior pages." },
   { id: "interior", title: "Interior Page Design", blurb: "Art for the inside pages: a background, a corner piece or a band. Product Studio adds the lines, calendars and text." },
-  { id: "character", title: "Children’s Character Illustrations", blurb: "A consistent cast of characters for children's journals, lessons and activity pages." },
+  { id: "character", title: "Children’s Character Illustrations", blurb: "A saved cast and scene batches: coloring pages, illustrations, worksheets, drawing pages and reference sheets." },
   { id: "collection", title: "Coordinated Collection Design", blurb: "One design system across a set: journal, planner, bookmark, cards and more." },
 ];
 export const categoryTitle = (c: CoverCategory) => CATEGORIES.find((x) => x.id === c)?.title ?? "Cover Artwork";
@@ -113,7 +115,9 @@ export function categoryPrompt(b: CoverBrief, direction: number, items: CoverIte
     case "interior":
       return interiorPrompt(b);
     case "character":
-      return characterPrompt(b);
+      return b.scenes.length ? allScenePrompts(b) : characterPrompt(b);
+    case "coloring-cover":
+      return coloringCoverPrompt(b);
     case "collection":
       return collectionPrompt(b, items, direction);
     default: {
@@ -127,12 +131,13 @@ export function categoryPrompt(b: CoverBrief, direction: number, items: CoverIte
 /** Why the category's prompt can't be built yet (null = it can). */
 export function categoryBlocker(b: CoverBrief): string | null {
   if (b.category === "interior") return null;
-  if (b.category === "character") return b.characters.trim() ? null : "Describe your characters: who they are, how they look and what they wear.";
+  if (b.category === "character") return b.scenes.length || b.characters.trim() || b.cast.length ? null : "Add your characters (Cast) or your scenes first.";
+  if (b.category === "coloring-cover") return coloringCoverBlocker(b);
   return promptBlocker(b);
 }
 
 /** Why it can't be handed to an image generator yet (adds the printer's spine for a cover wrap). */
 export function categoryCreateBlocker(b: CoverBrief): string | null {
-  if (b.category === "cover") return createBlocker(b);
+  if (b.category === "cover" || b.category === "coloring-cover") return categoryBlocker(b) ?? createBlocker(b);
   return categoryBlocker(b);
 }

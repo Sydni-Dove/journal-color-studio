@@ -5,7 +5,9 @@
  * generator (ChatGPT) by hand, and the screen says so.
  */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { newBrief, withProduct, type CoverBrief, type CoverCollection, type CoverItem } from "../../engines/cover/brief";
+import { newBrief, withProduct, type CoverBrief, type CoverCategory, type CoverCollection, type CoverItem } from "../../engines/cover/brief";
+import { ApprovePanel, CastPanel, ColoringCoverCards, ColoringStyleControls, CoverCards, LayoutPanel, ScenesPanel, SceneReview, RefThumb, styleDefaults } from "./ColoringPanels";
+import { castFor, outputLabel as PAGE_OUTPUT_LABEL, referenceImages } from "../../engines/cover/coloring";
 import { briefFromProject } from "../../engines/cover/fromProject";
 import {
   COVER_BINDINGS, COVER_PRODUCTS, COVER_SIZES, COVER_STATUSES, DEFAULT_SIZE, DIRECTIONS, DPI_CHOICES, STARTER_SET, STYLE_GROUPS, STYLE_GUIDES, STYLE_HINT_FALLBACK, isWrapProduct, type CoverProduct,
@@ -26,14 +28,27 @@ import type { ProjectSummary } from "../../persistence/projectStore";
 import { PalettePicker } from "../editor/PalettePicker";
 import { Field, LabeledNumeric } from "../editor/ui";
 
-/** Cover Studio's four screens. */
-type CoverStepId = "category" | "direction" | "details" | "review";
-export const COVER_STEPS: StepDef<CoverStepId>[] = [
-  { id: "category", title: "Design category", blurb: "What you're designing: a cover, interior page art, children's characters, or a coordinated collection." },
-  { id: "direction", title: "Art direction", blurb: "The style, the palette's exact colors, and the lettering." },
-  { id: "details", title: "Artwork details", blurb: "What this category needs: title, characters, placement, products and print size. Advanced options are folded away." },
-  { id: "review", title: "Review and copy", blurb: "The complete prompt, ready to copy. Edit any earlier step from here." },
-];
+/** Cover Studio's screens. Every category starts with its collection and ends with Review; between them, what that category needs. */
+type CoverStepId = "collection" | "direction" | "cast" | "scenes" | "layout" | "details" | "cover-design" | "production" | "review";
+const STEP_DEFS: Record<CoverStepId, StepDef<CoverStepId>> = {
+  collection: { id: "collection", title: "Collection", blurb: "Name the collection, start from one of your products, or open a saved one." },
+  direction: { id: "direction", title: "Art direction", blurb: "The style, the palette's exact colors, and the lettering." },
+  cast: { id: "cast", title: "Cast & references", blurb: "The characters every scene and the cover share, with their reference images." },
+  scenes: { id: "scenes", title: "Scenes", blurb: "Paste or import the scenes, split them, and edit each one." },
+  layout: { id: "layout", title: "Page layout", blurb: "What each page is, where its text goes, and how much room the illustration takes." },
+  details: { id: "details", title: "Artwork details", blurb: "What this category needs: title, placement, products and print size. Advanced options are folded away." },
+  "cover-design": { id: "cover-design", title: "Cover design", blurb: "The interior characters, a suggested direction, and the cover's composition." },
+  production: { id: "production", title: "Production", blurb: "Artwork only or a complete concept, the title, and the print size. A paperback wrap needs the printer's spine width." },
+  review: { id: "review", title: "Review and copy", blurb: "The complete prompt, ready to copy. Edit any earlier step from here." },
+};
+const STEPS_FOR: Record<CoverCategory, CoverStepId[]> = {
+  cover: ["collection", "direction", "details", "review"],
+  "coloring-cover": ["collection", "cover-design", "production", "review"],
+  interior: ["collection", "direction", "details", "review"],
+  character: ["collection", "direction", "cast", "scenes", "layout", "review"],
+  collection: ["collection", "direction", "details", "review"],
+};
+export const stepsFor = (c: CoverCategory): StepDef<CoverStepId>[] => STEPS_FOR[c].map((id) => STEP_DEFS[id]);
 
 type Props = {
   onBack: () => void;
@@ -163,21 +178,40 @@ export function CoverStudio({ onBack, projects, loadProject, store = localCoverS
   };
 
   // The four screens. The screen in view (and the furthest reached) is kept with the draft, so a reload returns to it.
-  const [step, setStep] = useState<CoverStepId>(() => (COVER_STEPS.some((x) => x.id === draft?.step) ? (draft!.step as CoverStepId) : "category"));
+  // The screen in view (and the furthest reached) is kept with the draft, so a reload returns to it.
+  const [step, setStep] = useState<CoverStepId>(() => {
+    const saved = draft?.step === "category" ? "collection" : draft?.step;
+    return saved && saved in STEP_DEFS ? (saved as CoverStepId) : "collection";
+  });
   const [reached, setReached] = useState(draft?.reached ?? 0);
+  const steps = stepsFor(brief.category);
+  const shownStep: CoverStepId = STEPS_FOR[brief.category].includes(step) ? step : "collection";
   const go = (s: CoverStepId) => {
     setStep(s);
-    setReached((r) => Math.max(r, COVER_STEPS.findIndex((x) => x.id === s)));
+    setReached((r) => Math.max(r, STEPS_FOR[brief.category].indexOf(s)));
     window.scrollTo({ top: 0 });
   };
+  /** Switch category: everything entered is kept; the same screen stays open when the new category has it. */
+  const switchCategory = (c: CoverCategory) => {
+    set({ category: c });
+    if (!STEPS_FOR[c].includes(step)) setStep(step === "review" ? "review" : "collection");
+  };
+  // The approved interior artwork in your products, offered as reference images.
+  const productImages = useMemo(
+    () => projects.flatMap((p) => (loadProject(p.id)?.artwork?.assets ?? []).map((asset) => ({ asset, product: p.name }))),
+    [projects, loadProject],
+  );
   useEffect(() => {
     const t = window.setTimeout(() => saveDraft({ brief, items, direction, collectionId, step, reached }), 400);
     return () => window.clearTimeout(t);
   }, [brief, items, direction, collectionId, step, reached]);
 
   const cat = brief.category;
-  const isCover = cat === "cover", isInterior = cat === "interior", isCharacter = cat === "character", isCollection = cat === "collection";
+  const isCover = cat === "cover", isInterior = cat === "interior", isCharacter = cat === "character", isCollection = cat === "collection", isColoringCover = cat === "coloring-cover";
+  const hasWrap = isCover || isColoringCover;
   const catBlocked = categoryBlocker(brief);
+  /** Where the missing information is entered. */
+  const fixStep: CoverStepId = isCharacter ? (brief.cast.length ? "scenes" : "cast") : isColoringCover ? "production" : "details";
   const catCreate = categoryCreateBlocker(brief);
   const fullPrompt = catBlocked ? null : categoryPrompt(brief, direction, items);
   const copyFull = () => {
@@ -248,7 +282,7 @@ export function CoverStudio({ onBack, projects, loadProject, store = localCoverS
 
   const advancedPrint = (
     <>
-      {isCover && (
+      {hasWrap && (
         <div className="cover-two">
           <Field label="Cover format">
             <select value={wrapOk ? brief.format : "front"} disabled={!wrapOk} onChange={(e) => set({ format: e.target.value === "wrap" ? "wrap" : "front" })}>
@@ -261,13 +295,13 @@ export function CoverStudio({ onBack, projects, loadProject, store = localCoverS
           </Field>
         </div>
       )}
-      {isCover && !wrapOk && <p className="hint">A full wrap applies to bound books; {brief.product.toLowerCase()} covers are front only.</p>}
+      {hasWrap && !wrapOk && <p className="hint">A full wrap applies to bound books; {brief.product.toLowerCase()} covers are front only.</p>}
       <Field label="Printer">
         <select value={brief.printProfile} onChange={(e) => set({ printProfile: e.target.value })} aria-label="Printer">
           {PRINT_PROFILES.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
         </select>
       </Field>
-      {isCover && (
+      {hasWrap && (
         <>
           <div className="cover-two">
             <LabeledNumeric label="Page count" value={brief.pages} step={2} rules={{ min: 0, integer: true, allowEmpty: true }} onCommit={(v) => set({ pages: v })} />
@@ -321,8 +355,17 @@ export function CoverStudio({ onBack, projects, loadProject, store = localCoverS
       {spec.ok ? (
         <div className="cover-spec">
           <span className="hint">CANVAS SIZE WITH BLEED</span>
-          <strong data-testid="spec-inches">{fmt(spec.canvasW)} × {fmt(spec.canvasH)} in</strong>
-          <div data-testid="spec-pixels"><b>{spec.pxW.toLocaleString()} × {spec.pxH.toLocaleString()} px</b></div>
+          {spec.needsSpine ? (
+            <>
+              <strong data-testid="spec-inches">Waiting for the printer's spine width</strong>
+              <div data-testid="spec-pixels"><b>The final wrap canvas is calculated once the spine width is entered.</b></div>
+            </>
+          ) : (
+            <>
+              <strong data-testid="spec-inches">{fmt(spec.canvasW)} × {fmt(spec.canvasH)} in</strong>
+              <div data-testid="spec-pixels"><b>{spec.pxW.toLocaleString()} × {spec.pxH.toLocaleString()} px</b></div>
+            </>
+          )}
           <dl className="cover-spec__grid">
             <div><dt>Finished trim</dt><dd data-testid="spec-trim">{fmt(spec.trimW)} × {fmt(spec.trimH)} in{spec.wrap ? " per panel" : ""}</dd></div>
             <div><dt>Bleed</dt><dd data-testid="spec-bleed">{fmt(spec.bleed)} in / edge</dd></div>
@@ -432,27 +475,34 @@ export function CoverStudio({ onBack, projects, loadProject, store = localCoverS
         <div>
           <div className="eyebrow">Your weekly creation desk</div>
           <h1>Cover Studio</h1>
-          <p className="hint">Write artwork prompts for covers, interior pages, children's characters and coordinated collections, with exact print dimensions from Product Studio's own printer and binding rules. Make the image elsewhere, then bring it into a product under Artwork and style → Artwork.</p>
+          <p className="hint">Write artwork prompts for covers, coloring books, interior pages, children's characters and coordinated collections, with exact print dimensions from Product Studio's own printer and binding rules. Make the image elsewhere, then bring it into a product under Artwork and style → Artwork, where titles and Scripture stay editable text.</p>
         </div>
         <div className="cover-head__actions">
-          <button type="button" className="btn" onClick={() => { startNew(); setStep("category"); setReached(0); }}>New collection</button>
+          <button type="button" className="btn" onClick={() => { startNew(); setStep("collection"); setReached(0); }}>New collection</button>
         </div>
       </header>
       {message && <div className="update-banner" role="status"><span>{message}</span></div>}
 
       <div className="cover-flow">
-        <StepHeader steps={COVER_STEPS} current={step} reached={reached} onGo={go} />
+        {/* Category tabs, then the step title and Back / Next, at the top. */}
+        <div className="cover-tabs" role="tablist" aria-label="What are you designing?">
+          {CATEGORIES.map((c) => (
+            <button key={c.id} type="button" role="tab" aria-selected={cat === c.id} className={`cover-tab${cat === c.id ? " cover-tab--on" : ""}`} data-category={c.id} onClick={() => switchCategory(c.id)} title={c.blurb}>
+              {c.title}
+            </button>
+          ))}
+        </div>
+        <p className="hint cover-tabs__blurb">{CATEGORIES.find((c) => c.id === cat)?.blurb}</p>
+        <StepHeader steps={steps} current={shownStep} reached={reached} onGo={go} />
+        <StepFooter
+          steps={steps}
+          current={shownStep}
+          onGo={go}
+          finish={<button type="button" className="btn btn--primary steps__nav-btn steps__nav-btn--next" onClick={copyFull} disabled={!!catBlocked}><span>{isCharacter && brief.scenes.length > 1 ? "Copy all prompts" : "Copy prompt"}</span></button>}
+        />
 
-        {step === "category" && (
-          <section className="cover-step" aria-label="Design category">
-            <div className="cover-categories" role="radiogroup" aria-label="What are you designing?">
-              {CATEGORIES.map((c) => (
-                <button key={c.id} type="button" role="radio" aria-checked={cat === c.id} className={`cover-category${cat === c.id ? " cover-category--on" : ""}`} data-category={c.id} onClick={() => set({ category: c.id })}>
-                  <strong>{c.title}</strong>
-                  <span className="hint">{c.blurb}</span>
-                </button>
-              ))}
-            </div>
+        {shownStep === "collection" && (
+          <section className="cover-step" aria-label="Collection">
             <TextField id="cover-collection" label="Collection name" value={brief.collection} placeholder="e.g. Rooted in Hope" onChange={(v) => set({ collection: v })} />
             {projects.length > 0 && (
               <Field label="Start from one of your products (optional)">
@@ -466,22 +516,35 @@ export function CoverStudio({ onBack, projects, loadProject, store = localCoverS
           </section>
         )}
 
-        {step === "direction" && (
+        {shownStep === "direction" && (
           <section className="cover-step" aria-label="Art direction">
+            {isCover && <CoverCards brief={brief} onApply={(b, d) => { setBrief(b); setDirection(d); }} />}
             <Field label="Style">
-              <select value={brief.style} onChange={(e) => set({ style: e.target.value })} aria-label="Style">
+              <select
+                value={brief.style}
+                aria-label="Style"
+                onChange={(e) => {
+                  const style = e.target.value;
+                  const d = isCharacter ? styleDefaults()[style] : undefined;
+                  set({ style, ...(d ?? {}) });
+                }}
+              >
                 {STYLE_GROUPS.map((g) => (
                   <optgroup key={g.label} label={g.label}>{g.styles.map((s) => <option key={s}>{s}</option>)}</optgroup>
                 ))}
               </select>
             </Field>
             <p className="hint" data-testid="style-hint">{STYLE_GUIDES[brief.style] ?? STYLE_HINT_FALLBACK}</p>
+            {isCharacter && <ColoringStyleControls brief={brief} set={set} />}
             {paletteBlock}
-            <Field label="Typography">
-              <select value={brief.typography} onChange={(e) => set({ typography: e.target.value })} aria-label="Typography">
-                {TYPOGRAPHY_CHOICES.map((t) => <option key={t}>{t}</option>)}
-              </select>
-            </Field>
+            {isCharacter && brief.coloringStyle === "outline" && <p className="hint">The palette is for the cover and any colored pieces; outline coloring pages stay black and white.</p>}
+            {!isCharacter && (
+              <Field label="Typography">
+                <select value={brief.typography} onChange={(e) => set({ typography: e.target.value })} aria-label="Typography">
+                  {TYPOGRAPHY_CHOICES.map((t) => <option key={t}>{t}</option>)}
+                </select>
+              </Field>
+            )}
             {(isCover || isCollection) && (
               <div className="field">
                 <span className="field-label">Composition</span>
@@ -499,7 +562,106 @@ export function CoverStudio({ onBack, projects, loadProject, store = localCoverS
           </section>
         )}
 
-        {step === "details" && (
+        {shownStep === "cast" && (
+          <section className="cover-step" aria-label="Cast and references">
+            <Field label="Age group"><select value={brief.ageGroup} aria-label="Age group" onChange={(e) => set({ ageGroup: e.target.value })}>{AGE_GROUPS.map((k) => <option key={k}>{k}</option>)}</select></Field>
+            <CastPanel brief={brief} set={set} productImages={productImages} />
+            <details className="section cover-advanced">
+              <summary>Character sheet without scenes</summary>
+              <div className="section-body">
+                <p className="hint">Used only when there are no scenes: a sheet of cut-out characters or one scene, described in words.</p>
+                <Field label="Your characters">
+                  <textarea rows={3} value={brief.characters} aria-label="Your characters" onChange={(e) => set({ characters: e.target.value })} />
+                </Field>
+                <LabeledNumeric label="How many poses" value={brief.characterCount} step={1} rules={{ min: 1, max: 12, integer: true }} onCommit={(v) => v !== null && set({ characterCount: v })} />
+                <TextField label="Poses and expressions" value={brief.expressions} onChange={(v) => set({ expressions: v })} />
+                <Field label="Background">
+                  <select value={brief.characterBackground} aria-label="Background" onChange={(e) => set({ characterBackground: e.target.value === "scene" ? "scene" : "transparent" })}>
+                    <option value="transparent">Transparent (cut-out characters)</option>
+                    <option value="scene">An illustrated scene</option>
+                  </select>
+                </Field>
+                {brief.characterBackground === "scene" && <TextField label="Scene" value={brief.scene} onChange={(v) => set({ scene: v })} />}
+              </div>
+            </details>
+          </section>
+        )}
+
+        {shownStep === "scenes" && (
+          <section className="cover-step" aria-label="Scenes">
+            <ScenesPanel brief={brief} set={set} say={say} />
+            <div className="cover-two">
+              <TextField label="Theme" value={brief.theme} placeholder="Grace, courage, friendship…" onChange={(v) => set({ theme: v })} />
+              <TextField label="Audience" value={brief.audience} placeholder="Girls ages 4–8" onChange={(v) => set({ audience: v })} />
+            </div>
+          </section>
+        )}
+
+        {shownStep === "layout" && (
+          <section className="cover-step" aria-label="Page layout">
+            <LayoutPanel brief={brief} set={set} />
+            {printSetup}
+            <details className="section cover-advanced">
+              <summary>Advanced options</summary>
+              <div className="section-body">
+                <TextField label="Avoid in this collection" value={brief.avoid} onChange={(v) => set({ avoid: v })} />
+                {advancedPrint}
+              </div>
+            </details>
+          </section>
+        )}
+
+        {shownStep === "cover-design" && (
+          <section className="cover-step" aria-label="Cover design">
+            <div className="cover-panel">
+              <div className="cover-panel__top"><div><div className="eyebrow">From the interior pages</div><h2>Interior characters</h2></div></div>
+              <CastPanel brief={brief} set={set} selecting productImages={productImages} />
+            </div>
+            <ColoringCoverCards brief={brief} set={(b) => setBrief(b)} />
+            <div className="cover-two">
+              <TextField label="Cover color" value={brief.coverColor} placeholder="Full-color storybook painting" onChange={(v) => set({ coverColor: v })} />
+              <TextField label="Composition" value={brief.coverComposition} onChange={(v) => set({ coverComposition: v })} />
+            </div>
+            <div className="cover-two">
+              <TextField label="Title placement" value={brief.titlePlacement} onChange={(v) => set({ titlePlacement: v })} />
+              <TextField label="Background" value={brief.coverBackground} onChange={(v) => set({ coverBackground: v })} />
+            </div>
+            <div className="cover-two">
+              <TextField label="Illustration scale" value={brief.illustrationScale} onChange={(v) => set({ illustrationScale: v })} />
+              <TextField label="Starter scene" value={brief.starterScene} onChange={(v) => set({ starterScene: v })} />
+            </div>
+            <Field label="Style">
+              <select value={brief.style} onChange={(e) => set({ style: e.target.value })} aria-label="Style">
+                {STYLE_GROUPS.map((g) => (
+                  <optgroup key={g.label} label={g.label}>{g.styles.map((s) => <option key={s}>{s}</option>)}</optgroup>
+                ))}
+              </select>
+            </Field>
+            {paletteBlock}
+          </section>
+        )}
+
+        {shownStep === "production" && (
+          <section className="cover-step" aria-label="Production">
+            <div className="field">
+              <span className="field-label">What the image generator makes</span>
+              <div className="segmented" role="group" aria-label="What the image generator makes">
+                <button type="button" aria-pressed={brief.coverOutput === "artwork-only"} style={{ minHeight: 44 }} onClick={() => set({ coverOutput: "artwork-only" })}>Artwork only</button>
+                <button type="button" aria-pressed={brief.coverOutput === "complete-concept"} style={{ minHeight: 44 }} onClick={() => set({ coverOutput: "complete-concept" })}>Complete cover concept</button>
+              </div>
+              <p className="hint">{brief.coverOutput === "artwork-only" ? "No words in the image: the title and Scripture are added as editable text in Product Studio, which assembles the final PDF." : "A concept with the title lettered in, to judge the whole cover. For print, set the final title and Scripture as editable text in Product Studio."}</p>
+            </div>
+            <div className="cover-two">
+              <TextField id="cover-title" label="Book title" value={brief.title} placeholder="She Is Gracious" onChange={(v) => set({ title: v })} />
+              <TextField label="Subtitle" value={brief.subtitle} placeholder="A Ballet Coloring Book" onChange={(v) => set({ subtitle: v })} />
+            </div>
+            <TextField label="Scripture / phrase" value={brief.scripture} placeholder="Proverbs 31:25" onChange={(v) => set({ scripture: v })} />
+            {printSetup}
+            {advancedPrint}
+          </section>
+        )}
+
+        {shownStep === "details" && (
           <section className="cover-step" aria-label="Artwork details">
             {(isCover || isCollection) && (
               <>
@@ -526,26 +688,6 @@ export function CoverStudio({ onBack, projects, loadProject, store = localCoverS
                 <p className="hint">Product Studio draws the lines, calendar and text; the prompt asks for art only. Corner and band art comes back as a transparent PNG that runs off the edges it touches, ready for Artwork → Page illustration.</p>
               </>
             )}
-            {isCharacter && (
-              <>
-                <Field label="Your characters">
-                  <textarea rows={4} value={brief.characters} aria-label="Your characters" placeholder="Maya, 7: brown curly hair in two puffs, yellow raincoat, red boots. Eli, 6: short black hair, round glasses, green hoodie." onChange={(e) => set({ characters: e.target.value })} />
-                </Field>
-                <div className="cover-two">
-                  <Field label="Age group"><select value={brief.ageGroup} aria-label="Age group" onChange={(e) => set({ ageGroup: e.target.value })}>{AGE_GROUPS.map((k) => <option key={k}>{k}</option>)}</select></Field>
-                  <LabeledNumeric label="How many poses" value={brief.characterCount} step={1} rules={{ min: 1, max: 12, integer: true }} onCommit={(v) => v !== null && set({ characterCount: v })} />
-                </div>
-                <TextField label="Poses and expressions" value={brief.expressions} onChange={(v) => set({ expressions: v })} />
-                <Field label="Background">
-                  <select value={brief.characterBackground} aria-label="Background" onChange={(e) => set({ characterBackground: e.target.value === "scene" ? "scene" : "transparent" })}>
-                    <option value="transparent">Transparent (cut-out characters)</option>
-                    <option value="scene">An illustrated scene</option>
-                  </select>
-                </Field>
-                {brief.characterBackground === "scene" && <TextField label="Scene" value={brief.scene} placeholder="A sunny classroom, a garden, a church picnic…" onChange={(v) => set({ scene: v })} />}
-                {printSetup}
-              </>
-            )}
             <div className="cover-two">
               <TextField label="Theme" value={brief.theme} placeholder="Renewal, rest, courage…" onChange={(v) => set({ theme: v })} />
               <TextField label="Audience" value={brief.audience} placeholder="Women in ministry" onChange={(v) => set({ audience: v })} />
@@ -556,7 +698,7 @@ export function CoverStudio({ onBack, projects, loadProject, store = localCoverS
               <div className="section-body">
                 <TextField label="Season / collection" value={brief.season} placeholder="Spring 2027" onChange={(v) => set({ season: v })} />
                 <TextField label="Avoid in this collection" value={brief.avoid} onChange={(v) => set({ avoid: v })} hint="Edit this list for your taste. These are blocked unless you specifically request them in Desired imagery." />
-                {(isCollection) && printSetup}
+                {isCollection && printSetup}
                 {advancedPrint}
                 {(isCover || isCollection) && listing}
               </div>
@@ -564,48 +706,80 @@ export function CoverStudio({ onBack, projects, loadProject, store = localCoverS
           </section>
         )}
 
-        {step === "review" && (
+        {shownStep === "review" && (
           <section className="cover-step" aria-label="Review and copy">
             <dl className="cover-summary" data-testid="cover-summary">
-              {summaryRow("Design category", categoryTitle(cat), "category")}
-              {summaryRow("Art direction", `${brief.style} · ${brief.palette === "custom" ? "Custom colors" : palette ? summarizePalette(palette).name : brief.palette} · ${brief.typography}`, "direction")}
-              {summaryRow("Artwork details", isCharacter ? (brief.characters.trim() ? brief.characters.trim().slice(0, 80) : "No characters yet") : isInterior ? `${brief.pageKind} · ${brief.artUse} · ${brief.artPlacement}` : isCollection ? `${brief.title || "No title yet"} · ${(items.length || STARTER_SET.length)} products` : `${brief.title || "No title yet"} · ${brief.product} ${brief.size}`, "details")}
+              {steps.filter((x) => x.id !== "review").map((x) => summaryRow(x.title, stepSummary(x.id), x.id))}
             </dl>
+            {isCharacter && brief.scenes.length > 0 && <SceneReview brief={brief} copy={copy} onEdit={() => go("scenes")} />}
             <div className="cover-panel">
-              <div className="cover-panel__top"><div><div className="eyebrow">{categoryTitle(cat)}</div><h2>Your prompt</h2></div></div>
+              <div className="cover-panel__top"><div><div className="eyebrow">{categoryTitle(cat)}</div><h2>{isCharacter && brief.scenes.length ? `All ${brief.scenes.length} scene prompts` : "Your prompt"}</h2></div></div>
+              {isColoringCover && !catBlocked && (
+                <div className="attach-list" data-testid="attach-list">
+                  <strong>Attach these reference images:</strong>
+                  {referenceImages(brief, castFor(brief)).length ? (
+                    <div className="row">
+                      {(brief.useGroupRef && brief.groupRefId ? [{ id: "g", refId: brief.groupRefId, refName: brief.groupRefName, name: "Group" }] : castFor(brief).filter((c) => c.refId)).map((c) => (
+                        <span key={c.id} className="attach-item"><RefThumb id={c.refId} name={c.refName} size={48} /> {c.refName}</span>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="hint"> none saved yet: add them in Cover design.</span>
+                  )}
+                </div>
+              )}
               <pre className="cover-prompt" data-testid="cover-prompt">{catBlocked ? catBlocked : fullPrompt}</pre>
               <div className="cover-actions cover-actions--main">
-                <button type="button" className="btn btn--primary btn--big" onClick={copyFull} disabled={!!catBlocked} data-testid="copy-prompt">Copy prompt</button>
+                <button type="button" className="btn btn--primary btn--big" onClick={copyFull} disabled={!!catBlocked} data-testid="copy-prompt">{isCharacter && brief.scenes.length > 1 ? "Copy all prompts" : "Copy prompt"}</button>
                 <button type="button" className="btn" disabled={!!catCreate} onClick={generateFull} data-testid="generate-chatgpt">Generate in ChatGPT ↗</button>
                 <button type="button" className="btn" onClick={openChatGpt} data-testid="open-chatgpt">Open ChatGPT ↗</button>
                 <button type="button" className="btn" disabled={!!catBlocked} onClick={() => { if (fullPrompt) download("dove-artwork-brief.txt", `COLLECTION: ${brief.collection}\n${categoryTitle(cat)}\n${specLine(brief, spec)}\n\n${fullPrompt}`, "text/plain"); }}>Download brief</button>
               </div>
               {catBlocked && (
                 <p className="hint" role="status">
-                  {catBlocked} <button type="button" className="btn btn--ghost" onClick={() => go("details")}>Go to Artwork details</button>
+                  {catBlocked} <button type="button" className="btn btn--ghost" onClick={() => go(fixStep)}>Go to {STEP_DEFS[fixStep].title}</button>
                 </p>
               )}
               {!catBlocked && catCreate && <p className="hint" role="status" data-testid="create-blocker">{catCreate}</p>}
               <p className="hint">“Generate in ChatGPT” opens ChatGPT in a new tab with the prompt in the message box; nothing is sent until you press send, and the prompt is also copied in case the box comes up empty. Product Studio does not make images. Image generators can miss exact text and size: use the specification below for the final print file.</p>
             </div>
+            {isColoringCover && <ApprovePanel brief={brief} set={set} />}
             {!isCharacter && specPanel}
             <div className="cover-actions">
               <button type="button" className="btn btn--primary" onClick={save}>{collectionId ? "Save changes" : "Save collection"}</button>
               <button type="button" className="btn" onClick={() => download("dove-stationery-collection.json", exportCollectionJson({ brief, items, direction }), "application/json")}>Export collection JSON</button>
             </div>
-            <p className="hint">Saved on this device. Export a backup for another browser.</p>
+            <p className="hint">Saved on this device, reference images included. An exported backup carries the choices but not the images: add those again on another device.</p>
           </section>
         )}
-
-        <StepFooter
-          steps={COVER_STEPS}
-          current={step}
-          onGo={go}
-          finish={<button type="button" className="btn btn--primary steps__nav-btn steps__nav-btn--next" onClick={copyFull} disabled={!!catBlocked}><span>Copy prompt</span></button>}
-        />
       </div>
     </div>
   );
+
+  /** One line per earlier step on the review. */
+  function stepSummary(id: CoverStepId): string {
+    const pal = brief.palette === "custom" ? "Custom colors" : palette ? summarizePalette(palette).name : brief.palette;
+    switch (id) {
+      case "collection":
+        return `${brief.collection || "Unnamed collection"} · ${categoryTitle(cat)}`;
+      case "direction":
+        return isCharacter ? `${brief.style} · ${brief.coloringStyle === "hybrid" ? "Hybrid · colored accents only" : "Black outlines on white"} · ${brief.lineThickness} lines · ${brief.complexity}` : `${brief.style} · ${pal} · ${brief.typography}`;
+      case "cast":
+        return brief.cast.length ? brief.cast.map((c) => c.name).join(", ") : "No saved characters yet";
+      case "scenes":
+        return `${brief.scenes.length} scene${brief.scenes.length === 1 ? "" : "s"}`;
+      case "layout":
+        return `${PAGE_OUTPUT_LABEL(brief.output)} · ${brief.coverage}% illustration · ${brief.product} ${brief.size}`;
+      case "cover-design":
+        return `${castFor(brief).map((c) => c.name).join(", ") || "No characters"} · ${brief.coverColor || "no direction yet"} · ${pal}`;
+      case "production":
+        return `${brief.title || "No title yet"} · ${brief.coverOutput === "artwork-only" ? "Artwork only" : "Complete concept"} · ${brief.product} ${brief.size}${spec.wrap ? " wrap" : ""}`;
+      case "details":
+        return isInterior ? `${brief.pageKind} · ${brief.artUse} · ${brief.artPlacement}` : isCollection ? `${brief.title || "No title yet"} · ${items.length || STARTER_SET.length} products` : `${brief.title || "No title yet"} · ${brief.product} ${brief.size}`;
+      default:
+        return "";
+    }
+  }
 }
 
 function TextField({ id, label, value, onChange, placeholder, hint }: { id?: string; label: string; value: string; onChange: (v: string) => void; placeholder?: string; hint?: ReactNode }) {

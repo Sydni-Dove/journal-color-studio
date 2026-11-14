@@ -49,6 +49,22 @@ image upload; "design styles", not "recipes"). **10 Research and develop content
 **11 Requirements Assistant** — reserved. Technical improvements (any time, not blocking a phase): self-hosted
 fonts (see Testing).
 
+## Cover Studio: four screens, coloring books (2026-11-14, branches — review pending, nothing merged or deployed)
+
+Stacked review branches, each containing the one before:
+1. `claude/guided-steps-artwork` — product editor in four steps + uploaded artwork (section below).
+2. `claude/stationery-cover-generator` — Cover Studio (section below).
+3. `claude/cover-studio-steps` — 1 + 2 merged; Cover Studio in four screens with four categories.
+4. **`claude/coloring-book-studio`** — 3 + current `main` (document upload, Scripture cards, generate-document v14)
+   merged; category tabs with the step title and Back / Next at the top; Coloring Book Cover tab; cast with reference
+   images; scene batches; coloring style (black outlines default, Hybrid optional, line thickness, complexity,
+   per-scene overrides); five page outputs with a live space estimate; NIV room for the verse; artwork-only vs complete
+   concept; compare-and-approve. Details: `product-studio/docs/cover-studio.md`. Merging 4 brings 1–3 with it.
+Tested with *She Is Gracious — Ballet Coloring Book* (`tests/browser/coloring-book.browser.ts`). Still manual: a
+signed-in ChatGPT run; checking real generated covers against the references (the approval is the maker's); the verse
+wording and permission (`codex/scripture-permissions-review` is a separate, unmerged review); reference images live on
+one device (no online copy yet).
+
 ## Cover Studio (2026-11-13, branch `claude/stationery-cover-generator` from `main` 7d7bb23 — review pending)
 
 Native port of the standalone stationery cover generator into Product Studio (home → **Cover Studio**). Docs:
