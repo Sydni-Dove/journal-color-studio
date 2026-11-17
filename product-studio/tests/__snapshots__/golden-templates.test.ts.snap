@@ -681,6 +681,39 @@ exports[`existing templates print exactly as before > journal-lined @ 8.5x11 1`]
 }
 `;
 
+exports[`existing templates print exactly as before > notepad-checklist @ 5.5x8.5 1`] = `
+{
+  "groups": [
+    "1-1:c78ce097f3f7",
+  ],
+  "pageCount": 1,
+  "plan": "dda672d4d870",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > notepad-checklist @ 7x9 1`] = `
+{
+  "groups": [
+    "1-1:18693f7ad73d",
+  ],
+  "pageCount": 1,
+  "plan": "dda672d4d870",
+  "recipeDiagnostics": [],
+}
+`;
+
+exports[`existing templates print exactly as before > notepad-checklist @ 8.5x11 1`] = `
+{
+  "groups": [
+    "1-1:f52dd3037877",
+  ],
+  "pageCount": 1,
+  "plan": "dda672d4d870",
+  "recipeDiagnostics": [],
+}
+`;
+
 exports[`existing templates print exactly as before > notepad-daily @ 5.5x8.5 1`] = `
 {
   "groups": [

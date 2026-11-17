@@ -36,39 +36,53 @@ export const groceryNotepad: LayoutDefinition = {
     repeats: ["repeated-sheet", "once", "count"],
     defaultRepeat: "repeated-sheet",
   },
-  // Six categories × (subhead + at least 2 rows) must fit in one or two columns.
+  // Six categories × (subhead + at least 2 rows) must fit in one or two columns (fewer sections fit more easily).
   fit: minimumAreaFit(2.5, 4, "Grocery list"),
   solve(ctx): SolvedPage[] {
     const s = ctx.spacing;
+    const opts = ctx.options.listPage ?? {};
     const frame = pageFrame(ctx, 0, { headerH: STUDIO_GROCERY.header.valueIn });
     const title = headerTitle("grocery-header", ctx, frame.zones, "pageTitle", ctx.wording.groceryList, "pageTitle", "header-center");
     const nodes: LayoutNode[] = [...frame.nodes, ...title.nodes];
-    const twoCols = frame.body.w + 1e-6 >= STUDIO_GROCERY.twoColumnMinWidth.valueIn;
+    // The maker's own sections (any number), or the six built-in categories (their wording renamable).
+    const custom = opts.sections?.map((t) => t.trim()).filter(Boolean);
+    const sections: { key: string; title: string }[] = custom?.length
+      ? custom.map((t, i) => ({ key: `s${i + 1}`, title: t }))
+      : CATEGORIES.map((k) => ({ key: k, title: ctx.wording[k] }));
+    const twoCols = frame.body.w + 1e-6 >= STUDIO_GROCERY.twoColumnMinWidth.valueIn && sections.length > 1;
     const colCount = twoCols ? 2 : 1;
     const cols = distributeEqual(frame.body.x, frame.body.w, colCount, s.section);
-    const perCol = CATEGORIES.length / colCount;
+    const perCol = Math.ceil(sections.length / colCount);
     const rowH = STUDIO_GROCERY.row.valueIn;
     const headH = STUDIO_GROCERY.categoryHead.valueIn;
     let rowsPerCategory = Infinity;
+    let short = false;
     cols.starts.forEach((x, c) => {
       const blocks = distributeEqual(frame.body.y, frame.body.h, perCol, s.block);
       blocks.starts.forEach((y, b) => {
-        const key = CATEGORIES[c * perCol + b];
-        const id = `grocery-${key}`;
+        const sec = sections[c * perCol + b];
+        if (!sec) return;
+        const id = `grocery-${sec.key}`;
         const blockRect = { x, y, w: cols.size, h: blocks.size };
         const headRect = { x, y, w: cols.size, h: headH };
-        const listRect = { x, y: y + headH, w: cols.size, h: blocks.size - headH };
-        const list = checklistRows(`${id}-list`, listRect, ctx, rowH);
+        // A set number of lines (never more than the block holds); otherwise as many as fit.
+        const room = blocks.size - headH;
+        const want = opts.lines ? opts.lines * rowH : room;
+        if (want > room + 1e-6) short = true;
+        const listRect = { x, y: y + headH, w: cols.size, h: Math.min(want, room) };
+        const list = checklistRows(`${id}-list`, listRect, ctx, rowH, opts.marker ? { marker: opts.marker } : {});
         rowsPerCategory = Math.min(rowsPerCategory, list.rows);
         nodes.push(
           group(id, "Section", blockRect),
-          text(`${id}-title`, { ...headRect, h: headH - s.headingToContentGap }, ctx.wording[key], "sectionHeading", { component: "SectionHeader", vAlign: "bottom" }),
+          text(`${id}-title`, { ...headRect, h: headH - s.headingToContentGap }, sec.title, "sectionHeading", { component: "SectionHeader", vAlign: "bottom" }),
           rule(`${id}-rule`, x, y + headH, x + cols.size, y + headH, { strokePt: 0.75 }),
           ...list.nodes,
         );
       });
     });
+    if (!Number.isFinite(rowsPerCategory)) rowsPerCategory = 0;
     const diagnostics = [...frame.diagnostics, ...title.diagnostics];
+    if (short) diagnostics.push({ severity: "warning", rule: "min-writing-area", componentId: "grocery", message: `${opts.lines} lines per section don't fit on this sheet: ${rowsPerCategory} are shown. Use fewer sections or lines, or a larger sheet.` });
     if (rowsPerCategory < 2) {
       diagnostics.push({ severity: "warning", rule: "min-writing-area", componentId: "grocery", message: `Only ${rowsPerCategory} row(s) per category fit on this sheet.` });
     }

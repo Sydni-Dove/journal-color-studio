@@ -71,6 +71,8 @@ export function categoryOf(step: BookStep, parents: BookGroup[]): BuilderCategor
       return "dividers";
     case "monthly-calendar":
       return "monthly";
+    case "yearly-calendar":
+      return "yearly";
     case "weekly-planner":
       return "weekly";
     case "daily-planner":
@@ -100,9 +102,13 @@ export function builderRows(structure: BookNode[]): BuilderRow[] {
 }
 
 // ─── Finding the right place ───────────────────────────────────────────────
+/** Sections that hold pages at the front of the book (all months together): never where repeating pages are added. */
+export const FRONT_PREFIX = "front-";
+const isFront = (n: BookNode) => n.kind === "group" && n.id.startsWith(FRONT_PREFIX);
+
 function findGroup(nodes: BookNode[], period: BookGroup["period"]): BookGroup | null {
   for (const n of nodes) {
-    if (n.kind !== "group") continue;
+    if (n.kind !== "group" || isFront(n)) continue;
     if (n.period === period) return n;
     const inner = findGroup(n.children, period);
     if (inner) return inner;
@@ -129,6 +135,65 @@ export function addFrontCover(nodes: BookNode[]): BookNode[] {
 
 export function addEndCover(nodes: BookNode[]): BookNode[] {
   return [...nodes, newStep("back-cover", { type: "once" })];
+}
+
+/** Where front pages end: after the front cover, opening dividers, yearly calendars and months at the front. */
+function frontEnd(nodes: BookNode[], withMonths = true): number {
+  let i = 0;
+  while (i < nodes.length) {
+    const n = nodes[i];
+    const front = (n.kind === "step" && (n.module === "cover-page" || n.module === "yearly-calendar" || (n.module === "divider-page" && i === 1 && nodes[0].kind === "step" && nodes[0].module === "cover-page"))) || (withMonths && isFront(n));
+    if (!front) break;
+    i++;
+  }
+  return i;
+}
+const insertAt = (nodes: BookNode[], i: number, node: BookNode) => [...nodes.slice(0, i), node, ...nodes.slice(i)];
+
+/** A yearly calendar (year at a glance, its spread, a linear year or a year in pixels) at the front of the book. */
+export function addYearlyCalendar(nodes: BookNode[], layoutId: string): BookNode[] {
+  // The year comes before the months at the front.
+  const title = { "year-in-pixels": "Year in Pixels", "year-linear": "Linear Year" }[layoutId] ?? "Year at a Glance";
+  return insertAt(nodes, frontEnd(nodes, false), newStepWith("yearly-calendar", { type: "once" }, { layoutId, title }));
+}
+
+/**
+ * Every month of the planner's time frame together at the front of the book (each month's calendar, one after
+ * another). Months inside the book ("Every Month") stay where they are: a book can have both.
+ */
+export function addMonthsAtFront(nodes: BookNode[]): BookNode[] {
+  // A plain (non-repeating) section holding an "Every Month": it keeps its place at the front, and its months repeat
+  // only inside it, so they print together instead of interleaving with the book's own months.
+  const months: BookGroup = { ...newSection("Every Month", "month"), children: [newStep("monthly-calendar", { type: "once" })] };
+  const g: BookGroup = { ...newSection("All months (at the front)"), id: `${FRONT_PREFIX}${nodeId("g")}`, children: [months] };
+  return insertAt(nodes, frontEnd(nodes), g);
+}
+
+/** The months-at-the-front section, if the book has one. */
+export const monthsAtFront = (nodes: BookNode[]) => nodes.find((n): n is BookGroup => isFront(n) && n.kind === "group") ?? null;
+/** A monthly calendar inside the book's own "Every Month" (not the months at the front). */
+export const hasMonthsThroughout = (nodes: BookNode[]) => {
+  const g = findGroup(nodes, "month");
+  return !!g && g.children.some((n) => n.kind === "step" && n.module === "monthly-calendar");
+};
+
+/**
+ * Dividers that separate the book by time: one opening every month, week or day, titled with that month, week or
+ * day. Month dividers carry a printed tab; week and day dividers don't (there would be too many tabs).
+ * A day divider wraps the daily page in an "Every Day" section, so each day's divider sits before that day's page.
+ */
+export function addTimeDividers(nodes: BookNode[], period: "month" | "week" | "day"): BookNode[] {
+  const divider = newStepWith("divider-page", { type: "once" }, { cover: period === "month" ? { tab: { show: true, style: "rounded" } } : {} });
+  if (period === "day") {
+    const daily = builderRows(nodes).find((r) => r.step.module === "daily-planner");
+    if (!daily) return nodes;
+    const dayDivider: BookStep = { ...divider, cadence: { type: "daily" } };
+    const parent = daily.parents.at(-1);
+    if (parent) return updateNode(nodes, parent.id, (g) => (g.kind === "group" ? { ...g, children: g.children.flatMap((c) => (c.id === daily.step.id ? [dayDivider, c] : [c])) } : g));
+    return nodes.flatMap((c) => (c.id === daily.step.id ? [dayDivider, c] : [c]));
+  }
+  const g = findGroup(nodes, period);
+  return g ? prependTo(nodes, g.id, divider) : nodes;
 }
 
 export function addMonthly(nodes: BookNode[]): BookNode[] {

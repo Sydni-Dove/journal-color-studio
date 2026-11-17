@@ -45,9 +45,11 @@ type Props = {
   onIndex: (i: number) => void;
   debug: DebugFlags;
   issueIds: Set<string>;
+  /** Reorder: move the kind of page at this index earlier or later in the book (Browse pages). */
+  onMove?: (index: number, dir: -1 | 1) => void;
 };
 
-export function PagePreview({ doc, index, onIndex, debug, issueIds }: Props) {
+export function PagePreview({ doc, index, onIndex, debug, issueIds, onMove }: Props) {
   const pages = doc.recipe.pages;
   const paged = pages.some((p) => p.side !== "single");
   const [spread, setSpread] = useState(false);
@@ -184,7 +186,7 @@ export function PagePreview({ doc, index, onIndex, debug, issueIds }: Props) {
         {current.physicalSheets ? `  ·  one design, printed on ${current.physicalSheets} sheets` : ""}
         {current.filler ? "  ·  extra notes page (keeps two-page spreads facing each other)" : ""}
       </div>
-      {sheet && <PageNavigator doc={doc} index={index} onIndex={onIndex} filter={filter} onFilter={setFilter} onClose={() => setSheet(false)} />}
+      {sheet && <PageNavigator doc={doc} index={index} onIndex={onIndex} filter={filter} onFilter={setFilter} onClose={() => setSheet(false)} onMove={onMove} />}
     </>
   );
 }
