@@ -175,6 +175,11 @@ export type ExportSettings = {
   paper?: "page" | "letter" | "a4";
   /** Home printing only: show corner trim/cut marks around the finished page. Default false. */
   showTrimMarks?: boolean;
+  /**
+   * Home paper only: one design per sheet (default), or two designs side by side or stacked, each at its
+   * actual size (never scaled), with the sheet turned to whichever orientation fits them.
+   */
+  perSheet?: 1 | 2;
 };
 
 export type ProductVariant = {

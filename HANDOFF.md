@@ -59,6 +59,16 @@ fonts (see Testing).
 - 38f8759 fixes the toolbar note "not updating with typography changes". Coloring book title and verse lines no longer pin their own font and size: they use the product's typography (headings = title font, body = Scripture font), so Style → Typography reaches the pages.
 - Combined suites: 1,749 unit and 202 browser tests, all passing. Golden snapshots: only the checklist entries were added.
 - a8335e7 (from `claude/online-cover-studio`): the artwork panel has a new "Covers" option, "Between the title and verse", for a page background on any page with a picture area (a coloring page). The whole picture is fitted between the words. The area comes from the solved `-art` group, inside the side margins. A new background on such a page starts there, and a hint shows when a picture runs under the words. This answers Sydni's screenshot of a page-size illustration drawn under the Joshua 1:9 verse. Coloring Book Studio still places page-canvas-size illustrations over the whole page, as before.
+- Two designs per sheet (built on this branch): Print / Save PDF now has these choices:
+  - "Single design per sheet" or "Two designs per sheet — actual size".
+  - Automatic orientation: `twoUpLayout` tries side by side and stacked, on landscape and portrait paper, and picks the arrangement with the most room at the edges. It leaves a 0.25" gap between the designs when there's room.
+  - Trim marks for both designs (`TwoUpCutMarks`).
+  - A count line, e.g. "50 notepad sheets = 25 printed Letter sheets". A single master design fills both places on the sheet. A page too large for two is refused, not scaled.
+  - A note when the art comes within 0.25" of the paper edge (most home printers can't print there).
+  - The dialog lists the sizes that print two per sheet, from `twoPerSheetSizes`:
+    - Clear of the printer's edge: 5×8, 5×7, 4×8, A6, 4×6, 3×5.
+    - Edge to edge: 4.25×11, 5.5×8.5, 4×9.
+  - New notepad sizes: 4 × 8 (two side by side on landscape Letter, 0.25" clear) and 4.25 × 11 (two fill portrait Letter).
 - Still open on the toolbar branch: "Still need line options" and "Should have option for no section" (grocery/list pages). When done, merge them into this branch too.
 
 ## Cover Studio and Coloring Book saved online (2026-11-17, branch `claude/online-cover-studio` — review pending)

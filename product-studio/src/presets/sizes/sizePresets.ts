@@ -32,6 +32,8 @@ const PAD: ProductType[] = ["notepad"];
 export const SIZE_PRESETS: SizePreset[] = [
   { id: "3x5", label: "3 × 5", unit: "in", short: 3, long: 5, defaultOrientation: "portrait", confidence: "manufacturer-published", source: "velocityBp", note: "retail memo pad", families: PAD },
   { id: "4x6", label: "4 × 6", unit: "in", short: 4, long: 6, defaultOrientation: "portrait", confidence: "manufacturer-published", source: "velocityBp", note: "retail memo pad", families: [...PAD, "insert"] },
+  { id: "4x8", label: "4 × 8", unit: "in", short: 4, long: 8, defaultOrientation: "portrait", confidence: "derived-calculation", note: "list pad; two print side by side on landscape Letter, a quarter inch clear of every paper edge", families: PAD },
+  { id: "4.25x11", label: "4.25 × 11", unit: "in", short: 4.25, long: 11, defaultOrientation: "portrait", confidence: "derived-calculation", note: "tall list pad: half a Letter sheet the long way; two fill portrait Letter edge to edge (borderless printer or cut from a larger sheet)", families: PAD },
   { id: "4x9", label: "4 × 9", unit: "in", short: 4, long: 9, defaultOrientation: "portrait", note: "notepad size list (research JSON fragment 3); no manufacturer row", families: PAD },
   { id: "5x7", label: "5 × 7", unit: "in", short: 5, long: 7, defaultOrientation: "portrait", confidence: "printer-standard", source: "ingramSpark", note: "IngramSpark trim; notepad size list", families: [...PAD, "journal", "insert"] },
   { id: "5x8", label: "5 × 8", unit: "in", short: 5, long: 8, defaultOrientation: "portrait", confidence: "printer-standard", source: "kdp", note: "KDP / IngramSpark trim; memo pad", families: [...BOOK, ...PAD] },
