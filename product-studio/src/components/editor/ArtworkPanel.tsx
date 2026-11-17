@@ -10,12 +10,13 @@
  * so what is shown here is what prints.
  */
 import { useMemo, useRef, useState, type ChangeEvent } from "react";
-import { artworkFor, isCoverPage, pageOrdinal, type ResolvedDocument } from "../../engines/document/resolve";
+import { artworkFor, geometryFor, isCoverPage, pageOrdinal, solvePage, type ResolvedDocument } from "../../engines/document/resolve";
 import { allPageInfo } from "../../engines/document/pageInfo";
 import { DEFAULT_CROP, edgeAnchor, effectivePpi, MAX_ZOOM, ppiAdvice } from "../../engines/artwork/place";
 import { importArtwork, useArtworkUrl } from "../../engines/artwork/store";
 import { newId } from "../../presets/products/projectFactory";
 import type { ArtworkAsset, ArtworkPlacement, ArtworkTarget, IllustrationAnchor, ProjectArtwork } from "../../types/artwork";
+import type { Rect } from "../../types/geometry";
 import type { ProductProject } from "../../types/project";
 import { Check, LabeledNumeric, Section, Segmented } from "./ui";
 
@@ -32,6 +33,20 @@ const ANCHORS: { value: IllustrationAnchor; label: string }[] = [
   { value: "bottom", label: "Bottom centre" },
   { value: "bottom-right", label: "Bottom right" },
 ];
+
+/**
+ * The picture area of a page that has one (a coloring page: between its title and its verse), in trim inches,
+ * inside the side margins: a background fitted here never runs under the page's words. Null on other pages.
+ */
+export function textClearRegion(doc: ResolvedDocument, index: number): Rect | null {
+  const page = doc.recipe.pages[index];
+  if (!page || page.filler) return null;
+  const art = solvePage(doc, index).nodes.find((n) => n.type === "group" && /-art$/.test(n.id)) as { rect: Rect } | undefined;
+  if (!art) return null;
+  const g = geometryFor(doc, page, index);
+  const side = Math.max(g.safe.left, g.safe.right);
+  return { x: side, y: art.rect.y, w: g.trimWidthIn - 2 * side, h: art.rect.h };
+}
 
 const withArt = (p: ProductProject, fn: (a: ProjectArtwork) => ProjectArtwork): ProductProject => ({ ...p, artwork: fn(p.artwork ?? { assets: [], placements: [] }) });
 
@@ -132,6 +147,8 @@ function PlacementCard({ p, asset, project, update, doc, current, onGoTo, onEdit
     return null;
   }, [doc, p.id]);
   const ppi = first ? ppiAdvice(effectivePpi(asset, first.art.draw)) : null;
+  // A page with a picture area (a coloring page) offers "Between the title and verse".
+  const clear = useMemo(() => (p.use === "background" ? textClearRegion(doc, first?.index ?? current) : null), [doc, p.use, first, current]);
   const assets = project.artwork?.assets ?? [];
   return (
     <div className="card art-placement" data-art-placement={p.use}>
@@ -172,7 +189,29 @@ function PlacementCard({ p, asset, project, update, doc, current, onGoTo, onEdit
       {(p.use === "cover" || p.use === "background") && (
         <>
           {p.use === "background" && (
-            <Segmented label="Covers" value={p.extent} options={[{ value: "bleed", label: "Whole page, to the edge" }, { value: "safe", label: "Inside the margins" }]} onChange={(extent) => set((x) => ({ ...(x as typeof p), extent }))} />
+            <>
+              <Segmented
+                label="Covers"
+                value={p.extent}
+                options={[
+                  { value: "bleed", label: "Whole page, to the edge" },
+                  { value: "safe", label: "Inside the margins" },
+                  ...(clear || p.extent === "region" ? [{ value: "region" as const, label: "Between the title and verse" }] : []),
+                ]}
+                onChange={(extent) =>
+                  set((x) => {
+                    if (extent !== "region") return { ...(x as typeof p), extent };
+                    // Kept clear of the words: the whole picture, fitted into the space between them.
+                    return clear ? { ...(x as typeof p), extent, region: clear, fit: "fit", crop: { x: 0.5, y: 0.5, zoom: 1 } } : x;
+                  })
+                }
+              />
+              {p.extent !== "region" && clear && (
+                <p className="hint" data-testid="art-over-words">
+                  The picture runs under this page’s words. Choose “Between the title and verse” to keep it clear of them.
+                </p>
+              )}
+            </>
           )}
           <Segmented label="Fit" value={p.fit} options={[{ value: "fill", label: "Fill and crop" }, { value: "fit", label: "Show the whole image" }]} onChange={(fit) => set((x) => ({ ...(x as typeof p), fit }))} />
           {p.fit === "fill" && (
@@ -322,6 +361,15 @@ export function ArtworkPanel(props: Props) {
     update((p) => withArt(p, (a) => ({ assets: a.assets.filter((x) => x.id !== id), placements: a.placements.filter((x) => x.assetId !== id) })));
   };
 
+  // On a page with a picture area (a coloring page), a new background starts clear of the page's words.
+  const backgroundFor = (id: string, assetId: string, here: string | undefined): ArtworkPlacement => {
+    const targets = here ? [{ item: here }] : [];
+    const clear = textClearRegion(doc, cur && !cur.filler ? current : (items[0]?.first ?? 0));
+    return clear
+      ? { id, use: "background", assetId, targets, fit: "fit", crop: { x: 0.5, y: 0.5, zoom: 1 }, opacity: 1, extent: "region", region: clear }
+      : { id, use: "background", assetId, targets, fit: "fill", crop: { ...DEFAULT_CROP }, opacity: 1, extent: "bleed" };
+  };
+
   const use = (assetId: string, kind: ArtworkPlacement["use"]) => {
     const id = newId();
     const here = cur && !cur.filler ? cur.recipeItemId : items[0]?.item;
@@ -329,7 +377,7 @@ export function ArtworkPanel(props: Props) {
       kind === "cover"
         ? { id, use: "cover", assetId, targets: [{ item: (cur && isCoverPage(cur) ? cur.recipeItemId : covers[0]?.item) ?? "" }], fit: "fill", crop: { ...DEFAULT_CROP }, mode: "as-is", titleColor: "palette" }
         : kind === "background"
-          ? { id, use: "background", assetId, targets: here ? [{ item: here }] : [], fit: "fill", crop: { ...DEFAULT_CROP }, opacity: 1, extent: "bleed" }
+          ? backgroundFor(id, assetId, here)
           : illustrationFor(id, assetId, here);
     update((p) => withArt(p, (a) => ({ ...a, placements: [...a.placements, placement] })));
     setChoose(null);
