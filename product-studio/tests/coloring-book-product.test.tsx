@@ -251,6 +251,25 @@ describe("Scripture on finished pages", () => {
   });
 });
 
+describe("Typography in the editor changes the coloring book's pages", () => {
+  it("fonts and sizes are the product's typography, not pinned on each line", () => {
+    const b = setScene(gracious(), 0, { verseApproved: "x" });
+    const p = assembleInterior(b);
+    expect(p.typography.fonts.headings).toBe(b.brief.pageTypography.titleFont);
+    expect(p.typography.fonts.body).toBe(b.brief.pageTypography.scriptureFont);
+    const verseSize = (proj: typeof p) => {
+      const doc = resolveDocument(proj);
+      const i = doc.recipe.pages.findIndex((x) => x.recipeItemId === `scene-${b.brief.scenes[0].id}`);
+      return (solvePage(doc, i).nodes.find((n) => n.id.endsWith("-verse-prompt")) as { fit: { sizePt: number } }).fit.sizePt;
+    };
+    expect(verseSize(p)).toBe(13);
+    // Style → Typography: a bigger body size and another heading font reach the page.
+    const edited = { ...p, typography: { fonts: { ...p.typography.fonts, headings: "Cinzel" }, roleOverrides: { ...p.typography.roleOverrides, body: { sizePt: 15 } } } };
+    expect(verseSize(edited)).toBe(15);
+    expect(JSON.stringify(bookStructure(b))).not.toMatch(/headingFont/);
+  });
+});
+
 describe("The finished book: preview = export", () => {
   it("assembles title page, copyright page, each scene with a blank back, on 8.5 × 11 in white pages with the safe margin and gutter", () => {
     const b = gracious();

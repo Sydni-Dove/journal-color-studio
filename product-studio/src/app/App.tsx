@@ -238,7 +238,11 @@ export function App() {
           bookId={view.bookId}
           onBack={() => setView({ kind: "list" })}
           onAdvanced={() => setView({ kind: "cover" })}
-          onExport={(p, book) => open(p, { fromBook: book.id, startInExport: true })}
+          onExport={(p, book) => {
+            // Exporting again rebuilds the pages from the book, but keeps the typography chosen in the editor (Style → Typography).
+            const before = store.load(p.id);
+            open(before ? { ...p, typography: before.typography } : p, { fromBook: book.id, startInExport: true });
+          }}
         />
       </>
     );

@@ -18,6 +18,7 @@ import { BINDING_TYPE } from "./guides";
 import { resolveCoverSpec } from "./spec";
 import { createProject } from "../../presets/products/projectFactory";
 import { CUSTOM_SIZE_ID, SIZE_PRESETS } from "../../presets/sizes/sizePresets";
+import { DEFAULT_FONTS } from "../../presets/typography/typography";
 import type { ProductProject } from "../../types/project";
 import type { PromptBlock } from "../../types/prompts";
 import type { BookStep } from "../../types/recipe";
@@ -26,6 +27,18 @@ import type { CoverBrief, PageOutput, Scene } from "./brief";
 
 /** Verse, lesson and custom text on a Coloring Book page (13 pt: children read it). */
 export const BOOK_TEXT_PT = 13;
+
+/**
+ * A Coloring Book's typography, as the product's own Style → Typography (not pinned on each line of text): the title
+ * font and size, and the verse / lesson font at 13 pt. Changing Typography in the editor then changes every page.
+ */
+export function bookTypography(b: CoverBrief): ProductProject["typography"] {
+  const t = b.pageTypography;
+  return {
+    fonts: { ...DEFAULT_FONTS, headings: t.titleFont, body: t.scriptureFont },
+    roleOverrides: { pageTitle: { sizePt: t.titleSizePt }, body: { sizePt: BOOK_TEXT_PT } },
+  };
+}
 
 export type Rect = { x: number; y: number; w: number; h: number };
 
@@ -97,11 +110,8 @@ export function pageBlocks(b: CoverBrief, s: Scene, withText = true): PromptBloc
  */
 function bookPageBlocks(b: CoverBrief, s: Scene, c: NonNullable<ReturnType<typeof pageContentOf>>, withText: boolean): PromptBlock[] {
   const t = b.pageTypography;
-  const text = (id: string, label: string, style: "title" | "body"): PromptBlock => ({
-    id, kind: "heading", label, textStyle: style, headingAlign: t.align, headingFont: style === "title" ? t.titleFont : t.scriptureFont,
-    // Children read these: the title at its size, a verse and other text at a comfortable 13 pt (not the body's small default).
-    headingSizePt: style === "title" ? t.titleSizePt : BOOK_TEXT_PT,
-  });
+  // Fonts and sizes come from the product's typography (bookTypography), so Style → Typography in the editor changes them.
+  const text = (id: string, label: string, style: "title" | "body"): PromptBlock => ({ id, kind: "heading", label, textStyle: style, headingAlign: t.align });
   const titleText = (s.pageTitle ?? s.title).trim();
   const verse = (s.scriptureMode ?? b.scriptureMode) === "art" ? "" : verseLine(b, s);
   const art: PromptBlock = { id: "art", label: "", space: "fill", responseStyle: "blank", weight: 3 };
@@ -145,7 +155,8 @@ export function assembleColoringBook(b: CoverBrief, scenes: Scene[] = b.scenes, 
     colors: { paletteId: "dove-signature", paper: "white" },
     recipe: { items: [], ordering: "sequential", structure },
   } as never) as ProductProject;
-  const withSize = project;
+  // A Coloring Book page takes its fonts and sizes from the product's typography (see bookTypography).
+  const withSize = b.pageContent ? { ...project, typography: bookTypography(b) } : project;
   const placements: ArtworkPlacement[] = scenes.flatMap((s) => {
     if (!s.illustrationId || !assets.some((a) => a.id === s.illustrationId)) return [];
     return [illustrationPlacement(b, s)];

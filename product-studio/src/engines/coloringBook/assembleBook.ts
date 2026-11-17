@@ -10,7 +10,7 @@
  * The cover is its own file (printers take the cover and the interior separately): `assembleCover`.
  */
 import { BINDING_TYPE } from "../cover/guides";
-import { illustrationPlacement, pageBlocks, pageCanvas, pageContentOf } from "../cover/assemble";
+import { bookTypography, illustrationPlacement, pageBlocks, pageCanvas, pageContentOf } from "../cover/assemble";
 import { createProject } from "../../presets/products/projectFactory";
 import { step } from "../../presets/bookRecipes";
 import { CUSTOM_SIZE_ID, SIZE_PRESETS } from "../../presets/sizes/sizePresets";
@@ -83,8 +83,9 @@ export function copyrightLines(book: ColoringBook, year = new Date().getFullYear
 export function bookStructure(book: ColoringBook): BookStep[] {
   const b = briefFor(book);
   const t = b.pageTypography;
-  const head = (id: string, label: string, size = t.titleSizePt): PromptBlock => ({ id, kind: "heading", label, textStyle: "title", headingAlign: "center", headingFont: t.titleFont, headingSizePt: size });
-  const body = (id: string, label: string): PromptBlock => ({ id, kind: "heading", label, textStyle: "body", headingAlign: "center", headingFont: t.scriptureFont });
+  // Fonts and sizes from the product's typography (bookTypography); only the title page's larger title sets its own size.
+  const head = (id: string, label: string, size?: number): PromptBlock => ({ id, kind: "heading", label, textStyle: "title", headingAlign: "center", ...(size && size !== t.titleSizePt ? { headingSizePt: size } : {}) });
+  const body = (id: string, label: string): PromptBlock => ({ id, kind: "heading", label, textStyle: "body", headingAlign: "center" });
   const single = book.sides === "single";
   const out: BookStep[] = [];
   const fm = book.frontMatter;
@@ -155,7 +156,9 @@ export function assembleInterior(book: ColoringBook, id?: string): ProductProjec
   } as never) as ProductProject;
   const assets = sceneAssets(b);
   const placements: ArtworkPlacement[] = b.scenes.flatMap((s) => (s.illustrationId ? [illustrationPlacement(b, s)] : []));
-  const out = placements.length ? { ...project, artwork: { assets, placements } } : project;
+  // Fonts and sizes as the product's own typography, so Style → Typography in the editor changes every page.
+  const typed = { ...project, typography: bookTypography(b) };
+  const out = placements.length ? { ...typed, artwork: { assets, placements } } : typed;
   return id ? { ...out, id } : out;
 }
 
