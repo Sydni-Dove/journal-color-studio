@@ -18,6 +18,7 @@ import { scenePrompt } from "../src/engines/cover/coloring";
 import { newBrief, type Scene } from "../src/engines/cover/brief";
 import { pageBlocks } from "../src/engines/cover/assemble";
 import { artworkFor, resolveDocument, solvePage } from "../src/engines/document/resolve";
+import { textClearRegion } from "../src/components/editor/ArtworkPanel";
 import { localBookStore, normalizeBook } from "../src/persistence/coloringBookStore";
 import { GRACIOUS_CAST, GRACIOUS_OUTLINE, JENNY_DESCRIPTION } from "./fixtures/graciousKids";
 
@@ -267,6 +268,39 @@ describe("Typography in the editor changes the coloring book's pages", () => {
     const edited = { ...p, typography: { fonts: { ...p.typography.fonts, headings: "Cinzel" }, roleOverrides: { ...p.typography.roleOverrides, body: { sizePt: 15 } } } };
     expect(verseSize(edited)).toBe(15);
     expect(JSON.stringify(bookStructure(b))).not.toMatch(/headingFont/);
+  });
+});
+
+describe("A picture placed on a coloring page keeps clear of its words", () => {
+  it("“Between the title and verse” fits the whole picture in the space between them, never under the verse", () => {
+    const b = setScene(gracious(), 0, { verseApproved: "x" });
+    const p = assembleInterior(b);
+    const doc = resolveDocument(p);
+    const i = doc.recipe.pages.findIndex((x) => x.recipeItemId === `scene-${b.brief.scenes[0].id}`);
+    const region = textClearRegion(doc, i)!;
+    expect(region).not.toBeNull();
+    // The page's own illustration (a page-canvas picture) is set to the whole page; switch it as the panel does.
+    const placements = p.artwork!.placements.map((x) => (x.use === "background" && x.targets[0]?.item === `scene-${b.brief.scenes[0].id}` ? { ...x, extent: "region" as const, region, fit: "fit" as const } : x));
+    const moved = resolveDocument({ ...p, artwork: { ...p.artwork!, placements } });
+    const pic = artworkFor(moved, i).find((x) => x.use === "background")!;
+    const off = { x: pic.box.x - region.x, y: pic.box.y - region.y }; // the bleed the placement adds around the trim
+    const r = { x: pic.draw.x - off.x, y: pic.draw.y - off.y, w: pic.draw.w, h: pic.draw.h };
+    const words = solvePage(moved, i).nodes.filter((n) => n.type === "text") as { text: string; rect: { x: number; y: number; w: number; h: number } }[];
+    expect(words.some((w) => /Proverbs|Joshua|wisdom/.test(w.text))).toBe(true);
+    for (const w of words) {
+      const overlaps = r.x < w.rect.x + w.rect.w - 1e-6 && w.rect.x < r.x + r.w - 1e-6 && r.y < w.rect.y + w.rect.h - 1e-6 && w.rect.y < r.y + r.h - 1e-6;
+      expect(overlaps, `picture overlaps “${w.text.slice(0, 40)}”`).toBe(false);
+    }
+    // And the same picture over the whole page (as before) does run under the words.
+    const whole = artworkFor(doc, i).find((x) => x.use === "background")!;
+    const wr = { x: whole.draw.x - off.x, y: whole.draw.y - off.y, w: whole.draw.w, h: whole.draw.h };
+    expect(words.some((w) => wr.y < w.rect.y + w.rect.h && w.rect.y < wr.y + wr.h)).toBe(true);
+  });
+
+  it("only pages with a picture area offer it", () => {
+    const p = assembleInterior(gracious());
+    const doc = resolveDocument(p);
+    expect(textClearRegion(doc, doc.recipe.pages.findIndex((x) => x.recipeItemId === "front-copyright"))).toBeNull();
   });
 });
 

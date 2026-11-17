@@ -58,6 +58,7 @@ fonts (see Testing).
 - `claude/online-cover-studio` (38f8759, includes `claude/coloring-book-studio`) with `claude/toolbar-feedback-six` (903e35b) merged in. The only conflict was `app.css`, where both branches added styles at the end; both sets were kept.
 - 38f8759 fixes the toolbar note "not updating with typography changes". Coloring book title and verse lines no longer pin their own font and size: they use the product's typography (headings = title font, body = Scripture font), so Style → Typography reaches the pages.
 - Combined suites: 1,749 unit and 202 browser tests, all passing. Golden snapshots: only the checklist entries were added.
+- a8335e7 (from `claude/online-cover-studio`): the artwork panel has a new "Covers" option, "Between the title and verse", for a page background on any page with a picture area (a coloring page). The whole picture is fitted between the words. The area comes from the solved `-art` group, inside the side margins. A new background on such a page starts there, and a hint shows when a picture runs under the words. This answers Sydni's screenshot of a page-size illustration drawn under the Joshua 1:9 verse. Coloring Book Studio still places page-canvas-size illustrations over the whole page, as before.
 - Still open on the toolbar branch: "Still need line options" and "Should have option for no section" (grocery/list pages). When done, merge them into this branch too.
 
 ## Cover Studio and Coloring Book saved online (2026-11-17, branch `claude/online-cover-studio` — review pending)
