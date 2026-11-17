@@ -43,7 +43,22 @@ export type ProductionSettings = {
 export type LayoutPlacement = "top-left" | "top-right" | "top-center";
 
 /** Per-layout user options, keyed by layout id. */
+/**
+ * List pages (Grocery List, Checklist): the sections, lines and checkbox shape. Every field optional; absent = the
+ * layout's own design (the grocery list's six categories, as many lines as fit, square checkboxes).
+ */
+export type ListPageOptions = {
+  /** Section titles, in order (Grocery List). Absent = the six built-in categories (renamed under Titles & labels). */
+  sections?: string[];
+  /** Lines per section (Grocery List) or on the page (Checklist). Absent = as many as fit. */
+  lines?: number;
+  /** Checkbox shape. Absent = square. */
+  marker?: "square" | "circle" | "none";
+};
+
 export type LayoutOptions = {
+  /** List pages: sections, lines and checkboxes (Grocery List, Checklist). */
+  listPage?: ListPageOptions;
   /**
    * A blank line between paragraphs of text prints as one empty line (dropped where a page breaks).
    * Absent = on; false = paragraphs follow each other with no space between them.

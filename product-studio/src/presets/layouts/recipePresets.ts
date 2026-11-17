@@ -72,6 +72,13 @@ export const RECIPE_PRESETS: RecipePreset[] = [
     build: ({ sheets }) => ({ items: [{ id: "sheet", layoutId: "notepad-grocery", repeat: { kind: "repeated-sheet", sheets } }], ordering: "sequential" }),
   },
   {
+    id: "notepad-checklist",
+    label: "Checklist (title and checkboxes)",
+    productTypes: ["notepad"],
+    needsCalendar: false,
+    build: ({ sheets }) => ({ items: [{ id: "sheet", layoutId: "notepad-checklist", repeat: { kind: "repeated-sheet", sheets } }], ordering: "sequential" }),
+  },
+  {
     id: "notepad-lined",
     label: "Lined Notes",
     productTypes: ["notepad"],

@@ -1534,16 +1534,9 @@ button.family-card:focus-visible {
   grid-auto-rows: max-content;
   align-content: start;
   gap: 8px;
-  max-height: 460px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  /* No scroll box of its own: inside the settings panel's scroll it trapped the wheel and hid the lower palettes.
+     The panel's one scroll reaches every palette, at every screen size. */
   padding: 2px;
-}
-@media (max-width: 900px) {
-  .palette-grid {
-    max-height: none;
-    overflow: visible;
-  }
 }
 .palette-card {
   display: grid;
@@ -2553,3 +2546,27 @@ button.family-card:focus-visible {
   .book-pages { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
   .book-spread-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
 }
+
+/* Colors: every arrangement at once, and each use's color chosen from the palette. */
+.arrangement-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 6px; margin: 6px 0; }
+.arrangement-card { display: grid; gap: 4px; justify-items: center; padding: 6px; min-height: 64px; border: 1px solid var(--ui-line); border-radius: var(--ui-radius); background: #fff; cursor: pointer; }
+.arrangement-card[aria-checked="true"] { border-color: var(--ui-brand); box-shadow: 0 0 0 2px var(--ui-brand) inset; }
+.arrangement-card__title { font: 600 16px/1 Georgia, serif; }
+.arrangement-card__bar { width: 80%; height: 2px; }
+.arrangement-card__dots { display: flex; gap: 3px; }
+.arrangement-card__dots i { width: 10px; height: 10px; border-radius: 50%; border: 1px solid rgba(0, 0, 0, 0.12); }
+.palette-roles > summary { cursor: pointer; min-height: var(--ui-touch); display: flex; align-items: center; font-weight: 600; font-size: 13px; }
+.palette-role { display: grid; gap: 4px; margin: 6px 0; }
+.palette-role__label { font-size: 12px; color: var(--ui-muted); }
+.palette-role__swatches { display: flex; flex-wrap: wrap; gap: 6px; }
+.palette-role__swatch { width: 36px; height: 36px; border-radius: 50%; border: 1px solid rgba(0, 0, 0, 0.15); cursor: pointer; }
+.palette-role__swatch[aria-checked="true"] { box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--ui-brand); }
+.list-sections { list-style: none; padding: 0; margin: 0 0 6px; display: grid; gap: 6px; }
+.list-sections__row { display: flex; gap: 4px; align-items: center; }
+.list-sections__row input { flex: 1 1 auto; min-width: 0; min-height: var(--ui-touch); }
+.list-lines__value { min-width: 110px; text-align: center; align-self: center; }
+/* Browse pages: ↑ ↓ beside each page to reorder it. */
+.page-list > li { display: flex; align-items: center; gap: 2px; }
+.page-list > li > .page-row { flex: 1 1 auto; min-width: 0; }
+.page-row__move { display: flex; flex-direction: column; }
+.page-row__move .btn { min-height: 32px; min-width: 40px; padding: 0 8px; }

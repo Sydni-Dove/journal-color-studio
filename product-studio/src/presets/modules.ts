@@ -46,8 +46,9 @@ export const MODULE_CADENCES: Record<PageModuleType, CadenceKind[]> = {
   // A cover or a divider opens the book or a section: placed once where it sits.
   "cover-page": ["once"],
   "back-cover": ["once"],
-  "divider-page": ["once"],
+  "divider-page": ["once", "yearly", "quarterly", "monthly", "weekly", "daily"],
   "monthly-calendar": ["once", "monthly"],
+  "yearly-calendar": ["once", "yearly"],
   "weekly-planner": ["once", "weekly"],
   "daily-planner": ["daily"],
   "meeting-with-god": EVERY_CADENCE,
@@ -80,6 +81,7 @@ export const PAGE_MODULES: PageModuleDefinition[] = [
   { type: "cover-page", label: "Cover & Divider Pages · Cover / title page", layouts: ["cover-page"], defaultCadence: { type: "once" }, cadences: MODULE_CADENCES["cover-page"], titles: { none: "Plan" }, prompts: { none: [] }, defaultStart: "recto" },
   { type: "back-cover", label: "Cover & Divider Pages · End cover (back)", layouts: ["back-cover-page"], defaultCadence: { type: "once" }, cadences: MODULE_CADENCES["back-cover"], titles: { none: "" }, prompts: { none: [] }, defaultStart: "verso" },
   { type: "divider-page", label: "Cover & Divider Pages · Section divider / tab page", layouts: ["divider-page"], defaultCadence: { type: "once" }, cadences: MODULE_CADENCES["divider-page"], titles: { none: "Prayer" }, prompts: { none: [] }, defaultStart: "recto" },
+  { type: "yearly-calendar", label: "Yearly calendar", layouts: ["year-at-a-glance", "year-at-a-glance-spread", "year-linear", "year-in-pixels"], defaultCadence: { type: "once" }, cadences: MODULE_CADENCES["yearly-calendar"], titles: { none: "Year at a Glance" }, prompts: { none: [] } },
   { type: "monthly-calendar", label: "Monthly calendar", layouts: ["planner-monthly"], defaultCadence: { type: "monthly" }, cadences: MODULE_CADENCES["monthly-calendar"], titles: { none: "Month" }, prompts: { none: [] } },
   {
     type: "weekly-planner",

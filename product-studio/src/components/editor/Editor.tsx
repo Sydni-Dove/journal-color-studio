@@ -13,6 +13,8 @@ import { GeometryInfo } from "../debug/GeometryInfo";
 import { ExportDialog, IssueList } from "../export/ExportDialog";
 import { PagePreview, visibleIndices } from "../preview/PagePreview";
 import { StationeryPanel } from "./StationeryPanel";
+import { moveNode } from "../../engines/recipe/bookEdit";
+import { ListPagePanel } from "./ListPagePanel";
 import { BackgroundPanel, ColorPanel, DecorationPanel, LayoutPanel, PatternPanel, SpacingPanel, TextPlacementPanel, TypographyPanel, VariantsPanel, WordingPanel, WritingTitlePanel } from "./DesignPanels";
 import type { BookNode } from "../../types/recipe";
 import { PagesPanel, PlannerSetupPanel, ProductPanel, ProductionPanel } from "./ProductionPanels";
@@ -199,6 +201,31 @@ export function Editor({ project, onChange, onBack, saveStatus, cloudLabel, star
     goToMonth: (key) => doc && setIndex(Math.max(0, doc.recipe.pages.findIndex((p) => p.period.kind === "month" && p.period.key === key))),
     layoutLabel: (id) => getLayout(id).label,
   };
+  /**
+   * Browse pages ↑ ↓: move the page's step (or recipe item) one place among its neighbours. A repeating page moves
+   * everywhere it repeats; the preview follows the moved page.
+   */
+  const followMoved = useRef<{ item: string; period: string } | null>(null);
+  const movePage = (i: number, dir: -1 | 1) => {
+    const page = doc?.recipe.pages[i];
+    if (!page) return;
+    followMoved.current = { item: page.recipeItemId, period: JSON.stringify(page.period) };
+    update((p) => {
+      if (p.recipe.structure) return { ...p, recipe: { ...p.recipe, structure: moveNode(p.recipe.structure, page.recipeItemId, dir) } };
+      const items = [...p.recipe.items];
+      const a = items.findIndex((x) => x.id === page.recipeItemId), b = a + dir;
+      if (a < 0 || b < 0 || b >= items.length) return p;
+      [items[a], items[b]] = [items[b], items[a]];
+      return { ...p, recipe: { ...p.recipe, items } };
+    });
+  };
+  useEffect(() => {
+    const f = followMoved.current;
+    if (!f || !doc) return;
+    followMoved.current = null;
+    const j = doc.recipe.pages.findIndex((p) => p.recipeItemId === f.item && JSON.stringify(p.period) === f.period);
+    if (j >= 0) setIndex(j);
+  }, [doc]);
   const goToPage = (n: number) => doc && setIndex(Math.max(0, doc.recipe.pages.findIndex((p) => p.pageNumber === n)));
   // A Custom Page is built from sections: it opens straight on "Add to page".
   // Duplicate page: a new independent copy right after this one; the editor then shows the copy.
@@ -337,6 +364,7 @@ export function Editor({ project, onChange, onBack, saveStatus, cloudLabel, star
                   <ThisPageHeading doc={doc} current={current} onDuplicate={duplicateCurrent} />
                   {project.recipe.structure && <ThisPagePanel project={project} update={update} doc={doc} current={current} parts={["sections"]} />}
                   <StationeryPanel project={project} update={update} usage={usage} doc={doc} />
+                  <ListPagePanel project={project} update={update} usage={usage} />
                   <LayoutPanel nav={nav} project={project} update={update} usage={usage} part="add" />
                   <AddToPageHint doc={doc} current={current} usage={usage} />
                 </>
@@ -424,7 +452,7 @@ export function Editor({ project, onChange, onBack, saveStatus, cloudLabel, star
         <PanelResizer width={panel.width} onChange={panel.set} onReset={panel.reset} />
         <main className="stage">
           {doc ? (
-            <PagePreview doc={doc} index={current} onIndex={setIndex} debug={debug} issueIds={issueIds} />
+            <PagePreview doc={doc} index={current} onIndex={setIndex} debug={debug} issueIds={issueIds} onMove={movePage} />
           ) : (
             <div className="page-shell">
               <div className="issue issue--error">Cannot build this product: {error}</div>

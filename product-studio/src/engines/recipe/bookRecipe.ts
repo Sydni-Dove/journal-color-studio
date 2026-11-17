@@ -72,6 +72,13 @@ export function periodKey(p: PeriodRef): string {
 
 const periodKind = (p: PeriodRef): PeriodKind => (p.kind === "none" || p.kind === "copy" || p.kind === "entry" ? "none" : p.kind);
 
+/** "Friday, January 1, 2027" (a day divider's title). */
+function dayTitle(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const wd = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
+  return `${wd}, ${MONTH_NAMES[m - 1]} ${d}, ${y}`;
+}
+
 export function periodLabel(cal: CalendarData | null, p: PeriodRef): string | undefined {
   if (!cal) return undefined;
   // An undated planner counts its periods and never names a date.
@@ -379,8 +386,11 @@ export function expandBook(structure: BookNode[], ctx: BookContext): ExpandedRec
     const entry = period.kind === "entry" ? entryOf(ctx, period) : null;
     if (period.kind === "entry" && !entry) continue;
     const values = entry ? entryValues(entry.c, entry.r, period.kind === "entry" ? period.index : 0) : null;
-    const title = (values && step.title ? fillTemplate(step.title, values).trim() : step.title) || moduleTitle(step.module, kind);
-    const subtitle = values ? (step.subtitle ? fillTemplate(step.subtitle, values).trim() || undefined : undefined) : periodLabel(ctx.calendar, period);
+    // A divider repeating in a dated section with no title of its own is titled with its month, week or day.
+    const timeDivider = step.module === "divider-page" && !step.title?.trim() && (period.kind === "month" || period.kind === "week" || period.kind === "day" || period.kind === "quarter" || period.kind === "year");
+    const label = timeDivider && period.kind === "day" && ctx.calendar && !ctx.calendar.settings.undated ? dayTitle(period.iso) : periodLabel(ctx.calendar, period);
+    const title = timeDivider && label ? label : (values && step.title ? fillTemplate(step.title, values).trim() : step.title) || moduleTitle(step.module, kind);
+    const subtitle = timeDivider && label ? undefined : values ? (step.subtitle ? fillTemplate(step.subtitle, values).trim() || undefined : undefined) : label;
     const promptSet = entry && step.promptSet && period.kind === "entry" ? bindPromptSet(step.promptSet, entry.c, entry.r, period.index) : step.promptSet;
     if (wrongSide) {
       pages.push({
