@@ -13,6 +13,7 @@ import { COVER_PALETTES } from "../presets/themes/palettes";
 import { jcsPaletteId } from "../design-library/palettes";
 import { COVER_SCHEMA_VERSION, newBrief, type CoverBrief, type CoverCollection, type CoverItem } from "../engines/cover/brief";
 import { summarizePalette } from "../engines/cover/prompt";
+import { markItemDeleted } from "./itemBases";
 
 const PREFIX = "dove-product-studio:v1";
 const INDEX_KEY = `${PREFIX}:cover-index`;
@@ -64,9 +65,12 @@ export const localCoverStore: CoverStore = {
     const idx = this.list().filter((s) => s.id !== c.id);
     idx.push(summarize(c));
     localStorage.setItem(INDEX_KEY, JSON.stringify(idx));
+    itemsChanged();
   },
   remove(id) {
     try {
+      const was = this.load(id);
+      if (was) markItemDeleted("cover-collection", id, was.updatedAt);
       localStorage.removeItem(coverKey(id));
       localStorage.setItem(INDEX_KEY, JSON.stringify(this.list().filter((s) => s.id !== id)));
     } catch {
@@ -77,14 +81,15 @@ export const localCoverStore: CoverStore = {
 
 /** The brief being worked on (not yet a saved collection): kept so a reload doesn't lose it. */
 /** The draft: the brief, the set, the chosen direction and collection, and the screen in view (and the furthest reached). */
-export type CoverDraft = { brief: CoverBrief; items: CoverItem[]; direction: number; collectionId: string | null; step?: string; reached?: number };
+export type CoverDraft = { brief: CoverBrief; items: CoverItem[]; direction: number; collectionId: string | null; step?: string; reached?: number; /** When it was last changed (online saving compares it). */ updatedAt?: string };
 export function loadDraft(): CoverDraft | null {
   try {
     const d = JSON.parse(safeGet(DRAFT_KEY) ?? "null");
     if (!d || typeof d !== "object") return null;
     return {
       brief: normalizeBrief(d.brief), items: normalizeItems(d.items), direction: clampDirection(d.direction), collectionId: typeof d.collectionId === "string" ? d.collectionId : null,
-      ...(typeof d.step === "string" ? { step: d.step } : {}), ...(Number.isFinite(d.reached) ? { reached: Math.max(0, Math.min(3, Math.round(d.reached))) } : {}),
+      ...(typeof d.step === "string" ? { step: d.step } : {}), ...(Number.isFinite(d.reached) ? { reached: Math.max(0, Math.min(9, Math.round(d.reached))) } : {}),
+      ...(typeof d.updatedAt === "string" ? { updatedAt: d.updatedAt } : {}),
     };
   } catch {
     return null;
@@ -92,10 +97,16 @@ export function loadDraft(): CoverDraft | null {
 }
 export function saveDraft(d: CoverDraft): void {
   try {
-    localStorage.setItem(DRAFT_KEY, JSON.stringify(d));
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...d, updatedAt: d.updatedAt ?? new Date().toISOString() }));
+    itemsChanged();
   } catch {
     /* a convenience only */
   }
+}
+
+/** Something Cover Studio or Coloring Book saved changed: online saving picks it up (persistence/itemsSync.ts). */
+export function itemsChanged(): void {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event("dove-items-changed"));
 }
 export function clearDraft(): void {
   try {

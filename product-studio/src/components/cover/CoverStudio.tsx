@@ -25,6 +25,8 @@ import {
   clearDraft, duplicateAndRecolor, exportCollectionJson, localCoverStore, loadDraft, newCollection, parseCollectionFile, saveDraft, type CoverStore,
 } from "../../persistence/coverStore";
 import type { ProductProject } from "../../types/project";
+import { holdItem } from "../../persistence/itemBases";
+import { savedWhere, useItemsSyncStatus } from "../../app/useItemsSync";
 import type { ProjectSummary } from "../../persistence/projectStore";
 import { PalettePicker } from "../editor/PalettePicker";
 import { Field, LabeledNumeric } from "../editor/ui";
@@ -59,6 +61,8 @@ type Props = {
   store?: CoverStore;
   /** Saves a new product and opens it in the editor (the assembled coloring book). */
   onCreateProject?: (p: ProductProject) => void;
+  /** Continue this coloring book in Coloring Book, with everything entered here (characters, scenes, settings). */
+  onColoringBook?: (brief: CoverBrief) => void;
 };
 
 const TIPS = {
@@ -75,7 +79,7 @@ function download(name: string, body: string, type: string) {
   setTimeout(() => URL.revokeObjectURL(url), 500);
 }
 
-export function CoverStudio({ onBack, projects, loadProject, store = localCoverStore, onCreateProject }: Props) {
+export function CoverStudio({ onBack, projects, loadProject, store = localCoverStore, onCreateProject, onColoringBook }: Props) {
   const draft = useRef(loadDraft()).current;
   const [brief, setBrief] = useState<CoverBrief>(draft?.brief ?? newBrief());
   const [items, setItems] = useState<CoverItem[]>(draft?.items ?? []);
@@ -204,10 +208,24 @@ export function CoverStudio({ onBack, projects, loadProject, store = localCoverS
     () => projects.flatMap((p) => (loadProject(p.id)?.artwork?.assets ?? []).map((asset) => ({ asset, product: p.name }))),
     [projects, loadProject],
   );
+  // Saved after a change only: opening Cover Studio never writes a draft (so an empty draft on a new device can't
+  // look newer than the one saved online). The draft stays put while it is open here (online saving waits).
+  const opened = useRef(true);
   useEffect(() => {
+    if (opened.current) {
+      opened.current = false;
+      return;
+    }
     const t = window.setTimeout(() => saveDraft({ brief, items, direction, collectionId, step, reached }), 400);
     return () => window.clearTimeout(t);
   }, [brief, items, direction, collectionId, step, reached]);
+  useEffect(() => holdItem("cover-draft", "draft"), []);
+  useEffect(() => {
+    const synced = () => refresh();
+    window.addEventListener("dove-items-synced", synced);
+    return () => window.removeEventListener("dove-items-synced", synced);
+  }, []);
+  const syncStatus = useItemsSyncStatus();
 
   const cat = brief.category;
   const isCover = cat === "cover", isInterior = cat === "interior", isCharacter = cat === "character", isCollection = cat === "collection", isColoringCover = cat === "coloring-cover";
@@ -482,6 +500,10 @@ export function CoverStudio({ onBack, projects, loadProject, store = localCoverS
         </div>
         <div className="cover-head__actions">
           <button type="button" className="btn" onClick={() => { startNew(); setStep("collection"); setReached(0); }}>New collection</button>
+          {onColoringBook && (brief.category === "character" || brief.category === "coloring-cover") && (
+            <button type="button" className="btn btn--primary" onClick={() => onColoringBook(brief)} data-testid="continue-as-book">Continue as a Coloring Book</button>
+          )}
+          <span className="hint" data-testid="cover-saved">{savedWhere(syncStatus)}</span>
         </div>
       </header>
       {message && <div className="update-banner" role="status"><span>{message}</span></div>}

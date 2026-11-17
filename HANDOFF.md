@@ -3,7 +3,7 @@
 Read this first when picking up the work (any assistant or developer). Keep it current: update it in the same
 commit as any change to state, branches, rules or open decisions.
 
-_Last updated: 2026-11-14 — Coloring Book product workflow on `claude/coloring-book-studio` (not merged; see "Coloring Book"). Earlier: four-step editor + uploaded artwork on `claude/guided-steps-artwork`; Phase 8 merged to `main` (89f054b) and live._
+_Last updated: 2026-11-17 — Online saving for Cover Studio and Coloring Book on `claude/online-cover-studio` (new Supabase table + bucket created, with approval; app code not merged). Toolbar feedback on `claude/toolbar-feedback-six` (not merged). Earlier: Coloring Book on `claude/coloring-book-studio`; Phase 8 merged to `main` (89f054b) and live._
 
 ## The two apps
 
@@ -23,6 +23,9 @@ that needs its own review.
 
 | Branch | State |
 | --- | --- |
+| `claude/online-cover-studio` | `claude/coloring-book-studio` + online saving for Cover Studio drafts/collections, coloring books and their pictures; full carry-over from Cover Studio (2026-11-17). **Not merged; needs approval.** |
+| `claude/toolbar-feedback-six` | From `main`: palette list reachable, color swaps, list pages + Checklist layout, yearly calendars, months at the front, Browse pages reordering, time dividers (2026-11-17). **Not merged; needs approval.** |
+| `claude/cover-studio-scripture-clarity` | Local only (not pushed): Cover Studio coloring pages — one Scripture choice, "Printed on this page", line art only. Two browser tests to update. |
 | `claude/coloring-book-studio` | Stacked on the three branches below it + `main`; Coloring Book product workflow (2026-11-14). **Not merged; needs approval.** |
 | `claude/guided-steps-artwork` | Four-step editor + uploaded artwork (2026-11-14). **Not merged; needs approval.** |
 | `main` | Phases 0–8 (Phase 8 merged 2026-10-15, 89f054b), paper-gold print fixes, Rose Marble gold. Production for both apps. |
@@ -49,6 +52,20 @@ documents). **8.1 Develop original content** — approved, planning on its own b
 image upload; "design styles", not "recipes"). **10 Research and develop content** — future, paid tier.
 **11 Requirements Assistant** — reserved. Technical improvements (any time, not blocking a phase): self-hosted
 fonts (see Testing).
+
+## Cover Studio and Coloring Book saved online (2026-11-17, branch `claude/online-cover-studio` — review pending)
+
+**Database change, live (approved by Sydni 2026-11-17):** table `public.product_studio_items` (kind `cover-draft` /
+`cover-collection` / `coloring-book`, owner-only RLS like `product_studio_projects`, soft delete) and private bucket
+`product-studio-artwork` (`<user id>/<picture id>`, owner-only read/add). Migration recorded in
+`supabase/migrations/20261117193100_product_studio_items_and_artwork.sql`. Existing tables and the live app are untouched;
+the live app doesn't use the new storage until this branch merges.
+App: `persistence/itemsSync.ts` (merge like projects: changed one side → copied across; both → keep both; deletions
+travel; items open in a screen are never replaced underneath), `persistence/itemBases.ts`, `app/useItemsSync.ts` (sync
+at sign-in, after saves, on focus, every minute). Existing local Cover Studio work goes online on the first signed-in
+sync. "Continue as a Coloring Book" (Cover Studio header, and Coloring Book's list) carries title, audience,
+characters + pictures, scenes, Scripture choice, verified wording (as approved), style, binding, finished cover.
+Tests: `tests/items-sync.test.ts`, `tests/browser/online-cover-studio.browser.ts` (two browsers, one account).
 
 ## Coloring Book: a finished product (2026-11-14, branch `claude/coloring-book-studio` — review pending, not merged or deployed)
 

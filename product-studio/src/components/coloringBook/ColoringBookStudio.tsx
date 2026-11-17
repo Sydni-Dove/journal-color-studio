@@ -15,6 +15,8 @@ import { localBookStore, type BookStore } from "../../persistence/coloringBookSt
 import { loadDraft, localCoverStore, type CoverStore } from "../../persistence/coverStore";
 import { newId } from "../../presets/products/projectFactory";
 import { useFontLoader } from "../../utils/useFontLoader";
+import { holdItem } from "../../persistence/itemBases";
+import { savedWhere, useItemsSyncStatus } from "../../app/useItemsSync";
 import type { ProductProject } from "../../types/project";
 import { StepFooter, StepHeader, type StepDef } from "../editor/Steps";
 import { relativeTime } from "../projects/ProjectList";
@@ -59,6 +61,9 @@ function BookFlow({ initial, store, onBack, onExport, onLibrary }: { initial: Co
   const msgTimer = useRef<number | undefined>(undefined);
   const latest = useRef(book);
   latest.current = book;
+  // Online saving leaves this book alone while it is open here.
+  useEffect(() => holdItem("coloring-book", initial.id), [initial.id]);
+  const online = useItemsSyncStatus();
 
   const save = (b: ColoringBook) => {
     try {
@@ -124,7 +129,7 @@ function BookFlow({ initial, store, onBack, onExport, onLibrary }: { initial: Co
         <div className="brand"><span className="brand-mark">D</span><span>Coloring Book</span></div>
         <span className="hint book-name">{bookTitle(book) || "Untitled coloring book"}</span>
         <span className="spacer" />
-        <span className="hint" role="status" data-testid="book-saved">{saved === "saved" ? "Saved on this device" : saved === "saving" ? "Saving…" : "Not saved: this browser's storage is full"}</span>
+        <span className="hint" role="status" data-testid="book-saved">{saved === "saved" ? savedWhere(online) : saved === "saving" ? "Saving…" : "Not saved: this browser's storage is full"}</span>
         <button className="btn" onClick={onLibrary}>My coloring books</button>
       </header>
       {message && <div className="update-banner" role="status"><span>{message}</span></div>}
@@ -150,6 +155,16 @@ function BookFlow({ initial, store, onBack, onExport, onLibrary }: { initial: Co
 /** The coloring books on this device: open one, start a new one, or bring one in from Cover Studio. */
 function BookLibrary({ store, coverStore, onOpen, onBack, onAdvanced }: { store: BookStore; coverStore: CoverStore; onOpen: (b: ColoringBook) => void; onBack: () => void; onAdvanced?: () => void }) {
   const [list, setList] = useState(() => store.list());
+  // Work arriving from your account (another device or address) appears without reopening.
+  const [synced, setSynced] = useState(0);
+  useEffect(() => {
+    const on = () => {
+      setList(store.list());
+      setSynced((n) => n + 1);
+    };
+    window.addEventListener("dove-items-synced", on);
+    return () => window.removeEventListener("dove-items-synced", on);
+  }, [store]);
   const start = (b: ColoringBook) => {
     store.save(b);
     onOpen(b);
@@ -164,7 +179,7 @@ function BookLibrary({ store, coverStore, onOpen, onBack, onAdvanced }: { store:
       if (c && (c.brief.cast.length || c.brief.scenes.length)) out.push({ label: c.name, brief: c.brief });
     }
     return out;
-  }, [coverStore]);
+  }, [coverStore, synced]);
   return (
     <div className="cover-studio book-studio" data-testid="coloring-library">
       <header className="topbar">

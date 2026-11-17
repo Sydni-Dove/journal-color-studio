@@ -13,6 +13,10 @@ import { resolveColors } from "../presets/themes/palettes";
 import { addVariantFromCurrent, duplicateProject, localProjectStore, projectKey, saveGuarded, type ProjectSummary } from "../persistence/projectStore";
 import type { ProductProject } from "../types/project";
 import { useCloud } from "./useCloud";
+import { useItemsSync } from "./useItemsSync";
+import { bookFromCoverBrief } from "../engines/coloringBook/book";
+import type { CoverBrief } from "../engines/cover/brief";
+import { newId } from "../presets/products/projectFactory";
 import { CloudAccount, cloudLabel } from "../components/projects/CloudAccount";
 
 type View =
@@ -108,6 +112,14 @@ export function App() {
   });
   const cloudRef = useRef(cloud);
   cloudRef.current = cloud;
+  // Cover Studio and Coloring Book saved online too (signed in); the home screen re-reads its lists when a sync brings work here.
+  const itemsReceived = useItemsSync(cloud.session?.user.id ?? null);
+  /** Continue a Cover Studio coloring book as a Coloring Book: everything entered there comes along. */
+  const continueAsBook = (brief: CoverBrief) => {
+    const book = bookFromCoverBrief(newId("book"), brief);
+    localBookStore.save(book);
+    setView({ kind: "coloring", bookId: book.id });
+  };
 
   const persist = useCallback((p: ProductProject) => {
     window.clearTimeout(timer.current);
@@ -215,7 +227,7 @@ export function App() {
     return (
       <>
         {banner}
-        <CoverStudio onBack={() => setView({ kind: "list" })} projects={projects} loadProject={(id) => store.load(id)} onCreateProject={open} />
+        <CoverStudio onBack={() => setView({ kind: "list" })} projects={projects} loadProject={(id) => store.load(id)} onCreateProject={open} onColoringBook={continueAsBook} />
       </>
     );
   if (view.kind === "coloring")
@@ -264,6 +276,7 @@ export function App() {
       onCovers={() => setView({ kind: "cover" })}
       onColoringBook={(bookId) => setView({ kind: "coloring", bookId: bookId ?? null })}
       books={localBookStore.list()}
+      key={`home-${itemsReceived}`}
       onOpen={(id) => {
         const p = store.load(id);
         if (p) openLoaded(p);

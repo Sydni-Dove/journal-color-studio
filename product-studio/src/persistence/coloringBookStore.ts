@@ -3,7 +3,8 @@
  * under the same versioned prefix). A book's reference images and artwork live in the artwork store (IndexedDB), by id.
  * Older saves keep working when fields are added: every field is merged onto the defaults; nothing is ever deleted.
  */
-import { normalizeBrief } from "./coverStore";
+import { itemsChanged, normalizeBrief } from "./coverStore";
+import { markItemDeleted } from "./itemBases";
 import { newBook, PRINT_FORMATS, type BookStepId, type ColoringBook, type PageContent } from "../engines/coloringBook/book";
 
 const PREFIX = "dove-product-studio:v1";
@@ -96,9 +97,12 @@ export const localBookStore: BookStore = {
     const idx = this.list().filter((s) => s.id !== b.id);
     idx.push(summarize(b));
     localStorage.setItem(INDEX_KEY, JSON.stringify(idx));
+    itemsChanged();
   },
   remove(id) {
     try {
+      const was = this.load(id);
+      if (was) markItemDeleted("coloring-book", id, was.updatedAt);
       localStorage.removeItem(bookKey(id));
       localStorage.setItem(INDEX_KEY, JSON.stringify(this.list().filter((s) => s.id !== id)));
     } catch {

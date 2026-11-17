@@ -125,13 +125,28 @@ export function newBook(id: string, over: Partial<ColoringBook> = {}, now = new 
 /** A coloring book started in Cover Studio (Children's Character Illustrations): every character, reference and scene kept as it is. */
 export function bookFromCoverBrief(id: string, brief: CoverBrief, now?: string): ColoringBook {
   const anyVerse = brief.scenes.some((s) => s.scriptureRef?.trim()) || !!brief.scripture.trim();
+  // Cover Studio's Scripture choice, as the book's: none / reference only / full verse (lettered-in pages print the full verse too).
+  const show = (brief as CoverBrief & { scriptureShow?: "full" | "reference" | "none" }).scriptureShow;
+  const scripture: PageContent["scripture"] = !anyVerse || show === "none" ? "none" : show === "reference" ? "reference" : "full";
+  // Wording the collection marked verified in Cover Studio counts as approved here (it was approved there): nothing to redo.
+  const stamp = now ?? new Date().toISOString();
+  const scenes = brief.scenes.map((s) => (brief.verseVerified && s.verseText?.trim() && s.scriptureRef?.trim() && !s.verseApproved ? { ...s, verseApproved: stamp, verseSource: s.verseSource ?? ("customer" as const) } : s));
+  // The binding chosen there is the print format here.
+  const printFormat: PrintFormatId = /spiral|coil/i.test(brief.binding) ? "spiral" : /loose|unbound/i.test(brief.binding) ? "home-print" : "kdp-paperback";
+  const difficulty = DIFFICULTIES.find((d) => d.lineThickness === brief.lineThickness && d.complexity === brief.complexity)?.id ?? "medium";
   return newBook(id, {
     name: brief.title || brief.collection || "Coloring book",
-    brief: { ...brief, category: "character" },
-    faithBased: anyVerse,
-    content: { title: true, scripture: anyVerse ? "full" : "none", lesson: brief.scenes.some((s) => s.lessonText?.trim()), customText: false },
+    brief: { ...brief, category: "character", scenes, title: brief.title || brief.collection },
+    faithBased: anyVerse && show !== "none",
+    content: { title: true, scripture, lesson: brief.scenes.some((s) => s.lessonText?.trim()), customText: false },
     sides: brief.blankBacks ? "single" : "double",
+    printFormat,
+    difficulty,
     importSource: brief.sceneSource,
+    // A finished cover already uploaded there is this book's cover.
+    ...(brief.finishedCoverId
+      ? { cover: { mode: brief.coverOutput === "complete-concept" ? ("as-is" as const) : ("with-title" as const), backText: "", front: { id: brief.finishedCoverId, name: brief.finishedCoverName ?? "cover", w: 0, h: 0 }, ...(brief.coverApproved ? { approved: brief.coverApproved } : {}) } }
+      : {}),
   }, now);
 }
 
