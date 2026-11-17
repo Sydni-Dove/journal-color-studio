@@ -178,6 +178,7 @@ function normalizeTypography(raw: unknown, d: CoverBrief["pageTypography"]): Cov
   return {
     titleFont: text(r.titleFont, d.titleFont), scriptureFont: text(r.scriptureFont, d.scriptureFont),
     align: r.align === "left" || r.align === "right" ? r.align : "center", titleSizePt: Math.max(10, Math.min(72, numOr(r.titleSizePt, d.titleSizePt))),
+    ...(typeof r.textSizePt === "number" && Number.isFinite(r.textSizePt) ? { textSizePt: Math.max(8, Math.min(36, r.textSizePt)) } : {}),
   };
 }
 

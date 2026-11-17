@@ -25,7 +25,9 @@ export function WritingLines({ node }: { node: LinesNode }) {
   const d = node.positions
     .map((p) => (node.orientation === "horizontal" ? `M${node.from} ${p}H${node.to}` : `M${p} ${node.from}V${node.to}`))
     .join("");
-  return <path d={d} style={strokeStyle(node.color, node.opacity)} strokeWidth={sw} data-node={node.id} />;
+  // Dashed: short dashes; dotted: round dots (zero-length dashes with round caps), both in inches.
+  const dash = node.dash === "dashed" ? `${Math.max(sw * 6, 0.06)} ${Math.max(sw * 4, 0.04)}` : node.dash === "dotted" ? `0 ${Math.max(sw * 4, 0.05)}` : undefined;
+  return <path d={d} style={strokeStyle(node.color, node.opacity)} strokeWidth={node.dash === "dotted" ? sw * 1.6 : sw} strokeDasharray={dash} strokeLinecap={node.dash === "dotted" ? "round" : undefined} data-node={node.id} data-dash={node.dash} />;
 }
 /** Graph grids are line sets drawn by the same primitive. */
 export const GraphGrid = WritingLines;

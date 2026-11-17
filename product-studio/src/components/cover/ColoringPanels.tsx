@@ -12,7 +12,7 @@ import {
 } from "../../engines/cover/coloring";
 import { getArtworkFile, importArtwork, useArtworkUrl } from "../../engines/artwork/store";
 import { effectivePpi, ppiAdvice } from "../../engines/artwork/place";
-import { artRegion, assembleColoringBook, isPageCanvas, pageCanvas } from "../../engines/cover/assemble";
+import { BOOK_TEXT_SIZES, artRegion, assembleColoringBook, bookTextPt, isPageCanvas, pageCanvas } from "../../engines/cover/assemble";
 import { geometryFor, resolveDocument, solvePage } from "../../engines/document/resolve";
 import { useFontLoader } from "../../utils/useFontLoader";
 import { PageThumb } from "../preview/PageThumb";
@@ -489,6 +489,7 @@ export function LayoutPanel({ brief, set }: { brief: CoverBrief; set: Set_ }) {
           <Pick label="Scripture font" value={brief.pageTypography.scriptureFont} options={FONT_CHOICES} onChange={(scriptureFont) => set({ pageTypography: { ...brief.pageTypography, scriptureFont } })} />
           <Pick label="Text alignment" value={brief.pageTypography.align} options={["left", "center", "right"]} onChange={(align) => set({ pageTypography: { ...brief.pageTypography, align: align as "left" | "center" | "right" } })} />
           <Pick label="Title size (pt)" value={String(brief.pageTypography.titleSizePt)} options={["18", "20", "24", "28", "32", "36"]} onChange={(v) => set({ pageTypography: { ...brief.pageTypography, titleSizePt: Number(v) } })} />
+          <Pick label="Verse size (pt)" value={String(bookTextPt(brief))} options={BOOK_TEXT_SIZES.map(String)} onChange={(v) => set({ pageTypography: { ...brief.pageTypography, textSizePt: Number(v) } })} />
         </div>
       </div>
       <div className="row">

@@ -25,8 +25,12 @@ import type { BookStep } from "../../types/recipe";
 import type { ArtworkAsset, ArtworkPlacement } from "../../types/artwork";
 import type { CoverBrief, PageOutput, Scene } from "./brief";
 
-/** Verse, lesson and custom text on a Coloring Book page (13 pt: children read it). */
+/** Verse, lesson and custom text on a Coloring Book page (13 pt: children read it), unless the maker sets a size. */
 export const BOOK_TEXT_PT = 13;
+/** The verse size chosen for this book's pages. */
+export const bookTextPt = (b: CoverBrief) => b.pageTypography.textSizePt ?? BOOK_TEXT_PT;
+/** Sizes offered for the verse and other page text. */
+export const BOOK_TEXT_SIZES = [10, 11, 12, 13, 14, 16, 18, 20];
 
 /**
  * A Coloring Book's typography, as the product's own Style → Typography (not pinned on each line of text): the title
@@ -36,7 +40,7 @@ export function bookTypography(b: CoverBrief): ProductProject["typography"] {
   const t = b.pageTypography;
   return {
     fonts: { ...DEFAULT_FONTS, headings: t.titleFont, body: t.scriptureFont },
-    roleOverrides: { pageTitle: { sizePt: t.titleSizePt }, body: { sizePt: BOOK_TEXT_PT } },
+    roleOverrides: { pageTitle: { sizePt: t.titleSizePt }, body: { sizePt: bookTextPt(b) } },
   };
 }
 
@@ -156,7 +160,12 @@ export function assembleColoringBook(b: CoverBrief, scenes: Scene[] = b.scenes, 
     recipe: { items: [], ordering: "sequential", structure },
   } as never) as ProductProject;
   // A Coloring Book page takes its fonts and sizes from the product's typography (see bookTypography).
-  const withSize = b.pageContent ? { ...project, typography: bookTypography(b) } : project;
+  // Cover Studio's own pages: the verse size too, when one is chosen.
+  const withSize = b.pageContent
+    ? { ...project, typography: bookTypography(b) }
+    : b.pageTypography.textSizePt
+      ? { ...project, typography: { ...project.typography, roleOverrides: { ...project.typography.roleOverrides, body: { ...project.typography.roleOverrides.body, sizePt: b.pageTypography.textSizePt } } } }
+      : project;
   const placements: ArtworkPlacement[] = scenes.flatMap((s) => {
     if (!s.illustrationId || !assets.some((a) => a.id === s.illustrationId)) return [];
     return [illustrationPlacement(b, s)];

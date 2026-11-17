@@ -8,7 +8,7 @@
  * Every issue names the step (and the page) where it is fixed. Text that doesn't fit, margins and the printer's rules
  * come from Product Studio's own page validator, run on the very pages the preview draws and the export prints.
  */
-import { BOOK_TEXT_PT, artRegion, isPageCanvas, pageContentOf } from "../cover/assemble";
+import { BOOK_TEXT_PT, artRegion, bookTextPt, isPageCanvas, pageContentOf } from "../cover/assemble";
 import { effectivePpi } from "../artwork/place";
 import { validateProject } from "../validation/validate";
 import { heuristicMeasurer, type TextMeasurer } from "../typography/textMeasure";
@@ -155,7 +155,7 @@ export function whatsMissing(book: ColoringBook, measure: TextMeasurer = heurist
         for (const node of solved.nodes) {
           if (node.type !== "text" || !node.fit) continue;
           const isTitle = /-title-title$/.test(node.id);
-          const want = isTitle ? b.pageTypography.titleSizePt : BOOK_TEXT_PT;
+          const want = isTitle ? b.pageTypography.titleSizePt : bookTextPt(b);
           const got = node.fit.sizePt;
           const what = isTitle ? "title" : /-verse-/.test(node.id) ? "verse" : /-lesson-/.test(node.id) ? "lesson" : "text";
           if (got < want - 0.25 && (!worst || got / want < worst.got / worst.want)) worst = { want, got, what };

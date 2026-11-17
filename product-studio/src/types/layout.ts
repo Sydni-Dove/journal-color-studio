@@ -111,6 +111,8 @@ export type LinesNode = NodeBase & {
   strokePt: number;
   color: ColorToken;
   opacity: number;
+  /** Absent = solid lines. */
+  dash?: "dashed" | "dotted";
 };
 
 export type DotsNode = NodeBase & {

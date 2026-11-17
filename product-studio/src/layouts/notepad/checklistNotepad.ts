@@ -7,6 +7,7 @@ import { distributeEqual } from "../../engines/layout/math";
 import { STUDIO_GROCERY } from "../../presets/studioDefaults";
 import type { LayoutMetric, LayoutNode, SolvedPage } from "../../types/layout";
 import { checklistRows, headerTitle, pageFrame } from "../shared/components";
+import { LIST_ROW_IN } from "./groceryNotepad";
 import { minimumAreaFit, type LayoutDefinition } from "../shared/types";
 
 export const checklistNotepad: LayoutDefinition = {
@@ -39,7 +40,7 @@ export const checklistNotepad: LayoutDefinition = {
     const frame = pageFrame(ctx, 0, { headerH: STUDIO_GROCERY.header.valueIn });
     const title = headerTitle("checklist-header", ctx, frame.zones, "pageTitle", ctx.wording.checklist, "pageTitle", "header-center");
     const nodes: LayoutNode[] = [...frame.nodes, ...title.nodes];
-    const rowH = STUDIO_GROCERY.row.valueIn;
+    const rowH = LIST_ROW_IN[opts.lineSpacing ?? "standard"];
     const colCount = frame.body.w + 1e-6 >= STUDIO_GROCERY.twoColumnMinWidth.valueIn ? 2 : 1;
     const cols = distributeEqual(frame.body.x, frame.body.w, colCount, s.section);
     const room = frame.body.h;

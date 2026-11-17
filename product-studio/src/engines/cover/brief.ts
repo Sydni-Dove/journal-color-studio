@@ -104,7 +104,14 @@ export type Scene = {
 export type ScriptureMode = "page" | "art";
 
 /** Page typography: applied only when Product Studio assembles the pages; never part of an image prompt. */
-export type PageTypography = { titleFont: string; scriptureFont: string; align: "left" | "center" | "right"; titleSizePt: number };
+export type PageTypography = {
+  titleFont: string;
+  scriptureFont: string;
+  align: "left" | "center" | "right";
+  titleSizePt: number;
+  /** The verse, lesson and custom text size. Absent = 13 pt (BOOK_TEXT_PT). */
+  textSizePt?: number;
+};
 
 export type CoverBrief = {
   category: CoverCategory;

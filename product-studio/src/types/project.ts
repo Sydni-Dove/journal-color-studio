@@ -54,6 +54,12 @@ export type ListPageOptions = {
   lines?: number;
   /** Checkbox shape. Absent = square. */
   marker?: "square" | "circle" | "none";
+  /** Writing lines (Grocery List): solid, dashed, dotted, or none (checkboxes on blank space). Absent = solid. */
+  lineStyle?: "solid" | "dashed" | "dotted" | "none";
+  /** Space between lines: compact 0.28", standard 0.35" (research 3.2.3), roomy 0.42". Absent = standard. */
+  lineSpacing?: "compact" | "standard" | "roomy";
+  /** Grocery List: one list with no section headings (in two columns when the sheet is wide enough). */
+  noSections?: boolean;
 };
 
 export type LayoutOptions = {

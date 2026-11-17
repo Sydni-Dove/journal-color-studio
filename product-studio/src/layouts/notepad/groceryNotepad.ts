@@ -11,6 +11,12 @@ import { checklistRows, headerTitle, pageFrame } from "../shared/components";
 import { group, rule, text } from "../shared/nodes";
 import { minimumAreaFit, type LayoutDefinition } from "../shared/types";
 
+/** Space between lines for the list-page "Line spacing" choice; standard is research 3.2.3's 0.35". */
+export const LIST_ROW_IN = { compact: 0.28, standard: STUDIO_GROCERY.row.valueIn, roomy: 0.42 } as const;
+/** The writing-line choice as checklist-row options: lines on or off, and dashed or dotted. */
+export const listLines = (style: "solid" | "dashed" | "dotted" | "none" | undefined) =>
+  style === "none" ? { lines: false } : style === "dashed" || style === "dotted" ? { dash: style } : {};
+
 const CATEGORIES: WordingKey[] = ["produce", "dairy", "protein", "pantry", "frozen", "household"];
 
 export const groceryNotepad: LayoutDefinition = {
@@ -45,16 +51,21 @@ export const groceryNotepad: LayoutDefinition = {
     const title = headerTitle("grocery-header", ctx, frame.zones, "pageTitle", ctx.wording.groceryList, "pageTitle", "header-center");
     const nodes: LayoutNode[] = [...frame.nodes, ...title.nodes];
     // The maker's own sections (any number), or the six built-in categories (their wording renamable).
+    // Or no sections at all: one list (two columns of it on a wide sheet), no headings.
     const custom = opts.sections?.map((t) => t.trim()).filter(Boolean);
-    const sections: { key: string; title: string }[] = custom?.length
-      ? custom.map((t, i) => ({ key: `s${i + 1}`, title: t }))
-      : CATEGORIES.map((k) => ({ key: k, title: ctx.wording[k] }));
-    const twoCols = frame.body.w + 1e-6 >= STUDIO_GROCERY.twoColumnMinWidth.valueIn && sections.length > 1;
+    const noSections = !!opts.noSections;
+    const wide = frame.body.w + 1e-6 >= STUDIO_GROCERY.twoColumnMinWidth.valueIn;
+    const sections: { key: string; title: string }[] = noSections
+      ? Array.from({ length: wide ? 2 : 1 }, (_, i) => ({ key: `list${i + 1}`, title: "" }))
+      : custom?.length
+        ? custom.map((t, i) => ({ key: `s${i + 1}`, title: t }))
+        : CATEGORIES.map((k) => ({ key: k, title: ctx.wording[k] }));
+    const twoCols = wide && sections.length > 1;
     const colCount = twoCols ? 2 : 1;
     const cols = distributeEqual(frame.body.x, frame.body.w, colCount, s.section);
     const perCol = Math.ceil(sections.length / colCount);
-    const rowH = STUDIO_GROCERY.row.valueIn;
-    const headH = STUDIO_GROCERY.categoryHead.valueIn;
+    const rowH = LIST_ROW_IN[opts.lineSpacing ?? "standard"];
+    const headH = noSections ? 0 : STUDIO_GROCERY.categoryHead.valueIn;
     let rowsPerCategory = Infinity;
     let short = false;
     cols.starts.forEach((x, c) => {
@@ -67,28 +78,31 @@ export const groceryNotepad: LayoutDefinition = {
         const headRect = { x, y, w: cols.size, h: headH };
         // A set number of lines (never more than the block holds); otherwise as many as fit.
         const room = blocks.size - headH;
-        const want = opts.lines ? opts.lines * rowH : room;
+        // With no sections, "lines" counts the whole list, shared between the columns.
+        const perList = opts.lines ? (noSections ? Math.ceil(opts.lines / sections.length) : opts.lines) : 0;
+        const want = perList ? perList * rowH : room;
         if (want > room + 1e-6) short = true;
         const listRect = { x, y: y + headH, w: cols.size, h: Math.min(want, room) };
-        const list = checklistRows(`${id}-list`, listRect, ctx, rowH, opts.marker ? { marker: opts.marker } : {});
+        const list = checklistRows(`${id}-list`, listRect, ctx, rowH, { ...(opts.marker ? { marker: opts.marker } : {}), ...listLines(opts.lineStyle) });
         rowsPerCategory = Math.min(rowsPerCategory, list.rows);
-        nodes.push(
-          group(id, "Section", blockRect),
-          text(`${id}-title`, { ...headRect, h: headH - s.headingToContentGap }, sec.title, "sectionHeading", { component: "SectionHeader", vAlign: "bottom" }),
-          rule(`${id}-rule`, x, y + headH, x + cols.size, y + headH, { strokePt: 0.75 }),
-          ...list.nodes,
-        );
+        nodes.push(group(id, "Section", blockRect));
+        if (!noSections)
+          nodes.push(
+            text(`${id}-title`, { ...headRect, h: headH - s.headingToContentGap }, sec.title, "sectionHeading", { component: "SectionHeader", vAlign: "bottom" }),
+            rule(`${id}-rule`, x, y + headH, x + cols.size, y + headH, { strokePt: 0.75 }),
+          );
+        nodes.push(...list.nodes);
       });
     });
     if (!Number.isFinite(rowsPerCategory)) rowsPerCategory = 0;
     const diagnostics = [...frame.diagnostics, ...title.diagnostics];
-    if (short) diagnostics.push({ severity: "warning", rule: "min-writing-area", componentId: "grocery", message: `${opts.lines} lines per section don't fit on this sheet: ${rowsPerCategory} are shown. Use fewer sections or lines, or a larger sheet.` });
+    if (short) diagnostics.push({ severity: "warning", rule: "min-writing-area", componentId: "grocery", message: noSections ? `${opts.lines} lines don't fit on this sheet: ${rowsPerCategory * sections.length} are shown. Use fewer lines, closer line spacing, or a larger sheet.` : `${opts.lines} lines per section don't fit on this sheet: ${rowsPerCategory} are shown. Use fewer sections or lines, or a larger sheet.` });
     if (rowsPerCategory < 2) {
       diagnostics.push({ severity: "warning", rule: "min-writing-area", componentId: "grocery", message: `Only ${rowsPerCategory} row(s) per category fit on this sheet.` });
     }
     const metrics: LayoutMetric[] = [
       { label: "Columns", value: colCount, unit: "count", provenance: { geometryClass: "studio-recommended", basis: `two columns when usable width ≥ ${STUDIO_GROCERY.twoColumnMinWidth.valueIn}"` } },
-      { label: "Rows per category", value: rowsPerCategory, unit: "count", provenance: { geometryClass: "user-design", basis: `floor((block − ${headH}) ÷ ${rowH})` } },
+      { label: noSections ? "Rows per column" : "Rows per category", value: rowsPerCategory, unit: "count", provenance: { geometryClass: "user-design", basis: `floor((block − ${headH}) ÷ ${rowH})` } },
       { label: "Category subhead", value: headH, unit: "in", provenance: STUDIO_GROCERY.categoryHead.provenance },
     ];
     return [{ nodes, diagnostics, metrics, regions: { mainContent: frame.body, writingArea: frame.body } }];

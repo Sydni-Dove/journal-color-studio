@@ -13,7 +13,7 @@ import { briefFor } from "../../engines/coloringBook/assembleBook";
 import type { MissingIssue } from "../../engines/coloringBook/missing";
 import { extractDocumentText } from "../../engines/import/documentText";
 import { launchChatGpt } from "../../engines/cover/launch";
-import { pageCanvas } from "../../engines/cover/assemble";
+import { BOOK_TEXT_SIZES, bookTextPt, pageCanvas } from "../../engines/cover/assemble";
 import { newId } from "../../presets/products/projectFactory";
 import { Check } from "../editor/ui";
 import { CHECKS, IllustrationCheck, LineSample, ReferenceFiles, Regenerate } from "../cover/ColoringPanels";
@@ -72,6 +72,13 @@ function ColoringSettings({ book, setBrief, update }: StepProps) {
         <Select label="Where the page text goes" value={b.textPlacement} options={TEXT_PLACEMENTS.filter((t) => t.value !== "none").map((t) => t.value)} labels={Object.fromEntries(TEXT_PLACEMENTS.map((t) => [t.value, t.label.replace("verse", "verse and other text")]))} onChange={(v) => setBrief({ textPlacement: v as typeof b.textPlacement })} />
         <Select label="Title font" value={b.pageTypography.titleFont} options={FONT_CHOICES} onChange={(titleFont) => setBrief({ pageTypography: { ...b.pageTypography, titleFont } })} />
         <Select label="Verse and text font" value={b.pageTypography.scriptureFont} options={FONT_CHOICES} onChange={(scriptureFont) => setBrief({ pageTypography: { ...b.pageTypography, scriptureFont } })} />
+        <Select
+          label="Verse and text size"
+          value={String(bookTextPt(b))}
+          options={BOOK_TEXT_SIZES.map(String)}
+          labels={Object.fromEntries(BOOK_TEXT_SIZES.map((n) => [String(n), `${n} pt${n === 13 ? " (standard)" : ""}`]))}
+          onChange={(v) => setBrief({ pageTypography: { ...b.pageTypography, textSizePt: Number(v) } })}
+        />
       </div>
       <div className="content-switches">
         <Check label="Keep characters consistent on every page" checked={b.keepConsistent} onChange={(keepConsistent) => setBrief({ keepConsistent })} />

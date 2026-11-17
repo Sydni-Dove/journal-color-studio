@@ -69,7 +69,11 @@ fonts (see Testing).
     - Clear of the printer's edge: 5×8, 5×7, 4×8, A6, 4×6, 3×5.
     - Edge to edge: 4.25×11, 5.5×8.5, 4×9.
   - New notepad sizes: 4 × 8 (two side by side on landscape Letter, 0.25" clear) and 4.25 × 11 (two fill portrait Letter).
-- Still open on the toolbar branch: "Still need line options" and "Should have option for no section" (grocery/list pages). When done, merge them into this branch too.
+- Grocery List toolbar notes, done on this branch. All three are `layoutOptions.listPage` settings, set in the "List sections, lines and checkboxes" panel:
+  - "Still need line options": `lineStyle` is solid, dashed, dotted, or no lines (checkboxes kept). `LinesNode.dash` renders dashed or dotted lines.
+  - Line spacing: `lineSpacing` is compact 0.28", standard 0.35" or roomy 0.42". The Checklist uses it too.
+  - "Should have option for no section": `noSections` makes one list with no headings, in two columns on a wide sheet. "Lines" then counts the whole list.
+- Verse size: `pageTypography.textSizePt` (default 13 pt) is set under "Verse and text size" in Coloring Book Interior Pages, and under "Verse size (pt)" in Cover Studio's page design. It reaches the product's body size and the What's Missing text-fit check. In the editor, Style → Typography's Body size also changes it.
 
 ## Cover Studio and Coloring Book saved online (2026-11-17, branch `claude/online-cover-studio` — review pending)
 

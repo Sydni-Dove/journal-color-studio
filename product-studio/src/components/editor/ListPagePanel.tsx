@@ -1,6 +1,7 @@
 /**
  * List pages (Grocery List, Checklist): add, remove, rename and reorder the sections; set how many lines each has
- * (or as many as fit); choose square, circle or no checkboxes. Nothing set = the layout's own design.
+ * (or as many as fit), or make one list with no sections; choose solid, dashed, dotted or no writing lines, the line
+ * spacing, and square, circle or no checkboxes. Nothing set = the layout's own design.
  */
 import type { ProjectUsage } from "../../engines/document/usage";
 import type { ListPageOptions, ProductProject } from "../../types/project";
@@ -34,6 +35,14 @@ export function ListPagePanel({ project, update, usage }: { project: ProductProj
   return (
     <Section title="List sections, lines and checkboxes" open>
       {grocery && (
+        <Segmented<"sections" | "one">
+          label="Sections"
+          value={opts.noSections ? "one" : "sections"}
+          options={[{ value: "sections", label: "With sections" }, { value: "one", label: "One list, no sections" }]}
+          onChange={(v) => set({ noSections: v === "one" ? true : undefined })}
+        />
+      )}
+      {grocery && !opts.noSections && (
         <div className="field" data-testid="list-sections">
           <span className="field-label">Sections ({sections.length})</span>
           <ol className="list-sections">
@@ -53,15 +62,29 @@ export function ListPagePanel({ project, update, usage }: { project: ProductProj
         </div>
       )}
       <div className="field" data-testid="list-lines">
-        <span className="field-label">{grocery ? "Lines in each section" : "Checkbox rows"}</span>
+        <span className="field-label">{grocery ? (opts.noSections ? "Lines in the list" : "Lines in each section") : "Checkbox rows"}</span>
         <div className="row">
           <button type="button" className="btn" aria-label="One line fewer" disabled={!opts.lines || opts.lines <= 1} onClick={() => set({ lines: Math.max(1, (opts.lines ?? 2) - 1) })}>−</button>
           <span className="list-lines__value" aria-live="polite">{opts.lines ? `${opts.lines} line${opts.lines === 1 ? "" : "s"}` : "As many as fit"}</span>
-          <button type="button" className="btn" aria-label="One line more" onClick={() => set({ lines: (opts.lines ?? (grocery ? 3 : 12)) + 1 })}>+</button>
+          <button type="button" className="btn" aria-label="One line more" onClick={() => set({ lines: (opts.lines ?? (grocery && !opts.noSections ? 3 : 12)) + 1 })}>+</button>
           {opts.lines && <button type="button" className="btn btn--ghost" onClick={() => set({ lines: undefined })}>As many as fit</button>}
         </div>
         <span className="hint">If more lines are chosen than the sheet holds, the page shows what fits and says so.</span>
       </div>
+      {grocery && (
+        <Segmented<"solid" | "dashed" | "dotted" | "none">
+          label="Writing lines"
+          value={opts.lineStyle ?? "solid"}
+          options={[{ value: "solid", label: "Solid" }, { value: "dashed", label: "Dashed" }, { value: "dotted", label: "Dotted" }, { value: "none", label: "No lines" }]}
+          onChange={(v) => set({ lineStyle: v === "solid" ? undefined : v })}
+        />
+      )}
+      <Segmented<"compact" | "standard" | "roomy">
+        label="Line spacing"
+        value={opts.lineSpacing ?? "standard"}
+        options={[{ value: "compact", label: "Compact" }, { value: "standard", label: "Standard" }, { value: "roomy", label: "Roomy" }]}
+        onChange={(v) => set({ lineSpacing: v === "standard" ? undefined : v })}
+      />
       <Segmented<"square" | "circle" | "none">
         label="Checkboxes"
         value={opts.marker ?? "square"}
