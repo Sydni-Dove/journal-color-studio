@@ -53,6 +53,13 @@ image upload; "design styles", not "recipes"). **10 Research and develop content
 **11 Requirements Assistant** — reserved. Technical improvements (any time, not blocking a phase): self-hosted
 fonts (see Testing).
 
+## Combined review build (2026-11-17, branch `claude/review-toolbar-and-coloring` — review pending, not merged)
+
+- `claude/online-cover-studio` (38f8759, includes `claude/coloring-book-studio`) with `claude/toolbar-feedback-six` (903e35b) merged in. The only conflict was `app.css`, where both branches added styles at the end; both sets were kept.
+- 38f8759 fixes the toolbar note "not updating with typography changes". Coloring book title and verse lines no longer pin their own font and size: they use the product's typography (headings = title font, body = Scripture font), so Style → Typography reaches the pages.
+- Combined suites: 1,749 unit and 202 browser tests, all passing. Golden snapshots: only the checklist entries were added.
+- Still open on the toolbar branch: "Still need line options" and "Should have option for no section" (grocery/list pages). When done, merge them into this branch too.
+
 ## Cover Studio and Coloring Book saved online (2026-11-17, branch `claude/online-cover-studio` — review pending)
 
 **Database change, live (approved by Sydni 2026-11-17):** table `public.product_studio_items` (kind `cover-draft` /
