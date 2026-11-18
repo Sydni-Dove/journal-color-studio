@@ -198,7 +198,14 @@ describe("Scripture on finished pages", () => {
   it("prints the full approved verse with its reference and translation on the exported page", () => {
     const b = setScene(gracious(), 0, { verseApproved: "2026-11-14" });
     const { texts } = sceneTexts(b, 0);
-    expect(texts).toContain(`“${NIV_26}” — Proverbs 31:26 (NIV)`);
+    // The reference on its own line under the words (no dash before it).
+    // The reference on its own line under the words, as laid out on the page.
+    const { doc, i } = sceneTexts(b, 0);
+    const verse = solvePage(doc, i).nodes.find((x) => x.id.endsWith("-verse-prompt")) as { fit: { lines: string[] } };
+    expect(verse.fit.lines.at(-1)).toBe("Proverbs 31:26 (NIV)");
+    expect(verse.fit.lines.join(" ")).toBe(`“${NIV_26}” Proverbs 31:26 (NIV)`);
+    expect(texts.some((t) => t.includes(NIV_26))).toBe(true);
+    expect(texts.join(" ")).not.toContain("—");
   });
   it("never prints unapproved wording: the reference stands alone and the page is flagged", () => {
     const b = gracious();
@@ -263,7 +270,9 @@ describe("Typography in the editor changes the coloring book's pages", () => {
       const i = doc.recipe.pages.findIndex((x) => x.recipeItemId === `scene-${b.brief.scenes[0].id}`);
       return (solvePage(doc, i).nodes.find((n) => n.id.endsWith("-verse-prompt")) as { fit: { sizePt: number } }).fit.sizePt;
     };
-    expect(verseSize(p)).toBe(13);
+    // A new book's verse: 18 pt Cormorant Garamond.
+    expect(verseSize(p)).toBe(18);
+    expect(p.typography.fonts.body).toBe("Cormorant Garamond");
     // Style → Typography: a bigger body size and another heading font reach the page.
     const edited = { ...p, typography: { fonts: { ...p.typography.fonts, headings: "Cinzel" }, roleOverrides: { ...p.typography.roleOverrides, body: { sizePt: 15 } } } };
     expect(verseSize(edited)).toBe(15);
@@ -350,7 +359,7 @@ describe("The finished book: preview = export", () => {
     const { texts, doc, i } = sceneTexts(long, 0);
     expect(texts[1]).toBe(lesson(40));
     const lessonNode = solvePage(doc, i).nodes.find((x) => x.id.endsWith("-lesson-prompt")) as { fit: { sizePt: number } };
-    expect(lessonNode.fit.sizePt).toBe(13);
+    expect(lessonNode.fit.sizePt).toBe(18);
     expect(whatsMissing(long).find((x) => x.id === `art-small-${sid}`)?.severity).toBe("warning");
     // Too long for the page: it would run onto another page, which blocks printing.
     const tooLong = setScene(base, 0, { lessonText: lesson(90) });

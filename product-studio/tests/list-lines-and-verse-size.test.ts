@@ -73,13 +73,19 @@ describe("Coloring book: the verse size", () => {
     const i = doc.recipe.pages.findIndex((p) => p.recipeItemId === "scene-s1");
     return (solvePage(doc, i).nodes.find((n) => n.id.endsWith("-verse-prompt")) as { fit: { sizePt: number } }).fit.sizePt;
   };
-  it("13 pt unless the maker chooses a size; the chosen size prints", () => {
-    expect(verseSize(book())).toBe(13);
+  it("a new book starts at 18 pt Cormorant Garamond; the chosen size prints; an older book without a size stays 13 pt", () => {
+    expect(verseSize(book())).toBe(18);
+    expect(book().brief.pageTypography.scriptureFont).toBe("Cormorant Garamond");
+    const older = book();
+    const { textSizePt: _drop, ...rest } = older.brief.pageTypography;
+    expect(verseSize({ ...older, brief: { ...older.brief, pageTypography: rest } })).toBe(13);
     expect(verseSize(book(16))).toBe(16);
     expect(verseSize(book(11))).toBe(11);
   });
   it("is kept when the book is saved and reopened", () => {
     expect(normalizeBrief({ ...book(16).brief } as never).pageTypography.textSizePt).toBe(16);
-    expect(normalizeBrief({ ...book().brief } as never).pageTypography.textSizePt).toBeUndefined();
+    const b = book();
+    const { textSizePt: _drop, ...rest } = b.brief.pageTypography;
+    expect(normalizeBrief({ ...b.brief, pageTypography: rest } as never).pageTypography.textSizePt).toBeUndefined();
   });
 });

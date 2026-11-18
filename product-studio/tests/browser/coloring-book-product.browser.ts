@@ -138,7 +138,8 @@ describe("Coloring Book — a first-time customer, start to export", () => {
     await editor.getByTestId("approve-verse").click();
     // The page draws each wrapped line separately: compare without line breaks.
     const flat = async () => ((await editor.getByTestId("finished-page").textContent()) ?? "").replace(/\s+/g, "");
-    await expect.poll(flat).toContain(`“${NIV_26}”—Proverbs31:26(NIV)`.replace(/\s+/g, ""));
+    // The reference on its own line under the words (no dash before it).
+    await expect.poll(flat).toContain(`“${NIV_26}”Proverbs31:26(NIV)`.replace(/\s+/g, ""));
     finished = (await editor.getByTestId("finished-page").textContent()) ?? "";
     expect(finished).not.toMatch(/kind words help us feel brave|Lesson/);
     // The artwork instructions: text-free, black and white, Jenny's registry.

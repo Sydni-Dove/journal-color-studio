@@ -53,6 +53,24 @@ image upload; "design styles", not "recipes"). **10 Research and develop content
 **11 Requirements Assistant** — reserved. Technical improvements (any time, not blocking a phase): self-hosted
 fonts (see Testing).
 
+## Online saving outage (2026-11-18) and the fix (branch `claude/review-toolbar-and-coloring`)
+
+- **What happened:** from about 13:07 UTC, the Supabase API (PostgREST) killed a request about once a minute for running too long ("Thread killed by timeout manager"). By about 13:15 UTC (8:15 AM Eastern) the database stopped answering. Every table returned 504 or 522, the Dove journal app's tables too, and sign-ins failed. `select 1` from the Supabase tools also timed out.
+- **Cause:** `useItemsSync` ran a full sync every minute in every open tab, including background tabs. Each sync downloaded every Cover Studio and Coloring Book item with its whole `data` (`select kind,id,name,updated_at,data,deleted_at`). Three preview tabs (4od3is4gx, m7kq263c4, m9yc0axz8) did this every minute. Timeouts started the evening online saving went live and grew as books grew.
+- **Fix in the app:**
+  - `ItemsBackend.list()` now reads names and versions only. `syncItems` fetches an item's data (`get`) only when it changed online, is new on this device, or was deleted online while kept here.
+  - Routine checks run every 5 minutes, only in a visible tab, and back off to 10, 20, then 30 minutes after failures (`nextWaitMs`). Coming back to a tab checks at most once a minute.
+  - Every Supabase request gives up after 45 s (`timedFetch` in persistence/cloud.ts).
+  - Plain messages (persistence/saveErrors.ts): a server that can't be reached is never called a wrong password. Sign-in shows "Couldn't reach the sign-in server, so your password wasn't checked…"; a save shows "Couldn't reach the saving server, so your work isn't saved online yet…".
+  - No saved data was deleted or changed.
+- **Still needed:** the old preview tabs still run the old every-minute sync, so close them. The database itself needs a restart from the Supabase dashboard (waiting on Sydni's go-ahead).
+- **Coloring Book review fixes** (from a test of the review build):
+  - Page words print in black (`COLORING_INK` overrides on the interior and Cover Studio coloring pages).
+  - The reference goes on its own line under the verse, with no dash.
+  - New books start at 18 pt Cormorant Garamond (`NEW_BOOK_TEXT_PT`). Saved books keep their own choice; one without a size stays 13 pt.
+  - One print-sharpness number everywhere (`illustrationPpi`, measured where the page draws the picture).
+  - A picture placed "Between the title and verse" now follows the words as laid out (`pictureAreaOf`), so it updates with the verse size and never overlaps it.
+
 ## Combined review build (2026-11-17, branch `claude/review-toolbar-and-coloring` — review pending, not merged)
 
 - `claude/online-cover-studio` (38f8759, includes `claude/coloring-book-studio`) with `claude/toolbar-feedback-six` (903e35b) merged in. The only conflict was `app.css`, where both branches added styles at the end; both sets were kept.

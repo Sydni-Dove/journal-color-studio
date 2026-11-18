@@ -13,7 +13,8 @@
  * `artRegion` measures that layout, so each prompt tells the image generator exactly which part of the page to keep
  * white — the same numbers Product Studio uses when it assembles the page.
  */
-import { resolveDocument, solvePage, geometryFor } from "../document/resolve";
+import { artworkFor, pictureAreaOf, resolveDocument, geometryFor } from "../document/resolve";
+import { effectivePpi } from "../artwork/place";
 import { BINDING_TYPE } from "./guides";
 import { resolveCoverSpec } from "./spec";
 import { createProject } from "../../presets/products/projectFactory";
@@ -24,6 +25,9 @@ import type { PromptBlock } from "../../types/prompts";
 import type { BookStep } from "../../types/recipe";
 import type { ArtworkAsset, ArtworkPlacement } from "../../types/artwork";
 import type { CoverBrief, PageOutput, Scene } from "./brief";
+
+/** A coloring page's words are black like its line art: titles, verse, lessons, rules and lines. */
+export const COLORING_INK = { primary: "#000000", secondary: "#000000", accent: "#000000", text: "#000000", mutedText: "#000000", line: "#000000", border: "#000000" } as const;
 
 /** Verse, lesson and custom text on a Coloring Book page (13 pt: children read it), unless the maker sets a size. */
 export const BOOK_TEXT_PT = 13;
@@ -71,7 +75,8 @@ export function verseLine(b: CoverBrief, s: Scene): string {
   if (!ref || content?.scripture === "none") return "";
   if (content) {
     const words = content.scripture === "full" && s.verseApproved && s.verseText?.trim() ? s.verseText.trim() : "";
-    return words ? `“${words.replace(/^["“]|["”]$/g, "")}” — ${ref} (${b.translation})` : `${ref} (${b.translation})`;
+    // The reference on its own line under the words (no dash before it).
+    return words ? `“${words.replace(/^["“]|["”]$/g, "")}”\n${ref} (${b.translation})` : `${ref} (${b.translation})`;
   }
   const words = b.verseVerified && s.verseText?.trim() ? `${s.verseText.trim()} ` : "";
   return `${words}${ref} (${b.translation})`;
@@ -156,7 +161,8 @@ export function assembleColoringBook(b: CoverBrief, scenes: Scene[] = b.scenes, 
     name: b.collection || b.title || "Coloring book",
     dimensions: preset ? { sizePresetId: preset.id, orientation: "portrait" } : { sizePresetId: CUSTOM_SIZE_ID, custom: { width: page.trimW, height: page.trimH, unit: "in" }, orientation: "portrait" },
     production: { bindingType: BINDING_TYPE[b.binding] ?? "perfect-bound", printProfileId: b.printProfile, duplex: true, includeBleed: false, userMargins: { top: b.safe, bottom: b.safe, outside: b.safe, inside: b.gutter } },
-    colors: { paletteId: "dove-signature", paper: "white" },
+    // Black-and-white pages: the title and every word print in black ink, never the palette's maroon.
+    colors: { paletteId: "dove-signature", paper: "white", overrides: COLORING_INK },
     recipe: { items: [], ordering: "sequential", structure },
   } as never) as ProductProject;
   // A Coloring Book page takes its fonts and sizes from the product's typography (see bookTypography).
@@ -202,16 +208,31 @@ export type ArtRegion = {
   canvas: { pxW: number; pxH: number };
 };
 
+/**
+ * How sharply a scene's illustration prints, in pixels per inch, measured where the finished page actually draws it
+ * (the whole page, or fitted between the title and verse at the current text size). Null without an illustration.
+ * Every screen that shows a print-sharpness number uses this one, so they always agree.
+ */
+export function illustrationPpi(b: CoverBrief, s: Scene): number | null {
+  if (!s.illustrationId || !s.illustrationW || !s.illustrationH) return null;
+  const asset: ArtworkAsset = { id: s.illustrationId, name: s.illustrationName ?? "illustration", widthPx: s.illustrationW, heightPx: s.illustrationH, mime: "image/png", bytes: 0, addedAt: "", hasAlpha: false } as ArtworkAsset;
+  const one = assembleColoringBook(b, [s], [asset]);
+  const doc = resolveDocument(one);
+  const i = doc.recipe.pages.findIndex((p) => !p.filler);
+  const art = i >= 0 ? artworkFor(doc, i).find((a) => a.use === "background") : undefined;
+  return art ? effectivePpi(asset, art.draw) : null;
+}
+
 /** Measures the assembled page: the illustration area and the text space around it, in inches and pixels. */
 export function artRegion(b: CoverBrief, s: Scene): ArtRegion {
   const one = assembleColoringBook(b, [s]);
   const doc = resolveDocument(one);
   const i = doc.recipe.pages.findIndex((p) => !p.filler);
   const g = geometryFor(doc, doc.recipe.pages[i], i);
-  const art = solvePage(doc, i).nodes.find((n) => n.type === "group" && /-art$/.test(n.id)) as { rect: Rect } | undefined;
-  const side = Math.max(b.gutter, b.safe, g.safe.left, g.safe.right);
-  const y0 = art?.rect.y ?? g.safeRect.y, y1 = art ? art.rect.y + art.rect.h : g.safeRect.y + g.safeRect.h;
-  const rect = { x: side, y: y0, w: g.trimWidthIn - 2 * side, h: y1 - y0 };
+  // The same picture area the printed page uses (pictureAreaOf), so every check measures the same box.
+  const area = pictureAreaOf(doc, i);
+  const rect = area ?? { x: g.safeRect.x, y: g.safeRect.y, w: g.safeRect.w, h: g.safeRect.h };
+  const y0 = rect.y, y1 = rect.y + rect.h;
   const c = pageCanvas(b);
   const px = (v: number) => Math.round(v * c.dpi);
   const hasTop = b.textPlacement !== "none" && b.textPlacement !== "bottom" && y0 > g.safeRect.y + 0.01;

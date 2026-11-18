@@ -15,6 +15,8 @@ vi.mock("../src/engines/artwork/store", () => ({
 
 import { artworkIds, browserItems, planItems, syncItems, type Item, type ItemsBackend } from "../src/persistence/itemsSync";
 import { holdItem, itemBase } from "../src/persistence/itemBases";
+import { nextWaitMs } from "../src/app/useItemsSync";
+import { SAVE_UNREACHABLE, SIGN_IN_UNREACHABLE, WRONG_PASSWORD, saveErrorMessage, signInErrorMessage, unreachable } from "../src/persistence/saveErrors";
 import { loadDraft, localCoverStore, newCollection, saveDraft } from "../src/persistence/coverStore";
 import { localBookStore } from "../src/persistence/coloringBookStore";
 import { newBrief, type CoverBrief } from "../src/engines/cover/brief";
@@ -37,9 +39,11 @@ beforeEach(() => {
 function fakeOnline(init: Item[] = []) {
   const rows = new Map(init.map((i) => [`${i.kind}:${i.id}`, structuredClone(i)]));
   const pics = new Map<string, Blob>();
+  const calls = { gets: 0 };
   const backend: ItemsBackend = {
-    async list() { return [...rows.values()].map((r) => structuredClone(r)); },
-    async get(kind, id) { return structuredClone(rows.get(`${kind}:${id}`) ?? null); },
+    // As the real table: the list carries names and versions only, never the books themselves.
+    async list() { return [...rows.values()].map((r) => ({ ...structuredClone(r), data: undefined })); },
+    async get(kind, id) { calls.gets++; return structuredClone(rows.get(`${kind}:${id}`) ?? null); },
     async putIf(item, expected) {
       const cur = rows.get(`${item.kind}:${item.id}`);
       if (expected === null ? cur : !cur || cur.updatedAt !== expected || cur.deletedAt) return false;
@@ -57,7 +61,7 @@ function fakeOnline(init: Item[] = []) {
     async putArtwork(id, b) { pics.set(id, b); },
     async getArtwork(id) { return pics.get(id) ?? null; },
   };
-  return { backend, rows, pics };
+  return { backend, rows, pics, calls };
 }
 
 const gracious = (over: Partial<CoverBrief> = {}) => newBrief({ category: "character", collection: "Gracious Kids", title: "She Is Gracious", audience: "girls 4–8", cast: GRACIOUS_CAST.map((c) => ({ ...c, refId: PIC })), scenes: [{ id: "s1", title: "The Brave First Step", text: "Jenny steps in.", scriptureRef: "Proverbs 31:26", verseText: "She speaks with wisdom, and faithful instruction is on her tongue.", illustrationId: PIC2 }], ...over });
@@ -180,5 +184,51 @@ describe("continuing a Cover Studio coloring book carries everything", () => {
   it("browserItems lists a coloring book continued from Cover Studio like any other", () => {
     localBookStore.save(bookFromCoverBrief("bk", gracious()));
     expect(browserItems.list().map((i) => i.kind)).toContain("coloring-book");
+  });
+});
+
+describe("a routine check stays small, however many books are saved", () => {
+  it("nothing changed: no book is downloaded, only names and versions", async () => {
+    localBookStore.save({ ...newBook("b1", { name: "Ballerinas" }), updatedAt: "2026-11-18T10:00:00.000Z" });
+    const online = fakeOnline();
+    await syncItems(online.backend);
+    online.calls.gets = 0;
+    await syncItems(online.backend);
+    await syncItems(online.backend);
+    expect(online.calls.gets).toBe(0);
+  });
+  it("a book changed on another device is the only one downloaded", async () => {
+    localBookStore.save({ ...newBook("b1", { name: "One" }), updatedAt: "2026-11-18T10:00:00.000Z" });
+    localBookStore.save({ ...newBook("b2", { name: "Two" }), updatedAt: "2026-11-18T10:00:00.000Z" });
+    const online = fakeOnline();
+    await syncItems(online.backend);
+    const row = online.rows.get("coloring-book:b2")!;
+    online.rows.set("coloring-book:b2", { ...row, name: "Two, renamed", updatedAt: "2026-11-18T11:00:00.000Z", data: { ...(row.data as object), name: "Two, renamed", updatedAt: "2026-11-18T11:00:00.000Z" } });
+    online.calls.gets = 0;
+    await syncItems(online.backend);
+    expect(online.calls.gets).toBe(1);
+    expect(localBookStore.load("b2")!.name).toBe("Two, renamed");
+  });
+  it("checks every 5 minutes, and after failures waits 10, 20, then 30 minutes", () => {
+    expect([0, 1, 2, 3, 4, 9].map((n) => nextWaitMs(n) / 60_000)).toEqual([5, 5, 10, 20, 30, 30]);
+  });
+});
+
+describe("when the saving server can't be reached, it says so plainly", () => {
+  const gateway = { name: "AuthRetryableFetchError", message: "", status: 504 };
+  it("a timed-out sign-in is never called a wrong password", () => {
+    expect(signInErrorMessage(gateway)).toBe(SIGN_IN_UNREACHABLE);
+    expect(signInErrorMessage(new TypeError("Failed to fetch"))).toBe(SIGN_IN_UNREACHABLE);
+    expect(signInErrorMessage({ name: "TimeoutError", message: "signal timed out" })).toBe(SIGN_IN_UNREACHABLE);
+    expect(SIGN_IN_UNREACHABLE).toMatch(/password wasn't checked/);
+    expect(signInErrorMessage({ name: "AuthApiError", message: "Invalid login credentials", status: 400 })).toBe(WRONG_PASSWORD);
+  });
+  it("a failed save says the work isn't saved online yet, and is safe here", () => {
+    for (const e of [gateway, { code: "", message: "upstream request timeout" }, { message: "Unexpected token '<', \"<html>\" is not valid JSON" }, { status: 522 }]) {
+      expect(unreachable(e)).toBe(true);
+      expect(saveErrorMessage(e)).toBe(SAVE_UNREACHABLE);
+    }
+    expect(SAVE_UNREACHABLE).toMatch(/Couldn't reach the saving server, so your work isn't saved online yet/);
+    expect(unreachable({ code: "42501", message: "new row violates row-level security policy" })).toBe(false);
   });
 });

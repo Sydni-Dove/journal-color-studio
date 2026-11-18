@@ -10,7 +10,7 @@
  * The cover is its own file (printers take the cover and the interior separately): `assembleCover`.
  */
 import { BINDING_TYPE } from "../cover/guides";
-import { bookTypography, illustrationPlacement, pageBlocks, pageCanvas, pageContentOf } from "../cover/assemble";
+import { COLORING_INK, bookTypography, illustrationPlacement, pageBlocks, pageCanvas, pageContentOf } from "../cover/assemble";
 import { createProject } from "../../presets/products/projectFactory";
 import { step } from "../../presets/bookRecipes";
 import { CUSTOM_SIZE_ID, SIZE_PRESETS } from "../../presets/sizes/sizePresets";
@@ -151,7 +151,8 @@ export function assembleInterior(book: ColoringBook, id?: string): ProductProjec
     name: `${bookTitle(book) || "Coloring book"} — interior`,
     dimensions: sizeOf(b),
     production: { bindingType: BINDING_TYPE[f.binding] ?? "perfect-bound", printProfileId: f.printProfile, duplex: true, includeBleed: false, userMargins: { top: b.safe, bottom: b.safe, outside: b.safe, inside: b.gutter } },
-    colors: { paletteId: "dove-signature", paper: "white" },
+    // Black-and-white pages: the title and every word print in black ink, never the palette's maroon.
+    colors: { paletteId: "dove-signature", paper: "white", overrides: COLORING_INK },
     recipe: { items: [], ordering: "sequential", structure: bookStructure(book) },
   } as never) as ProductProject;
   const assets = sceneAssets(b);

@@ -25,7 +25,7 @@ import { isScriptFont, withLuxeCoverType } from "../../presets/coverLuxe";
 import { resolveWording } from "../../presets/wording";
 import type { BindingProfile } from "../../types/binding";
 import type { CalendarData, WeekStart } from "../../types/calendar";
-import type { PageGeometry, PageSide } from "../../types/geometry";
+import type { PageGeometry, PageSide, Rect } from "../../types/geometry";
 import { sidewaysGeometry } from "../geometry/turn";
 import type { SolvedPage } from "../../types/layout";
 import type { PrintProfile } from "../../types/print";
@@ -492,6 +492,19 @@ export const isCoverPage = (page: PageInstance) => page.module?.type === "cover-
 /** The uploaded artwork this printed page draws, placed (the one answer preview, thumbnails and print all use). */
 const NO_ART: PageArt[] = [];
 const artCache = new WeakMap<ResolvedDocument, Map<number, PageArt[]>>();
+/**
+ * A page's picture area (a coloring page: the space between its title and its verse), in trim inches, inside the
+ * side margins — from the page as it is laid out now. Null on a page without one.
+ */
+export function pictureAreaOf(doc: ResolvedDocument, index: number, g = fullGeometryFor(doc, doc.recipe.pages[index], index)): Rect | null {
+  const page = doc.recipe.pages[index];
+  if (!page || page.filler) return null;
+  const art = solvePage(doc, index).nodes.find((n) => n.type === "group" && /-art$/.test(n.id)) as { rect: Rect } | undefined;
+  if (!art) return null;
+  const side = Math.max(g.safe.left, g.safe.right);
+  return { x: side, y: art.rect.y, w: g.trimWidthIn - 2 * side, h: art.rect.h };
+}
+
 export function artworkFor(doc: ResolvedDocument, index: number): PageArt[] {
   const page = doc.recipe.pages[index];
   if (!page || page.filler || !doc.project.artwork?.placements.length) return NO_ART;
@@ -499,7 +512,10 @@ export function artworkFor(doc: ResolvedDocument, index: number): PageArt[] {
   if (!byPage) artCache.set(doc, (byPage = new Map()));
   let out = byPage.get(index);
   if (!out) {
-    out = placeArtwork(doc.project.artwork, { item: page.recipeItemId, nth: pageOrdinal(doc, index), side: page.side, cover: isCoverPage(page) }, fullGeometryFor(doc, page, index));
+    const full = fullGeometryFor(doc, page, index);
+    // Only when a picture sits between the words: the page's picture area as laid out now.
+    const area = doc.project.artwork.placements.some((p) => p.use === "background" && p.extent === "region") ? pictureAreaOf(doc, index, full) : null;
+    out = placeArtwork(doc.project.artwork, { item: page.recipeItemId, nth: pageOrdinal(doc, index), side: page.side, cover: isCoverPage(page) }, full, area);
     if (!out.length) out = NO_ART;
     byPage.set(index, out);
   }

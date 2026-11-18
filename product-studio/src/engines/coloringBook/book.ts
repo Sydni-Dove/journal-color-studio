@@ -102,12 +102,17 @@ export function contentOf(book: ColoringBook, s: Scene): PageContent {
 }
 
 /** The interior page brief every coloring book starts from: clean black outlines on white, 8.5 × 11 in, 300 DPI. */
+/** The verse size a new coloring book starts with. */
+export const NEW_BOOK_TEXT_PT = 18;
+
 export function coloringBrief(over: Partial<CoverBrief> = {}): CoverBrief {
   return newBrief({
     category: "character", coloringStyle: "outline", lineThickness: "Medium", complexity: "Moderate", output: "coloring-page",
     product: "Workbook", size: "8.5×11", bleed: 0, safe: 0.25, gutter: 0.5, dpi: 300, binding: "Perfect bound", printProfile: "kdp",
     backgroundDensity: "Light", textPlacement: "bottom", coverage: 70, blankBacks: true, illustrationStyle: "Clean storybook line art",
     coverOutput: "artwork-only", coverColor: "Full-color storybook painting", style: "Whimsical storybook illustration",
+    // A new book's verse starts large and graceful: 18 pt Cormorant Garamond (saved books keep their own choice).
+    pageTypography: { titleFont: "Playfair Display", scriptureFont: "Cormorant Garamond", align: "center", titleSizePt: 24, textSizePt: NEW_BOOK_TEXT_PT },
     ...over,
   });
 }

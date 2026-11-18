@@ -8,8 +8,7 @@
  * Every issue names the step (and the page) where it is fixed. Text that doesn't fit, margins and the printer's rules
  * come from Product Studio's own page validator, run on the very pages the preview draws and the export prints.
  */
-import { BOOK_TEXT_PT, artRegion, bookTextPt, isPageCanvas, pageContentOf } from "../cover/assemble";
-import { effectivePpi } from "../artwork/place";
+import { BOOK_TEXT_PT, bookTextPt, illustrationPpi, isPageCanvas, pageContentOf } from "../cover/assemble";
 import { validateProject } from "../validation/validate";
 import { heuristicMeasurer, type TextMeasurer } from "../typography/textMeasure";
 import { geometryFor, resolveDocument, solvePage } from "../document/resolve";
@@ -63,7 +62,8 @@ export function whatsMissing(book: ColoringBook, measure: TextMeasurer = heurist
     else {
       if (!s.approvedAt) push({ id: `approve-${s.id}`, severity: "warning", title: `${where}'s illustration isn't approved yet`, detail: "Check the characters match their references, then approve it.", step: "pages", sceneId: s.id, where });
       if (!isPageCanvas(b, s.illustrationW, s.illustrationH)) {
-        const ppi = effectivePpi({ widthPx: s.illustrationW ?? 1, heightPx: s.illustrationH ?? 1 }, artRegion(b, s).rect);
+        // Measured where the finished page draws it: the same number the page's own check shows.
+        const ppi = illustrationPpi(b, s) ?? 0;
         if (ppi < 150) push({ id: `ppi-${s.id}`, severity: "blocking", title: `${where}'s illustration is too small to print sharply`, detail: `${ppi} pixels per inch where it's placed (300 is needed). Upload a larger image.`, step: "pages", sceneId: s.id, where });
         else if (ppi < 300) push({ id: `ppi-${s.id}`, severity: "warning", title: `${where}'s illustration may print a little soft`, detail: `${ppi} pixels per inch where it's placed; 300 or more prints sharp.`, step: "pages", sceneId: s.id, where });
       }

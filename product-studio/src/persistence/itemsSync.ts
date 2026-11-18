@@ -29,6 +29,10 @@ export type Item = { kind: ItemKind; id: string; name: string; updatedAt: string
 
 /** Where items are kept online (a fake one in tests). */
 export interface ItemsBackend {
+  /**
+   * Every item's kind, id, name and versions — WITHOUT its data (`data` may be absent): a routine check must stay
+   * small however many books are saved. A sync fetches the data (get) only for items that changed.
+   */
   list(): Promise<Item[]>;
   get(kind: ItemKind, id: string): Promise<Item | null>;
   /** Write only if the online copy is still at `expected` (null = only if there is no row). One statement. */
@@ -58,11 +62,13 @@ export const supabaseItems = (userId: string): ItemsBackend => {
   type Row = { kind: ItemKind; id: string; name: string; updated_at: string; data: unknown; deleted_at: string | null };
   const row = (r: Row): Item => ({ kind: r.kind, id: r.id, name: r.name, updatedAt: iso(r.updated_at)!, data: r.data, deletedAt: iso(r.deleted_at) });
   const COLS = "kind,id,name,updated_at,data,deleted_at";
+  const META = "kind,id,name,updated_at,deleted_at";
   return {
     async list() {
-      const { data, error } = await db().select(COLS);
+      // Names and versions only: the books themselves are fetched one at a time, and only when they changed.
+      const { data, error } = await db().select(META);
       if (error) throw error;
-      return ((data ?? []) as Row[]).map(row);
+      return ((data ?? []) as Row[]).map((r) => row({ ...r, data: undefined }));
     },
     async get(kind, id) {
       const { data, error } = await db().select(COLS).eq("kind", kind).eq("id", id).maybeSingle();
@@ -221,6 +227,27 @@ export function artworkIds(item: Item): string[] {
   return [...out];
 }
 
+/**
+ * The online items with their data filled in only where the merge needs it: new here, changed online, or deleted
+ * online while kept here. Items already in agreement, or changed only on this device, are never downloaded.
+ */
+async function withChangedData(backend: ItemsBackend, listed: Item[], localItems: Item[]): Promise<Item[]> {
+  const here = new Map(localItems.map((i) => [k(i), i]));
+  const out: Item[] = [];
+  for (const r of listed) {
+    const l = here.get(k(r));
+    const base = itemBase.get(r.kind, r.id);
+    const needs = r.deletedAt ? !!l : !l || (l.updatedAt !== r.updatedAt && !(base !== undefined && r.updatedAt === base));
+    if (!needs || r.data !== undefined) {
+      out.push(r);
+      continue;
+    }
+    const full = await backend.get(r.kind, r.id);
+    if (full) out.push(full);
+  }
+  return out;
+}
+
 export type ItemsSyncResult = { uploaded: number; downloaded: number; copies: number; pictures: number; deferred: number };
 
 /** One full sync: items both ways, then pictures both ways. Throws on network errors (nothing is lost; try again later). */
@@ -231,8 +258,10 @@ export async function syncItems(backend: ItemsBackend, local: LocalItems = brows
     if (await backend.removeIf(d.kind, d.id, d.version)) itemDeletionDone(d.kind, d.id);
   }
   const deleting = new Set(pendingItemDeletions().map(k));
-  const remote = (await backend.list()).filter((r) => !deleting.has(k(r)));
-  const plan = planItems(local.list(), remote, (i) => itemBase.get(i.kind, i.id));
+  const listed = (await backend.list()).filter((r) => !deleting.has(k(r)));
+  const localItems = local.list();
+  const remote = await withChangedData(backend, listed, localItems);
+  const plan = planItems(localItems, remote, (i) => itemBase.get(i.kind, i.id));
   const held = (i: Item) => isHeld(i.kind, i.id);
   for (const r of plan.toLocal) {
     if (held(r)) { res.deferred++; continue; }

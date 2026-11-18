@@ -11,8 +11,8 @@ import {
   applyColoringCard as applyColoringCardTo, applyCoverCard, castDesignPrompt, castFor, coloringCardOf, letteredVerse, referenceFiles, sceneBlocker, scenePrompt, spaceEstimate, splitScenes, verseArtBlocker,
 } from "../../engines/cover/coloring";
 import { getArtworkFile, importArtwork, useArtworkUrl } from "../../engines/artwork/store";
-import { effectivePpi, ppiAdvice } from "../../engines/artwork/place";
-import { BOOK_TEXT_SIZES, artRegion, assembleColoringBook, bookTextPt, isPageCanvas, pageCanvas } from "../../engines/cover/assemble";
+import { ppiAdvice } from "../../engines/artwork/place";
+import { BOOK_TEXT_SIZES, artRegion, assembleColoringBook, bookTextPt, illustrationPpi, isPageCanvas, pageCanvas } from "../../engines/cover/assemble";
 import { geometryFor, resolveDocument, solvePage } from "../../engines/document/resolve";
 import { useFontLoader } from "../../utils/useFontLoader";
 import { PageThumb } from "../preview/PageThumb";
@@ -595,7 +595,9 @@ export function IllustrationCheck({ brief, scene, index, cast, setScene, onNext,
   const exact = isPageCanvas(brief, scene.illustrationW, scene.illustrationH);
   const region = useMemo(() => artRegion(brief, scene), [brief, scene]);
   const fit = scene.illustrationW && scene.illustrationH ? (exact ? { w: canvas.trimW, h: canvas.trimH } : (() => { const k = Math.min(region.rect.w / scene.illustrationW!, region.rect.h / scene.illustrationH!); return { w: scene.illustrationW! * k, h: scene.illustrationH! * k }; })()) : null;
-  const ppi = fit ? ppiAdvice(effectivePpi({ widthPx: scene.illustrationW!, heightPx: scene.illustrationH! }, { x: 0, y: 0, ...fit })) : null;
+  // The same measurement What's Missing uses: where the finished page draws it, at the current text size.
+  const ppiValue = useMemo(() => illustrationPpi(brief, scene), [brief, scene]);
+  const ppi = fit && ppiValue !== null ? ppiAdvice(ppiValue) : null;
   const checks = scene.checks ?? {};
   const items = letteredVerse(brief, scene) ? [...CHECKS, { key: "verse", label: "The verse is spelled exactly, word for word" }] : CHECKS;
   const allChecked = items.every((c) => checks[c.key]);

@@ -136,7 +136,13 @@ export function withReservedBand(g: PageGeometry, band: { top: number; bottom: n
  * `g` is the page's FULL geometry (before any dedicated area was taken out);
  * `side` decides mirroring on left-hand pages.
  */
-export function placeArtwork(art: ProjectArtwork | undefined, page: { item: string; nth: number; side: PageSide; cover: boolean }, g: PageGeometry): PageArt[] {
+export function placeArtwork(
+  art: ProjectArtwork | undefined,
+  page: { item: string; nth: number; side: PageSide; cover: boolean },
+  g: PageGeometry,
+  /** The page's picture area as laid out now (a coloring page: between its title and verse), in trim inches. */
+  pictureArea?: Rect | null,
+): PageArt[] {
   if (!art?.placements.length) return [];
   const asset = new Map(art.assets.map((a) => [a.id, a] as const));
   const out: PageArt[] = [];
@@ -152,7 +158,10 @@ export function placeArtwork(art: ProjectArtwork | undefined, page: { item: stri
       cover = { key: p.id, assetId: a.id, use: "cover", box, draw: drawRect(box, a.widthPx, a.heightPx, p.fit, p.crop), opacity: 1, coverMode: p.mode, titleColor: p.titleColor ?? "palette" };
     } else if (p.use === "background") {
       if (!targets(p.targets, page.item, page.nth)) continue;
-      const box = p.extent === "region" && p.region ? { x: g.trimOffset.x + p.region.x, y: g.trimOffset.y + p.region.y, w: p.region.w, h: p.region.h } : p.extent === "safe" ? safe : mediaBox(g);
+      // "Between the title and verse" follows the words as they are laid out now (a bigger verse, a longer title);
+      // the stored region is only for a page that has no picture area.
+      const region = p.extent === "region" ? (pictureArea ?? p.region) : undefined;
+      const box = region ? { x: g.trimOffset.x + region.x, y: g.trimOffset.y + region.y, w: region.w, h: region.h } : p.extent === "safe" ? safe : mediaBox(g);
       // Mirrored: the image is flipped inside its box, and so is the crop, so the chosen part shows on the outer edge.
       const flip = !!p.mirror && page.side === "verso";
       const crop = flip ? { ...p.crop, x: 1 - p.crop.x } : p.crop;
