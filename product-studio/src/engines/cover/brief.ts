@@ -85,6 +85,10 @@ export type Scene = {
   customText?: string;
   /** When the customer approved this page's verse wording (it is printed in full only then). */
   verseApproved?: string;
+  /** Which words print: the full verse (default) or a short excerpt typed by the maker (KJV only). */
+  verseUse?: "full" | "excerpt";
+  /** The short excerpt, taken from the verse's own wording. */
+  verseExcerpt?: string;
   /** Where the wording came from: typed or pasted by the customer, or a public-domain text fetched for them. */
   verseSource?: "customer" | "public-domain";
   /** A suggested reference for a scene without one, waiting for the customer's approval. */
@@ -111,6 +115,13 @@ export type PageTypography = {
   titleSizePt: number;
   /** The verse, lesson and custom text size. Absent = 13 pt (BOOK_TEXT_PT). */
   textSizePt?: number;
+  /**
+   * How the page's words look: "elegant" (the fonts above, default) or "bubble" (chunky outlined bubble letters
+   * to color, at the bottom under the picture, with hearts and bursts — layouts/book/coloringLettering.ts).
+   */
+  letterStyle?: "elegant" | "bubble";
+  /** Bubble letters: the verse size (absent = 28 pt). */
+  bubbleVersePt?: number;
 };
 
 export type CoverBrief = {

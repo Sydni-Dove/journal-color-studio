@@ -8,7 +8,7 @@
  * Every issue names the step (and the page) where it is fixed. Text that doesn't fit, margins and the printer's rules
  * come from Product Studio's own page validator, run on the very pages the preview draws and the export prints.
  */
-import { BOOK_TEXT_PT, bookTextPt, illustrationPpi, isPageCanvas, pageContentOf } from "../cover/assemble";
+import { BOOK_TEXT_PT, bookTextPt, excerptAllowed, excerptFromVerse, illustrationPpi, isPageCanvas, pageContentOf } from "../cover/assemble";
 import { validateProject } from "../validation/validate";
 import { heuristicMeasurer, type TextMeasurer } from "../typography/textMeasure";
 import { geometryFor, resolveDocument, solvePage } from "../document/resolve";
@@ -58,6 +58,12 @@ export function whatsMissing(book: ColoringBook, measure: TextMeasurer = heurist
     const where = `Scene ${i + 1}`;
     const c = pageContentOf(b, s)!;
     const name = (s.pageTitle ?? s.title).trim();
+    // A short excerpt: KJV only, typed, and in the verse's own words.
+    if (s.verseUse === "excerpt" && c.scripture === "full") {
+      if (!excerptAllowed(b)) push({ id: `excerpt-${s.id}`, severity: "warning", title: `${where}: short excerpts are for the KJV only`, detail: `This book uses the ${b.translation}, so the full approved verse prints. Choose the KJV under Book Setup to print a short excerpt.`, step: "pages", sceneId: s.id, where });
+      else if (!s.verseExcerpt?.trim()) push({ id: `excerpt-${s.id}`, severity: "warning", title: `${where}: the short excerpt is empty`, detail: "Type the part of the verse to print, or choose “Full verse”. Until then the full verse prints.", step: "pages", sceneId: s.id, where });
+      else if (s.verseText && !excerptFromVerse(s.verseExcerpt, s.verseText)) push({ id: `excerpt-${s.id}`, severity: "blocking", title: `${where}: the excerpt isn't the verse's own words`, detail: "Use the KJV words of the verse, in order, without adding or rewording any.", step: "pages", sceneId: s.id, where });
+    }
     if (!s.illustrationId) push({ id: `art-${s.id}`, severity: "blocking", title: `${where}${name ? ` (“${name}”)` : ""} has no illustration`, detail: "Generate the artwork, then upload the finished image to this page.", step: "pages", sceneId: s.id, where });
     else {
       if (!s.approvedAt) push({ id: `approve-${s.id}`, severity: "warning", title: `${where}'s illustration isn't approved yet`, detail: "Check the characters match their references, then approve it.", step: "pages", sceneId: s.id, where });

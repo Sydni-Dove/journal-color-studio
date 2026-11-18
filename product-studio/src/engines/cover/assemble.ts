@@ -15,6 +15,7 @@
  */
 import { artworkFor, pictureAreaOf, resolveDocument, geometryFor } from "../document/resolve";
 import { effectivePpi } from "../artwork/place";
+import { BUBBLE_VERSE_PT } from "../../layouts/book/coloringLettering";
 import { BINDING_TYPE } from "./guides";
 import { resolveCoverSpec } from "./spec";
 import { createProject } from "../../presets/products/projectFactory";
@@ -69,14 +70,41 @@ export const pageContentOf = (b: CoverBrief, s: Scene) => (b.pageContent ? { ...
  *   full verse ("wording" — Reference (Translation)) only once the customer approved this page's wording. Until then
  *   the reference stands alone, and the book's review lists the page as missing its approved verse.
  */
+/** Short excerpts are offered for the King James Version only (public domain: its wording may be shortened). */
+export const excerptAllowed = (b: CoverBrief) => b.translation === "KJV";
+
+/** The verse words this page prints: the approved verse, or the maker's short excerpt of it (KJV only). */
+export function verseWords(b: CoverBrief, s: Scene): string {
+  const full = s.verseApproved && s.verseText?.trim() ? s.verseText.trim() : "";
+  if (!full) return "";
+  const excerpt = s.verseUse === "excerpt" && excerptAllowed(b) ? s.verseExcerpt?.trim() : "";
+  return (excerpt || full).replace(/^["“]|["”]$/g, "");
+}
+
+/** Does the excerpt keep the verse's own words, in order (nothing added or reworded)? */
+export function excerptFromVerse(excerpt: string, verse: string): boolean {
+  const words = (t: string) => t.toLowerCase().replace(/[^a-z0-9' ]+/g, " ").split(/\s+/).filter(Boolean);
+  const v = words(verse);
+  let i = 0;
+  for (const w of words(excerpt)) {
+    while (i < v.length && v[i] !== w) i++;
+    if (i === v.length) return false;
+    i++;
+  }
+  return words(excerpt).length > 0;
+}
+
+/** The layout a scene's page uses. */
+export const sceneLayoutId = (b: CoverBrief) => (b.pageTypography.letterStyle === "bubble" && b.pageContent ? "coloring-lettering" : "guided-page");
+
 export function verseLine(b: CoverBrief, s: Scene): string {
   const content = pageContentOf(b, s);
   const ref = (s.scriptureRef || (content ? "" : b.scripture) || "").trim();
   if (!ref || content?.scripture === "none") return "";
   if (content) {
-    const words = content.scripture === "full" && s.verseApproved && s.verseText?.trim() ? s.verseText.trim() : "";
+    const words = content.scripture === "full" ? verseWords(b, s) : "";
     // The reference on its own line under the words (no dash before it).
-    return words ? `“${words.replace(/^["“]|["”]$/g, "")}”\n${ref} (${b.translation})` : `${ref} (${b.translation})`;
+    return words ? `“${words}”\n${ref} (${b.translation})` : `${ref} (${b.translation})`;
   }
   const words = b.verseVerified && s.verseText?.trim() ? `${s.verseText.trim()} ` : "";
   return `${words}${ref} (${b.translation})`;
@@ -124,6 +152,20 @@ function bookPageBlocks(b: CoverBrief, s: Scene, c: NonNullable<ReturnType<typeo
   const titleText = (s.pageTitle ?? s.title).trim();
   const verse = (s.scriptureMode ?? b.scriptureMode) === "art" ? "" : verseLine(b, s);
   const art: PromptBlock = { id: "art", label: "", space: "fill", responseStyle: "blank", weight: 3 };
+  if (b.pageTypography.letterStyle === "bubble") {
+    // Bubble letters: title, verse words and reference as separate pieces, all under the picture.
+    if (!withText) return [art];
+    const ref = (s.scriptureRef ?? "").trim();
+    const lettered = (s.scriptureMode ?? b.scriptureMode) === "art" || c.scripture === "none" || !ref;
+    const words = !lettered && c.scripture === "full" ? verseWords(b, s) : "";
+    return [
+      art,
+      ...(c.title && titleText ? [{ id: "title", kind: "heading", label: titleText, textStyle: "title" } as PromptBlock] : []),
+      ...(words ? [{ id: "verse", kind: "heading", label: words, textStyle: "body", headingSizePt: b.pageTypography.bubbleVersePt ?? BUBBLE_VERSE_PT } as PromptBlock] : []),
+      // The reference alone (KJV and other translations named by abbreviation), no dash.
+      ...(!lettered ? [{ id: "ref", kind: "heading", label: b.translation === "KJV" ? ref : `${ref} (${b.translation})`, textStyle: "body" } as PromptBlock] : []),
+    ];
+  }
   const parts = {
     title: c.title && titleText ? [text("title", titleText, "title")] : [],
     rest: [
@@ -149,7 +191,7 @@ export function assembleColoringBook(b: CoverBrief, scenes: Scene[] = b.scenes, 
   const preset = SIZE_PRESETS.find((z) => z.unit === "in" && Math.min(z.short, z.long) === Math.min(page.trimW, page.trimH) && Math.max(z.short, z.long) === Math.max(page.trimW, page.trimH));
   const structure: BookStep[] = scenes.flatMap((s, i): BookStep[] => [
     {
-      kind: "step", id: `scene-${s.id}`, module: "custom", layoutId: "guided-page", cadence: { type: "copies", count: 1 },
+      kind: "step", id: `scene-${s.id}`, module: "custom", layoutId: sceneLayoutId(b), cadence: { type: "copies", count: 1 },
       title: `Scene ${i + 1}: ${s.title}`, promptSet: { blocks: pageBlocks(b, s) },
     },
     // Each picture on its own sheet: the back stays blank (a one-page preview of a scene has no back).

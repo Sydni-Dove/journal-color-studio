@@ -4,6 +4,7 @@
  * Every change is saved as it happens (this device). The finished pages are drawn by Product Studio's own page
  * renderer from one assembled book, so the page previews, the book preview and the print file are the same pages.
  */
+import { BUBBLE_FONT } from "../../layouts/book/coloringLettering";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { bookFromCoverBrief, bookTitle, newBook, type BookStepId, type ColoringBook } from "../../engines/coloringBook/book";
 import { assembleCover, assembleInterior } from "../../engines/coloringBook/assembleBook";
@@ -106,7 +107,7 @@ function BookFlow({ initial, store, onBack, onExport, onLibrary }: { initial: Co
   };
 
   const interior = useMemo(() => resolveDocument(assembleInterior(book)), [book]);
-  const fontsReady = useFontLoader(interior.typography.fonts, [book.brief.pageTypography.titleFont, book.brief.pageTypography.scriptureFont]);
+  const fontsReady = useFontLoader(interior.typography.fonts, [book.brief.pageTypography.titleFont, book.brief.pageTypography.scriptureFont, BUBBLE_FONT]);
   const issues = useMemo(() => whatsMissing(book, (fontsReady && createCanvasMeasurer()) || heuristicMeasurer), [book, fontsReady]);
   const props = { book, update, setBrief, setScene, say, copy, go, interior };
   const blocking = issues.filter((i) => i.severity === "blocking").length;

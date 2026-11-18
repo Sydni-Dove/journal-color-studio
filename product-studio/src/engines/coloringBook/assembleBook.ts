@@ -10,7 +10,7 @@
  * The cover is its own file (printers take the cover and the interior separately): `assembleCover`.
  */
 import { BINDING_TYPE } from "../cover/guides";
-import { COLORING_INK, bookTypography, illustrationPlacement, pageBlocks, pageCanvas, pageContentOf } from "../cover/assemble";
+import { COLORING_INK, sceneLayoutId, bookTypography, illustrationPlacement, pageBlocks, pageCanvas, pageContentOf } from "../cover/assemble";
 import { createProject } from "../../presets/products/projectFactory";
 import { step } from "../../presets/bookRecipes";
 import { CUSTOM_SIZE_ID, SIZE_PRESETS } from "../../presets/sizes/sizePresets";
@@ -37,7 +37,7 @@ export function briefFor(book: ColoringBook): CoverBrief {
   };
 }
 
-const page = (id: string, title: string, blocks: PromptBlock[]): BookStep => ({ kind: "step", id, module: "custom", layoutId: "guided-page", cadence: { type: "copies", count: 1 }, title, promptSet: { blocks } });
+const page = (id: string, title: string, blocks: PromptBlock[], layoutId = "guided-page"): BookStep => ({ kind: "step", id, module: "custom", layoutId, cadence: { type: "copies", count: 1 }, title, promptSet: { blocks } });
 const blank = (id: string, title: string) => page(id, title, []);
 
 /** Every Bible reference printed in the book (pages that show Scripture). */
@@ -116,7 +116,7 @@ export function bookStructure(book: ColoringBook): BookStep[] {
     if (single) out.push(blank("front-belongs-back", "Back of “This book belongs to” (blank)"));
   }
   b.scenes.forEach((s, i) => {
-    out.push(page(`scene-${s.id}`, `Scene ${i + 1}: ${s.pageTitle ?? s.title}`, pageBlocks(b, s)));
+    out.push(page(`scene-${s.id}`, `Scene ${i + 1}: ${s.pageTitle ?? s.title}`, pageBlocks(b, s), sceneLayoutId(b)));
     if (single) out.push(blank(`back-${s.id}`, `Back of scene ${i + 1} (blank)`));
   });
   for (let i = 0; i < book.drawingPages; i++) {

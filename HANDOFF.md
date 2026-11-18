@@ -53,10 +53,27 @@ image upload; "design styles", not "recipes"). **10 Research and develop content
 **11 Requirements Assistant** — reserved. Technical improvements (any time, not blocking a phase): self-hosted
 fonts (see Testing).
 
+## Bubble letters to color (2026-11-18, branch `claude/review-toolbar-and-coloring`)
+
+- Coloring Book → Interior Pages → "Title and verse style" offers "Elegant fonts" (as before) or "Bubble letters to color", stored in `pageTypography.letterStyle: "bubble"`. Bubble pages use the layout `coloring-lettering` (layouts/book/coloringLettering.ts), built to match Sydni's Brave Ballerinas sample:
+  - Everything sits at the bottom under the picture: the title, then the verse, then the reference.
+  - Title: Fredoka 700 at 64 pt, made smaller only if it doesn't fit, with an outlined heart each side.
+  - Verse: the same outlined letters, 28 pt by default (`bubbleVersePt`, 22–36), centred on 2–4 lines. If it would run past four lines it drops in steps to 18 pt, then shows a note to use a short excerpt.
+  - Reference: alone, with no dash and no "(KJV)", with a short line each side ending in a small outlined heart.
+  - Burst strokes sit beside the verse, three short lines each side.
+  - The picture area ends 0.18" below the top of the title, so the art tucks slightly behind it.
+  - Black outlines only. Outlined text is `TextNode.outline` (white letters, black stroke via `-webkit-text-stroke` + `paint-order`). Hearts are `TextNode.glyph: "heart"`, drawn as an SVG path.
+- Words on the page, per scene: "Full verse" or "Short excerpt" (`verseUse`, `verseExcerpt`), KJV only.
+  - The excerpt must be the verse's own words in order (`excerptFromVerse`); otherwise What's Missing blocks printing.
+  - A book in another translation prints its full approved wording and shows a warning saying so.
+  - Excerpts work in the elegant style too.
+- The Editor loads Fredoka for these pages, and the coloring studios always load it.
+
 ## Online saving outage (2026-11-18) and the fix (branch `claude/review-toolbar-and-coloring`)
 
 - **What happened:** from about 13:07 UTC, the Supabase API (PostgREST) killed a request about once a minute for running too long ("Thread killed by timeout manager"). By about 13:15 UTC (8:15 AM Eastern) the database stopped answering. Every table returned 504 or 522, the Dove journal app's tables too, and sign-ins failed. `select 1` from the Supabase tools also timed out.
-- **Cause:** `useItemsSync` ran a full sync every minute in every open tab, including background tabs. Each sync downloaded every Cover Studio and Coloring Book item with its whole `data` (`select kind,id,name,updated_at,data,deleted_at`). Three preview tabs (4od3is4gx, m7kq263c4, m9yc0axz8) did this every minute. Timeouts started the evening online saving went live and grew as books grew.
+- **Cause, corrected after the restart:** the saved data is tiny (1 coloring book of about 2 KB, 29 projects of about 104 KB in total, no pictures), so Product Studio's downloads were not what overloaded the database. Postgres logged no error: it went silent after 13:17 UTC until the restart at 15:47. The cause isn't visible in the logs; it may have been on Supabase's side. The Supabase dashboard's Reports (CPU, memory) for 13:00–13:20 UTC are the place to look. The app changes below still stand, since they make routine checks smaller and the error messages plainer.
+- **First reading (superseded):** `useItemsSync` ran a full sync every minute in every open tab, including background tabs. Each sync downloaded every Cover Studio and Coloring Book item with its whole `data` (`select kind,id,name,updated_at,data,deleted_at`). Three preview tabs (4od3is4gx, m7kq263c4, m9yc0axz8) did this every minute. Timeouts started the evening online saving went live and grew as books grew.
 - **Fix in the app:**
   - `ItemsBackend.list()` now reads names and versions only. `syncItems` fetches an item's data (`get`) only when it changed online, is new on this device, or was deleted online while kept here.
   - Routine checks run every 5 minutes, only in a visible tab, and back off to 10, 20, then 30 minutes after failures (`nextWaitMs`). Coming back to a tab checks at most once a minute.

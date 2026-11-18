@@ -89,7 +89,7 @@ export function TextBlock({ node, typography }: { node: TextNode; typography: Ty
     textAlign: align,
     fontFamily: node.family ? fontStack(node.family) : role.family ? fontStack(role.family) : `var(--f-${role.group})`,
     fontSize: `${node.fit?.sizePt ?? role.sizePt}pt`,
-    fontWeight: role.weight,
+    fontWeight: node.weight ?? role.weight,
     fontStyle: role.style,
     letterSpacing: `${node.fit?.trackingEm ?? role.trackingEm}em`,
     lineHeight: node.fit?.lineHeight ?? role.lineHeight,
@@ -97,7 +97,20 @@ export function TextBlock({ node, typography }: { node: TextNode; typography: Ty
     fontVariant: role.transform === "small-caps" ? "small-caps" : undefined,
     color: colorVar(node.color ?? role.color),
     whiteSpace: node.wrap && !node.fit ? "normal" : "nowrap",
+    // Bubble lettering: white letters with a black outline drawn outside them, ready to color.
+    ...(node.outline
+      ? { color: "#ffffff", WebkitTextStroke: `${Math.max(1, (node.fit?.sizePt ?? role.sizePt) * 0.05) * 2}pt #000000`, paintOrder: "stroke fill" }
+      : {}),
   };
+  if (node.glyph === "heart") {
+    // An outlined heart, white inside, to color.
+    const { x, y, w, h } = node.rect;
+    return (
+      <svg className="ps-text" data-node={node.id} data-glyph="heart" style={{ position: "absolute", left: `${x}in`, top: `${y}in`, width: `${w}in`, height: `${h}in`, overflow: "visible" }} viewBox="0 0 24 22" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+        <path d="M12 20.5C6.2 16.2 1.5 12.4 1.5 7.4 1.5 4.2 4 1.5 7.1 1.5c2 0 3.8 1 4.9 2.7 1.1-1.7 2.9-2.7 4.9-2.7 3.1 0 5.6 2.7 5.6 5.9 0 5-4.7 8.8-10.5 13.1z" fill="#ffffff" stroke="#000000" strokeWidth={1.6} strokeLinejoin="round" />
+      </svg>
+    );
+  }
   return (
     <div className="ps-text" style={style} data-node={node.id} data-fit={node.fit ? `${node.fit.sizePt}pt×${node.fit.lines.length}` : undefined}>
       {node.fit?.failed ? (

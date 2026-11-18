@@ -4,6 +4,7 @@
  * (paste or import, split, edit, per-scene overrides), page layout with a live space estimate, per-scene review,
  * suggested-direction cards, and comparing the finished cover with the interior references.
  */
+import { BUBBLE_FONT } from "../../layouts/book/coloringLettering";
 import { useMemo, useRef, useState, type ChangeEvent } from "react";
 import type { CastMember, Complexity, CoverBrief, LineThickness, PageOutput, Scene } from "../../engines/cover/brief";
 import {
@@ -656,7 +657,7 @@ export function IllustrationCheck({ brief, scene, index, cast, setScene, onNext,
 export function AssembledPreview({ brief, scene, withText, showSafe }: { brief: CoverBrief; scene: Scene; withText: boolean; showSafe: boolean }) {
   const asset: ArtworkAsset | null = scene.illustrationId ? { id: scene.illustrationId, name: scene.illustrationName ?? "", mime: "image/png", widthPx: scene.illustrationW ?? 1, heightPx: scene.illustrationH ?? 1, hasAlpha: false, bytes: 0, addedAt: "" } : null;
   const doc = useMemo(() => resolveDocument(assembleColoringBook(brief, [scene], asset ? [asset] : [])), [brief, scene]);
-  useFontLoader(doc.typography.fonts, [brief.pageTypography.titleFont, brief.pageTypography.scriptureFont]);
+  useFontLoader(doc.typography.fonts, [brief.pageTypography.titleFont, brief.pageTypography.scriptureFont, BUBBLE_FONT]);
   const index = doc.recipe.pages.findIndex((p) => !p.filler);
   const g = geometryFor(doc, doc.recipe.pages[index], index);
   const texts = solvePage(doc, index).nodes.filter((n) => n.type === "text") as { rect: { x: number; y: number; w: number; h: number } }[];

@@ -13,7 +13,8 @@ import { briefFor } from "../../engines/coloringBook/assembleBook";
 import type { MissingIssue } from "../../engines/coloringBook/missing";
 import { extractDocumentText } from "../../engines/import/documentText";
 import { launchChatGpt } from "../../engines/cover/launch";
-import { BOOK_TEXT_SIZES, bookTextPt, pageCanvas } from "../../engines/cover/assemble";
+import { BOOK_TEXT_SIZES, bookTextPt, excerptFromVerse, pageCanvas } from "../../engines/cover/assemble";
+import { BUBBLE_VERSE_PT } from "../../layouts/book/coloringLettering";
 import { newId } from "../../presets/products/projectFactory";
 import { Check } from "../editor/ui";
 import { CHECKS, IllustrationCheck, LineSample, ReferenceFiles, Regenerate } from "../cover/ColoringPanels";
@@ -69,16 +70,35 @@ function ColoringSettings({ book, setBrief, update }: StepProps) {
         <Select label="Line-art style" value={b.illustrationStyle} options={[...ILLUSTRATION_STYLES]} onChange={(illustrationStyle) => setBrief({ illustrationStyle })} />
         <Select label="Character proportions" value={b.proportions} options={[...PROPORTIONS]} onChange={(proportions) => setBrief({ proportions })} />
         <Select label="Age range" value={b.ageGroup} options={["Ages 2–4", "Ages 4–8", "Ages 8–12", "Teens", "Adults", "All ages"]} onChange={(ageGroup) => setBrief({ ageGroup })} />
-        <Select label="Where the page text goes" value={b.textPlacement} options={TEXT_PLACEMENTS.filter((t) => t.value !== "none").map((t) => t.value)} labels={Object.fromEntries(TEXT_PLACEMENTS.map((t) => [t.value, t.label.replace("verse", "verse and other text")]))} onChange={(v) => setBrief({ textPlacement: v as typeof b.textPlacement })} />
-        <Select label="Title font" value={b.pageTypography.titleFont} options={FONT_CHOICES} onChange={(titleFont) => setBrief({ pageTypography: { ...b.pageTypography, titleFont } })} />
-        <Select label="Verse and text font" value={b.pageTypography.scriptureFont} options={FONT_CHOICES} onChange={(scriptureFont) => setBrief({ pageTypography: { ...b.pageTypography, scriptureFont } })} />
         <Select
-          label="Verse and text size"
-          value={String(bookTextPt(b))}
-          options={BOOK_TEXT_SIZES.map(String)}
-          labels={Object.fromEntries(BOOK_TEXT_SIZES.map((n) => [String(n), `${n} pt${n === 13 ? " (standard)" : ""}`]))}
-          onChange={(v) => setBrief({ pageTypography: { ...b.pageTypography, textSizePt: Number(v) } })}
+          label="Title and verse style"
+          value={b.pageTypography.letterStyle ?? "elegant"}
+          options={["elegant", "bubble"]}
+          labels={{ elegant: "Elegant fonts", bubble: "Bubble letters to color (title, verse and reference at the bottom)" }}
+          onChange={(v) => setBrief({ pageTypography: { ...b.pageTypography, letterStyle: v === "bubble" ? "bubble" : undefined } })}
         />
+        {b.pageTypography.letterStyle === "bubble" ? (
+          <Select
+            label="Verse letter size"
+            value={String(b.pageTypography.bubbleVersePt ?? BUBBLE_VERSE_PT)}
+            options={["22", "24", "26", "28", "32", "36"]}
+            labels={Object.fromEntries(["22", "24", "26", "28", "32", "36"].map((n) => [n, `${n} pt${Number(n) === BUBBLE_VERSE_PT ? " (standard)" : ""}`]))}
+            onChange={(v) => setBrief({ pageTypography: { ...b.pageTypography, bubbleVersePt: Number(v) } })}
+          />
+        ) : (
+          <>
+            <Select label="Where the page text goes" value={b.textPlacement} options={TEXT_PLACEMENTS.filter((t) => t.value !== "none").map((t) => t.value)} labels={Object.fromEntries(TEXT_PLACEMENTS.map((t) => [t.value, t.label.replace("verse", "verse and other text")]))} onChange={(v) => setBrief({ textPlacement: v as typeof b.textPlacement })} />
+            <Select label="Title font" value={b.pageTypography.titleFont} options={FONT_CHOICES} onChange={(titleFont) => setBrief({ pageTypography: { ...b.pageTypography, titleFont } })} />
+            <Select label="Verse and text font" value={b.pageTypography.scriptureFont} options={FONT_CHOICES} onChange={(scriptureFont) => setBrief({ pageTypography: { ...b.pageTypography, scriptureFont } })} />
+            <Select
+              label="Verse and text size"
+              value={String(bookTextPt(b))}
+              options={BOOK_TEXT_SIZES.map(String)}
+              labels={Object.fromEntries(BOOK_TEXT_SIZES.map((n) => [String(n), `${n} pt${n === 13 ? " (standard)" : ""}`]))}
+              onChange={(v) => setBrief({ pageTypography: { ...b.pageTypography, textSizePt: Number(v) } })}
+            />
+          </>
+        )}
       </div>
       <div className="content-switches">
         <Check label="Keep characters consistent on every page" checked={b.keepConsistent} onChange={(keepConsistent) => setBrief({ keepConsistent })} />
@@ -420,6 +440,27 @@ function ScriptureEditor({ book, scene, set, say }: { book: StepProps["book"]; s
           </div>
           {problem && <p className="hint" role="alert">{problem}</p>}
           <p className="hint">{t.publicDomain ? "Fetched word for word from a public-domain text; still read it before approving." : `Product Studio never writes ${t.id} wording itself. Copy it from your Bible or the publisher's site, check it, then approve. Only approved wording prints.`}</p>
+          {t.id === "KJV" ? (
+            <div className="field" data-testid="verse-use">
+              <span>Words on the page</span>
+              <div className="row" role="group" aria-label="Words on the page">
+                <button type="button" className="btn" aria-pressed={scene.verseUse !== "excerpt"} onClick={() => set({ verseUse: undefined })}>Full verse</button>
+                <button type="button" className="btn" aria-pressed={scene.verseUse === "excerpt"} onClick={() => set({ verseUse: "excerpt" })}>Short excerpt</button>
+              </div>
+              {scene.verseUse === "excerpt" && (
+                <>
+                  <input value={scene.verseExcerpt ?? ""} placeholder="Be strong and of a good courage; be not afraid." onChange={(e) => set({ verseExcerpt: e.target.value || undefined })} aria-label="Short excerpt" data-testid="verse-excerpt" />
+                  <span className="hint" role={scene.verseExcerpt?.trim() && scene.verseText && !excerptFromVerse(scene.verseExcerpt, scene.verseText) ? "alert" : undefined}>
+                    {scene.verseExcerpt?.trim() && scene.verseText && !excerptFromVerse(scene.verseExcerpt, scene.verseText)
+                      ? "Use the verse's own words, in order: this excerpt has words that aren't in the KJV wording above."
+                      : "Type the part of the verse to print, in its own words (the reference stays the same). Only the KJV can be shortened."}
+                  </span>
+                </>
+              )}
+            </div>
+          ) : (
+            <p className="hint">Short excerpts are offered for the KJV only; other translations print their full approved wording.</p>
+          )}
         </>
       )}
     </div>

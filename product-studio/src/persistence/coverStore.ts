@@ -179,6 +179,8 @@ function normalizeTypography(raw: unknown, d: CoverBrief["pageTypography"]): Cov
     titleFont: text(r.titleFont, d.titleFont), scriptureFont: text(r.scriptureFont, d.scriptureFont),
     align: r.align === "left" || r.align === "right" ? r.align : "center", titleSizePt: Math.max(10, Math.min(72, numOr(r.titleSizePt, d.titleSizePt))),
     ...(typeof r.textSizePt === "number" && Number.isFinite(r.textSizePt) ? { textSizePt: Math.max(8, Math.min(36, r.textSizePt)) } : {}),
+    ...(r.letterStyle === "bubble" ? { letterStyle: "bubble" as const } : {}),
+    ...(typeof r.bubbleVersePt === "number" && Number.isFinite(r.bubbleVersePt) ? { bubbleVersePt: Math.max(16, Math.min(48, r.bubbleVersePt)) } : {}),
   };
 }
 
@@ -213,7 +215,8 @@ function normalizeColoring(r: Record<string, unknown>, d: CoverBrief): Partial<C
       ...(THICK.includes(c.lineThickness as never) ? { lineThickness: c.lineThickness as (typeof THICK)[number] } : {}),
       ...(COMPLEX.includes(c.complexity as never) ? { complexity: c.complexity as (typeof COMPLEX)[number] } : {}),
       ...(OUTPUTS.includes(c.output as never) ? { output: c.output as (typeof OUTPUTS)[number] } : {}),
-      ...Object.fromEntries((["pageTitle", "scriptureRef", "verseText", "lessonText", "illustrationId", "illustrationName", "approvedAt", "rejectNotes", "customText", "verseApproved", "suggestedRef", "characters", "actions", "styleNotes"] as const).flatMap((k) => (optText(c[k]) ? [[k, c[k]]] : []))),
+      ...Object.fromEntries((["pageTitle", "scriptureRef", "verseText", "lessonText", "illustrationId", "illustrationName", "approvedAt", "rejectNotes", "customText", "verseApproved", "suggestedRef", "characters", "actions", "styleNotes", "verseExcerpt"] as const).flatMap((k) => (optText(c[k]) ? [[k, c[k]]] : []))),
+      ...(c.verseUse === "excerpt" ? { verseUse: "excerpt" as const } : {}),
       ...(Number(c.illustrationW) > 0 && Number(c.illustrationH) > 0 ? { illustrationW: Number(c.illustrationW), illustrationH: Number(c.illustrationH) } : {}),
       ...(c.scriptureMode === "art" || c.scriptureMode === "page" ? { scriptureMode: c.scriptureMode as "art" | "page" } : {}),
       ...(c.verseSource === "customer" || c.verseSource === "public-domain" ? { verseSource: c.verseSource as "customer" | "public-domain" } : {}),

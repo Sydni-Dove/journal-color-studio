@@ -1,4 +1,5 @@
 import { LUXE_TITLE_FONT } from "../../presets/coverLuxe";
+import { BUBBLE_FONT } from "../../layouts/book/coloringLettering";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { PanelResizer, usePanelWidth } from "./PanelResizer";
 import { compositionFor, contentGeometryFor, geometryFor, resolveDocument, solvePage, type ResolvedDocument } from "../../engines/document/resolve";
@@ -87,7 +88,13 @@ export function Editor({ project, onChange, onBack, saveStatus, cloudLabel, star
   const ownFonts = useMemo(() => {
     const out = new Set<string>([LUXE_TITLE_FONT]);
     if (project.layoutOptions.writingTitle?.font) out.add(project.layoutOptions.writingTitle.font);
-    const walk = (ns: BookNode[]) => ns.forEach((n) => (n.kind === "group" ? walk(n.children) : n.promptSet?.blocks.forEach((b) => b.headingFont && out.add(b.headingFont))));
+    const walk = (ns: BookNode[]) =>
+      ns.forEach((n) => {
+        if (n.kind === "group") return walk(n.children);
+        // A coloring page in bubble letters draws its words in the bubble font.
+        if (n.layoutId === "coloring-lettering") out.add(BUBBLE_FONT);
+        n.promptSet?.blocks.forEach((b) => b.headingFont && out.add(b.headingFont));
+      });
     walk(project.recipe.structure ?? []);
     for (const d of project.pageDesigns ?? []) d.promptSet.blocks.forEach((b) => b.headingFont && out.add(b.headingFont));
     return [...out];

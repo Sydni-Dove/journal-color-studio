@@ -75,6 +75,12 @@ export type TextNode = NodeBase & {
   color?: ColorToken;
   /** Its own font family (otherwise its role's). */
   family?: string;
+  /** Its own font weight (otherwise its role's). */
+  weight?: number;
+  /** Drawn as black outlines with white inside (bubble lettering to color). */
+  outline?: boolean;
+  /** Drawn as a shape instead of its text: an outlined heart filling its box. */
+  glyph?: "heart";
   /** Semantic element this text is (user-positionable page titles, headings, footer). */
   semantic?: SemanticTextKey;
   /** Where a semantic element was placed, and the layout's default for it. */
