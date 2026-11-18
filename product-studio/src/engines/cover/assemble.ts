@@ -15,7 +15,6 @@
  */
 import { artworkFor, pictureAreaOf, resolveDocument, geometryFor } from "../document/resolve";
 import { effectivePpi } from "../artwork/place";
-import { BUBBLE_VERSE_PT } from "../../layouts/book/coloringLettering";
 import { BINDING_TYPE } from "./guides";
 import { resolveCoverSpec } from "./spec";
 import { createProject } from "../../presets/products/projectFactory";
@@ -158,10 +157,13 @@ function bookPageBlocks(b: CoverBrief, s: Scene, c: NonNullable<ReturnType<typeo
     const ref = (s.scriptureRef ?? "").trim();
     const lettered = (s.scriptureMode ?? b.scriptureMode) === "art" || c.scripture === "none" || !ref;
     const words = !lettered && c.scripture === "full" ? verseWords(b, s) : "";
+    const t = b.pageTypography;
     return [
       art,
-      ...(c.title && titleText ? [{ id: "title", kind: "heading", label: titleText, textStyle: "title" } as PromptBlock] : []),
-      ...(words ? [{ id: "verse", kind: "heading", label: words, textStyle: "body", headingSizePt: b.pageTypography.bubbleVersePt ?? BUBBLE_VERSE_PT } as PromptBlock] : []),
+      ...(c.title && titleText ? [{ id: "title", kind: "heading", label: titleText, textStyle: "title", ...(t.bubbleTitlePt ? { headingSizePt: t.bubbleTitlePt } : {}) } as PromptBlock] : []),
+      ...(words ? [{ id: "verse", kind: "heading", label: words, textStyle: "body", ...(t.bubbleVersePt ? { headingSizePt: t.bubbleVersePt } : {}) } as PromptBlock] : []),
+      // "Move the words up" (inches), read only by the bubble-lettering layout.
+      ...(t.bubbleRaiseIn ? [{ id: "raise", label: "", space: "fixed", weight: t.bubbleRaiseIn } as PromptBlock] : []),
       // The reference alone (KJV and other translations named by abbreviation), no dash.
       ...(!lettered ? [{ id: "ref", kind: "heading", label: b.translation === "KJV" ? ref : `${ref} (${b.translation})`, textStyle: "body" } as PromptBlock] : []),
     ];
@@ -234,7 +236,8 @@ export const isPageCanvas = (b: CoverBrief, w?: number, h?: number) => {
 export function illustrationPlacement(b: CoverBrief, s: Scene): ArtworkPlacement {
   const exact = isPageCanvas(b, s.illustrationW, s.illustrationH);
   return {
-    id: `art-${s.id}`, use: "background", assetId: s.illustrationId!, targets: [{ item: `scene-${s.id}` }], fit: "fit", crop: { x: 0.5, y: 0.5, zoom: 1 }, opacity: 1,
+    // Bubble letters: a fitted picture sits at the bottom of its area, right against the words (no gap between them).
+    id: `art-${s.id}`, use: "background", assetId: s.illustrationId!, targets: [{ item: `scene-${s.id}` }], fit: "fit", crop: { x: 0.5, y: b.pageTypography.letterStyle === "bubble" ? 1 : 0.5, zoom: 1 }, opacity: 1,
     extent: exact ? "bleed" : "region", ...(exact ? {} : { region: artRegion(b, s).rect }),
   };
 }

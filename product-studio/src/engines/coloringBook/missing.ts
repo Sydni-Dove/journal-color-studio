@@ -158,15 +158,24 @@ export function whatsMissing(book: ColoringBook, measure: TextMeasurer = heurist
         const where = `Scene ${k + 1}`;
         let worst: { want: number; got: number; what: string } | null = null;
         let clipped = false;
+        // Bubble letters size themselves to the page (Auto, or the maker's size); only words that still spill over count.
+        const bubble = b.pageTypography.letterStyle === "bubble";
         for (const node of solved.nodes) {
-          if (node.type !== "text" || !node.fit) continue;
+          // Hearts and other drawn shapes aren't words.
+          if (node.type !== "text" || !node.fit || node.glyph) continue;
+          if (bubble) {
+            if (node.fit.lines.length * node.fit.sizePt * node.fit.lineHeight / 72 > node.rect.h + 0.02) clipped = true;
+            continue;
+          }
           const isTitle = /-title-title$/.test(node.id);
           const want = isTitle ? b.pageTypography.titleSizePt : bookTextPt(b);
-          const got = node.fit.sizePt;
+          const got = Math.round(node.fit.sizePt * 10) / 10;
           const what = isTitle ? "title" : /-verse-/.test(node.id) ? "verse" : /-lesson-/.test(node.id) ? "lesson" : "text";
           if (got < want - 0.25 && (!worst || got / want < worst.got / worst.want)) worst = { want, got, what };
           if (node.fit.lines.length * node.fit.sizePt * node.fit.lineHeight / 72 > node.rect.h + 0.02) clipped = true;
         }
+        // The bubble layout's own notes (a verse too long for four lines, little room left for the picture).
+        if (bubble) for (const d of solved.diagnostics.filter((x) => x.componentId.startsWith("cl-"))) push({ id: `${d.componentId}-${sc.id}`, severity: "warning", title: `${where}: ${d.componentId === "cl-verse" ? "the verse is long for bubble letters" : "the lettering is large for the page"}`, detail: d.message, step: "pages", sceneId: sc.id, where });
         if (clipped || (worst && worst.got < MIN_READABLE_PT)) {
           push({ id: `fit-${sc.id}`, severity: "blocking", title: `${where}: the text doesn't fit`, detail: `${worst ? `The ${worst.what} would have to shrink to ${worst.got} pt to fit (it's set at ${worst.want} pt; under ${MIN_READABLE_PT} pt is too small to read). ` : ""}Shorten it, show less on this page (for example the reference instead of the full verse), or move the text above the picture.`, step: "pages", sceneId: sc.id, where });
         } else if (worst) {

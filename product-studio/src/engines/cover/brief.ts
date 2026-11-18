@@ -120,8 +120,11 @@ export type PageTypography = {
    * to color, at the bottom under the picture, with hearts and bursts — layouts/book/coloringLettering.ts).
    */
   letterStyle?: "elegant" | "bubble";
-  /** Bubble letters: the verse size (absent = 28 pt). */
+  /** Bubble letters: the title and verse sizes (absent = Auto: they fill about the bottom quarter of the page). */
+  bubbleTitlePt?: number;
   bubbleVersePt?: number;
+  /** Bubble letters: how far the words sit up from the bottom, closer to the picture (inches; absent = 0). */
+  bubbleRaiseIn?: number;
 };
 
 export type CoverBrief = {

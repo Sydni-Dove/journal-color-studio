@@ -20,9 +20,14 @@ import { minimumAreaFit, type LayoutContext, type LayoutDefinition } from "../sh
 /** The lettering's font: chunky, rounded, easy to color inside. */
 export const BUBBLE_FONT = "Fredoka";
 const WEIGHT = 700;
-/** Sizes a new bubble-lettered page starts with (points). */
+/** Sizes a page uses when the maker sets one; "Auto" (the default) makes the lettering fill about the bottom quarter. */
 export const BUBBLE_TITLE_PT = 64;
 export const BUBBLE_VERSE_PT = 28;
+/** Auto: the largest sizes up to these, with the title within ~11% and the verse within ~15% of the page height. */
+const AUTO_TITLE_MAX_PT = 110, AUTO_TITLE_SHARE = 0.11;
+const AUTO_VERSE_MAX_PT = 54, AUTO_VERSE_SHARE = 0.15;
+/** "Move the words up": at most this far (inches). */
+export const MAX_RAISE_IN = 2;
 /** The verse never goes below this to fit; longer verses get a note to use a short excerpt. */
 const MIN_VERSE_PT = 18;
 const MAX_VERSE_LINES = 4;
@@ -32,7 +37,7 @@ const LINE_HEIGHT = 1.08;
 /** Outline weight the strokes share with the letters (points). */
 const STROKE_PT = 1.6;
 
-type Words = { title: string; verse: string; ref: string; titlePt: number; versePt: number };
+type Words = { title: string; verse: string; ref: string; titlePt?: number; versePt?: number; raiseIn: number };
 
 function wordsOf(ctx: LayoutContext): Words {
   const blocks = ctx.module?.promptSet?.blocks ?? [];
@@ -41,8 +46,11 @@ function wordsOf(ctx: LayoutContext): Words {
     title: get("title")?.label.trim() ?? "",
     verse: get("verse")?.label.trim() ?? "",
     ref: get("ref")?.label.trim() ?? "",
-    titlePt: get("title")?.headingSizePt ?? BUBBLE_TITLE_PT,
-    versePt: get("verse")?.headingSizePt ?? BUBBLE_VERSE_PT,
+    // A size set by the maker, or none (Auto).
+    titlePt: get("title")?.headingSizePt,
+    versePt: get("verse")?.headingSizePt,
+    // "Move the words up" travels on a block of its own (its weight, in inches).
+    raiseIn: Math.max(0, Math.min(MAX_RAISE_IN, get("raise")?.weight ?? 0)),
   };
 }
 
@@ -99,10 +107,22 @@ export function solveColoringLettering(ctx: LayoutContext): SolvedPage {
   const diagnostics = [...frame.diagnostics];
   const gap = 0.08;
   const cx = body.x + body.w / 2;
-  let bottom = body.y + body.h;
+  // "Move the words up": the lettering sits that much higher, closer to the picture.
+  let bottom = body.y + body.h - w.raiseIn;
+
+  // Verse size: the maker's, or Auto — the largest (up to AUTO_VERSE_MAX_PT) on at most four lines within ~15% of the page.
+  const burstRoom = 0.55;
+  const verseW = body.w - 2 * burstRoom;
+  let versePt = w.versePt ?? AUTO_VERSE_MAX_PT;
+  let verseLines = w.verse ? wrap(ctx, w.verse, verseW, versePt) : [];
+  const verseFits = (pt: number, lines: string[]) => lines.length <= MAX_VERSE_LINES && (w.versePt !== undefined || lineH(pt, lines.length) <= body.h * AUTO_VERSE_SHARE);
+  while (w.verse && !verseFits(versePt, verseLines) && versePt > MIN_VERSE_PT) {
+    versePt = Math.max(MIN_VERSE_PT, versePt - 2);
+    verseLines = wrap(ctx, w.verse, verseW, versePt);
+  }
 
   // Reference: one line at the very bottom, a short line each side ending in a small heart.
-  const refPt = Math.max(13, Math.round(w.versePt * 0.55));
+  const refPt = Math.min(22, Math.max(13, Math.round(versePt * 0.45)));
   if (w.ref) {
     const h = lineH(refPt);
     const y = bottom - h;
@@ -118,16 +138,9 @@ export function solveColoringLettering(ctx: LayoutContext): SolvedPage {
     bottom = y - gap;
   }
 
-  // Verse: outlined, centred, 2–4 lines (smaller until it fits four lines, never under MIN_VERSE_PT).
-  const burstRoom = 0.55;
-  const verseW = body.w - 2 * burstRoom;
+  // Verse: outlined, centred, on at most four lines (never under MIN_VERSE_PT).
   if (w.verse) {
-    let pt = w.versePt;
-    let lines = wrap(ctx, w.verse, verseW, pt);
-    while (lines.length > MAX_VERSE_LINES && pt > MIN_VERSE_PT) {
-      pt = Math.max(MIN_VERSE_PT, pt - 2);
-      lines = wrap(ctx, w.verse, verseW, pt);
-    }
+    const pt = versePt, lines = verseLines;
     if (lines.length > MAX_VERSE_LINES) diagnostics.push({ severity: "warning", rule: "min-writing-area", componentId: "cl-verse", message: `This verse is long for bubble letters (${lines.length} lines at ${pt} pt). Choose “Short excerpt” and type the part to show.` });
     const h = lineH(pt, lines.length);
     const y = bottom - h;
@@ -141,15 +154,32 @@ export function solveColoringLettering(ctx: LayoutContext): SolvedPage {
   // Title: one line, as large as fits beside its two hearts.
   let titleTop = bottom;
   if (w.title) {
-    const heartPt = Math.round(w.titlePt * 0.45);
-    const room = body.w - 2 * ((heartPt * 1.1) / 72 + 0.2);
-    let pt = w.titlePt;
-    while (pt > 24 && m(w.title, style(ctx, pt)) > room) pt -= 2;
-    const h = lineH(pt);
+    // The maker's size, or Auto: the largest (up to AUTO_TITLE_MAX_PT) within ~11% of the page; never wider than the page.
+    let pt = w.titlePt ?? Math.min(AUTO_TITLE_MAX_PT, Math.floor((body.h * AUTO_TITLE_SHARE * 72) / LINE_HEIGHT));
+    const heartAt = (p: number) => Math.min(36, Math.round(p * 0.4));
+    const roomAt = (p: number) => body.w - 2 * ((heartAt(p) * 0.9) / 72 + 0.25);
+    while (pt > 24 && m(w.title, style(ctx, pt)) > roomAt(pt)) pt -= 2;
+    // Auto, a long title: on two balanced lines when that lets it stay bigger than the verse.
+    let titleLines = [w.title];
+    const words = w.title.split(/\s+/);
+    if (w.titlePt === undefined && words.length > 1 && pt < versePt * 1.3) {
+      const splits = words.slice(1).map((_, k) => [words.slice(0, k + 1).join(" "), words.slice(k + 1).join(" ")]);
+      const widest = (ls: string[], p: number) => Math.max(...ls.map((l) => m(l, style(ctx, p))));
+      const best = splits.sort((x, y) => widest(x, 40) - widest(y, 40))[0];
+      let p2 = Math.min(AUTO_TITLE_MAX_PT, Math.floor((body.h * AUTO_TITLE_SHARE * 1.6 * 72) / (LINE_HEIGHT * 2)));
+      while (p2 > 24 && widest(best, p2) > roomAt(p2)) p2 -= 2;
+      if (p2 > pt) {
+        pt = p2;
+        titleLines = best;
+      }
+    }
+    const heartPt = heartAt(pt);
+    const room = roomAt(pt);
+    const h = lineH(pt, titleLines.length);
     const y = bottom - h;
-    const tw = Math.min(room, m(w.title, style(ctx, pt)) + 0.1);
-    nodes.push(lettering("cl-title-title", { x: cx - tw / 2, y, w: tw, h }, w.title, [w.title], pt, true));
-    for (const side of [-1, 1] as const) nodes.push(heart(`cl-title-heart-${side < 0 ? "l" : "r"}`, cx + side * (tw / 2 + (heartPt * 0.6) / 72 + 0.08), y + h / 2, heartPt));
+    const tw = Math.min(room, Math.max(...titleLines.map((l) => m(l, style(ctx, pt)))) + 0.1);
+    nodes.push(lettering("cl-title-title", { x: cx - tw / 2, y, w: tw, h }, w.title, titleLines, pt, true));
+    for (const side of [-1, 1] as const) nodes.push(heart(`cl-title-heart-${side < 0 ? "l" : "r"}`, cx + side * (tw / 2 + (heartPt * 0.45) / 72 + 0.1), y + h / 2, heartPt));
     titleTop = y;
   }
 

@@ -63,6 +63,13 @@ fonts (see Testing).
   - Burst strokes sit beside the verse, three short lines each side.
   - The picture area ends 0.18" below the top of the title, so the art tucks slightly behind it.
   - Black outlines only. Outlined text is `TextNode.outline` (white letters, black stroke via `-webkit-text-stroke` + `paint-order`). Hearts are `TextNode.glyph: "heart"`, drawn as an SVG path.
+- Feedback round 1 (Gracious Ballerinas, Psalm 56:3):
+  - **Auto sizes by default:** the title is the largest that fits, up to 110 pt within ~11% of the page; a long title wraps onto two balanced lines rather than shrinking below the verse. The verse is the largest up to 54 pt, on at most 4 lines within ~15%. Together the lettering takes about the bottom quarter.
+  - **Size and position controls:** "Title letter size" and "Verse letter size" (Auto or a fixed size), and "Move the words up, closer to the picture" (0–2 in, `bubbleRaiseIn`, sent to the layout as a `raise` block's weight).
+  - **No gap above the words:** a fitted picture now sits at the bottom of its area (crop.y = 1).
+  - **"Doesn't fit" bug fixed:** What's Missing reported the 11.7 pt outlined hearts as shrunk text. It now skips drawn shapes, checks bubble pages for spill-over only, passes on the layout's own notes, and rounds sizes.
+  - **Reference box fixed:** it now resets per scene (`key={scene.id}` on PageEditor and ScriptureEditor).
+  - Fredoka `avgCharEm` corrected to 0.5 from a measured title, which puts the title hearts close to the letters.
 - Words on the page, per scene: "Full verse" or "Short excerpt" (`verseUse`, `verseExcerpt`), KJV only.
   - The excerpt must be the verse's own words in order (`excerptFromVerse`); otherwise What's Missing blocks printing.
   - A book in another translation prints its full approved wording and shows a warning saying so.

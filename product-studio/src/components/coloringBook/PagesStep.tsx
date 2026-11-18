@@ -14,7 +14,6 @@ import type { MissingIssue } from "../../engines/coloringBook/missing";
 import { extractDocumentText } from "../../engines/import/documentText";
 import { launchChatGpt } from "../../engines/cover/launch";
 import { BOOK_TEXT_SIZES, bookTextPt, excerptFromVerse, pageCanvas } from "../../engines/cover/assemble";
-import { BUBBLE_VERSE_PT } from "../../layouts/book/coloringLettering";
 import { newId } from "../../presets/products/projectFactory";
 import { Check } from "../editor/ui";
 import { CHECKS, IllustrationCheck, LineSample, ReferenceFiles, Regenerate } from "../cover/ColoringPanels";
@@ -27,7 +26,7 @@ export function PagesStep(props: StepProps & { openScene: string | null; setOpen
   return (
     <section className="cover-step book-step" aria-label="Interior pages">
       {scene ? (
-        <PageEditor {...props} scene={scene} onClose={() => setOpenScene(null)} />
+        <PageEditor key={scene.id} {...props} scene={scene} onClose={() => setOpenScene(null)} />
       ) : (
         <>
           <ColoringSettings {...props} />
@@ -78,13 +77,29 @@ function ColoringSettings({ book, setBrief, update }: StepProps) {
           onChange={(v) => setBrief({ pageTypography: { ...b.pageTypography, letterStyle: v === "bubble" ? "bubble" : undefined } })}
         />
         {b.pageTypography.letterStyle === "bubble" ? (
-          <Select
-            label="Verse letter size"
-            value={String(b.pageTypography.bubbleVersePt ?? BUBBLE_VERSE_PT)}
-            options={["22", "24", "26", "28", "32", "36"]}
-            labels={Object.fromEntries(["22", "24", "26", "28", "32", "36"].map((n) => [n, `${n} pt${Number(n) === BUBBLE_VERSE_PT ? " (standard)" : ""}`]))}
-            onChange={(v) => setBrief({ pageTypography: { ...b.pageTypography, bubbleVersePt: Number(v) } })}
-          />
+          <>
+            <Select
+              label="Title letter size"
+              value={String(b.pageTypography.bubbleTitlePt ?? "auto")}
+              options={["auto", "48", "56", "64", "72", "84", "96", "110"]}
+              labels={{ auto: "Auto (as big as fits)", ...Object.fromEntries(["48", "56", "64", "72", "84", "96", "110"].map((n) => [n, `${n} pt`])) }}
+              onChange={(v) => setBrief({ pageTypography: { ...b.pageTypography, bubbleTitlePt: v === "auto" ? undefined : Number(v) } })}
+            />
+            <Select
+              label="Verse letter size"
+              value={String(b.pageTypography.bubbleVersePt ?? "auto")}
+              options={["auto", "24", "28", "32", "36", "42", "48", "54"]}
+              labels={{ auto: "Auto (as big as fits on 4 lines)", ...Object.fromEntries(["24", "28", "32", "36", "42", "48", "54"].map((n) => [n, `${n} pt`])) }}
+              onChange={(v) => setBrief({ pageTypography: { ...b.pageTypography, bubbleVersePt: v === "auto" ? undefined : Number(v) } })}
+            />
+            <Select
+              label="Move the words up, closer to the picture"
+              value={String(b.pageTypography.bubbleRaiseIn ?? 0)}
+              options={["0", "0.25", "0.5", "0.75", "1", "1.5", "2"]}
+              labels={{ "0": "No — at the bottom of the page", "0.25": "¼ inch", "0.5": "½ inch", "0.75": "¾ inch", "1": "1 inch", "1.5": "1½ inches", "2": "2 inches" }}
+              onChange={(v) => setBrief({ pageTypography: { ...b.pageTypography, bubbleRaiseIn: Number(v) || undefined } })}
+            />
+          </>
         ) : (
           <>
             <Select label="Where the page text goes" value={b.textPlacement} options={TEXT_PLACEMENTS.filter((t) => t.value !== "none").map((t) => t.value)} labels={Object.fromEntries(TEXT_PLACEMENTS.map((t) => [t.value, t.label.replace("verse", "verse and other text")]))} onChange={(v) => setBrief({ textPlacement: v as typeof b.textPlacement })} />
@@ -334,7 +349,7 @@ function PageEditor({ book, scene, setScene, say, copy, interior, issues, onClos
               </div>
               {own && <button type="button" className="btn btn--ghost" onClick={() => set({ content: undefined })}>Use the book's settings on this page</button>}
             </div>
-            {book.faithBased && c.scripture !== "none" && <ScriptureEditor book={book} scene={scene} set={set} say={say} />}
+            {book.faithBased && c.scripture !== "none" && <ScriptureEditor key={scene.id} book={book} scene={scene} set={set} say={say} />}
             {c.lesson && <TextArea label="Lesson or reflection" value={scene.lessonText ?? ""} onChange={(v) => set({ lessonText: v || undefined })} testId="lesson-text" />}
             {c.customText && <TextArea label="Custom text" rows={2} value={scene.customText ?? ""} onChange={(v) => set({ customText: v || undefined })} testId="custom-text" />}
           </div>
