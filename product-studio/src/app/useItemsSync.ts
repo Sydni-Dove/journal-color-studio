@@ -1,8 +1,10 @@
 /**
  * Keeps Cover Studio and Coloring Book online while signed in (persistence/itemsSync.ts): a sync at sign-in and
- * start-up, shortly after every save, when the tab comes back into view (at most once a minute), and every five
- * minutes while the tab is in view — never from a tab in the background. When the server can't be reached, it waits
- * longer each time (up to half an hour) so a struggling server isn't kept busy. Signed out, nothing is
+ * start-up, shortly after every save, right away when the tab comes back into view, and every 3 minutes
+ * (SAVE_CHECK_INTERVAL_MS) while the tab is in view and in use — never from a tab in the background, and not after
+ * 15 minutes with no mouse, keyboard or touch (the next interaction checks and resumes). A routine check lists names
+ * and versions only; a book's data is fetched only when it changed. When the server can't be reached, it waits
+ * 3, 6, 12, then 15 minutes, back to 3 after a success. Signed out, nothing is
  * sent and everything stays on this device. The status is shared, so any screen can say where its work is saved.
  */
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
@@ -36,16 +38,22 @@ export function savedWhere(s: ItemsSyncStatus): string {
 }
 
 const DEBOUNCE_MS = 1500;
-/** A routine check while the tab is in view. */
-export const EVERY_MS = 5 * 60_000;
-/** After failures: wait longer each time, up to this. */
-export const MAX_BACKOFF_MS = 30 * 60_000;
-/** Coming back to the tab checks at most this often. */
-const VISIBLE_MIN_MS = 60_000;
-/** How long until the next routine check after this many failures in a row: 5, 10, 20, then 30 minutes. */
-export const nextWaitMs = (failures: number) => (failures ? Math.min(MAX_BACKOFF_MS, EVERY_MS * 2 ** (failures - 1)) : EVERY_MS);
+/** The routine check while the tab is in view and someone is using it: one light list (names and versions) every 3 minutes. */
+export const SAVE_CHECK_INTERVAL_MS = 180_000;
+/** After failures the wait doubles from the interval, up to this: 3, 6, 12, then 15 minutes. */
+export const MAX_BACKOFF_MS = 15 * 60_000;
+/** Routine checks stop after this long with no mouse, keyboard or touch; the next interaction checks and resumes. */
+export const IDLE_STOP_MS = 15 * 60_000;
+/** How long until the next routine check after this many failures in a row: 3, 3, 6, 12, then 15 minutes. */
+export const nextWaitMs = (failures: number) => (failures ? Math.min(MAX_BACKOFF_MS, SAVE_CHECK_INTERVAL_MS * 2 ** (failures - 1)) : SAVE_CHECK_INTERVAL_MS);
+/** Kept for older imports. */
+export const EVERY_MS = SAVE_CHECK_INTERVAL_MS;
 
-/** Returns a number that changes whenever a sync brought something to this device (screens re-read their lists). */
+/**
+ * Returns a number that changes whenever a sync brought something to this device (screens re-read their lists).
+ * One instance per tab (App), so however many Product Studio screens are open there is one shared check.
+ * A save never waits for the routine check: it starts its own sync (dove-items-changed), as before.
+ */
 export function useItemsSync(userId: string | null, backendFor: (userId: string) => ItemsBackend = supabaseItems): number {
   const [received, setReceived] = useState(0);
   const running = useRef(false);
@@ -61,18 +69,23 @@ export function useItemsSync(userId: string | null, backendFor: (userId: string)
     let stopped = false;
     let failures = 0;
     let last = 0;
-    // The next routine check: five minutes, or longer after failures (doubling, up to half an hour).
+    let lastActivity = Date.now();
+    /** A routine check came due while the tab was hidden or idle: it runs on return / the next interaction. */
+    let waiting = false;
+    const hidden = () => document.visibilityState === "hidden";
+    const idle = () => Date.now() - lastActivity > IDLE_STOP_MS;
+    // The next routine check: 3 minutes, or longer after failures. Hidden or idle: nothing runs until the person is back.
     const schedule = () => {
       window.clearTimeout(next);
       if (stopped) return;
-      const wait = nextWaitMs(failures);
       next = window.setTimeout(() => {
-        if (document.visibilityState === "visible") void run();
-        else schedule();
-      }, wait);
+        if (hidden() || idle()) waiting = true;
+        else void run();
+      }, nextWaitMs(failures));
     };
     const run = async () => {
       if (stopped) return;
+      waiting = false;
       last = Date.now();
       if (running.current) {
         again.current = true;
@@ -100,22 +113,33 @@ export function useItemsSync(userId: string | null, backendFor: (userId: string)
         }
       }
     };
+    // A save: its own sync shortly after, whatever the routine schedule (saving never depends on it).
     const soon = () => {
       window.clearTimeout(timer);
       timer = window.setTimeout(() => void run(), DEBOUNCE_MS);
     };
+    // Back to the tab: one check right away (not twice in a few seconds), then the schedule resumes.
     const visible = () => {
-      if (document.visibilityState === "visible" && Date.now() - last > VISIBLE_MIN_MS && !failures) void run();
+      if (!hidden() && Date.now() - last > 5_000) void run();
     };
+    // Mouse, keyboard or touch: the person is here. After an idle stop, check now and resume.
+    const active = () => {
+      const wasIdle = idle();
+      lastActivity = Date.now();
+      if ((wasIdle || waiting) && !hidden() && !running.current) void run();
+    };
+    const ACTIVITY = ["pointerdown", "pointermove", "keydown", "touchstart", "wheel"] as const;
     void run();
     window.addEventListener("dove-items-changed", soon);
     document.addEventListener("visibilitychange", visible);
+    for (const ev of ACTIVITY) window.addEventListener(ev, active, { passive: true });
     return () => {
       stopped = true;
       window.clearTimeout(timer);
       window.clearTimeout(next);
       window.removeEventListener("dove-items-changed", soon);
       document.removeEventListener("visibilitychange", visible);
+      for (const ev of ACTIVITY) window.removeEventListener(ev, active);
     };
   }, [userId, backendFor]);
   return received;

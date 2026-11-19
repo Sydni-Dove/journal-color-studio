@@ -13,7 +13,7 @@ import { COVER_PALETTES } from "../presets/themes/palettes";
 import { jcsPaletteId } from "../design-library/palettes";
 import { COVER_SCHEMA_VERSION, newBrief, type CoverBrief, type CoverCollection, type CoverItem } from "../engines/cover/brief";
 import { summarizePalette } from "../engines/cover/prompt";
-import { markItemDeleted } from "./itemBases";
+import { announceItemsChanged, markItemDeleted } from "./itemBases";
 
 const PREFIX = "dove-product-studio:v1";
 const INDEX_KEY = `${PREFIX}:cover-index`;
@@ -106,7 +106,7 @@ export function saveDraft(d: CoverDraft): void {
 
 /** Something Cover Studio or Coloring Book saved changed: online saving picks it up (persistence/itemsSync.ts). */
 export function itemsChanged(): void {
-  if (typeof window !== "undefined") window.dispatchEvent(new Event("dove-items-changed"));
+  announceItemsChanged();
 }
 export function clearDraft(): void {
   try {

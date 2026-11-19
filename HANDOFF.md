@@ -53,6 +53,20 @@ image upload; "design styles", not "recipes"). **10 Research and develop content
 **11 Requirements Assistant** — reserved. Technical improvements (any time, not blocking a phase): self-hosted
 fonts (see Testing).
 
+## Saving checks per the Nov 19 Supabase review (branch `claude/review-toolbar-and-coloring`)
+
+- **Timers that read `product_studio_items`:** only `useItemsSync` (src/app/useItemsSync.ts), mounted once in App, so there is one shared check per tab. Its schedule:
+  - `SAVE_CHECK_INTERVAL_MS = 180000` while the tab is visible and in use.
+  - None while hidden. On visibilitychange to visible, one check right away.
+  - Stops after 15 minutes with no pointer, keyboard, touch or wheel activity; the next interaction checks and resumes.
+  - Failures back off 3, 6, 12, then 15 minutes, and reset after a success.
+  - Routine lists `select=kind,id,name,updated_at,deleted_at`. A book's `data` is fetched only when it is new here, changed online, or deleted online while kept here.
+- **Other timers:** `useUpdateCheck` (a new-version check against Vercel, not Supabase), App autosave (local), and the save debounce (1.5 s).
+- **Saving is unchanged:** a save starts its own sync and never waits for the routine check. The compare-and-swap on kind, id and the last known updated_at is kept, and pictures stay in `product-studio-artwork`.
+- **Echo fix:** a sync's own writes on this device (`browserItems.put`/`remove`) no longer announce "changed", so they don't start a second sync (`quietly` in itemBases.ts).
+- **Browser test** (online-cover-studio, Playwright clock): one light list per 3 min; none hidden for 20 min; one on return; none while idle; one on the next interaction; book data fetched once.
+- **Logs, Nov 18 22:30 to Nov 19 22:30 UTC:** 13 item GETs in total, all from the nf29vmktu build. The overnight every-24-second polling came from the old preview tabs, now closed.
+
 ## Bubble letters to color (2026-11-18, branch `claude/review-toolbar-and-coloring`)
 
 - Coloring Book → Interior Pages → "Title and verse style" offers "Elegant fonts" (as before) or "Bubble letters to color", stored in `pageTypography.letterStyle: "bubble"`. Bubble pages use the layout `coloring-lettering` (layouts/book/coloringLettering.ts), built to match Sydni's Brave Ballerinas sample:

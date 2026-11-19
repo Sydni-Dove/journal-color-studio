@@ -15,7 +15,7 @@ vi.mock("../src/engines/artwork/store", () => ({
 
 import { artworkIds, browserItems, planItems, syncItems, type Item, type ItemsBackend } from "../src/persistence/itemsSync";
 import { holdItem, itemBase } from "../src/persistence/itemBases";
-import { nextWaitMs } from "../src/app/useItemsSync";
+import { SAVE_CHECK_INTERVAL_MS, nextWaitMs } from "../src/app/useItemsSync";
 import { SAVE_UNREACHABLE, SIGN_IN_UNREACHABLE, WRONG_PASSWORD, saveErrorMessage, signInErrorMessage, unreachable } from "../src/persistence/saveErrors";
 import { loadDraft, localCoverStore, newCollection, saveDraft } from "../src/persistence/coverStore";
 import { localBookStore } from "../src/persistence/coloringBookStore";
@@ -209,8 +209,9 @@ describe("a routine check stays small, however many books are saved", () => {
     expect(online.calls.gets).toBe(1);
     expect(localBookStore.load("b2")!.name).toBe("Two, renamed");
   });
-  it("checks every 5 minutes, and after failures waits 10, 20, then 30 minutes", () => {
-    expect([0, 1, 2, 3, 4, 9].map((n) => nextWaitMs(n) / 60_000)).toEqual([5, 5, 10, 20, 30, 30]);
+  it("checks every 3 minutes, and after failures waits 3, 6, 12, then 15 minutes (back to 3 after a success)", () => {
+    expect(SAVE_CHECK_INTERVAL_MS).toBe(180_000);
+    expect([0, 1, 2, 3, 4, 9].map((n) => nextWaitMs(n) / 60_000)).toEqual([3, 3, 6, 12, 15, 15]);
   });
 });
 

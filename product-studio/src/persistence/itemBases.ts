@@ -23,9 +23,26 @@ export const itemBase = {
   clear: (kind: ItemKind, id: string) => safe(() => localStorage.removeItem(`${P}:synced:${key(kind, id)}`), undefined),
 };
 
+/**
+ * "Something changed on this device: send it online" (a save or a deletion made here). Writes a sync makes itself
+ * (bringing an online change here) are quiet: they are not new changes, and announcing them would start another sync.
+ */
+let quiet = 0;
+export function announceItemsChanged(): void {
+  if (!quiet && typeof window !== "undefined") window.dispatchEvent(new Event("dove-items-changed"));
+}
+export function quietly<T>(fn: () => T): T {
+  quiet++;
+  try {
+    return fn();
+  } finally {
+    quiet--;
+  }
+}
+
 export function markItemDeleted(kind: ItemKind, id: string, version: string): void {
   safe(() => localStorage.setItem(`${P}:deleting:${key(kind, id)}`, version), undefined);
-  if (typeof window !== "undefined") window.dispatchEvent(new Event("dove-items-changed"));
+  announceItemsChanged();
 }
 export function pendingItemDeletions(): { kind: ItemKind; id: string; version: string }[] {
   return safe(() => {

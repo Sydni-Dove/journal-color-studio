@@ -209,4 +209,59 @@ describe("Cover Studio and Coloring Book online", () => {
     expect(sent).toBe(0);
     await ctx.close();
   }, 60_000);
+
+  it("one light check every 3 minutes, none while hidden or idle, one right away on return; book data only when it changed", async () => {
+    const account = onlineAccount();
+    account.rows.set("coloring-book:b1", { kind: "coloring-book", id: "b1", name: "Gracious Ballerinas", data: { schemaVersion: 1, id: "b1", name: "Gracious Ballerinas", updatedAt: "2026-11-18T10:00:00.000Z" }, updated_at: "2026-11-18T10:00:00.000Z", deleted_at: null });
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 1000 } });
+    await ctx.route(/fonts\.(googleapis|gstatic)\.com/, (route) => route.abort().catch(() => {}));
+    await ctx.route("**/rest/v1/product_studio_items**", account.handleItems);
+    await ctx.route("**/rest/v1/product_studio_projects**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+    await ctx.route("**/storage/v1/**", account.handleStorage);
+    await ctx.route("**/auth/v1/**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ id: USER, email: "maker@example.com" }) }));
+    const page = await ctx.newPage();
+    const gets: string[] = [];
+    page.on("request", (r) => {
+      if (r.method() === "GET" && r.url().includes("/rest/v1/product_studio_items")) gets.push(new URL(r.url()).searchParams.get("select") ?? "");
+    });
+    await page.clock.install({ time: new Date("2026-11-19T12:00:00Z") });
+    await page.goto(server.resolvedUrls!.local[0]);
+    await page.evaluate((user) => {
+      localStorage.clear();
+      const exp = Math.floor(Date.now() / 1000) + 36000;
+      localStorage.setItem("dove-product-studio:auth", JSON.stringify({ access_token: "test-token", refresh_token: "r", token_type: "bearer", expires_in: 36000, expires_at: exp, user: { id: user, email: "maker@example.com", aud: "authenticated", role: "authenticated" } }));
+    }, USER);
+    await page.reload();
+    const lists = () => gets.filter((g) => g === "kind,id,name,updated_at,deleted_at").length;
+    // Start-up: one light list; the book is new here, so its data is fetched once.
+    await expect.poll(lists).toBe(1);
+    await expect.poll(() => gets.filter((g) => g.includes("data")).length).toBe(1);
+    const settle = async (ms: number) => { await page.clock.runFor(ms); await page.waitForTimeout(150); };
+    // In view and in use: one light check per 3 minutes, and the book's data is not fetched again (unchanged).
+    await page.mouse.move(10, 10);
+    await settle(179_000);
+    expect(lists()).toBe(1);
+    await page.mouse.move(20, 20);
+    await settle(2_000);
+    expect(lists()).toBe(2);
+    expect(gets.filter((g) => g.includes("data")).length).toBe(1);
+    // Hidden: nothing, however long.
+    await page.evaluate(() => { Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "hidden" }); document.dispatchEvent(new Event("visibilitychange")); });
+    await settle(20 * 60_000);
+    expect(lists()).toBe(2);
+    // Back: one check right away.
+    await page.evaluate(() => { Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "visible" }); document.dispatchEvent(new Event("visibilitychange")); });
+    await expect.poll(lists).toBe(3);
+    // Idle 15 minutes (no mouse, keyboard or touch): the routine checks stop.
+    await settle(16 * 60_000);
+    const idleCount = lists();
+    await settle(30 * 60_000);
+    expect(lists()).toBe(idleCount);
+    // No interaction since well before the tab was hidden: no routine check ran after the return check.
+    expect(idleCount).toBe(3);
+    // An interaction: one check now, and the schedule resumes.
+    await page.mouse.move(50, 50);
+    await expect.poll(lists).toBe(idleCount + 1);
+    await ctx.close();
+  }, 120_000);
 });

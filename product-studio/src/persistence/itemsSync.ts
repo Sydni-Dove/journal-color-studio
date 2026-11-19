@@ -20,7 +20,7 @@ import { getArtworkFile, putArtworkFile } from "../engines/artwork/store";
 import { newId } from "../presets/products/projectFactory";
 import type { CoverCollection } from "../engines/cover/brief";
 import type { ColoringBook } from "../engines/coloringBook/book";
-import { isHeld, itemBase, itemDeletionDone, markArtworkUploaded, pendingItemDeletions, uploadedArtwork, type ItemKind } from "./itemBases";
+import { quietly, isHeld, itemBase, itemDeletionDone, markArtworkUploaded, pendingItemDeletions, uploadedArtwork, type ItemKind } from "./itemBases";
 
 const TABLE = "product_studio_items";
 export const ARTWORK_BUCKET = "product-studio-artwork";
@@ -139,6 +139,18 @@ export const browserItems: LocalItems = {
     return out;
   },
   put(item) {
+    quietly(() => putHere(item));
+  },
+  remove(kind, id) {
+    quietly(() => removeHere(kind, id));
+  },
+  keepCopy(item, from) {
+    // A kept copy is new work on this device: announced, so it goes online.
+    keepCopyHere(item, from);
+  },
+};
+
+function putHere(item: Item) {
     if (item.kind === "cover-draft") {
       const d = item.data as CoverDraft;
       saveDraft({ ...d, brief: normalizeBrief(d.brief), updatedAt: item.updatedAt });
@@ -149,14 +161,16 @@ export const browserItems: LocalItems = {
       const b = normalizeBook(item.data);
       if (b) localBookStore.save({ ...b, updatedAt: item.updatedAt });
     }
-  },
-  remove(kind, id) {
+}
+
+function removeHere(kind: ItemKind, id: string) {
     if (kind === "cover-collection") localCoverStore.remove(id);
     else if (kind === "coloring-book") localBookStore.remove(id);
     // A removal that came from online is not a deletion to send back.
     if (kind !== "cover-draft") itemDeletionDone(kind, id);
-  },
-  keepCopy(item, from) {
+}
+
+function keepCopyHere(item: Item, from: "this device" | "online") {
     const label = from === "online" ? "from another device" : "from this device";
     const now = new Date().toISOString();
     if (item.kind === "cover-draft") {
@@ -169,8 +183,7 @@ export const browserItems: LocalItems = {
       const b = normalizeBook(item.data);
       if (b) localBookStore.save({ ...b, id: newId("book"), name: `${b.name || "Coloring book"} (${label})`, interiorProjectId: undefined, coverProjectId: undefined, updatedAt: now } as ColoringBook);
     }
-  },
-};
+}
 
 // ---- Merging ----------------------------------------------------------------------------------------
 
