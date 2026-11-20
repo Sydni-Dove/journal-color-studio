@@ -63,7 +63,7 @@ const MODELS = ["gpt-4.1-mini", "gpt-4o-mini"];
 const DEVELOP_MODELS = ["gpt-4.1", "gpt-4.1-mini"];
 /** An HTTP status that means the model can't be used right now (not a problem with the request or its content). */
 const unavailable = (status: number) => status === 404 || status === 408 || status === 409 || status === 429 || status >= 500;
-const VERSION = "generate-document-2026-11-14-spec-v14-scripture-cards";
+const VERSION = "generate-document-2026-11-20-spec-v15-entry-retry";
 /** Bible translations the maker can choose for Scripture the AI quotes (product-studio/src/presets/scripture.ts). NIV: Biblica allows up to 500 verses, under 25% of the text, with its notice (the studio adds it). */
 const TRANSLATIONS = ["NIV", "KJV"] as const;
 /** The most entries one "develop" request writes (same as MAX_DEVELOPED_ENTRIES in product-studio/src/engines/generate/spec.ts). */
@@ -154,6 +154,21 @@ function developGap(raw: string, wanted: number, previous: string[] = []): strin
   if (repeats.length && repeats.length >= records.length / 2) return `${repeats.length} of the ${records.length} entries repeat ones already written (${repeats.join(", ")}). Write NEW entries on different themes, continuing the series.`;
   if (thin > records.length / 2) return `${thin} of the ${records.length} entries are only headings or a few words. Write each entry's parts in full (the teaching, activity, questions and prayer as real sentences).`;
   return null;
+}
+
+/**
+ * Structure only: pages that print an entry's fields ("Day {day}", the day's devotional) while the list of entries is
+ * empty. That prints blank days (live test, 2026-11-20: a pasted 21-day manuscript came back as one page). Returns what
+ * to ask for once more, or null. Only when the maker gave content to place: without it, blank pages to fill in are right.
+ */
+function entryGap(raw: string, hasContent: boolean): string | null {
+  if (!hasContent) return null;
+  let spec: { entries?: { records?: unknown[] } | null; sections?: { title?: string; components?: { fromEntryField?: string | null }[] }[] };
+  try { spec = JSON.parse(raw); } catch { return null; }
+  if (spec.entries?.records?.length) return null;
+  const keys = [...new Set((spec.sections ?? []).flatMap((s) => (s.components ?? []).map((c) => c.fromEntryField).filter((k): k is string => !!k)))];
+  if (!keys.length) return null;
+  return `pages print the entry fields ${keys.slice(0, 6).join(", ")}, but "entries" ${spec.entries ? "has no records" : "is null"}, so every repeated page would print blank. Put each repeated unit of the maker's content (each day, lesson or session) in entries.records as one record, with each part's exact wording (source "user"), and make the repeating section "per-entry".`;
 }
 
 type Batch = { name: string; fields: { key: string; label: string; valueType: string }[]; from: number; count: number; previous: string[]; verses: string[]; names: string[] };
@@ -263,6 +278,8 @@ Deno.serve(async (req) => {
   const wanted = batch?.count ?? entryCount ?? 6;
   // Which model answered, and whether it was the backup because the first was unavailable (shown to the maker).
   let fallback: { from: string; to: string; reason: string } | null = null;
+  // Structure: an answer with blank repeated pages, kept while it's asked once more.
+  let firstAnswer: { spec: string; model: string; gap: string } | null = null;
   for (let i = 0, models = [...(develop ? DEVELOP_MODELS : MODELS)]; i < models.length; i++) {
     const model = models[i];
     if (develop && i > 0 && model !== models[0] && !fallback) fallback = { from: models[0], to: model, reason: lastError.slice(0, 120) };
@@ -300,9 +317,11 @@ Deno.serve(async (req) => {
       }
       // No content is a failed answer, not an unavailable model: Develop doesn't hand it to the backup model.
       if (typeof message?.content !== "string") { lastError = "no content"; if (develop) break; continue; }
-      const gap = develop ? developGap(message.content, wanted, batch?.previous ?? []) : null;
+      const gap = develop ? developGap(message.content, wanted, batch?.previous ?? []) : entryGap(message.content, !!content.trim());
       // An incomplete answer comes back fast (it wrote little): retried only while there's time for a full one.
-      if (gap && !retry.length && Date.now() - started < 45_000) {
+      // Structure: kept, so a retry that fails or runs out of time still hands back this answer (never lost).
+      if (gap && !develop && !retry.length) firstAnswer = { spec: message.content, model, gap };
+      if (gap && !retry.length && Date.now() - started < (develop ? 45_000 : 70_000)) {
         await cost("incomplete-retried");
         retry = [{ role: "assistant", content: message.content }, { role: "user", content: `Your answer is incomplete: ${gap} Return the complete document specification again.` }];
         models.splice(i + 1, 0, model);
@@ -329,5 +348,6 @@ Deno.serve(async (req) => {
       lastError = e instanceof Error ? e.message : String(e);
     }
   }
+  if (firstAnswer) return reply({ spec: firstAnswer.spec, model: firstAnswer.model, version: VERSION, incomplete: firstAnswer.gap });
   return reply({ error: "Document generation failed. Please try again.", detail: lastError.slice(0, 200), version: VERSION }, 502);
 });

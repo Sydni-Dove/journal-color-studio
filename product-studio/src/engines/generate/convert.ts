@@ -69,7 +69,7 @@ function blocksOf(c: SpecComponent, keyOf: (field: string) => string | undefined
     }
     case "writing":
       if (c.text && !bound && BLANK.test(c.text)) return withBlanks(id, c.label, c.text);
-      return [{ id, label: c.label ?? "", ...(c.text && !bound ? { prompt: spaced(c.text) } : {}), ...(c.lines ? { space: "fixed" as const, lineCount: c.lines, minLines: Math.min(2, c.lines) } : { space: "fill" as const, minLines: 3 }), ...content }];
+      return [{ id, label: c.label ?? "", ...(c.text && !bound ? { prompt: spaced(c.text) } : {}), ...(c.lines ? { space: "fixed" as const, lineCount: c.lines, minLines: Math.min(2, c.lines) } : { space: "fill" as const, minLines: bound ? 2 : 3 }), ...content }];
     case "checklist":
       // Items to print go in a checkbox list; an empty checklist is rows of boxes to fill in.
       return c.items.length
@@ -128,7 +128,7 @@ const pageStep = (s: SpecSection, set: PromptSet, cadence: BookStep["cadence"], 
   layoutId: "guided-page",
   cadence,
   title,
-  ...(s.startOnRightPage ? { start: "recto" as const } : {}),
+  ...(s.startOnRightPage ? { start: "recto" as const } : s.startSpread ? { start: "spread" as const } : {}),
   promptSet: set,
 });
 
@@ -197,7 +197,10 @@ function build(checked: CheckedSpec, mode: "none" | "first-page" | "own-page"): 
     }
     if (s.repeat.mode === "per-entry" && collectionId) {
       // Once per entry, in the list's order: the section reads each entry's fields (and `{field}` in its title).
-      structure.push({ kind: "group", id: `gen-${s.id}-each`, label: s.title, entries: { collectionId }, children: [pageStep(s, set, { type: "once" })] });
+      // A day's next page (a manuscript's own page break) prints right after its first, for each day in turn.
+      const prev = structure[structure.length - 1];
+      if (s.withPrevious && prev?.kind === "group" && prev.entries?.collectionId === collectionId) prev.children.push(pageStep(s, set, { type: "once" }));
+      else structure.push({ kind: "group", id: `gen-${s.id}-each`, label: s.title, entries: { collectionId }, children: [pageStep(s, set, { type: "once" })] });
     } else structure.push(pageStep(s, set, s.repeat.mode === "copies" && s.repeat.count > 1 ? { type: "copies", count: s.repeat.count } : { type: "once" }));
     for (const c of cards) structure.push(cardStep(s, c));
   }
