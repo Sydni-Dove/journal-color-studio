@@ -111,5 +111,28 @@ describe("Hope Journal", () => {
       expect(n.rect.y).toBeGreaterThan(b.rect.y);
     });
   });
-});
 
+  it("margin shading can be one strip down the margin instead of a box per section", () => {
+    const p = hope(true);
+    p.layoutOptions = { ...p.layoutOptions, marginNoteShade: "strip" };
+    const doc = resolveDocument(p);
+    for (const id of ["hope-left", "hope-right"]) {
+      const nodes = solvePage(doc, doc.recipe.pages.findIndex((x) => x.recipeItemId === id)).nodes as any[];
+      const strips = nodes.filter((n) => n.id.endsWith("-margin-strip"));
+      const notes = nodes.filter((n) => n.id.endsWith("-margin-note"));
+      expect(nodes.filter((n) => n.id.endsWith("-margin-shade"))).toHaveLength(0);
+      expect(strips).toHaveLength(1);
+      const [band] = strips;
+      expect(band.fill).toBe("decorHighlight");
+      // Every note sits inside the one band, which runs past the last note.
+      for (const n of notes) {
+        expect(n.rect.x).toBeGreaterThan(band.rect.x);
+        expect(n.rect.y).toBeGreaterThan(band.rect.y);
+        expect(n.rect.y + n.rect.h).toBeLessThan(band.rect.y + band.rect.h);
+      }
+    }
+    // Pages without margin notes (Notes, How to Use, the index) get no strip.
+    const notesPage = solvePage(doc, 1).nodes as any[];
+    expect(notesPage.filter((n) => n.id.endsWith("-margin-strip"))).toHaveLength(0);
+  });
+});
