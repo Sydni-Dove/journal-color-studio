@@ -124,6 +124,9 @@ describe("Hope Journal", () => {
       expect(strips).toHaveLength(1);
       const [band] = strips;
       expect(band.fill).toBe("decorHighlight");
+      // It runs out to the outer edge, through the bleed (left pages bound on the right: left edge; right pages: right edge).
+      if (id === "hope-left") expect(band.rect.x).toBeLessThanOrEqual(0);
+      else expect(band.rect.x + band.rect.w).toBeGreaterThanOrEqual(8.5);
       // Every note sits inside the one band, which runs past the last note.
       for (const n of notes) {
         expect(n.rect.x).toBeGreaterThan(band.rect.x);

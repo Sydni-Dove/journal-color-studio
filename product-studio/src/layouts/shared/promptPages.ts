@@ -970,7 +970,13 @@ export function solveZonePages(spec: ZonePageSpec, ctx: LayoutContext, pageIndex
     if (strip && hasNote && f.margin && res.zones.length) {
       const top = res.zones[0].rect.y;
       const last = res.zones[res.zones.length - 1].rect;
-      nodes.push({ ...box(`${spec.idPrefix}${pi}-margin-strip`, { x: f.margin.x, y: top, w: f.margin.w, h: last.y + last.h - top }, { component: "Divider", stroke: null, fill: "decorHighlight" }), functional: false });
+      // The strip runs out to the page's outer edge (through the bleed when there is one), with no white margin beside
+      // it; the notes stay in the margin column, inside the safe area. Like the top border, it is page artwork.
+      const g = ctx.pages[pi];
+      const outerLeft = f.margin.x + f.margin.w / 2 < g.trimWidthIn / 2;
+      const x1 = outerLeft ? -g.bleed.left : f.margin.x;
+      const x2 = outerLeft ? f.margin.x + f.margin.w : g.trimWidthIn + g.bleed.right;
+      nodes.push({ ...box(`${spec.idPrefix}${pi}-margin-strip`, { x: x1, y: top, w: x2 - x1, h: last.y + last.h - top }, { component: "Divider", stroke: null, fill: "decorHighlight" }), functional: false });
     }
     res.zones.forEach((z, zi) => {
       const m = p.byZone.get(z.zone)!;
