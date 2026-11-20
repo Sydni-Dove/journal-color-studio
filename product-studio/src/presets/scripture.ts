@@ -17,7 +17,8 @@ export const TRANSLATIONS: Record<TranslationId, { label: string; notice: string
   KJV: { label: "KJV (King James Version)", notice: null },
 };
 
-export const DEFAULT_TRANSLATION: TranslationId = "NIV";
+/** KJV until written NIV permission is granted (Nov 2026); switch back to "NIV" then. */
+export const DEFAULT_TRANSLATION: TranslationId = "KJV";
 export const NIV_NOTICE = TRANSLATIONS.NIV.notice!;
 
 /** Whether wording quotes the NIV (its quotations end "(NIV)"). */

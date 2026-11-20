@@ -22,7 +22,6 @@ import type { PromptSet } from "../types/prompts";
 import type { BookNode } from "../types/recipe";
 import { step } from "./bookRecipes";
 import { DOVE_BRAND } from "./themes/palettes";
-import { NIV_NOTICE } from "./scripture";
 
 export const HOPE_SPREADS = 30;
 export const HOPE_INDEX_ROWS = 15;
@@ -36,11 +35,8 @@ export type HopeTitleWord = (typeof HOPE_TITLE_WORDS)[number];
 /** Label of the optional target date at the end of each step row (Steps I Am Taking). */
 export const HOPE_STEP_DATE_LABEL = "By";
 
-/** Hebrews 6:19a (NIV), on the interior title page. */
-export const HOPE_TITLE_VERSE = "We have this hope as an anchor for the soul, firm and secure. Hebrews 6:19 (NIV)";
-
-/** Biblica's required NIV notice: the Notes page (page 2, the back of the title page) carries it. */
-export { NIV_NOTICE } from "./scripture";
+/** Hebrews 6:19a (KJV, public domain: no notice needed), on the interior title page. */
+export const HOPE_TITLE_VERSE = "Which hope we have as an anchor of the soul, both sure and stedfast. Hebrews 6:19 (KJV)";
 
 /** Black text on white paper; burgundy lines and borders; pale pink behind the margin notes (Dove brand). */
 const INK = "#000000";
@@ -82,7 +78,7 @@ export function hopeHowToSet(): PromptSet {
         id: "hope-how-teaching", kind: "heading", label: "", textStyle: "body",
         prompt:
           "Biblical hope is confident expectation that rests on the character of God. It is stronger than a wish because it stands on what He has said. Romans 15:13 names Him the God of hope and asks Him to fill you with all joy and peace as you trust in Him. That same verse says you will overflow with hope by the power of the Holy Spirit. Hope is something God supplies while you trust Him.\n\n" +
-          "Hebrews 6:19 describes this hope as an anchor for the soul, firm and secure. An anchor holds a ship in place while the water keeps moving. Your circumstances may shift between the day you write a hope and the day it is fulfilled. The anchor keeps you steady through that stretch of time. These pages give you a place to set that anchor and to watch what God does.",
+          "Hebrews 6:19 describes this hope as an anchor of the soul, both sure and stedfast. An anchor holds a ship in place while the water keeps moving. Your circumstances may shift between the day you write a hope and the day it is fulfilled. The anchor keeps you steady through that stretch of time. These pages give you a place to set that anchor and to watch what God does.",
       },
       { id: "hope-how-gap-1", kind: "spacer", label: "", spacer: "small" },
       { id: "hope-how-1", kind: "heading", label: "1. Write the Hope" },
@@ -100,14 +96,13 @@ export function hopeHowToSet(): PromptSet {
   };
 }
 
-/** Notes, inside the front cover: a title, lines, and the NIV notice at the foot (the copyright page). */
+/** Notes, inside the front cover: a title and lines. */
 export function hopeNotesSet(): PromptSet {
   return {
     whenFull: "stop",
     blocks: [
       { id: "hope-notes-title", kind: "heading", label: "Notes", textStyle: "title" },
       { id: "hope-notes-lines", label: "", space: "fill", responseStyle: "ruled" },
-      { id: "hope-notes-niv", kind: "heading", textStyle: "body", label: "", prompt: NIV_NOTICE },
     ],
   };
 }
