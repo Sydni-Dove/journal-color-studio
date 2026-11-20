@@ -17,6 +17,8 @@ type Props = {
   meta: (id: string) => ProjectMeta;
   onStart: (start?: WizardStart) => void;
   onGenerate?: () => void;
+  /** Cover Studio: plan the covers of a collection. */
+  onCovers?: () => void;
   onOpen: (id: string) => void;
   onDuplicate: (id: string) => void;
   onDuplicateAsVariant: (id: string) => void;
@@ -118,7 +120,7 @@ function describe(p: ProjectSummary, m: ProjectMeta): string {
   return `${type} · ${size}${pages}`;
 }
 
-export function ProjectList({ projects, meta, onStart, onGenerate, onOpen, onDuplicate, onDuplicateAsVariant, onDelete, now, account }: Props) {
+export function ProjectList({ projects, meta, onStart, onGenerate, onCovers, onOpen, onDuplicate, onDuplicateAsVariant, onDelete, now, account }: Props) {
   const metas = useMemo(() => new Map(projects.map((p) => [p.id, meta(p.id)])), [projects, meta]);
   const recent = projects.slice(0, RECENT);
   const hasProjects = projects.length > 0;
@@ -133,6 +135,7 @@ export function ProjectList({ projects, meta, onStart, onGenerate, onOpen, onDup
         <span className="spacer" />
         <button className="btn btn--primary" onClick={() => onStart()}>New product</button>
         {onGenerate && <button className="btn" onClick={onGenerate}>Generate with AI</button>}
+        {onCovers && <button className="btn" onClick={onCovers}>Cover Studio</button>}
       </header>
       <div className="page-shell home">
         <section className="home-hero">

@@ -6,13 +6,14 @@ import { resolveDocument } from "../engines/document/resolve";
 import type { WizardStart } from "../presets/products/productFamilies";
 import { NewProductWizard } from "../components/wizard/NewProductWizard";
 import { AiDocumentWizard } from "../components/wizard/AiDocumentWizard";
+import { CoverStudio } from "../components/cover/CoverStudio";
 import { resolveColors } from "../presets/themes/palettes";
 import { addVariantFromCurrent, duplicateProject, localProjectStore, projectKey, saveGuarded, type ProjectSummary } from "../persistence/projectStore";
 import type { ProductProject } from "../types/project";
 import { useCloud } from "./useCloud";
 import { CloudAccount, cloudLabel } from "../components/projects/CloudAccount";
 
-type View = { kind: "list" } | { kind: "new"; start?: WizardStart } | { kind: "ai" } | { kind: "edit"; project: ProductProject };
+type View = { kind: "list" } | { kind: "new"; start?: WizardStart } | { kind: "ai" } | { kind: "cover" } | { kind: "edit"; project: ProductProject };
 
 /** Page count / pad sheets / book flag for the home screen (expansion only — no page is solved). */
 function projectMeta(id: string): ProjectMeta {
@@ -199,6 +200,13 @@ export function App() {
         />
       </>
     );
+  if (view.kind === "cover")
+    return (
+      <>
+        {banner}
+        <CoverStudio onBack={() => setView({ kind: "list" })} projects={projects} loadProject={(id) => store.load(id)} />
+      </>
+    );
   if (view.kind === "edit") {
     return (
       <>
@@ -228,6 +236,7 @@ export function App() {
       meta={projectMeta}
       onStart={(start) => setView({ kind: "new", start })}
       onGenerate={() => setView({ kind: "ai" })}
+      onCovers={() => setView({ kind: "cover" })}
       onOpen={(id) => {
         const p = store.load(id);
         if (p) openLoaded(p);

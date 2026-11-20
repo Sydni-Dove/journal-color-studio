@@ -169,7 +169,7 @@ and print always use the full files.
 | `marble-layers-blush.png` / procedural `paintWatercolor` | Retired upstream (JCS maps `blush` to the Abstract watercolor); Product Studio no longer renders it either. |
 | "Violet + peach cloud wash" (`wip/cloud-and-new-marble`, a51c2d6) | Only on an unmerged WIP branch — not approved on `main`. Import it when it merges. |
 | `Design Elements (3).zip` (commit 17fe6ea "Added cloud and marble") | Raw Canva SVG exports (pages 8, 68–71). The marbles among them are the kintsugi marbles above, already built into maps upstream; the app renders no cloud artwork. |
-| Prayer / Prayer Warrior / Warring Woman palettes (JCS `JOURNAL_PALETTES`) | Their roles mean different things (stone = the journal's watercolor figure, plate = title lettering…) — tied to those journals' artwork. |
+| Prayer / Prayer Warrior / Warring Woman palettes (JCS `JOURNAL_PALETTES`) | Their roles mean different things (stone = the journal's watercolor figure, plate = title lettering…) — tied to those journals' artwork. **Still out of `PALETTES`**: no product's color picker has them. Since 2026-11-13 the 18 of them in the repository's `palettes/studio-palettes.json` are in `COVER_PALETTES` (`JCS_COVER_ONLY` in `palettes.ts`), for the Cover Studio's picker only, where just their exact colors matter. |
 | JCS "Dove Signature" palette | Product Studio's own Dove Signature brand palette is canonical for the same brand colors. |
 | JCS editor UI, state, cover templates, title plates, experimental accent layouts | Application code, not the visual library. |
 
@@ -183,3 +183,7 @@ The largest circle made only of the artwork's own pixels: inside the leopard cir
 and left of x = 650 px, where Canva's edge mirror begins — a 644 px square centred at (328, 473), flattened onto the
 print's own median ground colour outside its soft edge. No mirroring, no redrawing, colours as designed. It replaces
 the procedurally drawn spots Product Studio used before (those were never Sydni's artwork).
+
+## Palettes added 2026-11-13 (Cover Studio)
+
+From the repository's `palettes/studio-palettes.json`, values copied unchanged: **Violet + Peach Cloud** (Dream Journal) joins the snapshotted palettes (`PALETTES` 46 → 47). The 18 Prayer Journal / Prayer Warrior / Warring Woman palettes are cover-only (see the table above). JCS's own "Dove Signature" is not added (Product Studio's own is canonical); a collection from the standalone generator that used it opens with Product Studio's. No artwork or other palette changed.

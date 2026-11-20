@@ -48,6 +48,14 @@ image upload; "design styles", not "recipes"). **10 Research and develop content
 **11 Requirements Assistant** — reserved. Technical improvements (any time, not blocking a phase): self-hosted
 fonts (see Testing).
 
+## Cover Studio (2026-11-13, branch `claude/stationery-cover-generator` from `main` 7d7bb23 — review pending)
+
+Native port of the standalone stationery cover generator into Product Studio (home → **Cover Studio**). Docs:
+`product-studio/docs/cover-studio.md`. Not merged, not deployed. Journal Color Studio untouched. Decisions: dimensions
+from the geometry engine and printer profiles (bleed 0 = no-bleed build; spine never invented, KDP formula only offered);
+collections stored locally apart from projects (no online saving); the 18 prayer / warrior / warring-woman palettes are
+cover-only (`COVER_PALETTES`), only Violet + Peach Cloud joined `PALETTES`.
+
 ## Phase 8 review (2026-10-15)
 
 - Merges cleanly with `main`. TypeScript clean. Unit tests 1519/1519. Print snapshots: every existing template

@@ -69,6 +69,8 @@ const JCS_PALETTES: JcsPalette[] = [
   { name: "Tropical Sunrise", swatches: ["#FF9F1C", "#FFBF69", "#FFFFFF", "#CBF3F0", "#2EC4B6"], stone: "#2EC4B6", vein: "#FF9F1C", highlight: "#CBF3F0", plate: "#FFFFFF", frame: "#1D7C73", trim: "#FF9F1C", title: "#1D7C73", paper: "#FFFFFF", line: "#FFBF69", accent: "#FFBF69" },
   { name: "Peach Cloud", swatches: ["#FFDCDC", "#FFF2EB", "#FFE8CD", "#FFD6BA"], stone: "#FFD6BA", vein: "#FFDCDC", highlight: "#FFF2EB", plate: "#FFF2EB", frame: "#DE9D78", trim: "#FFDCDC", title: "#6F4A33", paper: "#FFF2EB", line: "#FFD6BA", accent: "#FFE8CD" },
   { name: "Tiger Amber & Blues", swatches: ["#8ECAE6", "#219EBC", "#021433", "#FFB703", "#FB8500"], stone: "#021433", vein: "#FFB703", highlight: "#8ECAE6", plate: "#219EBC", frame: "#021433", trim: "#FB8500", title: "#FFFFFF", paper: "#FFFFFF", line: "#8ECAE6", accent: "#FFB703" },
+  // Added 2026-11-13 from the repository's palettes/studio-palettes.json: the Dream Journal palette newer than the snapshot.
+  { name: "Violet + Peach Cloud", stone: "#8466C2", vein: "#B79A6A", highlight: "#F1E8F7", plate: "#FFFFFF", frame: "#B79A6A", trim: "#B79A6A", title: "#9A7CCB", paper: "#FFFFFF", line: "#D8CBE6", accent: "#E3A085" },
 ];
 
 /**
@@ -228,9 +230,39 @@ function adapt(p: JcsPalette): ColorPalette {
   };
 }
 
+/**
+ * Journal Color Studio palettes of its Prayer Journal, Prayer Warrior and Warring Woman journals (studio-palettes.json, added
+ * 2026-11-13). Their roles mean different things in those journals (stone = the journal's watercolor figure, plate = title
+ * lettering…), so they are NOT in PALETTES (the color picker of every product). The Cover Studio offers them next to PALETTES
+ * (`COVER_PALETTES`), where only their exact colors matter. JCS's own "Dove Signature" is not added: Product Studio's own is canonical.
+ */
+const JCS_COVER_ONLY: JcsPalette[] = [
+  { name: "Pink Prayer", stone: "#E3595E", vein: "#C9A05A", highlight: "#EEBCBC", plate: "#E3595E", frame: "#E3595E", trim: "#C9A05A", title: "#794E0D", paper: "#FDF6F6", line: "#EEBCBC", accent: "#E3595E" },
+  { name: "Lavender Grace", stone: "#9B7FC8", vein: "#C9A05A", highlight: "#D9CCEE", plate: "#7A5BAF", frame: "#7A5BAF", trim: "#C9A05A", title: "#4A3A63", paper: "#FAF7FD", line: "#DCD2EC", accent: "#9B7FC8" },
+  { name: "Dusty Blue", stone: "#6F95C4", vein: "#B7B9C6", highlight: "#C9D9EE", plate: "#4F72A3", frame: "#4F72A3", trim: "#B7B9C6", title: "#2F3F5A", paper: "#F6F9FC", line: "#D2DDEC", accent: "#6F95C4" },
+  { name: "Sage + Gold", stone: "#8FAE8B", vein: "#C9A05A", highlight: "#D5E3D0", plate: "#5E7F5A", frame: "#5E7F5A", trim: "#C9A05A", title: "#3C4A36", paper: "#F8FAF6", line: "#D8E3D3", accent: "#8FAE8B" },
+  { name: "Peach Blossom", stone: "#F0A07A", vein: "#D4AF37", highlight: "#F8D3C0", plate: "#D9744E", frame: "#D9744E", trim: "#D4AF37", title: "#6B3A26", paper: "#FFF8F4", line: "#F3D9CC", accent: "#F0A07A" },
+  { name: "Berry Rose", stone: "#B03A5B", vein: "#C9A05A", highlight: "#E8B5C4", plate: "#8E2446", frame: "#8E2446", trim: "#C9A05A", title: "#4A1626", paper: "#FDF6F8", line: "#EBCBD5", accent: "#B03A5B" },
+  { name: "Prayer Warrior", stone: "#F3724B", vein: "#D97904", highlight: "#F3B9C3", plate: "#D97904", frame: "#EDB17A", trim: "#EDB17A", title: "#794E0D", paper: "#FFFFFF", line: "#860B03", accent: "#F3724B" },
+  { name: "Twilight Violet", stone: "#7B5EC6", vein: "#E0A96D", highlight: "#E6D6F5", plate: "#5B3E9E", frame: "#C7A6E8", trim: "#C7A6E8", title: "#3E2A5E", paper: "#FFFFFF", line: "#5B3E9E", accent: "#7B5EC6" },
+  { name: "Ocean Dawn", stone: "#3F8FC0", vein: "#F2C57C", highlight: "#CFE6F5", plate: "#2C6E99", frame: "#9CC7E3", trim: "#9CC7E3", title: "#1F3F5A", paper: "#FFFFFF", line: "#2C6E99", accent: "#3F8FC0" },
+  { name: "Rose Sunset", stone: "#E0607E", vein: "#F2A65A", highlight: "#F8CFD9", plate: "#B8405E", frame: "#F0B4C2", trim: "#F0B4C2", title: "#5A2030", paper: "#FFFFFF", line: "#B8405E", accent: "#E0607E" },
+  { name: "Emerald Dawn", stone: "#3E9E7E", vein: "#E8C170", highlight: "#D3EEE3", plate: "#2E7A60", frame: "#A8D8C4", trim: "#A8D8C4", title: "#1E4A3A", paper: "#FFFFFF", line: "#2E7A60", accent: "#3E9E7E" },
+  { name: "Golden Hour", stone: "#E0A030", vein: "#F4D06F", highlight: "#FBE7BF", plate: "#B87A14", frame: "#EFC877", trim: "#EFC877", title: "#5A3A08", paper: "#FFFFFF", line: "#B87A14", accent: "#E0A030" },
+  { name: "Warring Woman", stone: "#5170FF", vein: "#FF66C4", highlight: "#F3B9C3", plate: "#B28051", frame: "#38056B", trim: "#C9A05A", title: "#794E0D", paper: "#FFFFFF", line: "#5B3F8C", accent: "#8A63E8" },
+  { name: "Royal Night", stone: "#1E2A78", vein: "#7B3FA0", highlight: "#D6C8F0", plate: "#E8C77A", frame: "#F2E6C9", trim: "#D4AF37", title: "#3A2A5E", paper: "#FFFFFF", line: "#5B3F8C", accent: "#7B3FA0" },
+  { name: "Fire + Gold", stone: "#B3122E", vein: "#F28C28", highlight: "#FAD6C4", plate: "#FFE08A", frame: "#3A0A0A", trim: "#D4AF37", title: "#5A1A10", paper: "#FFFFFF", line: "#B3122E", accent: "#F28C28" },
+  { name: "Emerald Crown", stone: "#0E5E4E", vein: "#3FB58E", highlight: "#CFEDE2", plate: "#E8C77A", frame: "#E8F5EE", trim: "#D4AF37", title: "#1E3A30", paper: "#FFFFFF", line: "#0E5E4E", accent: "#3FB58E" },
+  { name: "Ocean Deep", stone: "#0F4C81", vein: "#2BB3C0", highlight: "#CDEAF0", plate: "#F2D38A", frame: "#E6F4F7", trim: "#C9A05A", title: "#16324A", paper: "#FFFFFF", line: "#0F4C81", accent: "#2BB3C0" },
+  { name: "Rose Gold", stone: "#B5657A", vein: "#F2B8A0", highlight: "#F8DCE0", plate: "#FFF4E8", frame: "#5A2436", trim: "#D9A38A", title: "#5A2436", paper: "#FFFFFF", line: "#B5657A", accent: "#F2B8A0" },
+];
+
 export const JCS_PALETTES_ADAPTED: ColorPalette[] = [...JCS_PALETTES, ...JCS_FAMILY_PALETTES].map(adapt);
 
 /** A snapshotted JCS palette's raw roles (used to recognise an artwork's own colourway). */
 export function jcsPaletteRoles(name: string): JcsPalette | undefined {
   return [...JCS_PALETTES, ...JCS_FAMILY_PALETTES].find((p) => p.name === name);
 }
+
+/** The Prayer / Prayer Warrior / Warring Woman palettes, adapted like the others, for the Cover Studio only. */
+export const JCS_COVER_ONLY_ADAPTED: ColorPalette[] = JCS_COVER_ONLY.map(adapt);
