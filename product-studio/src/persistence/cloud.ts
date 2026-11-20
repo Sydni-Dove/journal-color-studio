@@ -45,8 +45,12 @@ export interface CloudBackend {
 
 /** Every request to the saving server stops waiting after this long. */
 export const REQUEST_TIMEOUT_MS = 45_000;
+/** An AI proposal (Edge Functions) can take up to the function's own ~150 s limit: it waits that long, not 45 s. */
+export const FUNCTION_TIMEOUT_MS = 160_000;
 const timedFetch: typeof fetch = (input, init) => {
-  const own = typeof AbortSignal !== "undefined" && "timeout" in AbortSignal ? AbortSignal.timeout(REQUEST_TIMEOUT_MS) : undefined;
+  const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  const wait = url.includes("/functions/v1/") ? FUNCTION_TIMEOUT_MS : REQUEST_TIMEOUT_MS;
+  const own = typeof AbortSignal !== "undefined" && "timeout" in AbortSignal ? AbortSignal.timeout(wait) : undefined;
   const signal = init?.signal && own && "any" in AbortSignal ? (AbortSignal as unknown as { any(s: AbortSignal[]): AbortSignal }).any([init.signal, own]) : (init?.signal ?? own);
   return fetch(input, { ...init, ...(signal ? { signal } : {}) });
 };

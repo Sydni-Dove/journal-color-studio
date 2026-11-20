@@ -14,6 +14,7 @@
  * source or claims legal / regulatory compliance is flagged as unverified.
  */
 import type { ValueType } from "../../types/document";
+import { withManuscriptDays } from "./manuscript";
 
 export type SpecValueType = Exclude<ValueType, "computed">;
 export type SpecField = { label: string; valueType: SpecValueType };
@@ -49,6 +50,10 @@ export type SpecSection = {
   repeat: { mode: "once" | "copies" | "per-entry"; count: number };
   startOnRightPage: boolean;
   components: SpecComponent[];
+  /** Read from a manuscript's numbered days: the day's next page, printed with the page before it for each day (not the AI's). */
+  withPrevious?: boolean;
+  /** The day's first page opens a two-page spread, so its pages face each other (not the AI's). */
+  startSpread?: boolean;
 };
 export type SpecEntries = {
   name: string;
@@ -164,10 +169,14 @@ export function checkSpec(raw: unknown, input: { description: string; content?: 
       throw new SpecError("The AI's answer wasn't a document outline (it couldn't be read). Try again.");
     }
   }
+  // Pages meant to print each day's parts, but no days written: the maker's own "Day 1… Day 21" headings fill them.
+  const days = isObj(r) ? withManuscriptDays(r, input.content ?? "") : { r, note: null };
+  r = days.r;
   if (!isObj(r)) throw new SpecError("The AI's answer wasn't a document outline. Try again.");
   if (!Array.isArray(r.sections) || !r.sections.length) throw new SpecError("The AI's outline has no sections. Try describing the document again.");
   const problems: Problem[] = [];
   const flags: Flag[] = [];
+  if (days.note) problems.push({ level: "note", message: days.note });
   const said = normWords(`${input.description}\n${input.content ?? ""}`);
   const isTheirs = (t: string) => !!normWords(t) && said.includes(normWords(t));
 
@@ -331,7 +340,7 @@ export function checkSpec(raw: unknown, input: { description: string; content?: 
       count = 1;
     }
     flags.push(...flagsIn(title, where, true));
-    sections.push({ id: uid(s.id, `section-${si + 1}`), title, purpose: str(s.purpose).slice(0, 300), repeat: { mode, count }, startOnRightPage: !!s.startOnRightPage, components });
+    sections.push({ id: uid(s.id, `section-${si + 1}`), title, purpose: str(s.purpose).slice(0, 300), repeat: { mode, count }, startOnRightPage: !!s.startOnRightPage, components, ...(days.note && s.withPrevious === true && mode === "per-entry" ? { withPrevious: true } : {}), ...(days.note && s.startSpread === true && mode === "per-entry" ? { startSpread: true } : {}) });
   }
   // One note, not one per part. With nothing of the maker's to quote, "theirs" can only be a mislabel.
   if (notVerbatim.length && normWords(input.content ?? "")) problems.push({ level: "note", message: `${notVerbatim.length === 1 ? `${notVerbatim[0]} was` : `${notVerbatim.length} parts were`} marked as your wording but ${notVerbatim.length === 1 ? "isn't" : "aren't"} word for word what you wrote, so ${notVerbatim.length === 1 ? "it's shown as a suggestion" : "they're shown as suggestions"}.` });
