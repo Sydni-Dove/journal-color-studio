@@ -1,3 +1,4 @@
+import { ScripturePermissions } from "./ScripturePermissions";
 import { LUXE_TITLE_FONT } from "../../presets/coverLuxe";
 import { BUBBLE_FONT } from "../../layouts/book/coloringLettering";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
@@ -408,6 +409,7 @@ export function Editor({ project, onChange, onBack, saveStatus, cloudLabel, star
               )}
               {area === "print" && (
                 <>
+                  <ScripturePermissions project={project} update={update} />
                   <div className="card-actions">
                     <button className="btn btn--primary" disabled={!doc} onClick={() => setExporting(true)}>Print / Save PDF…</button>
                   </div>
