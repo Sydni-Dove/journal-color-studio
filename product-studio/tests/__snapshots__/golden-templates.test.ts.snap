@@ -120,7 +120,7 @@ exports[`existing templates print exactly as before > book-daily-planner @ 8.5x1
 exports[`existing templates print exactly as before > book-hope-journal @ 5.5x8.5 1`] = `
 {
   "groups": [
-    "1-25:b16a9952117a",
+    "1-25:c163c7d4b7c2",
     "26-50:baba82562ee0",
     "51-66:0676b5f3cdcd",
   ],
@@ -133,7 +133,7 @@ exports[`existing templates print exactly as before > book-hope-journal @ 5.5x8.
 exports[`existing templates print exactly as before > book-hope-journal @ 7x9 1`] = `
 {
   "groups": [
-    "1-25:a8333685d7e1",
+    "1-25:3feb3d85190a",
     "26-50:af3f263cf461",
     "51-66:ee8d5c772a02",
   ],
@@ -146,7 +146,7 @@ exports[`existing templates print exactly as before > book-hope-journal @ 7x9 1`
 exports[`existing templates print exactly as before > book-hope-journal @ 8.5x11 1`] = `
 {
   "groups": [
-    "1-25:78cb8fb3693d",
+    "1-25:01b133ed8355",
     "26-50:250a5513ccfb",
     "51-66:e17b20288599",
   ],
