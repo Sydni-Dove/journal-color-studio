@@ -7,13 +7,26 @@ import type { WizardStart } from "../presets/products/productFamilies";
 import { NewProductWizard } from "../components/wizard/NewProductWizard";
 import { AiDocumentWizard } from "../components/wizard/AiDocumentWizard";
 import { CoverStudio } from "../components/cover/CoverStudio";
+import { ColoringBookStudio } from "../components/coloringBook/ColoringBookStudio";
+import { localBookStore } from "../persistence/coloringBookStore";
 import { resolveColors } from "../presets/themes/palettes";
 import { addVariantFromCurrent, duplicateProject, localProjectStore, projectKey, saveGuarded, type ProjectSummary } from "../persistence/projectStore";
 import type { ProductProject } from "../types/project";
 import { useCloud } from "./useCloud";
+import { useItemsSync } from "./useItemsSync";
+import { bookFromCoverBrief } from "../engines/coloringBook/book";
+import type { CoverBrief } from "../engines/cover/brief";
+import { newId } from "../presets/products/projectFactory";
 import { CloudAccount, cloudLabel } from "../components/projects/CloudAccount";
 
-type View = { kind: "list" } | { kind: "new"; start?: WizardStart } | { kind: "ai" } | { kind: "cover" } | { kind: "edit"; project: ProductProject };
+type View =
+  | { kind: "list" }
+  | { kind: "new"; start?: WizardStart }
+  | { kind: "ai" }
+  | { kind: "cover" }
+  | { kind: "coloring"; bookId: string | null }
+  /** `fromBook`: opened from a Coloring Book's export (its print step open; Back returns to the book). */
+  | { kind: "edit"; project: ProductProject; fromBook?: string; startInExport?: boolean };
 
 /** Page count / pad sheets / book flag for the home screen (expansion only — no page is solved). */
 function projectMeta(id: string): ProjectMeta {
@@ -75,7 +88,7 @@ export function App() {
           base.current = e.current.updatedAt;
           current.current = e.current;
           dirty.current = false;
-          setView((v) => (v.kind === "edit" && v.project.id === e.current.id ? { kind: "edit", project: e.current } : v));
+          setView((v) => (v.kind === "edit" && v.project.id === e.current.id ? { ...v, project: e.current } : v));
           setGeneration((g) => g + 1);
           setNotice(`This project was also changed on another device, so the newest version is open here. The other version was kept as a separate project: “${e.copy.name}”.`);
         } else setNotice(`“${e.current.name}” was changed on two devices. Both versions were kept: the newest as “${e.current.name}”, the other as “${e.copy.name}”.`);
@@ -99,6 +112,14 @@ export function App() {
   });
   const cloudRef = useRef(cloud);
   cloudRef.current = cloud;
+  // Cover Studio and Coloring Book saved online too (signed in); the home screen re-reads its lists when a sync brings work here.
+  const itemsReceived = useItemsSync(cloud.session?.user.id ?? null);
+  /** Continue a Cover Studio coloring book as a Coloring Book: everything entered there comes along. */
+  const continueAsBook = (brief: CoverBrief) => {
+    const book = bookFromCoverBrief(newId("book"), brief);
+    localBookStore.save(book);
+    setView({ kind: "coloring", bookId: book.id });
+  };
 
   const persist = useCallback((p: ProductProject) => {
     window.clearTimeout(timer.current);
@@ -111,7 +132,7 @@ export function App() {
         // Never overwrite newer work: keep the newer version open, this tab's edits as a separate copy.
         base.current = r.stored.updatedAt;
         current.current = r.stored;
-        setView((v) => (v.kind === "edit" && v.project.id === p.id ? { kind: "edit", project: r.stored } : v));
+        setView((v) => (v.kind === "edit" && v.project.id === p.id ? { ...v, project: r.stored } : v));
         setGeneration((g) => g + 1);
         setNotice(`This project was changed in another tab, so that newer version is open here. Your edits were kept as a separate project: “${r.copy.name}”.`);
       } else base.current = p.updatedAt;
@@ -127,24 +148,26 @@ export function App() {
     if (dirty.current && current.current) persist(current.current);
   }, [persist]);
 
-  const openLoaded = (p: ProductProject) => {
+  const openLoaded = (p: ProductProject, from?: { fromBook?: string; startInExport?: boolean }) => {
     base.current = p.updatedAt;
     current.current = p;
     dirty.current = false;
     setNotice(null);
     setGeneration((g) => g + 1);
-    setView({ kind: "edit", project: p });
+    setView({ kind: "edit", project: p, ...(from ?? {}) });
   };
-  const open = (p: ProductProject) => {
-    base.current = null;
-    persist(p);
-    openLoaded(p);
+  const open = (p: ProductProject, from?: { fromBook?: string; startInExport?: boolean }) => {
+    // Rebuilding a product that exists (a Coloring Book exported again) replaces it: never a conflict copy.
+    const existing = store.load(p.id);
+    base.current = existing ? existing.updatedAt : null;
+    persist({ ...p, createdAt: existing?.createdAt ?? p.createdAt, updatedAt: new Date().toISOString() });
+    openLoaded(store.load(p.id) ?? p, from);
   };
 
   const onChange = (p: ProductProject) => {
     current.current = p;
     dirty.current = true;
-    setView({ kind: "edit", project: p });
+    setView((v) => (v.kind === "edit" ? { ...v, project: p } : { kind: "edit", project: p }));
     setSaveStatus("saving");
     window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => persist(p), AUTOSAVE_MS);
@@ -204,7 +227,23 @@ export function App() {
     return (
       <>
         {banner}
-        <CoverStudio onBack={() => setView({ kind: "list" })} projects={projects} loadProject={(id) => store.load(id)} />
+        <CoverStudio onBack={() => setView({ kind: "list" })} projects={projects} loadProject={(id) => store.load(id)} onCreateProject={open} onColoringBook={continueAsBook} />
+      </>
+    );
+  if (view.kind === "coloring")
+    return (
+      <>
+        {banner}
+        <ColoringBookStudio
+          bookId={view.bookId}
+          onBack={() => setView({ kind: "list" })}
+          onAdvanced={() => setView({ kind: "cover" })}
+          onExport={(p, book) => {
+            // Exporting again rebuilds the pages from the book, but keeps the typography chosen in the editor (Style → Typography).
+            const before = store.load(p.id);
+            open(before ? { ...p, typography: before.typography } : p, { fromBook: book.id, startInExport: true });
+          }}
+        />
       </>
     );
   if (view.kind === "edit") {
@@ -218,10 +257,12 @@ export function App() {
         onChange={onChange}
         saveStatus={saveStatus}
         cloudLabel={cloudLabel(cloud.status)}
+        startInExport={view.startInExport}
+        backLabel={view.fromBook ? "‹ Back to the coloring book" : undefined}
         onBack={() => {
           flush();
           current.current = null;
-          setView({ kind: "list" });
+          setView(view.fromBook ? { kind: "coloring", bookId: view.fromBook } : { kind: "list" });
         }}
       />
       </>
@@ -237,6 +278,9 @@ export function App() {
       onStart={(start) => setView({ kind: "new", start })}
       onGenerate={() => setView({ kind: "ai" })}
       onCovers={() => setView({ kind: "cover" })}
+      onColoringBook={(bookId) => setView({ kind: "coloring", bookId: bookId ?? null })}
+      books={localBookStore.list()}
+      key={`home-${itemsReceived}`}
       onOpen={(id) => {
         const p = store.load(id);
         if (p) openLoaded(p);

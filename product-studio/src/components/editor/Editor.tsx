@@ -1,4 +1,5 @@
 import { LUXE_TITLE_FONT } from "../../presets/coverLuxe";
+import { BUBBLE_FONT } from "../../layouts/book/coloringLettering";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { PanelResizer, usePanelWidth } from "./PanelResizer";
 import { compositionFor, contentGeometryFor, geometryFor, resolveDocument, solvePage, type ResolvedDocument } from "../../engines/document/resolve";
@@ -13,6 +14,8 @@ import { GeometryInfo } from "../debug/GeometryInfo";
 import { ExportDialog, IssueList } from "../export/ExportDialog";
 import { PagePreview, visibleIndices } from "../preview/PagePreview";
 import { StationeryPanel } from "./StationeryPanel";
+import { moveNode } from "../../engines/recipe/bookEdit";
+import { ListPagePanel } from "./ListPagePanel";
 import { BackgroundPanel, ColorPanel, DecorationPanel, LayoutPanel, PatternPanel, SpacingPanel, TextPlacementPanel, TypographyPanel, VariantsPanel, WordingPanel, WritingTitlePanel } from "./DesignPanels";
 import type { BookNode } from "../../types/recipe";
 import { PagesPanel, PlannerSetupPanel, ProductPanel, ProductionPanel } from "./ProductionPanels";
@@ -23,7 +26,8 @@ import { LayoutAssistant } from "./LayoutAssistant";
 import { withDevotionalStructure } from "../../presets/devotionalStructures";
 import { refitAfterEdit } from "../../engines/recipe/fitRows";
 import { DesignPresetsPanel } from "./DesignPresetsPanel";
-import { AreaList, AreaView, useArea, type AreaId } from "./Areas";
+import { AreaList, AreaView, StepFooter, StepHeader, STEPS, stepOfArea, useArea, useStep, type AreaId, type StepId } from "./Areas";
+import { ArtworkPanel } from "./ArtworkPanel";
 import { ThisPageHeading, AddToPageHint } from "./ThisPage";
 import { pageInfo } from "../../engines/document/pageInfo";
 import { findPalette } from "../../presets/themes/palettes";
@@ -53,6 +57,10 @@ type Props = {
   saveStatus: "saved" | "saving" | "error";
   /** Where the project is saved beyond this device ("Saved online", "On this device only"…). */
   cloudLabel?: string;
+  /** Open with the print / export dialog showing (a Coloring Book's "Export"). */
+  startInExport?: boolean;
+  /** The back button's label (default "‹ Projects"). */
+  backLabel?: string;
 };
 
 function tryResolve(p: ProductProject): { doc: ResolvedDocument | null; error: string | null } {
@@ -63,7 +71,7 @@ function tryResolve(p: ProductProject): { doc: ResolvedDocument | null; error: s
   }
 }
 
-export function Editor({ project, onChange, onBack, saveStatus, cloudLabel }: Props) {
+export function Editor({ project, onChange, onBack, saveStatus, cloudLabel, startInExport = false, backLabel = "‹ Projects" }: Props) {
   // Open on the first real page (spread products start with a filler page).
   const [index, setIndex] = useState(() => {
     try {
@@ -73,14 +81,20 @@ export function Editor({ project, onChange, onBack, saveStatus, cloudLabel }: Pr
     }
   });
   const [debug, setDebug] = useState<DebugFlags>(DEBUG_OFF);
-  const [exporting, setExporting] = useState(false);
+  const [exporting, setExporting] = useState(startInExport);
   const panel = usePanelWidth();
   // The Neutral Cheetah Luxe script is always loaded: covers and dividers in that design use it for their title.
   // Fonts chosen for one heading or one kind of title load too (not only the Style fonts).
   const ownFonts = useMemo(() => {
     const out = new Set<string>([LUXE_TITLE_FONT]);
     if (project.layoutOptions.writingTitle?.font) out.add(project.layoutOptions.writingTitle.font);
-    const walk = (ns: BookNode[]) => ns.forEach((n) => (n.kind === "group" ? walk(n.children) : n.promptSet?.blocks.forEach((b) => b.headingFont && out.add(b.headingFont))));
+    const walk = (ns: BookNode[]) =>
+      ns.forEach((n) => {
+        if (n.kind === "group") return walk(n.children);
+        // A coloring page in bubble letters draws its words in the bubble font.
+        if (n.layoutId === "coloring-lettering") out.add(BUBBLE_FONT);
+        n.promptSet?.blocks.forEach((b) => b.headingFont && out.add(b.headingFont));
+      });
     walk(project.recipe.structure ?? []);
     for (const d of project.pageDesigns ?? []) d.promptSet.blocks.forEach((b) => b.headingFont && out.add(b.headingFont));
     return [...out];
@@ -194,6 +208,31 @@ export function Editor({ project, onChange, onBack, saveStatus, cloudLabel }: Pr
     goToMonth: (key) => doc && setIndex(Math.max(0, doc.recipe.pages.findIndex((p) => p.period.kind === "month" && p.period.key === key))),
     layoutLabel: (id) => getLayout(id).label,
   };
+  /**
+   * Browse pages ↑ ↓: move the page's step (or recipe item) one place among its neighbours. A repeating page moves
+   * everywhere it repeats; the preview follows the moved page.
+   */
+  const followMoved = useRef<{ item: string; period: string } | null>(null);
+  const movePage = (i: number, dir: -1 | 1) => {
+    const page = doc?.recipe.pages[i];
+    if (!page) return;
+    followMoved.current = { item: page.recipeItemId, period: JSON.stringify(page.period) };
+    update((p) => {
+      if (p.recipe.structure) return { ...p, recipe: { ...p.recipe, structure: moveNode(p.recipe.structure, page.recipeItemId, dir) } };
+      const items = [...p.recipe.items];
+      const a = items.findIndex((x) => x.id === page.recipeItemId), b = a + dir;
+      if (a < 0 || b < 0 || b >= items.length) return p;
+      [items[a], items[b]] = [items[b], items[a]];
+      return { ...p, recipe: { ...p.recipe, items } };
+    });
+  };
+  useEffect(() => {
+    const f = followMoved.current;
+    if (!f || !doc) return;
+    followMoved.current = null;
+    const j = doc.recipe.pages.findIndex((p) => p.recipeItemId === f.item && JSON.stringify(p.period) === f.period);
+    if (j >= 0) setIndex(j);
+  }, [doc]);
   const goToPage = (n: number) => doc && setIndex(Math.max(0, doc.recipe.pages.findIndex((p) => p.pageNumber === n)));
   // A Custom Page is built from sections: it opens straight on "Add to page".
   // Duplicate page: a new independent copy right after this one; the editor then shows the copy.
@@ -216,7 +255,21 @@ export function Editor({ project, onChange, onBack, saveStatus, cloudLabel }: Pr
   }, [doc, pendingPage]);
   // A product made from its own content opens on that content while it has none yet (add the days first).
   const awaitingContent = !!project.data?.collections.length && project.data.collections.every((c) => !c.records.length) && !!project.recipe.structure?.some((n) => n.kind === "group" && n.entries);
-  const [area, setArea] = useArea(project.productType === "custom" ? "add" : awaitingContent ? "data" : undefined);
+  const startArea: AreaId | undefined = project.productType === "custom" ? "add" : awaitingContent ? "data" : undefined;
+  const [areaChoice, setAreaChoice] = useArea(startArea);
+  // The four steps: the open area always belongs to the step in view.
+  const [stepState, goStepRaw] = useStep(project.id, startArea ? stepOfArea(startArea) : undefined, project.createdAt === project.updatedAt);
+  const step = STEPS.find((s) => s.id === stepState.step)!;
+  const singleArea = step.areas.length === 1 || step.id === "export";
+  const area: AreaId | null = areaChoice && step.areas.includes(areaChoice) ? areaChoice : singleArea ? step.areas[0] : null;
+  const goStep = (id: StepId) => {
+    goStepRaw(id);
+    setAreaChoice(null);
+  };
+  const setArea = (a: AreaId | null) => {
+    if (a && stepOfArea(a) !== stepState.step) goStepRaw(stepOfArea(a));
+    setAreaChoice(a);
+  };
   const currentItemId = doc?.recipe.pages[current]?.recipeItemId;
   const summaries: Partial<Record<AreaId, string>> = doc
     ? {
@@ -224,7 +277,8 @@ export function Editor({ project, onChange, onBack, saveStatus, cloudLabel }: Pr
         data: dataSummary(project.data),
         // A product can have no pages yet (a devotional list with no entries, an empty page list).
         layout: doc.recipe.pages[current] ? `This page: ${pageInfo(doc, current).typeLabel}` : "No pages yet",
-        style: findPalette(project.colors.paletteId)?.label ?? "Colors, background, decorations and typography",
+        style: findPalette(project.colors.paletteId)?.label ?? "Colors, fonts, covers, background and decorations",
+        artwork: project.artwork?.placements.length ? `${project.artwork.placements.length} use${project.artwork.placements.length === 1 ? "" : "s"} of your artwork` : undefined,
         setup: `${SIZE_PRESETS.find((z) => z.id === project.dimensions.sizePresetId)?.label ?? "Custom size"} · ${BINDING_PROFILES[project.production.bindingType]?.label ?? project.production.bindingType}`,
         print: check ? (check.errorCount ? `${check.errorCount} to fix before printing` : check.warningCount ? `${check.warningCount} to check` : "This page checks out") : undefined,
       }
@@ -233,7 +287,7 @@ export function Editor({ project, onChange, onBack, saveStatus, cloudLabel }: Pr
   return (
     <>
       <header className="topbar">
-        <button className="btn" onClick={onBack}>‹ Projects</button>
+        <button className="btn" onClick={onBack}>{backLabel}</button>
         <input className="name-input" value={project.name} aria-label="Project name" onChange={(e) => update((p) => ({ ...p, name: e.target.value }))} />
         <span className={`save-status ${saveStatus === "error" ? "save-status--error" : ""}`}>
           {saveStatus === "saved" ? "Saved" : saveStatus === "saving" ? "Saving…" : "Save failed (storage full?)"}
@@ -257,10 +311,11 @@ export function Editor({ project, onChange, onBack, saveStatus, cloudLabel }: Pr
 
       <div className="editor" style={{ "--ui-panel-w": `${panel.width}px` } as CSSProperties}>
         <aside className="panel" aria-label="Product controls">
+          <StepHeader state={stepState} onGo={goStep} />
           {area === null ? (
-            <AreaList summaries={summaries} onOpen={setArea} />
+            <AreaList summaries={summaries} onOpen={setArea} only={step.areas} />
           ) : (
-            <AreaView id={area} onBack={() => setArea(null)}>
+            <AreaView id={area} onBack={step.areas.length > 1 ? () => setAreaChoice(null) : undefined} backLabel={step.title}>
               {area === "pages" && doc && usage && (
                 <>
                   <PlannerSetupPanel nav={nav} project={project} update={update} doc={doc} usage={usage} />
@@ -316,9 +371,24 @@ export function Editor({ project, onChange, onBack, saveStatus, cloudLabel }: Pr
                   <ThisPageHeading doc={doc} current={current} onDuplicate={duplicateCurrent} />
                   {project.recipe.structure && <ThisPagePanel project={project} update={update} doc={doc} current={current} parts={["sections"]} />}
                   <StationeryPanel project={project} update={update} usage={usage} doc={doc} />
+                  <ListPagePanel project={project} update={update} usage={usage} />
                   <LayoutPanel nav={nav} project={project} update={update} usage={usage} part="add" />
                   <AddToPageHint doc={doc} current={current} usage={usage} />
                 </>
+              )}
+              {area === "artwork" && doc && (
+                <ArtworkPanel
+                  project={project}
+                  update={update}
+                  doc={doc}
+                  current={current}
+                  onGoTo={setIndex}
+                  onEditCoverWording={() => {
+                    const i = doc.recipe.pages.findIndex((p) => !p.filler && (p.module?.type === "cover-page" || p.module?.type === "back-cover"));
+                    if (i >= 0) setIndex(i);
+                    setArea("layout");
+                  }}
+                />
               )}
               {area === "style" && doc && usage && (
                   <>
@@ -382,12 +452,14 @@ export function Editor({ project, onChange, onBack, saveStatus, cloudLabel }: Pr
               )}
             </AreaView>
           )}
+          {step.id === "export" && area === "print" && <AreaList summaries={summaries} onOpen={setArea} only={["advanced"]} />}
+          <StepFooter state={stepState} onGo={goStep} onExport={() => setExporting(true)} canExport={!!doc} />
         </aside>
 
         <PanelResizer width={panel.width} onChange={panel.set} onReset={panel.reset} />
         <main className="stage">
           {doc ? (
-            <PagePreview doc={doc} index={current} onIndex={setIndex} debug={debug} issueIds={issueIds} />
+            <PagePreview doc={doc} index={current} onIndex={setIndex} debug={debug} issueIds={issueIds} onMove={movePage} />
           ) : (
             <div className="page-shell">
               <div className="issue issue--error">Cannot build this product: {error}</div>

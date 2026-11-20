@@ -21,9 +21,10 @@ export function styleForRole(typography: TypographySettings, role: keyof Typogra
 }
 
 /** A text node's measuring style: its role, at the fitted size when the layout fitted it. */
-export function styleForNode(typography: TypographySettings, node: { role: keyof TypographySettings["roles"]; family?: string; fit?: { sizePt: number; trackingEm?: number } }): TextStyle {
+export function styleForNode(typography: TypographySettings, node: { role: keyof TypographySettings["roles"]; family?: string; weight?: number; fit?: { sizePt: number; trackingEm?: number } }): TextStyle {
   const s0 = styleForRole(typography, node.role);
-  const s = node.family ? { ...s0, family: node.family } : s0;
+  const s1 = node.family ? { ...s0, family: node.family } : s0;
+  const s = node.weight ? { ...s1, weight: node.weight } : s1;
   return node.fit ? { ...s, sizePt: node.fit.sizePt, ...(node.fit.trackingEm !== undefined ? { trackingEm: node.fit.trackingEm } : {}) } : s;
 }
 

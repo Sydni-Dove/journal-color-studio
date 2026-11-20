@@ -43,7 +43,28 @@ export type ProductionSettings = {
 export type LayoutPlacement = "top-left" | "top-right" | "top-center";
 
 /** Per-layout user options, keyed by layout id. */
+/**
+ * List pages (Grocery List, Checklist): the sections, lines and checkbox shape. Every field optional; absent = the
+ * layout's own design (the grocery list's six categories, as many lines as fit, square checkboxes).
+ */
+export type ListPageOptions = {
+  /** Section titles, in order (Grocery List). Absent = the six built-in categories (renamed under Titles & labels). */
+  sections?: string[];
+  /** Lines per section (Grocery List) or on the page (Checklist). Absent = as many as fit. */
+  lines?: number;
+  /** Checkbox shape. Absent = square. */
+  marker?: "square" | "circle" | "none";
+  /** Writing lines (Grocery List): solid, dashed, dotted, or none (checkboxes on blank space). Absent = solid. */
+  lineStyle?: "solid" | "dashed" | "dotted" | "none";
+  /** Space between lines: compact 0.28", standard 0.35" (research 3.2.3), roomy 0.42". Absent = standard. */
+  lineSpacing?: "compact" | "standard" | "roomy";
+  /** Grocery List: one list with no section headings (in two columns when the sheet is wide enough). */
+  noSections?: boolean;
+};
+
 export type LayoutOptions = {
+  /** List pages: sections, lines and checkboxes (Grocery List, Checklist). */
+  listPage?: ListPageOptions;
   /**
    * A blank line between paragraphs of text prints as one empty line (dropped where a page breaks).
    * Absent = on; false = paragraphs follow each other with no space between them.
@@ -160,6 +181,11 @@ export type ExportSettings = {
   paper?: "page" | "letter" | "a4";
   /** Home printing only: show corner trim/cut marks around the finished page. Default false. */
   showTrimMarks?: boolean;
+  /**
+   * Home paper only: one design per sheet (default), or two designs side by side or stacked, each at its
+   * actual size (never scaled), with the sheet turned to whichever orientation fits them.
+   */
+  perSheet?: 1 | 2;
 };
 
 export type ProductVariant = {
@@ -227,6 +253,8 @@ export type ProductProject = {
   pageDesigns?: PageDesign[];
   /** The product's own data: collections of typed entries (engines/data/data.ts). Absent until the first collection. */
   data?: import("./document").ProjectData;
+  /** Uploaded artwork and where it is used (types/artwork.ts). Absent until the first image is added. */
+  artwork?: import("./artwork").ProjectArtwork;
   activeVariantId: string | null;
   origin: ProjectOrigin;
 

@@ -13,6 +13,7 @@ import { COVER_PALETTES } from "../presets/themes/palettes";
 import { jcsPaletteId } from "../design-library/palettes";
 import { COVER_SCHEMA_VERSION, newBrief, type CoverBrief, type CoverCollection, type CoverItem } from "../engines/cover/brief";
 import { summarizePalette } from "../engines/cover/prompt";
+import { announceItemsChanged, markItemDeleted } from "./itemBases";
 
 const PREFIX = "dove-product-studio:v1";
 const INDEX_KEY = `${PREFIX}:cover-index`;
@@ -64,9 +65,12 @@ export const localCoverStore: CoverStore = {
     const idx = this.list().filter((s) => s.id !== c.id);
     idx.push(summarize(c));
     localStorage.setItem(INDEX_KEY, JSON.stringify(idx));
+    itemsChanged();
   },
   remove(id) {
     try {
+      const was = this.load(id);
+      if (was) markItemDeleted("cover-collection", id, was.updatedAt);
       localStorage.removeItem(coverKey(id));
       localStorage.setItem(INDEX_KEY, JSON.stringify(this.list().filter((s) => s.id !== id)));
     } catch {
@@ -76,21 +80,33 @@ export const localCoverStore: CoverStore = {
 };
 
 /** The brief being worked on (not yet a saved collection): kept so a reload doesn't lose it. */
-export function loadDraft(): { brief: CoverBrief; items: CoverItem[]; direction: number; collectionId: string | null } | null {
+/** The draft: the brief, the set, the chosen direction and collection, and the screen in view (and the furthest reached). */
+export type CoverDraft = { brief: CoverBrief; items: CoverItem[]; direction: number; collectionId: string | null; step?: string; reached?: number; /** When it was last changed (online saving compares it). */ updatedAt?: string };
+export function loadDraft(): CoverDraft | null {
   try {
     const d = JSON.parse(safeGet(DRAFT_KEY) ?? "null");
     if (!d || typeof d !== "object") return null;
-    return { brief: normalizeBrief(d.brief), items: normalizeItems(d.items), direction: clampDirection(d.direction), collectionId: typeof d.collectionId === "string" ? d.collectionId : null };
+    return {
+      brief: normalizeBrief(d.brief), items: normalizeItems(d.items), direction: clampDirection(d.direction), collectionId: typeof d.collectionId === "string" ? d.collectionId : null,
+      ...(typeof d.step === "string" ? { step: d.step } : {}), ...(Number.isFinite(d.reached) ? { reached: Math.max(0, Math.min(9, Math.round(d.reached))) } : {}),
+      ...(typeof d.updatedAt === "string" ? { updatedAt: d.updatedAt } : {}),
+    };
   } catch {
     return null;
   }
 }
-export function saveDraft(d: { brief: CoverBrief; items: CoverItem[]; direction: number; collectionId: string | null }): void {
+export function saveDraft(d: CoverDraft): void {
   try {
-    localStorage.setItem(DRAFT_KEY, JSON.stringify(d));
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...d, updatedAt: d.updatedAt ?? new Date().toISOString() }));
+    itemsChanged();
   } catch {
     /* a convenience only */
   }
+}
+
+/** Something Cover Studio or Coloring Book saved changed: online saving picks it up (persistence/itemsSync.ts). */
+export function itemsChanged(): void {
+  announceItemsChanged();
 }
 export function clearDraft(): void {
   try {
@@ -142,6 +158,92 @@ export function normalizeBrief(raw: unknown): CoverBrief {
     bleed: numOr(r.bleed, d.bleed), safe: numOr(r.safe, d.safe), medium: r.medium === "Digital" ? "Digital" : "Print", dpi: numOr(r.dpi, d.dpi),
     title: text(r.title, d.title), subtitle: text(r.subtitle, d.subtitle), etsyTitle: text(r.etsyTitle, d.etsyTitle), angle: text(r.angle, d.angle), tags: text(r.tags, d.tags),
     mockups: text(r.mockups, d.mockups), status: text(r.status, d.status),
+    // Saved before categories existed: a cover, with the other categories' details at their defaults.
+    category: r.category === "interior" || r.category === "character" || r.category === "collection" || r.category === "coloring-cover" ? r.category : "cover",
+    typography: text(r.typography, d.typography),
+    pageKind: text(r.pageKind, d.pageKind), artUse: text(r.artUse, d.artUse), artPlacement: text(r.artPlacement, d.artPlacement), clearArea: text(r.clearArea, d.clearArea),
+    characters: text(r.characters, d.characters), ageGroup: text(r.ageGroup, d.ageGroup), expressions: text(r.expressions, d.expressions),
+    characterCount: Math.max(1, Math.min(12, Math.round(numOr(r.characterCount, d.characterCount)))), characterBackground: r.characterBackground === "scene" ? "scene" : "transparent", scene: text(r.scene, d.scene),
+    ...normalizeColoring(r, d),
+  };
+}
+
+const oneOf = <T extends string>(v: unknown, list: readonly T[], d: T): T => (list.includes(v as T) ? (v as T) : d);
+const optText = (v: unknown): string | undefined => (typeof v === "string" && v ? v : undefined);
+const THICK = ["Thin", "Medium", "Thick"] as const, COMPLEX = ["Simple", "Moderate", "Detailed"] as const;
+const OUTPUTS = ["coloring-page", "illustration", "worksheet", "drawing-page", "reference-sheet"] as const;
+
+function normalizeTypography(raw: unknown, d: CoverBrief["pageTypography"]): CoverBrief["pageTypography"] {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  return {
+    titleFont: text(r.titleFont, d.titleFont), scriptureFont: text(r.scriptureFont, d.scriptureFont),
+    align: r.align === "left" || r.align === "right" ? r.align : "center", titleSizePt: Math.max(10, Math.min(72, numOr(r.titleSizePt, d.titleSizePt))),
+    ...(typeof r.textSizePt === "number" && Number.isFinite(r.textSizePt) ? { textSizePt: Math.max(8, Math.min(36, r.textSizePt)) } : {}),
+    ...(r.letterStyle === "bubble" ? { letterStyle: "bubble" as const } : {}),
+    ...(typeof r.bubbleTitlePt === "number" && Number.isFinite(r.bubbleTitlePt) ? { bubbleTitlePt: Math.max(24, Math.min(144, r.bubbleTitlePt)) } : {}),
+    ...(typeof r.bubbleVersePt === "number" && Number.isFinite(r.bubbleVersePt) ? { bubbleVersePt: Math.max(16, Math.min(72, r.bubbleVersePt)) } : {}),
+    ...(typeof r.bubbleRaiseIn === "number" && Number.isFinite(r.bubbleRaiseIn) && r.bubbleRaiseIn > 0 ? { bubbleRaiseIn: Math.min(2, r.bubbleRaiseIn) } : {}),
+  };
+}
+
+/** A page's own content choice: only the parts it set. */
+function normalizeContent(c: Record<string, unknown>): Partial<import("../engines/coloringBook/book").PageContent> {
+  return {
+    ...(typeof c.title === "boolean" ? { title: c.title } : {}),
+    ...(c.scripture === "full" || c.scripture === "reference" || c.scripture === "none" ? { scripture: c.scripture } : {}),
+    ...(typeof c.lesson === "boolean" ? { lesson: c.lesson } : {}),
+    ...(typeof c.customText === "boolean" ? { customText: c.customText } : {}),
+  };
+}
+
+/** The cast, scenes, coloring defaults and coloring-cover choices (absent in collections saved before them). */
+function normalizeColoring(r: Record<string, unknown>, d: CoverBrief): Partial<CoverBrief> {
+  const cast = (Array.isArray(r.cast) ? r.cast : []).flatMap((x) => {
+    const c = (x ?? {}) as Record<string, unknown>;
+    if (typeof c.id !== "string") return [];
+    return [{
+      id: c.id, name: text(c.name, ""), description: text(c.description, ""), traits: text(c.traits, ""),
+      ...(optText(c.refId) ? { refId: optText(c.refId), refName: optText(c.refName) } : {}),
+      ...Object.fromEntries((["pose", "expression", "outfit", "hairstyle", "age", "face", "hair", "hairAccessories", "proportions", "clothing", "accessories"] as const).flatMap((k) => (optText(c[k]) ? [[k, c[k]]] : []))),
+    }];
+  });
+  const ids = new Set(cast.map((c) => c.id));
+  const scenes = (Array.isArray(r.scenes) ? r.scenes : []).flatMap((x) => {
+    const c = (x ?? {}) as Record<string, unknown>;
+    if (typeof c.id !== "string") return [];
+    return [{
+      id: c.id, title: text(c.title, ""), text: text(c.text, ""),
+      ...(Array.isArray(c.castIds) ? { castIds: c.castIds.filter((i): i is string => typeof i === "string" && ids.has(i)) } : {}),
+      ...(THICK.includes(c.lineThickness as never) ? { lineThickness: c.lineThickness as (typeof THICK)[number] } : {}),
+      ...(COMPLEX.includes(c.complexity as never) ? { complexity: c.complexity as (typeof COMPLEX)[number] } : {}),
+      ...(OUTPUTS.includes(c.output as never) ? { output: c.output as (typeof OUTPUTS)[number] } : {}),
+      ...Object.fromEntries((["pageTitle", "scriptureRef", "verseText", "lessonText", "illustrationId", "illustrationName", "approvedAt", "rejectNotes", "customText", "verseApproved", "suggestedRef", "characters", "actions", "styleNotes", "verseExcerpt"] as const).flatMap((k) => (optText(c[k]) ? [[k, c[k]]] : []))),
+      ...(c.verseUse === "excerpt" ? { verseUse: "excerpt" as const } : {}),
+      ...(Number(c.illustrationW) > 0 && Number(c.illustrationH) > 0 ? { illustrationW: Number(c.illustrationW), illustrationH: Number(c.illustrationH) } : {}),
+      ...(c.scriptureMode === "art" || c.scriptureMode === "page" ? { scriptureMode: c.scriptureMode as "art" | "page" } : {}),
+      ...(c.verseSource === "customer" || c.verseSource === "public-domain" ? { verseSource: c.verseSource as "customer" | "public-domain" } : {}),
+      ...(c.content && typeof c.content === "object" ? { content: normalizeContent(c.content as Record<string, unknown>) } : {}),
+      ...(Number(c.attempts) > 0 ? { attempts: Math.round(Number(c.attempts)) } : {}),
+      ...(c.checks && typeof c.checks === "object" ? { checks: Object.fromEntries(Object.entries(c.checks as Record<string, unknown>).filter(([, v]) => typeof v === "boolean")) as Record<string, boolean> } : {}),
+    }];
+  });
+  return {
+    cast, useGroupRef: r.useGroupRef === true, keepConsistent: r.keepConsistent !== false, castLocked: r.castLocked === true, useRefs: r.useRefs !== false,
+    illustrationStyle: text(r.illustrationStyle, d.illustrationStyle), proportions: text(r.proportions, d.proportions), hairClothingDetail: text(r.hairClothingDetail, d.hairClothingDetail),
+    backgroundDensity: text(r.backgroundDensity, d.backgroundDensity), coloringArea: text(r.coloringArea, d.coloringArea), gutter: Math.max(0, Math.min(2, numOr(r.gutter, d.gutter))), blankBacks: r.blankBacks !== false,
+    pageTypography: normalizeTypography(r.pageTypography, d.pageTypography),
+    ...(optText(r.groupRefId) ? { groupRefId: optText(r.groupRefId), groupRefName: optText(r.groupRefName) } : {}),
+    castSelected: Array.isArray(r.castSelected) ? r.castSelected.filter((i): i is string => typeof i === "string" && ids.has(i)) : cast.map((c) => c.id),
+    coloringStyle: r.coloringStyle === "hybrid" ? "hybrid" : "outline",
+    lineThickness: oneOf(r.lineThickness, THICK, d.lineThickness), complexity: oneOf(r.complexity, COMPLEX, d.complexity), output: oneOf(r.output, OUTPUTS, d.output),
+    textPlacement: oneOf(r.textPlacement, ["top", "bottom", "top-and-bottom", "none"] as const, d.textPlacement),
+    coverage: Math.max(20, Math.min(100, Math.round(numOr(r.coverage, d.coverage)))), translation: text(r.translation, d.translation), verseVerified: r.verseVerified === true, scriptureMode: r.scriptureMode === "art" ? "art" : "page",
+    sceneSource: text(r.sceneSource, ""), scenes,
+    coverOutput: r.coverOutput === "complete-concept" ? "complete-concept" : "artwork-only",
+    coverColor: text(r.coverColor, ""), coverComposition: text(r.coverComposition, ""), titlePlacement: text(r.titlePlacement, ""), coverBackground: text(r.coverBackground, ""),
+    illustrationScale: text(r.illustrationScale, ""), starterScene: text(r.starterScene, ""),
+    ...(optText(r.finishedCoverId) ? { finishedCoverId: optText(r.finishedCoverId), finishedCoverName: optText(r.finishedCoverName) } : {}),
+    ...(optText(r.coverApproved) ? { coverApproved: optText(r.coverApproved) } : {}),
   };
 }
 

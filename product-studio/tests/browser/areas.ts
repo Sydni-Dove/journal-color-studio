@@ -1,15 +1,31 @@
-/** Editor areas (Pages, Page layout, Writing, Add to page, Style, Page setup, Print & export, Advanced). */
+/**
+ * Editor areas (Pages, Your content, Page layout, Writing, Add to page, Artwork, Style, Page setup, Print & export,
+ * Advanced), grouped in the editor's four steps: 1 Product setup, 2 Pages and content, 3 Artwork and style,
+ * 4 Preview and export.
+ */
 import type { Page } from "playwright-core";
 
-export type Area = "pages" | "layout" | "writing" | "add" | "style" | "setup" | "print" | "advanced";
+export type Area = "pages" | "data" | "layout" | "writing" | "add" | "artwork" | "style" | "setup" | "print" | "advanced";
+const STEP_OF: Record<Area, number> = { setup: 1, pages: 2, data: 2, layout: 2, writing: 2, add: 2, artwork: 3, style: 3, print: 4, advanced: 4 };
 
-/** Open one area of the editor's settings (from the list, or from another open area). */
+/** Open one step (1–4) of the editor. */
+export async function openStep(page: Page, n: number): Promise<void> {
+  await page.locator(".steps__dot").nth(n - 1).click();
+  await page.locator(`.steps__item--current .steps__dot`).filter({ hasText: String(n) }).waitFor();
+}
+
+/** Open one area of the editor's settings (its step, then the area from the step's list). */
 export async function openArea(page: Page, area: Area): Promise<void> {
   const open = page.locator(`section.area[data-area="${area}"]`);
   if (await open.count()) return;
-  const back = page.getByRole("button", { name: "‹ All settings" });
+  const step = STEP_OF[area];
+  if (!(await page.locator(`.steps__item--current .steps__dot`).filter({ hasText: String(step) }).count())) await openStep(page, step);
+  if (await open.count()) return;
+  const back = page.locator("section.area .area__back");
   if (await back.count()) await back.click();
-  await page.locator(`.area-link[data-area="${area}"]`).click();
+  const link = page.locator(`.area-link[data-area="${area}"]`);
+  await link.waitFor();
+  await link.click();
   await open.waitFor();
 }
 

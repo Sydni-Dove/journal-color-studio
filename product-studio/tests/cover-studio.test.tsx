@@ -10,7 +10,7 @@ import { newBrief, withProduct, type CoverBrief, type CoverItem } from "../src/e
 import { briefFromProject } from "../src/engines/cover/fromProject";
 import { CHATGPT_HOME, CHATGPT_URL_MAX, chatgptPromptUrl, fitsInAddress, launchChatGpt } from "../src/engines/cover/launch";
 import { DIRECTIONS, STARTER_SET, STYLE_GROUPS, STYLE_GUIDES } from "../src/engines/cover/guides";
-import { createBlocker, handoffPrompt, paletteColors, paletteSpec, promptBlocker, promptFor, setPrompts } from "../src/engines/cover/prompt";
+import { NEVER_DRAW_SIZES, createBlocker, handoffPrompt, paletteColors, paletteSpec, promptBlocker, promptFor, setPrompts } from "../src/engines/cover/prompt";
 import { fmt, resolveCoverSpec, specLine } from "../src/engines/cover/spec";
 import {
   duplicateAndRecolor, exportCollectionJson, importedPaletteId, loadDraft, localCoverStore, newCollection, normalizeBrief, parseCollectionFile, saveDraft,
@@ -19,6 +19,7 @@ import { localProjectStore } from "../src/persistence/projectStore";
 import { COVER_PALETTES, PALETTES } from "../src/presets/themes/palettes";
 import { TEST_PRODUCTS } from "../src/presets/products/testProducts";
 import { GOLDEN_PROMPTS } from "./fixtures/coverGolden";
+import { categoryBlocker, categoryPrompt } from "../src/engines/cover/categories";
 import { GENERATOR_PALETTES } from "./fixtures/coverGeneratorPalettes";
 
 function memoryStorage() {
@@ -45,7 +46,8 @@ describe("prompts keep the generator's wording", () => {
   for (const g of GOLDEN_PROMPTS) {
     it(`${g.name}: identical to the generator's own prompt`, () => {
       const brief = normalizeBrief(g.brief);
-      expect(promptFor(brief, g.dir, g.item)).toBe(g.expected);
+      // The generator's prompt word for word, plus the one sentence added after a generated cover printed its own pixel size.
+      expect(promptFor(brief, g.dir, g.item)).toBe(g.expected.replace("do not claim it is print-ready.", `do not claim it is print-ready. ${NEVER_DRAW_SIZES}`));
     });
   }
 
@@ -332,23 +334,110 @@ describe("nothing else changes", () => {
   });
 });
 
-describe("the screen", () => {
-  const html = renderToStaticMarkup(<CoverStudio onBack={() => {}} projects={[]} loadProject={() => null} />);
-  it("shows the brief, the live specification, the five directions, the set and the library", () => {
-    for (const t of ["Cover Studio", "1 · Collection brief", "2 · Product &amp; print setup", "3 · Cover text &amp; listing", "Live print specification", "Design directions", "Coordinated set", "Collection library"]) expect(html).toContain(t);
-    expect((html.match(/data-direction="/g) ?? []).length).toBe(5);
-    expect(html).toContain("6.25 × 9.25 in");
-    expect(html).toContain("1,875 × 2,775 px");
+describe("the screen: four steps", () => {
+  /** The screen as it opens on a step (the step comes from the saved draft, as after a reload). */
+  const screen = (step: string, brief: CoverBrief = newBrief(), items: CoverItem[] = []) => {
+    saveDraft({ brief, items, direction: 0, collectionId: null, step, reached: 3 });
+    return renderToStaticMarkup(<CoverStudio onBack={() => {}} projects={[]} loadProject={() => null} />);
+  };
+  it("step 1 · Collection, under the category tabs (with the coloring book cover), and the saved collections", () => {
+    const html = screen("collection");
+    expect(html).toContain("Step 1 of 4");
+    for (const t of ["Cover Artwork", "Coloring Book Cover", "Interior Page Design", "Children’s Character Illustrations", "Coordinated Collection Design", "Your saved collections"]) expect(html).toContain(t);
+    expect((html.match(/role="tab"/g) ?? []).length).toBe(5);
+    // The step title and Back / Next come right after the tabs.
+    expect(html.indexOf('class="steps__nav"')).toBeGreaterThan(html.indexOf('role="tablist"'));
+    expect(html.indexOf('class="steps__nav"')).toBeLessThan(html.indexOf('class="cover-step"'));
+    // A draft saved on the old first screen ("category") opens on Collection.
+    expect(screen("category")).toContain("Step 1 of 4");
+    expect(html).toContain("‹ Back");
+    expect(html).toContain("Next ›");
   });
-  it("reuses the studio's palette picker, with named swatches and the exact hex values", () => {
+  it("step 2 · Art direction: style, the studio's palette picker with exact hex values, typography, the five directions", () => {
+    const html = screen("direction");
+    expect(html).toContain("Step 2 of 4");
     expect(html).toContain('class="palette-picker"');
     expect(html).toContain('data-testid="palette-hexes"');
     expect(html).toContain("#5B0610");
+    expect(html).toContain("Typography");
+    expect((html.match(/data-direction="/g) ?? []).length).toBe(5);
+    // Interior art has no cover composition.
+    expect((screen("direction", newBrief({ category: "interior" })).match(/data-direction="/g) ?? []).length).toBe(0);
   });
-  it("asks for a title first and says plainly that ChatGPT is a handoff", () => {
-    expect(html).toContain("Add a cover title, then choose Generate directions.");
+  it("step 3 · Artwork details: what each category needs, advanced options folded away", () => {
+    const cover = screen("details");
+    expect(cover).toContain("Cover title");
+    expect(cover).toMatch(/<details class="section cover-advanced"><summary>Advanced options/);
+    expect(cover).toContain("Bleed, each edge (in)");
+    expect(screen("details", newBrief({ category: "interior" }))).toContain("Artwork placement");
+    expect(screen("cast", newBrief({ category: "character" }))).toContain("Your characters");
+    expect(screen("scenes", newBrief({ category: "character" }))).toContain("Split into scenes");
+    expect(screen("details", newBrief({ category: "collection" }))).toContain("Products in the set");
+  });
+  it("step 4 · Review and copy: the complete prompt, the live specification, Edit for every earlier step", () => {
+    const html = screen("review", titled());
+    expect(html).toContain("Step 4 of 4");
+    expect((html.match(/>Edit</g) ?? []).length).toBe(3);
+    expect(html).toContain("Exact cover title: “Rooted in Hope”");
+    expect(html).toContain("6.25 × 9.25 in");
+    expect(html).toContain("1,875 × 2,775 px");
     expect(html).toContain("Product Studio does not make images.");
-    expect(html).toMatch(/data-testid="generate-chatgpt"[^>]*disabled|disabled[^>]*data-testid="generate-chatgpt"/);
+  });
+  it("asks for what is missing first: a title for a cover, the characters for illustrations", () => {
+    const cover = screen("review");
+    expect(cover).toContain("Add a cover title: the prompt never uses a placeholder title.");
+    expect(cover).toMatch(/data-testid="generate-chatgpt"[^>]*disabled|disabled[^>]*data-testid="generate-chatgpt"/);
+    expect(screen("review", newBrief({ category: "character" }))).toContain("Add your characters (Cast) or your scenes first.");
+  });
+});
+
+describe("the four categories' prompts carry the palette and the category's own details", () => {
+  const pal = COVER_PALETTES.find((p) => p.id === "neutral-cheetah-luxe")!;
+  const hexes = paletteColors(newBrief({ palette: pal.id }));
+  it("cover: the generator's prompt, exactly, unless a lettering direction is chosen", () => {
+    const b = titled({ palette: pal.id });
+    expect(categoryPrompt(b, 2, [])).toBe(promptFor(b, 2));
+    const t = categoryPrompt({ ...b, typography: "Elegant flowing script" }, 2, []);
+    expect(t).toContain("Typography: Elegant flowing script.");
+    for (const h of hexes) expect(t).toContain(h);
+  });
+  it("interior page: art only (no lines, grids or text), its placement and writing space, transparent PNG running off the edges it touches", () => {
+    const b = newBrief({ category: "interior", palette: pal.id, size: "6×9", pageKind: "To-do list page", artUse: "Corner illustration", artPlacement: "Bottom right corner", clearArea: "Keep the center two-thirds clear", imagery: "dots and stripes" });
+    const p = categoryPrompt(b, 0, []);
+    for (const t of ["to-do list page", "draw NO lines, grids, boxes, text", "Placement: Bottom right corner", "run off the bottom and right edges", "Keep the center two-thirds clear", "transparent background", "dots and stripes"]) expect(p).toContain(t);
+    for (const h of hexes) expect(p).toContain(h);
+    expect(categoryBlocker(b)).toBeNull();
+    const bg = categoryPrompt({ ...b, artUse: "Page background" }, 0, []);
+    expect(bg).toContain("Fill the whole canvas edge to edge, into the bleed.");
+    expect(bg).toContain("1875 × 2775 pixels");
+  });
+  it("children's characters: the cast, age group, poses, consistency and background", () => {
+    const b = newBrief({ category: "character", palette: pal.id, characters: "Maya, 7: curly hair in two puffs, yellow raincoat.", ageGroup: "Ages 4–8", expressions: "praying, sharing a snack", characterCount: 6 });
+    const p = categoryPrompt(b, 0, []);
+    for (const t of ["Maya, 7: curly hair in two puffs, yellow raincoat.", "ages 4–8", "praying, sharing a snack", "6 separate character illustrations", "exactly consistent", "transparent background"]) expect(p).toContain(t);
+    for (const h of hexes) expect(p).toContain(h);
+    expect(categoryPrompt({ ...b, characterBackground: "scene", scene: "a church picnic" }, 0, [])).toContain("a church picnic");
+    expect(categoryBlocker({ ...b, characters: " " })).toMatch(/Add your characters/);
+  });
+  it("coordinated collection: one design system, then every product in the set (the starter set if none)", () => {
+    const b = titled({ category: "collection", palette: pal.id, typography: "Modern clean sans-serif" });
+    const items: CoverItem[] = [{ id: "a", product: "Journal", size: "6×9", status: "Idea" }, { id: "b", product: "Bookmark", size: "2×6", status: "Idea" }];
+    const p = categoryPrompt(b, 4, items);
+    expect(p).toContain("COORDINATED COLLECTION DESIGN SYSTEM");
+    expect(p).toContain("Pieces: Journal (6×9 in), Bookmark (2×6 in)");
+    expect(p).toContain("one lettering direction (Modern clean sans-serif)");
+    expect(p).toContain(promptFor(b, 4, items[1]));
+    for (const h of hexes) expect(p).toContain(h);
+    expect(categoryPrompt(b, 0, [])).toContain(`Pieces: ${STARTER_SET.map((s) => `${s.product} (${s.size} in)`).join(", ")}`);
+  });
+  it("a collection saved before categories opens as a cover; the new details are saved and reopened", () => {
+    const old = JSON.parse(JSON.stringify(titled())) as Record<string, unknown>;
+    for (const k of ["category", "typography", "pageKind", "artUse", "artPlacement", "clearArea", "characters", "ageGroup", "expressions", "characterCount", "characterBackground", "scene"]) delete old[k];
+    expect(normalizeBrief(old).category).toBe("cover");
+    const b = newBrief({ category: "character", characters: "Eli", characterCount: 3, characterBackground: "scene", scene: "a garden", typography: "Hand-lettered brush" });
+    expect(normalizeBrief(JSON.parse(JSON.stringify(b)))).toEqual(b);
+    saveDraft({ brief: b, items: [], direction: 1, collectionId: null, step: "details", reached: 2 });
+    expect(loadDraft()).toMatchObject({ step: "details", reached: 2, brief: { category: "character", characters: "Eli" } });
   });
 });
 

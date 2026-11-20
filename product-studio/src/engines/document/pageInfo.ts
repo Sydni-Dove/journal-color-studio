@@ -15,6 +15,7 @@ import type { ResolvedDocument } from "./resolve";
 export type PageCategory =
   | "cover"
   | "divider"
+  | "yearly"
   | "monthly"
   | "weekly"
   | "daily"
@@ -28,6 +29,7 @@ export type PageCategory =
 
 /** User-facing names, in the order the filter lists them. */
 export const PAGE_CATEGORIES: { id: PageCategory; label: string; plural: string }[] = [
+  { id: "yearly", label: "Yearly Calendar", plural: "Yearly" },
   { id: "monthly", label: "Monthly Planner", plural: "Monthly" },
   { id: "weekly", label: "Weekly Planner", plural: "Weekly" },
   { id: "daily", label: "Daily Planner", plural: "Daily" },
@@ -67,6 +69,11 @@ const LAYOUT_CATEGORY: Record<string, PageCategory> = {
   "back-cover-page": "cover",
   "divider-page": "divider",
   "planner-monthly": "monthly",
+  "year-at-a-glance": "yearly",
+  "year-at-a-glance-spread": "yearly",
+  "year-linear": "yearly",
+  "year-in-pixels": "yearly",
+  "notepad-checklist": "notes",
   "planner-weekly-spread": "weekly",
   "weekly-plan-spread": "weekly",
   "weekly-plan-mwg-spread": "weekly",
@@ -92,6 +99,7 @@ const MODULE_CATEGORY: Partial<Record<string, PageCategory>> = {
   notes: "notes",
   "daily-planner": "daily",
   "monthly-calendar": "monthly",
+  "yearly-calendar": "yearly",
   guided: "journal",
   custom: "journal",
 };

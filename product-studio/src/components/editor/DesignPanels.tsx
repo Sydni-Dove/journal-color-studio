@@ -601,6 +601,9 @@ export function ColorPanel({ project, update, usage }: PanelProps) {
   const paper = project.colors.paper ?? "palette";
   const count = arrangementsOf(palette.colors, paper === "white" ? WHITE_PAPER : palette.colors.background).length;
   const at = Math.abs(project.colors.arrangement ?? 0) % count;
+  const arrangements = arrangementsOf(palette.colors, paper === "white" ? WHITE_PAPER : palette.colors.background);
+  // The palette's own colors (not the paper), to choose from for each use.
+  const swatches = [...new Set(Object.values(palette.colors).filter((h): h is string => typeof h === "string" && HEX.test(h)).map((h) => h.toUpperCase()))].filter((h) => h !== (paper === "white" ? WHITE_PAPER : palette.colors.background).toUpperCase());
   const nextArrangement = () => update((p) => ({ ...p, colors: { ...p.colors, overrides: {}, arrangement: ((p.colors.arrangement ?? 0) + 1) % count || undefined } }));
   return (
     <Section title="Colors" open>
@@ -615,10 +618,52 @@ export function ColorPanel({ project, update, usage }: PanelProps) {
       {count > 1 && (
         <div className="color-arrangement" data-testid="color-arrangement">
           <p className="hint">
-            Color arrangement {at + 1} of {count}: tap the chosen palette again (or the button) to swap which color is used for titles, lines and accents. Only this palette's colors are used.
+            Color arrangement {at + 1} of {count}: which of this palette's colors is used for titles, lines and accents. Pick one, or tap the chosen palette again to step through them.
           </p>
+          <div className="arrangement-grid" role="radiogroup" aria-label="Color arrangement">
+            {arrangements.map((a, i) => (
+              <button
+                key={i}
+                type="button"
+                role="radio"
+                aria-checked={i === at && !Object.keys(project.colors.overrides).length}
+                aria-label={`Arrangement ${i + 1}`}
+                className="arrangement-card"
+                onClick={() => update((p) => ({ ...p, colors: { ...p.colors, overrides: {}, arrangement: i || undefined } }))}
+              >
+                <span className="arrangement-card__title" style={{ color: a.primary }}>Aa</span>
+                <span className="arrangement-card__bar" style={{ background: a.lineArt }} />
+                <span className="arrangement-card__dots">{[a.primary, a.accent, a.decorativeAccent].map((h, k) => <i key={k} style={{ background: h }} />)}</span>
+              </button>
+            ))}
+          </div>
           <button type="button" className="btn" onClick={nextArrangement}>Try another arrangement</button>
         </div>
+      )}
+      {editable.length > 0 && swatches.length > 1 && (
+        <details className="palette-roles" data-testid="palette-roles">
+          <summary>Swap colors within this palette, one use at a time</summary>
+          <p className="hint">Each use can take any of this palette's colors. “Fine-tune” below still allows any color.</p>
+          {editable.map((t) => (
+            <div key={t} className="palette-role">
+              <span className="palette-role__label">{TOKEN_LABEL[t]}</span>
+              <span className="palette-role__swatches" role="radiogroup" aria-label={`${TOKEN_LABEL[t]} color`}>
+                {swatches.map((h) => (
+                  <button
+                    key={h}
+                    type="button"
+                    role="radio"
+                    aria-checked={(effective[t] ?? "").toLowerCase() === h.toLowerCase()}
+                    aria-label={`${TOKEN_LABEL[t]}: ${h}`}
+                    className="palette-role__swatch"
+                    style={{ background: h }}
+                    onClick={() => setLook(update, { colors: { [t]: h } })}
+                  />
+                ))}
+              </span>
+            </div>
+          ))}
+        </details>
       )}
       <Segmented<"palette" | "white">
         label="Paper"
