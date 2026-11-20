@@ -136,10 +136,14 @@ export function withManuscriptDays(r: Raw, content: string): { r: Raw; note: str
   const sections = r.sections.filter(isObj);
   const comps = (s: Raw) => (Array.isArray(s.components) ? s.components.filter(isObj) : []);
   const bound = (c: Raw) => typeof c.fromEntryField === "string" && !!c.fromEntryField.trim();
-  const daily = sections.filter((s) => comps(s).some(bound));
-  if (!daily.length) return { r, note: null };
   const ms = manuscriptDays(content);
   if (!ms) return { r, note: null };
+  // The AI's daily page: one printing entry fields, or (live test, 2026-11-20, second answer) one "copied" once per
+  // day of the manuscript (21 copies for 21 days) holding placeholders instead.
+  const copiesPerDay = (s: Raw) => isObj(s.repeat) && s.repeat.mode === "copies" && Math.round(Number(s.repeat.count)) === ms.days.length;
+  const bySection = sections.filter((s) => comps(s).some(bound));
+  const daily = bySection.length ? bySection : sections.filter(copiesPerDay);
+  if (!daily.length) return { r, note: null };
 
   // Only places some day fills (a slot with words); the shared title lines print as fixed headings.
   const filled = ms.slots.filter((s) => s.label !== null || ms.days.some((d) => d.values.get(s.key)?.trim()));

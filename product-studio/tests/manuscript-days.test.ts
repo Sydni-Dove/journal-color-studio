@@ -102,4 +102,16 @@ describe("manuscript days", () => {
     const b = checkSpec(JSON.stringify(AI), { description: "A fasting journal", content: "Welcome to these days of prayer." });
     expect(b.problems.some((p) => /were read from your manuscript/.test(p.message))).toBe(false);
   });
+
+  it("also fills a page the AI copied once per day with placeholders instead of entry fields", () => {
+    const copied = { ...AI, sections: [AI.sections[0], section("days", "Day {#}", [part("text", { text: "Daily devotional text from the manuscript", source: "user" }), part("writing", { label: "Reflection", lines: 6 })], { repeat: { mode: "copies", count: 3 } }), AI.sections[2]] };
+    const c = checkSpec(JSON.stringify(copied), { description: "A fasting journal", content: MANUSCRIPT });
+    expect(c.problems.some((p) => /Your 3 days were read/.test(p.message))).toBe(true);
+    expect(c.spec.entries?.records).toHaveLength(3);
+    expect(c.spec.sections.filter((s) => s.repeat.mode === "per-entry")).toHaveLength(2);
+    expect(c.spec.sections.some((s) => s.repeat.mode === "copies")).toBe(false);
+    // A copied page whose count isn't the number of days (a blank log) is left alone.
+    const log = { ...copied, sections: [copied.sections[0], { ...copied.sections[1], repeat: { mode: "copies", count: 30 } }] };
+    expect(checkSpec(JSON.stringify(log), { description: "A fasting journal", content: MANUSCRIPT }).problems.some((p) => /were read from your manuscript/.test(p.message))).toBe(false);
+  });
 });
