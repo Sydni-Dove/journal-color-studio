@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { planSync, saveOnline, supabase, supabaseBackend, type CloudBackend, type Session } from "../persistence/cloud";
 import { duplicateProject, type ProjectStore } from "../persistence/projectStore";
 import { copyName } from "../persistence/copyNames";
+import { saveErrorMessage, signInErrorMessage } from "../persistence/saveErrors";
 import { storageBases, type SyncBases } from "../persistence/sync";
 import type { ProductProject } from "../types/project";
 
@@ -39,7 +40,7 @@ export function useCloud({ store, onLocalChanged, onEvent }: Hooks, backendFor: 
       setError(null);
     } catch (e) {
       setStatus(navigator.onLine === false ? "offline" : "error");
-      setError((e as Error).message ?? String(e));
+      setError(saveErrorMessage(e));
     }
   }, [store]);
 
@@ -87,7 +88,7 @@ export function useCloud({ store, onLocalChanged, onEvent }: Hooks, backendFor: 
     } catch (e) {
       // Kept on this device; the next sync sends it.
       setStatus(navigator.onLine === false ? "offline" : "error");
-      setError((e as Error).message ?? String(e));
+      setError(saveErrorMessage(e));
     }
   }, [store]);
 
@@ -101,8 +102,14 @@ export function useCloud({ store, onLocalChanged, onEvent }: Hooks, backendFor: 
   }, [store]);
 
   const signIn = async (email: string, password: string) => {
-    const { error: e } = await supabase().auth.signInWithPassword({ email: email.trim(), password });
-    if (e) throw new Error(e.message === "Invalid login credentials" ? "That email and password don't match a Dove Expressions account." : e.message);
+    let e: unknown;
+    try {
+      ({ error: e } = await supabase().auth.signInWithPassword({ email: email.trim(), password }));
+    } catch (thrown) {
+      e = thrown;
+    }
+    // A server that couldn't be reached is never reported as a wrong password.
+    if (e) throw new Error(signInErrorMessage(e));
   };
   const signOut = async () => {
     await supabase().auth.signOut();

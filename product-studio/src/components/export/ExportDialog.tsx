@@ -2,8 +2,9 @@ import { plainIssue, SEVERITY_LABEL } from "../help/plainIssues";
 import { TechnicalDetails } from "../help/visuals";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ResolvedDocument } from "../../engines/document/resolve";
-import { planPrint } from "../../engines/print/printPlan";
-import { compositionFor, contentGeometryFor, solvePage } from "../../engines/document/resolve";
+import { planPrint, twoPerSheetSizes } from "../../engines/print/printPlan";
+import { artworkFor, compositionFor, contentGeometryFor, solvePage } from "../../engines/document/resolve";
+import { ensureArtworkLoaded } from "../../engines/artwork/store";
 import { coverSurfaceColors, coverSurfaceTheme } from "../../design-library/coverSurfaces";
 import { rasterRequests } from "../../themes/decorationPlan";
 import { prepareRasters } from "../../themes/recolor";
@@ -127,6 +128,14 @@ export function ExportDialog({ doc, usage, currentIndex, fontsReady, onClose, on
         return rasterRequests([page], coverSurfaceTheme(surface.assetId), coverSurfaceColors(surface.assetId, surface.ownColors, doc.colors));
       });
       await prepareRasters([...rasterRequests(pages, doc.background, doc.colors), ...rasterRequests(pages, doc.decorative, doc.colors), ...surfaces]);
+      // Uploaded artwork on the printed pages must be on this device and loaded.
+      const artIds = [...new Set([...new Set(plan.sequence)].flatMap((i) => artworkFor(doc, i).map((a) => a.assetId)))];
+      const missing = await ensureArtworkLoaded(artIds);
+      if (missing.length) {
+        const names = missing.map((id) => doc.project.artwork?.assets.find((a) => a.id === id)?.name ?? "artwork");
+        setPrepError(`Artwork isn't on this device: ${names.join(", ")}. Add it again under Artwork and style → Artwork, then print.`);
+        return;
+      }
       setPrinting(true);
     } catch (e) {
       setPrepError(`Decoration could not be prepared: ${(e as Error).message}`);
@@ -187,6 +196,10 @@ export function ExportDialog({ doc, usage, currentIndex, fontsReady, onClose, on
   }, [printing]);
 
   const isPad = doc.binding.sheetCountIsMetadata;
+  const two = plan.perSheet === 2;
+  const home = two || (!!settings.paper && settings.paper !== "page");
+  const paperLabel = settings.paper === "a4" ? "A4" : "Letter";
+  const sizes = useMemo(() => (two ? twoPerSheetSizes(doc.project.productType, settings.paper === "a4" ? "a4" : "letter") : []), [two, doc.project.productType, settings.paper]);
 
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Export">
@@ -234,30 +247,67 @@ export function ExportDialog({ doc, usage, currentIndex, fontsReady, onClose, on
           />
         )}
         <Segmented
+          label="Designs per sheet"
+          value={String(settings.perSheet ?? 1)}
+          options={[
+            { value: "1", label: "Single design per sheet" },
+            { value: "2", label: "Two designs per sheet — actual size" },
+          ]}
+          onChange={(v) =>
+            onSettings(v === "2"
+              ? { ...settings, perSheet: 2, paper: settings.paper && settings.paper !== "page" ? settings.paper : "letter" }
+              : { ...settings, perSheet: undefined })
+          }
+        />
+        <Segmented
           label="Paper"
           value={settings.paper ?? "page"}
           options={[
-            { value: "page", label: "Page size (PDF, print shop)" },
+            ...(two ? [] : [{ value: "page" as const, label: "Page size (PDF, print shop)" }]),
             { value: "letter", label: "Letter (home printer)" },
             { value: "a4", label: "A4 (home printer)" },
           ]}
           onChange={(paper) => onSettings({ ...settings, paper: paper === "page" ? undefined : paper })}
         />
-        {settings.paper && settings.paper !== "page" && (
-          <Check
-            label="Show trim marks"
-            checked={settings.showTrimMarks === true}
-            onChange={(showTrimMarks) => onSettings({ ...settings, showTrimMarks })}
-          />
+        {home && (
+          <>
+            <Check
+              label="Show trim marks"
+              checked={settings.showTrimMarks === true}
+              onChange={(showTrimMarks) => onSettings({ ...settings, showTrimMarks })}
+            />
+            <p className="hint" data-testid="export-orientation">
+              Orientation is automatic: {paperLabel} {plan.orientation}
+              {two ? ", with the two designs " + (plan.orientation === "landscape" ? "side by side" : "one above the other") : ""}.
+            </p>
+          </>
         )}
+        <p className="hint" data-testid="export-sheets">
+          <strong>
+            {two
+              ? `${plan.sequence.length} ${isPad ? "notepad sheets" : "designs"} = ${plan.sheets.length} printed ${paperLabel} sheet${plan.sheets.length === 1 ? "" : "s"}`
+              : `${plan.sheets.length} printed ${home ? `${paperLabel} ` : ""}sheet${plan.sheets.length === 1 ? "" : "s"}`}
+          </strong>
+          {two && isPad && !settings.repeatSheets ? " (the pad's design twice on one sheet; turn on “Print every sheet of the pad” to print the whole pad)" : ""}
+        </p>
         <p className="hint" data-testid="export-output">
-          Output: {plan.sequence.length} page(s), {plan.mediaWidthIn}" × {plan.mediaHeightIn}"
+          Output: {two ? `${plan.sheets.length} sheet(s), each with two ` : `${plan.sequence.length} page(s), `}{plan.mediaWidthIn}" × {plan.mediaHeightIn}"{two ? " designs at actual size" : ""}
           {doc.project.production.includeBleed ? " (page size plus the area past the cut edge)" : " (page size)"}
-          {settings.paper && settings.paper !== "page" ? `, centred on ${settings.paper === "letter" ? "Letter" : "A4"} paper with nothing else on the sheet` : ""}.{" "}
-          {settings.paper && settings.paper !== "page"
-            ? `In the print dialog keep scale at 100% (“Default” or “Actual size”) and turn on background graphics.${settings.showTrimMarks ? ` Cut along the corner marks for a page whose art runs to every edge${doc.project.production.includeBleed ? "" : " — turn on “Extend background past the cut edge” (Page setup) so no white shows where you cut"}.` : " Trim marks are off; turn them on above only when you plan to cut the sheet down to the finished page size."}`
+          {home && !two ? `, centred on ${paperLabel} paper with nothing else on the sheet` : ""}.{" "}
+          {home
+            ? `In the print dialog keep scale at 100% (“Default” or “Actual size”) and turn on background graphics.${settings.showTrimMarks ? ` Cut along the marks for ${two ? "two finished pages" : "a page whose art runs to every edge"}${doc.project.production.includeBleed ? "" : " — turn on “Extend background past the cut edge” (Page setup) so no white shows where you cut"}.` : " Trim marks are off; turn them on above when you plan to cut the sheet down to the finished page size."}`
             : "In the print dialog choose “Save as PDF”, margins “None”, scale 100%, and turn on background graphics. A home printer has no paper this size — choose Letter or A4 above to print at home."}
         </p>
+        {two && (
+          <p className="hint" data-testid="two-per-sheet-sizes">
+            Sizes that print two per {paperLabel} sheet, clear of a home printer’s edge:{" "}
+            {sizes.filter((x) => x.clear).map((x) => x.label).join(", ") || "none"}.
+            {sizes.some((x) => !x.clear) ? ` Edge to edge (a borderless printer or a print shop): ${sizes.filter((x) => !x.clear).map((x) => x.label).join(", ")}.` : ""} Change the size under Product setup.
+          </p>
+        )}
+        {plan.notes.map((n) => (
+          <p key={n} className="hint" data-testid="export-note">{n}</p>
+        ))}
         <div className="row">
           <span className={`badge ${report.errorCount ? "badge--error" : "badge--ok"}`}>{report.errorCount} to fix</span>
           <span className={`badge ${report.warningCount ? "badge--warning" : ""}`}>{report.warningCount} to check</span>

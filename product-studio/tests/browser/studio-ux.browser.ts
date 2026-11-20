@@ -61,14 +61,17 @@ describe("Studio home", () => {
       await expect(page.locator("h1").textContent()).resolves.toBe("Dove Expressions Product Studio");
       await expect(page.getByText("Your studio is ready").count()).resolves.toBe(1);
       // The simplified home: real product categories (the daily planner is a Planner template, reached below).
-      // Nine since Phase 6 added Inventory & Log Book.
-      await expect(page.locator("button.family-card").count()).resolves.toBe(9);
+      // "What would you like to create?": six finished products open their flow (Coloring Book, Activity Book, Journal,
+      // Planner, Book Cover, Other / Custom), then six more product types (Devotional, Worksheet, Inventory & Log Book,
+      // Tracker, Notepad, Desk Pad).
+      await expect(page.locator("button.family-card").count()).resolves.toBe(12);
+      await expect(page.locator('button.family-card[data-create="coloring-book"]').count()).resolves.toBe(1);
       await expect(page.locator("button.family-card", { hasText: "Inventory & Log Book" }).count()).resolves.toBe(1);
       await expect(page.locator("button.family-card", { hasText: /^Planner/ }).count()).resolves.toBe(1);
       await expect(page.getByRole("button", { name: /Start a daily planner/ }).count()).resolves.toBe(1);
       // Families without a foundation are shown, never clickable.
       const next = page.locator(".family-card--next");
-      await expect(next.count()).resolves.toBe(1);
+      await expect(next.count()).resolves.toBe(2); // Children's Storybook and Workbook
       await expect(next.evaluateAll((els) => els.every((e) => e.tagName !== "BUTTON" && !e.querySelector("button, a")))).resolves.toBe(true);
       await expect(page.getByText("Open your latest project").count()).resolves.toBe(0);
       expect(await overflow(page)).toBeLessThanOrEqual(0);

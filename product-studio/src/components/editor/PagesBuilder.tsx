@@ -16,6 +16,7 @@ import { resolveDocument, type ResolvedDocument } from "../../engines/document/r
 import { removeNode, structureFromItems, updateNode } from "../../engines/recipe/bookEdit";
 import {
   addCardSheet, addDaily, addDivider, addEndCover, addFrontCover, addMonthly, addPageOfType, addToEachMonth, addToEachWeek, addWeekly, addYearly,
+  addMonthsAtFront, addTimeDividers, addYearlyCalendar, hasMonthsThroughout, monthsAtFront,
   BUILDER_CATEGORIES, builderRows, categoryOf, primaryCategories, stepPeriod, WEEKLY_JOURNAL, type BuilderCategory, type BuilderRow, type WeeklyJournalKind,
 } from "../../engines/recipe/pageBuilder";
 import { getLayout } from "../../layouts/registry";
@@ -72,8 +73,12 @@ const templateName = (t: string, project?: ProductProject) =>
     return `[${k === "#" ? "number" : f?.label ?? k}]`;
   });
 
+const TIME_DIVIDER: Record<string, string> = { year: "Divider for each year", quarter: "Divider for each quarter", month: "Divider for each month", week: "Divider for each week", day: "Divider for each day" };
 const rowName = (s: BookStep, period: string = "none") =>
-  s.module === "monthly-calendar" || s.module === "weekly-planner" || s.module === "daily-planner" || s.module === "back-cover" || s.module === "cover-page"
+  // A divider with no title of its own, repeating by time, is titled with its month, week or day.
+  s.module === "divider-page" && !s.title?.trim() && TIME_DIVIDER[period]
+    ? TIME_DIVIDER[period]
+    : s.module === "monthly-calendar" || s.module === "weekly-planner" || s.module === "daily-planner" || s.module === "back-cover" || s.module === "cover-page"
     ? pageTypeName(s.module)
     : s.title || moduleTitle(s.module, (period === "day" ? "none" : period) as Parameters<typeof moduleTitle>[1]) || pageTypeName(s.module);
 
@@ -184,13 +189,18 @@ function Category({ cat, rows, allRows, edit, onEdit, doc, structure, project }:
         )}
         {cat === "yearly" && (
           <>
+            <button type="button" className="btn" onClick={() => add((n) => addYearlyCalendar(n, "year-at-a-glance"))}>+ Year at a glance (one page)</button>
+            <button type="button" className="btn" onClick={() => add((n) => addYearlyCalendar(n, "year-at-a-glance-spread"))}>+ Year at a glance (two-page spread)</button>
+            <button type="button" className="btn" onClick={() => add((n) => addYearlyCalendar(n, "year-linear"))}>+ Linear year</button>
+            <button type="button" className="btn" onClick={() => add((n) => addYearlyCalendar(n, "year-in-pixels"))}>+ Year in pixels</button>
             <button type="button" className="btn" onClick={() => add((n) => addYearly(n, "goals"))}>+ Goals for the year</button>
             <button type="button" className="btn" onClick={() => add((n) => addYearly(n, "review"))}>+ Year in review</button>
           </>
         )}
         {cat === "monthly" && (
           <>
-            {!has("monthly-calendar") && <button type="button" className="btn" onClick={() => add(addMonthly)}>+ Add monthly</button>}
+            {!hasMonthsThroughout(structure) && <button type="button" className="btn" onClick={() => add(addMonthly)}>+ Monthly calendar before each month's pages</button>}
+            {!monthsAtFront(structure) && <button type="button" className="btn" onClick={() => add(addMonthsAtFront)}>+ All months at the front of the book</button>}
             {has("monthly-calendar") && (
               <>
                 <button type="button" className="btn" onClick={() => add((n) => addToEachMonth(n, "goals"))}>+ Monthly goals</button>
@@ -220,6 +230,9 @@ function Category({ cat, rows, allRows, edit, onEdit, doc, structure, project }:
           <>
             <button type="button" className="btn" onClick={() => add((n) => addDivider(n))}>+ Divider with tab</button>
             <button type="button" className="btn" onClick={() => add((n) => addDivider(n, "Section", false))}>+ Divider without tab</button>
+            {has("monthly-calendar") && hasMonthsThroughout(structure) && <button type="button" className="btn" onClick={() => add((n) => addTimeDividers(n, "month"))}>+ Divider before every month</button>}
+            {has("weekly-planner") && <button type="button" className="btn" onClick={() => add((n) => addTimeDividers(n, "week"))}>+ Divider before every week</button>}
+            {has("daily-planner") && <button type="button" className="btn" onClick={() => add((n) => addTimeDividers(n, "day"))}>+ Divider before every day</button>}
             <button type="button" className="btn" onClick={() => add((n) => [...neutralLuxeDividers().filter((x) => !(x.kind === "step" && x.module === "cover-page" && n.some((y) => y.kind === "step" && y.module === "cover-page"))), ...n])}>+ Coordinating set of 9 dividers</button>
           </>
         )}

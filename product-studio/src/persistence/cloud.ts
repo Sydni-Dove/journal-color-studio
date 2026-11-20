@@ -43,9 +43,21 @@ export interface CloudBackend {
   removeIf(id: string, upTo: string): Promise<boolean>;
 }
 
+/** Every request to the saving server stops waiting after this long. */
+export const REQUEST_TIMEOUT_MS = 45_000;
+const timedFetch: typeof fetch = (input, init) => {
+  const own = typeof AbortSignal !== "undefined" && "timeout" in AbortSignal ? AbortSignal.timeout(REQUEST_TIMEOUT_MS) : undefined;
+  const signal = init?.signal && own && "any" in AbortSignal ? (AbortSignal as unknown as { any(s: AbortSignal[]): AbortSignal }).any([init.signal, own]) : (init?.signal ?? own);
+  return fetch(input, { ...init, ...(signal ? { signal } : {}) });
+};
+
 let client: SupabaseClient | null = null;
 export function supabase(): SupabaseClient {
-  client ??= createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, { auth: { persistSession: true, autoRefreshToken: true, storageKey: "dove-product-studio:auth" } });
+  client ??= createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+    auth: { persistSession: true, autoRefreshToken: true, storageKey: "dove-product-studio:auth" },
+    // A request that gets no answer gives up instead of hanging (the screen then says the server couldn't be reached).
+    global: { fetch: timedFetch },
+  });
   return client;
 }
 

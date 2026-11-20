@@ -99,7 +99,8 @@ describe("Cover and divider browser QA", () => {
     await go(page, 1);
     await openArea(page, "layout");
     const card = page.locator(".this-page");
-    // Real artwork thumbnails, not a text list.
+    // Real artwork thumbnails, not a text list (they load as they scroll into view, as the maker scrolls).
+    await card.locator('.cover-picker [data-cover^="surface:"]').last().scrollIntoViewIfNeeded();
     await expect.poll(() => card.locator('.cover-picker [data-cover^="surface:"] .thumb[data-ready="true"] img').count(), { timeout: 20000 }).toBe(7);
     await card.locator('[data-cover="surface:jcs-marble-ember"]').click();
     await expect.poll(() => page.locator('.ps-page--editor [data-layer="surface"] image').count(), { timeout: 20000 }).toBeGreaterThan(0);

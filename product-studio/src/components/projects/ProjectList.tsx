@@ -19,6 +19,10 @@ type Props = {
   onGenerate?: () => void;
   /** Cover Studio: plan the covers of a collection. */
   onCovers?: () => void;
+  /** Coloring Book: the complete coloring-book workflow (a saved book by id, or the book list). */
+  onColoringBook?: (bookId?: string) => void;
+  /** Saved coloring books, newest first. */
+  books?: { id: string; name: string; scenes: number; updatedAt: string }[];
   onOpen: (id: string) => void;
   onDuplicate: (id: string) => void;
   onDuplicateAsVariant: (id: string) => void;
@@ -29,6 +33,23 @@ type Props = {
 };
 
 const RECENT = 4;
+
+/** "What would you like to create?": finished products first. Each card opens that product's guided flow. */
+type CreateCard = { id: string; label: string; blurb: string; glyph: ProductFamilyId | "coloring" | "storybook" | "cover"; family?: ProductFamilyId; action?: "coloring" | "cover"; start?: WizardStart; next?: string; featured?: boolean };
+const familyStart = (id: ProductFamilyId) => {
+  const f = PRODUCT_FAMILIES.find((x) => x.id === id);
+  return f?.status === "ready" ? f.start : undefined;
+};
+const CREATE: CreateCard[] = [
+  { id: "coloring-book", label: "Coloring Book", blurb: "Characters, scenes, black-and-white pages, Bible verses if you want them, a full-color cover, and print-ready files.", glyph: "coloring", action: "coloring", featured: true },
+  { id: "storybook", label: "Children's Storybook", blurb: "Full-color illustrated pages with your story text.", glyph: "storybook", next: "Coming next" },
+  { id: "activity-book", label: "Activity Book", blurb: "Worksheets with prompts, tables, drawing boxes and answer space.", glyph: "worksheet", family: "worksheet", start: familyStart("worksheet") },
+  { id: "journal", label: "Journal", blurb: "Guided writing, reflection, lined, dot-grid and free-writing pages.", glyph: "journal", family: "journal", start: familyStart("journal") },
+  { id: "workbook", label: "Workbook", blurb: "Lessons with guided exercises and response space.", glyph: "workbook", family: "workbook", start: familyStart("workbook"), next: PRODUCT_FAMILIES.find((f) => f.id === "workbook")?.nextNote },
+  { id: "planner", label: "Planner", blurb: "Monthly, weekly, daily and yearly planning pages.", glyph: "planner", family: "planner", start: familyStart("planner") },
+  { id: "book-cover", label: "Book Cover", blurb: "A cover on its own: artwork instructions with the exact print size, spine and bleed.", glyph: "cover", action: "cover" },
+  { id: "custom", label: "Other / Custom Product", blurb: "Start blank, then add the pages you need.", glyph: "custom", family: "custom", start: familyStart("custom") },
+];
 
 export function relativeTime(iso: string, now = new Date()): string {
   const t = new Date(iso).getTime();
@@ -42,7 +63,7 @@ export function relativeTime(iso: string, now = new Date()): string {
 }
 
 /** Small line glyphs per family (studio UI, not product art). */
-const GLYPH: Partial<Record<ProductFamilyId, ReactNode>> = {
+const GLYPH: Partial<Record<ProductFamilyId | "coloring" | "storybook" | "cover", ReactNode>> = {
   planner: (
     <>
       <rect x="5" y="7" width="22" height="20" rx="2" />
@@ -97,6 +118,24 @@ const GLYPH: Partial<Record<ProductFamilyId, ReactNode>> = {
       <path d="M10 11h12M10 16h12M10 21h12M8 11h.1M8 16h.1M8 21h.1" />
     </>
   ),
+  coloring: (
+    <>
+      <path d="M8 5h15a2 2 0 0 1 2 2v20H10a2 2 0 0 1-2-2z" />
+      <path d="M13 17c0-3 2-5 4.5-5s4.5 2 4.5 5-2 5-4.5 5-4.5-2-4.5-5zM17.5 12v-2M13 21l-2 2" />
+    </>
+  ),
+  storybook: (
+    <>
+      <path d="M16 8c-3-2-7-2-10 0v18c3-2 7-2 10 0 3-2 7-2 10 0V8c-3-2-7-2-10 0z" />
+      <path d="M16 8v18M9 13l2-2 2 2M19 14h4" />
+    </>
+  ),
+  cover: (
+    <>
+      <rect x="8" y="4" width="16" height="24" rx="1.5" />
+      <path d="M11 9h10M11 12h7M12 24l4-6 4 6" />
+    </>
+  ),
   custom: (
     <>
       <rect x="6" y="6" width="20" height="20" rx="2" strokeDasharray="3 3" />
@@ -105,7 +144,7 @@ const GLYPH: Partial<Record<ProductFamilyId, ReactNode>> = {
   ),
 };
 
-function Glyph({ id }: { id: ProductFamilyId }) {
+function Glyph({ id }: { id: ProductFamilyId | "coloring" | "storybook" | "cover" }) {
   return (
     <svg className="family-glyph" viewBox="0 0 32 32" aria-hidden fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
       {GLYPH[id]}
@@ -120,7 +159,7 @@ function describe(p: ProjectSummary, m: ProjectMeta): string {
   return `${type} · ${size}${pages}`;
 }
 
-export function ProjectList({ projects, meta, onStart, onGenerate, onCovers, onOpen, onDuplicate, onDuplicateAsVariant, onDelete, now, account }: Props) {
+export function ProjectList({ projects, meta, onStart, onGenerate, onCovers, onColoringBook, books = [], onOpen, onDuplicate, onDuplicateAsVariant, onDelete, now, account }: Props) {
   const metas = useMemo(() => new Map(projects.map((p) => [p.id, meta(p.id)])), [projects, meta]);
   const recent = projects.slice(0, RECENT);
   const hasProjects = projects.length > 0;
@@ -146,6 +185,21 @@ export function ProjectList({ projects, meta, onStart, onGenerate, onCovers, onO
         </section>
         {account}
 
+        {books.length > 0 && onColoringBook && (
+          <section aria-labelledby="h-books">
+            <h2 id="h-books">Coloring books</h2>
+            <div className="recent-grid">
+              {books.slice(0, RECENT).map((b) => (
+                <div key={b.id} className="card recent-card" data-book={b.id}>
+                  <h3>{b.name}</h3>
+                  <p>Coloring book · {b.scenes} scene{b.scenes === 1 ? "" : "s"}</p>
+                  <p className="recent-card__time">Edited {relativeTime(b.updatedAt, now)}</p>
+                  <div className="card-actions"><button className="btn btn--primary" onClick={() => onColoringBook(b.id)}>Open</button></div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
         {hasProjects ? (
           <section aria-labelledby="h-continue">
             <h2 id="h-continue">Continue working</h2>
@@ -174,26 +228,67 @@ export function ProjectList({ projects, meta, onStart, onGenerate, onCovers, onO
         )}
 
         <section aria-labelledby="h-create">
-          <h2 id="h-create">What are you creating?</h2>
-          <div className="family-grid">
-            {PRODUCT_FAMILIES.map((f) =>
-              f.status === "ready" ? (
-                <button key={f.id} type="button" className="family-card" onClick={() => onStart(f.start)}>
-                  <Glyph id={f.id} />
-                  <span className="family-card__label">{f.label}</span>
-                  <span className="family-card__blurb">{f.blurb}</span>
+          <h2 id="h-create">What would you like to create?</h2>
+          <p className="hint">Choose the finished product. Each one guides you from setup to a print-ready file.</p>
+          <div className="family-grid create-grid" data-testid="create-grid">
+            {CREATE.map((c) => {
+              const go = c.action === "coloring" ? onColoringBook && (() => onColoringBook()) : c.action === "cover" ? onCovers : c.start ? () => onStart(c.start) : undefined;
+              return go ? (
+                <button key={c.id} type="button" className={`family-card${c.featured ? " family-card--featured" : ""}`} onClick={go} data-create={c.id}>
+                  <Glyph id={c.glyph} />
+                  <span className="family-card__label">{c.label}</span>
+                  <span className="family-card__blurb">{c.blurb}</span>
                 </button>
               ) : (
-                <div key={f.id} className="family-card family-card--next" aria-disabled="true">
-                  <Glyph id={f.id} />
-                  <span className="family-card__label">{f.label}</span>
-                  <span className="family-card__blurb">{f.blurb}</span>
-                  <span className="family-card__next">{f.nextNote}</span>
+                <div key={c.id} className="family-card family-card--next" aria-disabled="true" data-create={c.id}>
+                  <Glyph id={c.glyph} />
+                  <span className="family-card__label">{c.label}</span>
+                  <span className="family-card__blurb">{c.blurb}</span>
+                  <span className="family-card__next">{c.next ?? "Coming next"}</span>
                 </div>
-              ),
-            )}
+              );
+            })}
+          </div>
+          <h3 className="more-types">More product types</h3>
+          <div className="family-grid">
+              {PRODUCT_FAMILIES.filter((f) => !["journal", "planner", "workbook", "custom"].includes(f.id)).map((f) =>
+                f.status === "ready" ? (
+                  <button key={f.id} type="button" className="family-card" onClick={() => onStart(f.start)}>
+                    <Glyph id={f.id} />
+                    <span className="family-card__label">{f.label}</span>
+                    <span className="family-card__blurb">{f.blurb}</span>
+                  </button>
+                ) : (
+                  <div key={f.id} className="family-card family-card--next" aria-disabled="true">
+                    <Glyph id={f.id} />
+                    <span className="family-card__label">{f.label}</span>
+                    <span className="family-card__blurb">{f.blurb}</span>
+                    <span className="family-card__next">{f.nextNote}</span>
+                  </div>
+                ),
+              )}
           </div>
         </section>
+
+        {(onCovers || onGenerate) && (
+          <section aria-labelledby="h-advanced" className="advanced-tools">
+            <h2 id="h-advanced">Advanced tools</h2>
+            <div className="quick-list">
+              {onCovers && (
+                <button type="button" className="quick-action" onClick={onCovers}>
+                  <strong>Cover art and illustration prompts</strong>
+                  <span>Artwork instructions for covers, interior art, children's characters and coordinated collections, on their own.</span>
+                </button>
+              )}
+              {onGenerate && (
+                <button type="button" className="quick-action" onClick={onGenerate}>
+                  <strong>Turn a document into pages</strong>
+                  <span>AI builds a journal, workbook or devotional's pages from your own document or idea.</span>
+                </button>
+              )}
+            </div>
+          </section>
+        )}
 
         <div className="home-columns">
           <section aria-labelledby="h-quick">

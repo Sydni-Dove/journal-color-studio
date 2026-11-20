@@ -338,7 +338,7 @@ describe("Page Composer", () => {
     await page.goto(base);
     await page.evaluate(() => localStorage.clear());
     await page.goto(base);
-    await page.locator("button.family-card", { hasText: /^Custom Page/ }).first().click();
+    await page.locator('button.family-card[data-create="custom"]').click(); // "Other / Custom Product": the Custom Page flow
     await page.waitForSelector("#wizard-build");
     await page.getByRole("button", { name: /^Create/ }).last().click();
     await page.waitForSelector(".ps-page--editor");

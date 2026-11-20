@@ -49,6 +49,7 @@ export type PageModuleType =
   | "back-cover"
   | "divider-page"
   | "monthly-calendar"
+  | "yearly-calendar"
   | "weekly-planner"
   | "daily-planner"
   | "lined-journal"

@@ -5,6 +5,9 @@
  * Layers (bottom → top):
  *   1 Background  2 Decorative theme  3 Functional pattern
  *   4 Layout structure  5 Text / labels  6 User content (reserved)
+ * Uploaded artwork (engines/artwork/place.ts) joins them: page backgrounds
+ * above the background layer, illustrations above the page's structure and
+ * under its text, and cover artwork in place of the cover's own design.
  *   + debug overlay (editor only; never printed)
  */
 import { memo, useMemo, type CSSProperties, type ReactNode } from "react";
@@ -19,6 +22,8 @@ import { DecorativeLayer } from "../themes/DecorativeLayer";
 import { coverSurfaceColors, coverSurfaceTheme } from "../design-library/coverSurfaces";
 import { PatternLayer, StructureLayer, TextLayer } from "./nodes";
 import { contentToPageTransform, sidewaysGeometry } from "../engines/geometry/turn";
+import type { PageArt } from "../engines/artwork/place";
+import { ArtLayer } from "./ArtLayer";
 
 export function themeVars(colors: ColorTokens, typography: TypographySettings): CSSProperties {
   const vars: Record<string, string | number> = {};
@@ -42,6 +47,8 @@ type Props = {
   spacing?: SpacingTokens;
   mode: "editor" | "print";
   overlay?: ReactNode;
+  /** Uploaded artwork on this page, already placed (artworkFor in engines/document/resolve.ts). */
+  art?: PageArt[];
 };
 
 export const SafeArea = ({ geometry: g, children }: { geometry: PageGeometry; children: ReactNode }) => (
@@ -57,7 +64,14 @@ export const SafeArea = ({ geometry: g, children }: { geometry: PageGeometry; ch
 
 const DEFAULT_SPACING = resolveSpacing("balanced");
 
-export const PrintablePage = memo(function PrintablePage({ geometry: g, solved, colors, typography, decorative, background, spacing = DEFAULT_SPACING, mode, overlay }: Props) {
+const NO_ART: PageArt[] = [];
+/** A cover title over artwork, in light or dark ink for legibility: every color the text draws with becomes that ink. */
+function inkVars(colors: ColorTokens, ink: "light" | "dark"): CSSProperties {
+  const c = ink === "light" ? "#ffffff" : "#1f1a17";
+  return Object.fromEntries(Object.keys(colors).filter((k) => k !== "lineOpacity").map((k) => [`--c-${k}`, c])) as CSSProperties;
+}
+
+export const PrintablePage = memo(function PrintablePage({ geometry: g, solved, colors, typography, decorative, background, spacing = DEFAULT_SPACING, mode, overlay, art = NO_ART }: Props) {
   // A rotated page (the rotated monthly calendar) is solved in landscape; its
   // content geometry is the turned one, and the painted content is rotated 90°
   // back onto the portrait sheet below.
@@ -75,26 +89,43 @@ export const PrintablePage = memo(function PrintablePage({ geometry: g, solved, 
     width: `${g.mediaWidthIn}in`,
     height: `${g.mediaHeightIn}in`,
   };
+  // Uploaded artwork, drawn on the physical page (never turned with sideways content).
+  const cover = art.find((a) => a.use === "cover");
+  const underArt = art.filter((a) => a.use === "background");
+  const overArt = art.filter((a) => a.use === "illustration");
+  const own = !cover; // the page's own design (a cover with artwork shows the artwork instead)
+  const showText = !cover || cover.coverMode === "with-title";
+  const under = (cover || underArt.length > 0) && <ArtLayer geometry={g} items={cover ? [cover, ...underArt] : underArt} mode={mode} />;
+  const over = overArt.length > 0 && <ArtLayer geometry={g} items={overArt} mode={mode} />;
+  const textStyle: CSSProperties = { left: `${cg.trimOffset.x}in`, top: `${cg.trimOffset.y}in`, width: `${cg.trimWidthIn}in`, height: `${cg.trimHeightIn}in`, ...(cover && cover.titleColor && cover.titleColor !== "palette" ? inkVars(colors, cover.titleColor) : {}) };
   const content = (
     <>
       {/* 1 background */}
-      <div className="ps-layer ps-bg" />
+      {(!rotated || !under) && <div className="ps-layer ps-bg" />}
       {/* 2 decorative */}
-      {surface && <DecorativeLayer geometry={cg} theme={surface.theme} colors={surface.colors} composition={surface.composition} layer="surface" />}
-      {background && <DecorativeLayer geometry={cg} theme={background} colors={colors} composition={composition} layer="background" />}
-      <DecorativeLayer geometry={cg} theme={decorative} colors={colors} composition={composition} layer="elements" />
+      {own && surface && <DecorativeLayer geometry={cg} theme={surface.theme} colors={surface.colors} composition={surface.composition} layer="surface" />}
+      {own && background && <DecorativeLayer geometry={cg} theme={background} colors={colors} composition={composition} layer="background" />}
+      {!rotated && under}
+      {own && <DecorativeLayer geometry={cg} theme={decorative} colors={colors} composition={composition} layer="elements" />}
       {/* 3 functional pattern */}
-      <SafeArea geometry={cg}>
-        <PatternLayer nodes={solved.nodes} />
-      </SafeArea>
+      {own && (
+        <SafeArea geometry={cg}>
+          <PatternLayer nodes={solved.nodes} />
+        </SafeArea>
+      )}
       {/* 4 structure */}
-      <SafeArea geometry={cg}>
-        <StructureLayer nodes={solved.nodes} />
-      </SafeArea>
+      {own && (
+        <SafeArea geometry={cg}>
+          <StructureLayer nodes={solved.nodes} />
+        </SafeArea>
+      )}
+      {!rotated && over}
       {/* 5 text */}
-      <div className="ps-layer" style={{ left: `${cg.trimOffset.x}in`, top: `${cg.trimOffset.y}in`, width: `${cg.trimWidthIn}in`, height: `${cg.trimHeightIn}in` }}>
-        <TextLayer nodes={solved.nodes} typography={typography} />
-      </div>
+      {showText && (
+        <div className="ps-layer" style={textStyle}>
+          <TextLayer nodes={solved.nodes} typography={typography} />
+        </div>
+      )}
       {/* 6 user content — reserved */}
       {mode === "editor" ? overlay : null}
     </>
@@ -111,6 +142,12 @@ export const PrintablePage = memo(function PrintablePage({ geometry: g, solved, 
   // Mobile Safari also draws reliably inside the scaled preview.
   return (
     <div className={`ps-page ps-page--${mode}`} style={{ ...style, position: "relative", overflow: "hidden" }}>
+      {under && (
+        <>
+          <div className="ps-layer ps-bg" />
+          {under}
+        </>
+      )}
       <div
         data-rotated-content="90"
         style={{
@@ -125,6 +162,7 @@ export const PrintablePage = memo(function PrintablePage({ geometry: g, solved, 
       >
         {content}
       </div>
+      {over}
     </div>
   );
 });

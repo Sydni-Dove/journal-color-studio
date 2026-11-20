@@ -1,7 +1,7 @@
 /**
  * PAGES sheet: every generated page with its plain-language type, a filter by
- * page type and "Jump to" (months, sections, page types). Navigation only —
- * choosing a page moves the preview; nothing about the book changes.
+ * page type and "Jump to" (months, sections, page types). Choosing a page moves the preview; ↑ ↓ beside a page
+ * move that kind of page earlier or later in the book (among the pages around it, everywhere it repeats).
  *
  * A bottom sheet on phones, a drawer on wider screens; never a permanent
  * sidebar. Thumbnails are the real renderer, drawn only while on screen, so a
@@ -27,7 +27,7 @@ export function CategoryMark({ category }: { category: PageCategory }) {
   return <span className={`page-mark page-mark--${category}`} aria-hidden />;
 }
 
-function Row({ info, doc, current, onPick, root }: { info: PageInfo; doc: ResolvedDocument; current: boolean; onPick: (i: number) => void; root: HTMLElement | null }) {
+function Row({ info, doc, current, onPick, root, onMove }: { info: PageInfo; doc: ResolvedDocument; current: boolean; onPick: (i: number) => void; root: HTMLElement | null; onMove?: (i: number, dir: -1 | 1) => void }) {
   const ref = useRef<HTMLButtonElement>(null);
   const [seen, setSeen] = useState(false);
   useEffect(() => {
@@ -53,11 +53,17 @@ function Row({ info, doc, current, onPick, root }: { info: PageInfo; doc: Resolv
           {info.filler && <span className="page-row__date">Keeps the next spread facing</span>}
         </span>
       </button>
+      {onMove && !info.filler && (
+        <span className="page-row__move">
+          <button type="button" className="btn btn--ghost" aria-label={`Move page ${info.pageNumber} earlier`} title="Move earlier" onClick={() => onMove(info.index, -1)}>↑</button>
+          <button type="button" className="btn btn--ghost" aria-label={`Move page ${info.pageNumber} later`} title="Move later" onClick={() => onMove(info.index, 1)}>↓</button>
+        </span>
+      )}
     </li>
   );
 }
 
-export function PageNavigator({ doc, index, onIndex, filter, onFilter, onClose }: { doc: ResolvedDocument; index: number; onIndex: (i: number) => void; filter: PageFilter; onFilter: (f: PageFilter) => void; onClose: () => void }) {
+export function PageNavigator({ doc, index, onIndex, filter, onFilter, onClose, onMove }: { doc: ResolvedDocument; index: number; onIndex: (i: number) => void; filter: PageFilter; onFilter: (f: PageFilter) => void; onClose: () => void; onMove?: (i: number, dir: -1 | 1) => void }) {
   const info = allPageInfo(doc);
   const options = useMemo(() => filterOptions(doc), [doc]);
   const targets = useMemo(() => jumpTargets(doc), [doc]);
@@ -121,10 +127,10 @@ export function PageNavigator({ doc, index, onIndex, filter, onFilter, onClose }
             </label>
           )}
         </div>
-        <p className="hint sheet__count">{filter === "all" ? `${info.length} pages` : `${shown.length} of ${info.length} pages`} · tap a page to open it</p>
+        <p className="hint sheet__count">{filter === "all" ? `${info.length} pages` : `${shown.length} of ${info.length} pages`} · tap a page to open it{onMove ? "; ↑ ↓ move it (a repeating page moves everywhere it repeats)" : ""}</p>
         <ol className="page-list" ref={listRef}>
           {shown.map((i) => (
-            <Row key={i.index} info={i} doc={doc} current={i.index === index} onPick={pick} root={root} />
+            <Row key={i.index} info={i} doc={doc} current={i.index === index} onPick={pick} root={root} onMove={onMove} />
           ))}
         </ol>
       </div>

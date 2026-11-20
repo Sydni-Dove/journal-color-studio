@@ -60,6 +60,8 @@ export const FONT_CATALOG: FontDefinition[] = [
   { family: "Bodoni Moda", category: "display", googleSpec: "ital,wght@0,400;0,700;1,400", fallback: "Georgia, serif", avgCharEm: 0.52 },
   // More Google Fonts (each checked against fonts.googleapis.com, 2026-10-01): classic serifs, elegant
   // capitals for covers, clean sans, and formal / flowing scripts.
+  // Chunky rounded letters: a coloring page's bubble lettering (drawn as black outlines, white inside).
+  { family: "Fredoka", category: "display", googleSpec: "wght@500;600;700", fallback: "'Arial Rounded MT Bold', Helvetica, Arial, sans-serif", avgCharEm: 0.5 },
   { family: "Cormorant", category: "serif", googleSpec: "ital,wght@0,400;0,600;0,700;1,400", fallback: "Georgia, serif", avgCharEm: 0.45 },
   { family: "Prata", category: "serif", googleSpec: "wght@400", fallback: "Georgia, serif", avgCharEm: 0.55 },
   { family: "Marcellus", category: "serif", googleSpec: "wght@400", fallback: "Georgia, serif", avgCharEm: 0.56 },
