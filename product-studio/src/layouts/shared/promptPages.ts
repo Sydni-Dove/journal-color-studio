@@ -964,6 +964,20 @@ export function solveZonePages(spec: ZonePageSpec, ctx: LayoutContext, pageIndex
         metrics.push({ label: `"${z.label || z.key}" writing height`, value: response.h, unit: "in", provenance: { geometryClass: "user-design", basis: `${spec.basis}: ${z.lines !== undefined ? `${z.lines} lines requested` : `weight ${z.weight.toFixed(2)} of the page body`}` } });
       }
     };
+    // One continuous margin band: from the page's first section to its last, behind every note (only on pages with one).
+    const strip = ctx.options.marginNoteShade === "strip";
+    const hasNote = res.zones.some((z) => !(z.zone.range && z.zone.range.from > 0) && (z.zone.marginNote ?? z.zone.pair?.find((h) => h.marginNote)?.marginNote));
+    if (strip && hasNote && f.margin && res.zones.length) {
+      const top = res.zones[0].rect.y;
+      const last = res.zones[res.zones.length - 1].rect;
+      // The strip runs out to the page's outer edge (through the bleed when there is one), with no white margin beside
+      // it; the notes stay in the margin column, inside the safe area. Like the top border, it is page artwork.
+      const g = ctx.pages[pi];
+      const outerLeft = f.margin.x + f.margin.w / 2 < g.trimWidthIn / 2;
+      const x1 = outerLeft ? -g.bleed.left : f.margin.x;
+      const x2 = outerLeft ? f.margin.x + f.margin.w : g.trimWidthIn + g.bleed.right;
+      nodes.push({ ...box(`${spec.idPrefix}${pi}-margin-strip`, { x: x1, y: top, w: x2 - x1, h: last.y + last.h - top }, { component: "Divider", stroke: null, fill: "decorHighlight" }), functional: false });
+    }
     res.zones.forEach((z, zi) => {
       const m = p.byZone.get(z.zone)!;
       const pad = frameInsets(z.zone.frame, ctx).b;
@@ -973,7 +987,7 @@ export function solveZonePages(spec: ZonePageSpec, ctx: LayoutContext, pageIndex
         // Optional pale band behind the note, the height of the section; the note sits inside it.
         const shade = !!ctx.options.marginNoteShade;
         const pad = shade ? MARGIN_SHADE_PAD_IN : 0;
-        if (shade) nodes.push({ ...box(`${spec.idPrefix}${pi}-${z.zone.key}-margin-shade`, { x: f.margin.x, y: z.rect.y, w: f.margin.w, h: z.rect.h }, { component: "Divider", stroke: null, fill: "decorHighlight" }), functional: false });
+        if (shade && !strip) nodes.push({ ...box(`${spec.idPrefix}${pi}-${z.zone.key}-margin-shade`, { x: f.margin.x, y: z.rect.y, w: f.margin.w, h: z.rect.h }, { component: "Divider", stroke: null, fill: "decorHighlight" }), functional: false });
         const tw = f.margin.w - pad * 2;
         const lines = wrapText(note, tw, ctx, "prompt");
         const h = lines.length * lineBoxIn(ctx.typography, "prompt");
