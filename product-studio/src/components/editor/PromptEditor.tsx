@@ -701,6 +701,23 @@ export function PromptEditor({
                             onChange={(v) => putBlock(b.id, { table: { ...(b.table ?? { columns: ["Task", "Due", "Done"], rows: b.lineCount ?? 6 }), borders: v as "grid" | "horizontal" | "minimal" | "none" } })}
                           />
                         </div>
+                        <div className="row" data-testid={`table-look-${b.id}`}>
+                          <Select
+                            label="Look"
+                            value={b.table?.look ?? "standard"}
+                            options={[
+                              { value: "standard", label: "Standard (Style → Tables)" },
+                              { value: "stationery", label: "Stationery: thin rules, small headings" },
+                            ]}
+                            onChange={(v) => putBlock(b.id, { table: { ...(b.table ?? { columns: ["Task", "Due", "Done"], rows: b.lineCount ?? 6 }), look: v === "stationery" ? "stationery" : undefined } })}
+                          />
+                          {b.table?.look === "stationery" && (
+                            <label className="check">
+                              <input type="checkbox" checked={b.table.outerBorder !== false} onChange={(e) => putBlock(b.id, { table: { ...b.table!, outerBorder: e.target.checked ? undefined : false } })} />
+                              <span>Light outer border</span>
+                            </label>
+                          )}
+                        </div>
                         {!same && (
                           <Segmented<string>
                             label="Table space"

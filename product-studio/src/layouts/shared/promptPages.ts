@@ -30,6 +30,19 @@ import { fitHeading, headerTitle, pageFrame } from "./components";
 import { box, group, lineBoxIn, rule, text } from "./nodes";
 import type { FitContext, LayoutContext } from "./types";
 
+/**
+ * The "stationery" table look: hairline rules under each row, a light outer border (or none), subtle column
+ * separators, small headings, no shading — in the product's table color. Geometry and writing space unchanged.
+ */
+export const stationeryTableStyle = (outerBorder = true): import("../../types/stationery").TableStyle => ({
+  weight: "hairline",
+  grid: outerBorder ? "outer-horizontal" : "horizontal",
+  columns: "subtle",
+  header: "plain",
+  padding: "standard",
+  smallHeadings: true,
+});
+
 export type ZonePageSpec = {
   /** Node id prefix ("st", "gp"). */
   idPrefix: string;
@@ -176,6 +189,8 @@ function blockZone(set: PromptSet, b: PromptBlock, surfaceOf: (b: PromptBlock) =
             ...(numbered ? { numbers: tableNumbers(sequenceStarts?.[b.id] ?? b.table!.numbering!.start ?? 1, lines!) } : {}),
             showHeader: b.table?.showHeader !== false,
             borders: b.table?.borders ?? "grid",
+            // A table's own lighter "stationery" look, over the product's table style.
+            ...(b.table?.look === "stationery" ? { style: stationeryTableStyle(b.table.outerBorder !== false) } : {}),
             ...(b.table?.headerLines ? { headerLines: b.table.headerLines } : {}),
             ...(b.table?.headerFull ? { headerFull: true } : {}),
             ...(b.table?.rowSpace && b.table.rowSpace !== "standard" ? { rowScale: TABLE_ROW_SCALE[b.table.rowSpace] } : {}),

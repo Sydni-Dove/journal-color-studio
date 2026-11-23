@@ -51,6 +51,9 @@ export type BoxNode = NodeBase & {
   fill: ColorToken | null;
   fillOpacity: number;
   radiusIn: number;
+  /** The outline in a color of its own (over `stroke`), and drawn lighter (0–1). */
+  strokeHex?: string;
+  strokeOpacity?: number;
 };
 
 /** `failed`: the heading could not fit even at the minimum — it is reported (heading-fit) and kept inside its box. */
@@ -147,6 +150,10 @@ export type RuleNode = NodeBase & {
   color: ColorToken;
   /** A dashed line: dash and gap lengths (inches). Absent = solid. */
   dashIn?: [number, number];
+  /** A color of its own (a table style's light gray or custom color), over `color`. */
+  hex?: string;
+  /** Drawn lighter (a softer tint), 0–1. Absent = full strength. */
+  opacity?: number;
 };
 
 /** Structural grouping — bounds only (debug + validation). */

@@ -181,6 +181,9 @@ export type ComponentPresentation = {
   marginNote?: string;
   /** Table: rule treatment (never changes table geometry). */
   tableBorders?: "grid" | "horizontal" | "minimal" | "none";
+  /** A table's own look (stationery) and, for it, whether the light outer border shows. */
+  tableLook?: "standard" | "stationery";
+  tableOuterBorder?: boolean;
 };
 export type PresentationHints = Record<string, ComponentPresentation>;
 

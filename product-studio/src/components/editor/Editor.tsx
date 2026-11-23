@@ -17,7 +17,7 @@ import { PagePreview, visibleIndices } from "../preview/PagePreview";
 import { StationeryPanel } from "./StationeryPanel";
 import { moveNode } from "../../engines/recipe/bookEdit";
 import { ListPagePanel } from "./ListPagePanel";
-import { BackgroundPanel, ColorPanel, DecorationPanel, LayoutPanel, PatternPanel, SpacingPanel, TextPlacementPanel, TypographyPanel, VariantsPanel, WordingPanel, WritingTitlePanel } from "./DesignPanels";
+import { BackgroundPanel, ColorPanel, DecorationPanel, LayoutPanel, PatternPanel, SpacingPanel, TablesPanel, TextPlacementPanel, TypographyPanel, VariantsPanel, WordingPanel, WritingTitlePanel } from "./DesignPanels";
 import type { BookNode } from "../../types/recipe";
 import { PagesPanel, PlannerSetupPanel, ProductPanel, ProductionPanel } from "./ProductionPanels";
 import { BookOutlinePanel, BookStructurePanel, ThisPagePanel } from "./BookPanels";
@@ -363,6 +363,7 @@ export function Editor({ project, onChange, onBack, saveStatus, cloudLabel, star
                 <>
                   <ThisPageHeading doc={doc} current={current} onDuplicate={duplicateCurrent} />
                   <PatternPanel nav={nav} project={project} update={update} usage={usage} />
+                  <TablesPanel nav={nav} project={project} update={update} usage={usage} />
                   <LayoutPanel nav={nav} project={project} update={update} usage={usage} part="writing" />
                   {!usage.patterns.length && !usage.lineStyle && !usage.sectionsPerDay && !usage.writingRows && <p className="hint">This product has no writing-line settings.</p>}
                 </>

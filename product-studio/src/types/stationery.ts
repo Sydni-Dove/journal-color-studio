@@ -48,7 +48,31 @@ export type SurfaceKind =
 /** `fixedIn`: a width the maker set for this column — kept exactly; only the other columns share the rest. */
 export type TableColumn = { key: string; label: string; referenceWidthIn: number; fixedIn?: number };
 
+/**
+ * How a table looks (lines only — never its geometry or writing space). Every field is optional: what is
+ * absent keeps the studio's original table (full grid, 0.5 pt rules, 1 pt heading rule, plain heading).
+ *   weight   rule weight: none, hairline 0.25 pt, light 0.4 pt, medium 0.6 pt, strong 1 pt (the heading rule a bit heavier)
+ *   color    the rules: the product's border color (burgundy in the Dove palettes), a softer tint of it, light gray, or a custom color
+ *   grid     full grid; horizontal lines only; an outer border with horizontal lines; minimal (lighter row lines, no border)
+ *   header   plain; subtle shading behind the headings; headings in the rule color
+ *   padding  space inside the cells around the headings: compact, standard, spacious
+ *   columns  separators between columns: full lines, subtle (a lighter tint) or none (default follows the grid)
+ */
+export type TableStyle = {
+  weight?: "none" | "hairline" | "light" | "medium" | "strong";
+  color?: "burgundy" | "soft-burgundy" | "light-gray" | "custom";
+  customColor?: string;
+  grid?: "full" | "horizontal" | "outer-horizontal" | "minimal";
+  header?: "plain" | "shaded" | "accent";
+  padding?: "compact" | "standard" | "spacious";
+  columns?: "full" | "subtle" | "none";
+  /** Smaller column headings. */
+  smallHeadings?: boolean;
+};
+
 export type TableSpec = {
+  /** The look (the product's table style, with a table's own look over it). */
+  style?: TableStyle;
   columns: TableColumn[];
   /** Where the reference widths come from (shown in metrics / docs). */
   basis: string;

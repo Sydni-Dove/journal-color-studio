@@ -64,6 +64,8 @@ export type ListPageOptions = {
 };
 
 export type LayoutOptions = {
+  /** Every table in the product (Style → Tables). Absent: the studio's original table look. */
+  tableStyle?: import("./stationery").TableStyle;
   /** List pages: sections, lines and checkboxes (Grocery List, Checklist). */
   listPage?: ListPageOptions;
   /**

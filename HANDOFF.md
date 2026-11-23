@@ -5,6 +5,19 @@ commit as any change to state, branches, rules or open decisions.
 
 _Last updated: 2026-11-17 — Online saving for Cover Studio and Coloring Book on `claude/online-cover-studio` (new Supabase table + bucket created, with approval; app code not merged). Toolbar feedback on `claude/toolbar-feedback-six` (not merged). Earlier: Coloring Book on `claude/coloring-book-studio`; Phase 8 merged to `main` (89f054b) and live._
 
+
+## Table styling and the Stationery table look (2026-11-23, branch `claude/table-styling` from main 7519da0 — review pending, not merged)
+
+- **Style → Tables** (`layoutOptions.tableStyle`, `TablesPanel`, shown in the Writing area when a product has a table): border weight, border color (custom via `RuleNode.hex` / `BoxNode.strokeHex`, tints via `opacity` / `strokeOpacity`), grid, header and padding. Lines only (`tableLines` in layouts/stationery/surfaces.ts): rows, row height and writing space never change; padding only changes the heading row. Absent style = the original look, and golden snapshots are unchanged.
+- **Per-table "Look"** (`PromptTable.look: "stationery"`, `outerBorder`): `stationeryTableStyle` gives 0.25 pt rules under each row, a light outer border (or none), a subtle column line (45% tint), headings at 88% size, no shading, in the product's border color. It keeps its own look over the product style. The look is saved through the document model (`tableLook` / `tableOuterBorder`).
+- **Hope Planner check** (working copy built from the template with Sydni's saved settings; her project p_mwpi3k8q_qpa7vbdp was read, not changed):
+  - 66 pages: title, Notes, How to Use, 30 spreads, 2 index pages, a blank last page. All 8.5 × 11 in; only page 66 (the blank last page) has no text.
+  - Margins alternate: inside 0.75" (coil side) and outside, top and bottom 0.5".
+  - 180 margin notes: all at 11 pt, none shrunk; at least 0.08" room around each, panels at most 35% full. No panel overlaps writing or enters the binding side, and there are no diagnostics.
+  - **Unresolved:** her saved PDF has 65 pages, but the template gives 66. It wasn't changed; it needs her PDF to compare.
+- **Not changed:** the template, her project, and any page count. The stationery look is opt-in per table.
+
+
 ## The two apps
 
 | App | Where | Role | Deploys (Vercel) |

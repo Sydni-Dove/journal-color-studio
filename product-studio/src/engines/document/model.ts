@@ -61,6 +61,8 @@ function presentationOf(b: PromptBlock): ComponentPresentation {
   if (b.fieldStyles !== undefined) p.fieldStyles = b.fieldStyles;
   if (b.marginNote !== undefined) p.marginNote = b.marginNote;
   if (b.table?.borders !== undefined) p.tableBorders = b.table.borders;
+  if (b.table?.look !== undefined) p.tableLook = b.table.look;
+  if (b.table?.outerBorder !== undefined) p.tableOuterBorder = b.table.outerBorder;
   return p;
 }
 
@@ -171,6 +173,8 @@ export function componentToBlock(c: DocComponent, p: ComponentPresentation = {})
         id: c.id, label: c.label, ...(c.prompt !== undefined ? { prompt: c.prompt } : {}), responseStyle: "table", ...spaceToBlock(c.space),
         table: {
           columns: c.columns.map((f) => f.label), rows: c.rows, ...(c.showHeader !== undefined ? { showHeader: c.showHeader } : {}), ...(c.rowSpace !== undefined ? { rowSpace: c.rowSpace } : {}), ...(p.tableBorders !== undefined ? { borders: p.tableBorders } : {}),
+          ...(p.tableLook !== undefined ? { look: p.tableLook } : {}),
+          ...(p.tableOuterBorder !== undefined ? { outerBorder: p.tableOuterBorder } : {}),
           // An untyped column was stored as text; only a table sized by content says what its columns hold.
           ...(c.sizedByContent ? { columnTypes: c.columns.map((f) => f.valueType) } : {}),
           ...(c.numbering ? { numbering: { ...c.numbering } } : {}),

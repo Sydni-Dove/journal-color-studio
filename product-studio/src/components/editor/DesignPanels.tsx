@@ -460,6 +460,72 @@ export function PatternPanel({ project, update, usage, nav }: PanelProps) {
   );
 }
 
+/** Does the product have a table anywhere (a prompt block set to a table)? */
+export function hasTables(project: ProductProject): boolean {
+  const walk = (ns: import("../../types/recipe").BookNode[]): boolean => ns.some((n) => (n.kind === "group" ? walk(n.children) : !!n.promptSet?.blocks.some((b) => b.responseStyle === "table")));
+  return walk(project.recipe.structure ?? []) || !!project.pageDesigns?.some((d) => d.promptSet.blocks.some((b) => b.responseStyle === "table"));
+}
+
+type TableStyleValue = NonNullable<ProductProject["layoutOptions"]["tableStyle"]>;
+
+/**
+ * Style → Tables: how every table in the product looks — rule weight and color, which lines, the heading row,
+ * cell padding. It changes lines only, never rows or writing space. Nothing set: the original table look.
+ */
+export function TablesPanel({ project, update }: PanelProps) {
+  if (!hasTables(project)) return null;
+  const st = project.layoutOptions.tableStyle ?? {};
+  const set = (patch: Partial<TableStyleValue>) =>
+    update((p) => {
+      const next: TableStyleValue = { ...(p.layoutOptions.tableStyle ?? {}), ...patch };
+      for (const k of Object.keys(next) as (keyof TableStyleValue)[]) if (next[k] === undefined) delete next[k];
+      return { ...p, layoutOptions: { ...p.layoutOptions, tableStyle: Object.keys(next).length ? next : undefined } };
+    });
+  return (
+    <Section title="Tables">
+      <div data-testid="tables-panel">
+        <Segmented<string>
+          label="Border weight"
+          value={st.weight ?? "original"}
+          options={[{ value: "original", label: "Original" }, { value: "none", label: "None" }, { value: "hairline", label: "Hairline" }, { value: "light", label: "Light" }, { value: "medium", label: "Medium" }, { value: "strong", label: "Strong" }]}
+          onChange={(v) => set({ weight: v === "original" ? undefined : (v as TableStyleValue["weight"]) })}
+        />
+        <Segmented<string>
+          label="Border color"
+          value={st.color ?? "burgundy"}
+          options={[{ value: "burgundy", label: "Burgundy" }, { value: "soft-burgundy", label: "Soft burgundy" }, { value: "light-gray", label: "Light gray" }, { value: "custom", label: "Custom" }]}
+          onChange={(v) => set({ color: v === "burgundy" ? undefined : (v as TableStyleValue["color"]), ...(v === "custom" && !st.customColor ? { customColor: "#7A2E3A" } : {}) })}
+        />
+        {st.color === "custom" && (
+          <label className="field">
+            <span>Custom color</span>
+            <input type="color" value={st.customColor ?? "#7A2E3A"} onChange={(e) => set({ customColor: e.target.value })} aria-label="Custom table color" />
+          </label>
+        )}
+        <Segmented<string>
+          label="Grid"
+          value={st.grid ?? "each-table"}
+          options={[{ value: "each-table", label: "Each table's own" }, { value: "full", label: "Full grid" }, { value: "horizontal", label: "Horizontal lines" }, { value: "outer-horizontal", label: "Outer border + horizontal lines" }, { value: "minimal", label: "Minimal" }]}
+          onChange={(v) => set({ grid: v === "each-table" ? undefined : (v as TableStyleValue["grid"]) })}
+        />
+        <Segmented<string>
+          label="Header"
+          value={st.header ?? "plain"}
+          options={[{ value: "plain", label: "Plain" }, { value: "shaded", label: "Subtle shading" }, { value: "accent", label: "Accent-colored text" }]}
+          onChange={(v) => set({ header: v === "plain" ? undefined : (v as TableStyleValue["header"]) })}
+        />
+        <Segmented<string>
+          label="Padding"
+          value={st.padding ?? "standard"}
+          options={[{ value: "compact", label: "Compact" }, { value: "standard", label: "Standard" }, { value: "spacious", label: "Spacious" }]}
+          onChange={(v) => set({ padding: v === "standard" ? undefined : (v as TableStyleValue["padding"]) })}
+        />
+        <p className="hint">For every table in this product; a table set to the Stationery look keeps its own lighter lines. Rows and writing space never change.</p>
+      </div>
+    </Section>
+  );
+}
+
 export function SpacingPanel({ project, update }: PanelProps) {
   return (
     <Section title="Spacing">

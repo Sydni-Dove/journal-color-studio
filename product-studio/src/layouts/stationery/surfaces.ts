@@ -11,7 +11,7 @@ import { tableRows, resolveColumns } from "../../engines/stationery/geometry";
 import { STUDIO_STROKES } from "../../presets/studioDefaults";
 import type { Rect } from "../../types/geometry";
 import type { LayoutDiagnostic, LayoutMetric, LayoutNode } from "../../types/layout";
-import type { StationeryZone, SurfaceKind } from "../../types/stationery";
+import type { StationeryZone, SurfaceKind, TableStyle } from "../../types/stationery";
 import { TABLE_MAX_STRETCH } from "../../types/prompts";
 import { getLayoutMeasurer, styleForRole } from "../../engines/typography/textMeasure";
 import { checklistRows, fitHeading, HEADING_MIN_PT, writingSurface } from "../shared/components";
@@ -85,9 +85,49 @@ export const columnMinIn = (ctx: LayoutContext, label: string, maxLines: 2 | 3 =
   return need + 2 * ctx.spacing.labelToBorderInset;
 };
 
+/** Rule weights for a table style (points). */
+const TABLE_WEIGHT_PT = { none: 0, hairline: 0.25, light: 0.4, medium: 0.6, strong: 1 } as const;
+const TABLE_PADDING = { compact: 0.6, standard: 1, spacious: 1.5 } as const;
+const LIGHT_GRAY = "#BDBDBD";
+
+/** The table's look: the product's table style with the table's own look over it. */
+export function tableStyleOf(spec: NonNullable<StationeryZone["table"]>, ctx: Pick<LayoutContext, "options">): TableStyle {
+  return { ...(ctx.options.tableStyle ?? {}), ...(spec.style ?? {}) };
+}
+
+/**
+ * How a table draws its lines (never its geometry). With no style set this is exactly the studio's original
+ * table: full grid with 0.5 pt rules and a 1 pt heading rule (or the block's own borders choice).
+ */
+function tableLines(spec: NonNullable<StationeryZone["table"]>, ctx: LayoutContext) {
+  const st = tableStyleOf(spec, ctx);
+  const legacy = spec.borders ?? "grid";
+  const grid = st.grid ?? (legacy === "grid" ? "full" : legacy === "horizontal" ? "horizontal" : legacy === "minimal" ? "outer-horizontal" : "none");
+  const w = st.weight ? TABLE_WEIGHT_PT[st.weight] : STUDIO_STROKES.gridRulePt;
+  const headPt = st.weight ? (w ? Math.max(w * 1.6, w + 0.15) : 0) : STUDIO_STROKES.headerRulePt;
+  const custom = st.color === "custom" && /^#[0-9a-f]{3,8}$/i.test(st.customColor ?? "") ? st.customColor : undefined;
+  const hex = st.color === "light-gray" ? LIGHT_GRAY : custom;
+  const tint = st.color === "soft-burgundy" ? 0.55 : 1;
+  const cols = st.columns ?? (grid === "full" ? "full" : "none");
+  return {
+    on: grid !== "none" && w > 0,
+    box: grid === "full" || grid === "outer-horizontal",
+    cols,
+    rowPt: w,
+    headPt,
+    // Minimal: the row lines lighter than the heading rule.
+    rowTint: tint * (grid === "minimal" ? 0.6 : 1),
+    tint,
+    hex,
+    header: st.header ?? "plain",
+    small: !!st.smallHeadings,
+  };
+}
+
 /** A table's column headings at this width, and the header row's height (0 when the header is hidden). */
 function tableHead(spec: NonNullable<StationeryZone["table"]>, rect: Pick<Rect, "x" | "w">, ctx: LayoutContext) {
-  const inset = ctx.spacing.labelToBorderInset;
+  // Cell padding (Style → Tables): the heading row's inner space; the writing rows keep their height.
+  const inset = ctx.spacing.labelToBorderInset * TABLE_PADDING[tableStyleOf(spec, ctx).padding ?? "standard"];
   // Geometry first (column widths from the research proportions), then the headings fitted to those widths.
   // A numbered table's "No." column is never narrower than the widest number it prints (drawn in the label role).
   const numberMin = spec.numbers ? getLayoutMeasurer().measure(spec.numbers.widest, styleForRole(ctx.typography, "label")) + 2 * inset : 0;
@@ -122,29 +162,47 @@ function table(id: string, rect: Rect, zone: StationeryZone, ctx: LayoutContext)
   const t: Rect = { x: rect.x, y: rect.y, w: rect.w, h };
   const stroke = STUDIO_STROKES.gridRulePt;
   const rowEdges = [t.y, ...Array.from({ length: rows + 1 }, (_, i) => t.y + headerH + i * rowH)];
-  const borderStyle = spec.borders ?? "grid";
+  const look = tableLines(spec, ctx);
+  void stroke;
+  // A rule in the table's color, weight and tint.
+  const line = (rid: string, x1: number, y1: number, x2: number, y2: number, pt: number, tint: number) => {
+    const r = rule(rid, x1, y1, x2, y2, { strokePt: pt, component: "Grid" });
+    if (look.hex) r.hex = look.hex;
+    if (tint < 1) r.opacity = tint;
+    return r;
+  };
   const nodes: LayoutNode[] = [
     group(id, "Grid", t, { columnEdges: [...cols.columns.map((c) => c.x), t.x + t.w], rowEdges }),
   ];
-  if (borderStyle === "grid" || borderStyle === "minimal") nodes.push(box(`${id}-border`, t, { component: "Grid", strokePt: stroke }));
+  // Subtle shading behind the headings (Style → Tables → Header).
+  if (showHeader && look.header === "shaded") nodes.push(box(`${id}-header-shade`, { x: t.x, y: t.y, w: t.w, h: headerH }, { component: "Grid", stroke: null, fill: "border", fillOpacity: 0.07 }));
+  if (look.on && look.box) {
+    const b = box(`${id}-border`, t, { component: "Grid", strokePt: look.rowPt });
+    if (look.hex) b.strokeHex = look.hex;
+    if (look.tint < 1) b.strokeOpacity = look.tint;
+    nodes.push(b);
+  }
   cols.columns.forEach((c, i) => {
-    if (i > 0 && borderStyle === "grid") nodes.push(rule(`${id}-v${i}`, c.x, t.y, c.x, t.y + h, { strokePt: stroke, component: "Grid" }));
+    if (i > 0 && look.on && look.cols !== "none") nodes.push(line(`${id}-v${i}`, c.x, t.y, c.x, t.y + h, look.rowPt, look.cols === "subtle" ? look.tint * 0.45 : look.tint));
     if (showHeader) {
       const f = heads[i];
       const head = text(`${id}-h-${c.column.key}`, { x: c.x + inset, y: t.y + inset, w: c.w - 2 * inset, h: headerH - 2 * inset }, c.column.label, "label", { component: "SectionHeader", vAlign: "middle" });
-      if (f.lines.length > 1 || f.sizePt !== ctx.typography.roles.label.sizePt) head.fit = { sizePt: f.sizePt, lineHeight: f.lineHeight, lines: f.lines, ...(f.ok ? {} : { failed: true }) };
+      // Small headings: drawn smaller in the same row (the table's geometry stays the same).
+      const sizePt = look.small ? Math.max(HEADING_MIN_PT, +(f.sizePt * 0.88).toFixed(2)) : f.sizePt;
+      if (f.lines.length > 1 || sizePt !== ctx.typography.roles.label.sizePt) head.fit = { sizePt, lineHeight: f.lineHeight, lines: f.lines, ...(f.ok ? {} : { failed: true }) };
+      if (look.header === "accent") head.color = "border";
       nodes.push(head);
     }
   });
   // Header rule, then one rule under every writing row.
-  if (showHeader && borderStyle !== "none") {
+  if (showHeader && look.on) {
     const y = t.y + headerH;
-    nodes.push(rule(`${id}-header-rule`, t.x, y, t.x + t.w, y, { strokePt: STUDIO_STROKES.headerRulePt, component: "Grid" }));
+    nodes.push(line(`${id}-header-rule`, t.x, y, t.x + t.w, y, look.headPt, look.tint));
   }
-  if (borderStyle !== "none") {
+  if (look.on) {
     for (let i = 1; i <= rows; i++) {
       const y = t.y + headerH + i * rowH;
-      nodes.push(rule(`${id}-r${i}`, t.x, y, t.x + t.w, y, { strokePt: stroke, component: "Grid" }));
+      nodes.push(line(`${id}-r${i}`, t.x, y, t.x + t.w, y, look.rowPt, look.rowTint));
     }
   }
   // Numbered rows: the first column counts on from this instance's start (a continued piece from its first row).

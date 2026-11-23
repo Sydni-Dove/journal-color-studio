@@ -25,6 +25,14 @@ export type PromptTable = {
   showHeader?: boolean;
   /** Visual rule treatment; never changes table geometry. */
   borders?: "grid" | "horizontal" | "minimal" | "none";
+  /**
+   * This table's look: "standard" follows the product's table style (Style → Tables); "stationery" is a lighter
+   * letterpress look — thin rules under each row, a light outer border (or none), subtle column separators,
+   * small headings, no shading. The writing space is the same either way.
+   */
+  look?: "standard" | "stationery";
+  /** Stationery look: the light outer border (default true). */
+  outerBorder?: boolean;
   /** Row height in plain words (default standard); "Fill remaining space" is the block's `fill` space. */
   rowSpace?: TableRowSpace;
   /**

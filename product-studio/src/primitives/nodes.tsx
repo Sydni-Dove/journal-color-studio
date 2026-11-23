@@ -52,7 +52,7 @@ export function Box({ node }: { node: BoxNode }) {
       width={w}
       height={h}
       rx={node.radiusIn}
-      style={{ fill: node.fill ? colorVar(node.fill) : "none", fillOpacity: node.fillOpacity, stroke: node.stroke ? colorVar(node.stroke) : "none" }}
+      style={{ fill: node.fill ? colorVar(node.fill) : "none", fillOpacity: node.fillOpacity, stroke: node.strokeHex ?? (node.stroke ? colorVar(node.stroke) : "none"), ...(node.strokeOpacity !== undefined ? { strokeOpacity: node.strokeOpacity } : {}) }}
       strokeWidth={sw}
       data-node={node.id}
     />
@@ -70,7 +70,8 @@ export function Checkbox({ node }: { node: CheckboxNode }) {
 }
 
 export function Divider({ node }: { node: RuleNode }) {
-  return <line x1={node.x1} y1={node.y1} x2={node.x2} y2={node.y2} style={strokeStyle(node.color)} strokeWidth={ptToIn(node.strokePt)} strokeDasharray={node.dashIn?.join(" ")} data-node={node.id} />;
+  const style = { ...strokeStyle(node.color, node.opacity ?? 1), ...(node.hex ? { stroke: node.hex } : {}) };
+  return <line x1={node.x1} y1={node.y1} x2={node.x2} y2={node.y2} style={style} strokeWidth={ptToIn(node.strokePt)} strokeDasharray={node.dashIn?.join(" ")} data-node={node.id} />;
 }
 
 // ─── Text primitive (HTML, positioned in inches) ───────────────────────────
