@@ -13,7 +13,10 @@ import type { ProductProject } from "../src/types/project";
 import type { BookNode } from "../src/types/recipe";
 import type { BoxNode, LayoutNode, RuleNode, TextNode } from "../src/types/layout";
 
-const hope = (): ProductProject =>
+/** The Hope Planner with its Prayers table in the original (standard) look, as a baseline. */
+const hope = (): ProductProject => withPrayers(hopeTemplate(), { look: undefined });
+/** The Hope Planner as the template now makes it (Prayers in the approved Stationery look). */
+const hopeTemplate = (): ProductProject =>
   createProject("journal", {
     ...HOPE_JOURNAL_SETTINGS,
     dimensions: { sizePresetId: "8.5x11", orientation: "portrait" },
@@ -108,5 +111,13 @@ describe("Prayers I Have Prayed: the Stationery look", () => {
     const i = doc.recipe.pages.findIndex((x) => x.recipeItemId === "hope-index");
     const index = solvePage(doc, i).nodes.find((n) => n.type === "rule" && /hope-index.*-r1$/.test(n.id)) as RuleNode;
     expect(index.strokePt).toBe(1);
+  });
+});
+
+describe("the Hope Planner template", () => {
+  it("makes its Prayers I Have Prayed table in the approved Stationery look; the other tables follow the product style", () => {
+    const t = prayers(hopeTemplate());
+    expect(t.rules.filter((r) => /-r\d+$/.test(r.id)).every((r) => r.strokePt === 0.25)).toBe(true);
+    expect(t.grid.rowEdges).toEqual(prayers(hope()).grid.rowEdges);
   });
 });

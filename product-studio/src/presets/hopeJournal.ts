@@ -128,7 +128,8 @@ export function hopeRightSet(opts: { stepDates?: boolean } = {}): PromptSet {
       { id: "hope-steps", label: "Steps I Am Taking", space: "fixed", lineCount: 6, responseStyle: "checkboxes", taskMarker: "square", taskMarkerPosition: "left", ...(opts.stepDates ? { taskDate: HOPE_STEP_DATE_LABEL } : {}), marginNote: "One step this week is enough." },
       {
         id: "hope-prayers", label: "Prayers I Have Prayed", space: "fixed", lineCount: 6, responseStyle: "table", marginNote: "Date every prayer so you can see the pattern.",
-        table: { columns: ["Date", "Prayer"], columnTypes: ["date", "longText"], columnWidths: [1.1, null], rows: 6, showHeader: true, borders: "grid", headerLines: 2 },
+        // The Stationery look (approved Nov 2026): thin burgundy rules, a light outer border, small headings.
+        table: { columns: ["Date", "Prayer"], columnTypes: ["date", "longText"], columnWidths: [1.1, null], rows: 6, showHeader: true, borders: "grid", headerLines: 2, look: "stationery" },
       },
       { id: "hope-moved", label: "God Moved", space: "fill", responseStyle: "ruled", marginNote: "Record small movement too." },
       { id: "hope-fulfilled", kind: "info", label: "", fields: ["Fulfilled on"], fieldStyles: ["check-line"] },

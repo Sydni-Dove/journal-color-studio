@@ -120,9 +120,9 @@ exports[`existing templates print exactly as before > book-daily-planner @ 8.5x1
 exports[`existing templates print exactly as before > book-hope-journal @ 5.5x8.5 1`] = `
 {
   "groups": [
-    "1-25:c163c7d4b7c2",
-    "26-50:baba82562ee0",
-    "51-66:0676b5f3cdcd",
+    "1-25:7a5a7c629a86",
+    "26-50:046c3a3a3033",
+    "51-66:30fe268e911d",
   ],
   "pageCount": 66,
   "plan": "2bc8e58caa2b",
@@ -133,9 +133,9 @@ exports[`existing templates print exactly as before > book-hope-journal @ 5.5x8.
 exports[`existing templates print exactly as before > book-hope-journal @ 7x9 1`] = `
 {
   "groups": [
-    "1-25:3feb3d85190a",
-    "26-50:af3f263cf461",
-    "51-66:ee8d5c772a02",
+    "1-25:3906cef65f0f",
+    "26-50:57ded2a8f835",
+    "51-66:92d1b4d62c19",
   ],
   "pageCount": 66,
   "plan": "2bc8e58caa2b",
@@ -146,9 +146,9 @@ exports[`existing templates print exactly as before > book-hope-journal @ 7x9 1`
 exports[`existing templates print exactly as before > book-hope-journal @ 8.5x11 1`] = `
 {
   "groups": [
-    "1-25:01b133ed8355",
-    "26-50:250a5513ccfb",
-    "51-66:e17b20288599",
+    "1-25:1ff5508a856d",
+    "26-50:ea349711e88c",
+    "51-66:e29b0863976a",
   ],
   "pageCount": 66,
   "plan": "2bc8e58caa2b",
