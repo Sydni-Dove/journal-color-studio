@@ -15,6 +15,7 @@ _Last updated: 2026-11-17 — Online saving for Cover Studio and Coloring Book o
   - Margins alternate: inside 0.75" (coil side) and outside, top and bottom 0.5".
   - 180 margin notes: all at 11 pt, none shrunk; at least 0.08" room around each, panels at most 35% full. No panel overlaps writing or enters the binding side, and there are no diagnostics.
   - **Unresolved:** her saved PDF has 65 pages, but the template gives 66. It wasn't changed; it needs her PDF to compare.
+- Merged to main on Nov 24 (fast-forward to 9cb3dcf, with Sydni's approval); production deployment dpl_FhQ8uKk9c1rvf4KP2TifpjVrjhVy is READY. Her finished Hope Planner p_mwpi3k8q_qpa7vbdp was updated at her request: only `recipe.structure[4].promptSet.blocks[1].table.look = "stationery"`, plus updatedAt/updated_at bumped so devices sync it. A conditional update on the previous updated_at; a checksum confirms nothing else changed.
 - Sydni approved the Stationery look (Nov 24). The Hope Planner template now makes its Prayers I Have Prayed table in it (`look: "stationery"`); only the book-hope-journal golden snapshots changed, and the rows are identical. Her saved project and the page count are unchanged.
 
 
