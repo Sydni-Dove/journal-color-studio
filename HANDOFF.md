@@ -3,10 +3,10 @@
 Read this first when picking up the work (any assistant or developer). Keep it current: update it in the same
 commit as any change to state, branches, rules or open decisions.
 
-_Last updated: 2026-11-25 — Devotional Spread on `claude/devotional-spread` (preview, not merged). 2026-11-17 — Online saving for Cover Studio and Coloring Book on `claude/online-cover-studio` (new Supabase table + bucket created, with approval; app code not merged). Toolbar feedback on `claude/toolbar-feedback-six` (not merged). Earlier: Coloring Book on `claude/coloring-book-studio`; Phase 8 merged to `main` (89f054b) and live._
+_Last updated: 2026-11-25 — Devotional Spread merged to `main` (fea7fe4) and live, with Sydni's approval (Nov 25). 2026-11-17 — Online saving for Cover Studio and Coloring Book on `claude/online-cover-studio` (new Supabase table + bucket created, with approval; app code not merged). Toolbar feedback on `claude/toolbar-feedback-six` (not merged). Earlier: Coloring Book on `claude/coloring-book-studio`; Phase 8 merged to `main` (89f054b) and live._
 
 
-## Devotional Spread (2026-11-25, branch `claude/devotional-spread` from main 9cb3dcf — preview, not merged)
+## Devotional Spread (2026-11-25, branch `claude/devotional-spread`; merged to `main` fea7fe4 and live with Sydni's approval)
 
 A new Coloring Book page type, started for Sydni's “Mommy & Me: Growing With God Together” (KJV, per Sydni, Nov 25). Her book wasn't in her saved items, so it was built and checked on a sample (`tests/fixtures/mommyAndMe.ts`: KJV lines word for word, placeholder devotional wording). Her saved books and projects were not read for changes or touched.
 - **Model:** `Scene.pageType = "devotional-spread"` + `Scene.mommy` (`MommyPage`: declaration, art, `readWord` lines with `kind` exact/paraphrase/reflection, `blanks` with answers never printed, `reflect`, `heart`, `layout` column/band, `qr`, `textOff`, `letterStyle`). Per-page `letterStyle` and `textOff` work on every page (`sceneBrief` in cover/assemble.ts); absent = the book's setting. Book: `spread` (split 0.65, label 10.5 pt, text 9.5 pt, lines 0.3 in), `artCharacters` (Girl 1 by default), `digitalProjectId`. All normalized in coverStore/coloringBookStore; older books open unchanged.
