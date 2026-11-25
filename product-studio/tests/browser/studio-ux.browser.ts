@@ -64,7 +64,7 @@ describe("Studio home", () => {
       // "What would you like to create?": six finished products open their flow (Coloring Book, Activity Book, Journal,
       // Planner, Book Cover, Other / Custom), then six more product types (Devotional, Worksheet, Inventory & Log Book,
       // Tracker, Notepad, Desk Pad).
-      await expect(page.locator("button.family-card").count()).resolves.toBe(12);
+      await expect(page.locator("button.family-card").count()).resolves.toBe(13);
       await expect(page.locator('button.family-card[data-create="coloring-book"]').count()).resolves.toBe(1);
       await expect(page.locator("button.family-card", { hasText: "Inventory & Log Book" }).count()).resolves.toBe(1);
       await expect(page.locator("button.family-card", { hasText: /^Planner/ }).count()).resolves.toBe(1);

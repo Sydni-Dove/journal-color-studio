@@ -8,6 +8,8 @@ import { NewProductWizard } from "../components/wizard/NewProductWizard";
 import { AiDocumentWizard } from "../components/wizard/AiDocumentWizard";
 import { CoverStudio } from "../components/cover/CoverStudio";
 import { ColoringBookStudio } from "../components/coloringBook/ColoringBookStudio";
+import { LetteringStudio, type StudioPicture } from "../components/lettering/LetteringStudio";
+import type { ColoringBook } from "../engines/coloringBook/book";
 import { localBookStore } from "../persistence/coloringBookStore";
 import { resolveColors } from "../presets/themes/palettes";
 import { addVariantFromCurrent, duplicateProject, localProjectStore, projectKey, saveGuarded, type ProjectSummary } from "../persistence/projectStore";
@@ -25,6 +27,7 @@ type View =
   | { kind: "ai" }
   | { kind: "cover" }
   | { kind: "coloring"; bookId: string | null }
+  | { kind: "lettering" }
   /** `fromBook`: opened from a Coloring Book's export (its print step open; Back returns to the book). */
   | { kind: "edit"; project: ProductProject; fromBook?: string; startInExport?: boolean };
 
@@ -38,6 +41,22 @@ function projectMeta(id: string): ProjectMeta {
   } catch {
     return null;
   }
+}
+
+/** Pictures already in Product Studio (projects' artwork, coloring books' pages and covers), each once. */
+function studioPictures(projects: ProductProject[], books: ColoringBook[]): StudioPicture[] {
+  const out = new Map<string, StudioPicture>();
+  for (const p of projects) for (const a of p.artwork?.assets ?? []) if (!out.has(a.id)) out.set(a.id, { id: a.id, name: a.name, from: p.name });
+  for (const b of books) {
+    const from = b.brief.title || b.name || "Coloring book";
+    const add = (id: string | undefined, name: string | undefined) => { if (id && !out.has(id)) out.set(id, { id, name: name ?? "picture", from }); };
+    add(b.cover.front?.id, b.cover.front?.name);
+    for (const s of b.brief.scenes) {
+      add(s.illustrationId, s.illustrationName);
+      add(s.mommy?.illustrationId, s.mommy?.illustrationName);
+    }
+  }
+  return [...out.values()];
 }
 
 /** Autosave debounce — long enough to batch typing, short enough to feel instant. */
@@ -230,6 +249,19 @@ export function App() {
         <CoverStudio onBack={() => setView({ kind: "list" })} projects={projects} loadProject={(id) => store.load(id)} onCreateProject={open} onColoringBook={continueAsBook} />
       </>
     );
+  if (view.kind === "lettering")
+    return (
+      <>
+        {banner}
+        <LetteringStudio
+          onBack={() => setView({ kind: "list" })}
+          projects={projects}
+          loadProject={(id) => store.load(id)}
+          pictures={studioPictures(projects.map((p) => store.load(p.id)).filter((p): p is ProductProject => !!p), localBookStore.list().flatMap((b) => localBookStore.load(b.id) ?? []))}
+          onPlaced={open}
+        />
+      </>
+    );
   if (view.kind === "coloring")
     return (
       <>
@@ -278,6 +310,7 @@ export function App() {
       onStart={(start) => setView({ kind: "new", start })}
       onGenerate={() => setView({ kind: "ai" })}
       onCovers={() => setView({ kind: "cover" })}
+      onLettering={() => setView({ kind: "lettering" })}
       onColoringBook={(bookId) => setView({ kind: "coloring", bookId: bookId ?? null })}
       books={localBookStore.list()}
       key={`home-${itemsReceived}`}

@@ -3,7 +3,21 @@
 Read this first when picking up the work (any assistant or developer). Keep it current: update it in the same
 commit as any change to state, branches, rules or open decisions.
 
-_Last updated: 2026-11-25 — Devotional Spread merged to `main` (fea7fe4) and live, with Sydni's approval (Nov 25). 2026-11-17 — Online saving for Cover Studio and Coloring Book on `claude/online-cover-studio` (new Supabase table + bucket created, with approval; app code not merged). Toolbar feedback on `claude/toolbar-feedback-six` (not merged). Earlier: Coloring Book on `claude/coloring-book-studio`; Phase 8 merged to `main` (89f054b) and live._
+_Last updated: 2026-11-25 — Bubble Lettering on `claude/bubble-lettering` (preview, not merged).  Devotional Spread merged to `main` (fea7fe4) and live, with Sydni's approval (Nov 25). 2026-11-17 — Online saving for Cover Studio and Coloring Book on `claude/online-cover-studio` (new Supabase table + bucket created, with approval; app code not merged). Toolbar feedback on `claude/toolbar-feedback-six` (not merged). Earlier: Coloring Book on `claude/coloring-book-studio`; Phase 8 merged to `main` (89f054b) and live._
+
+
+## Bubble Lettering line art (2026-11-25, branch `claude/bubble-lettering` from main 6ae0fd3 — preview, not merged)
+
+Requested by Sydni (via another chat, with her Allow). A home card, “Bubble Lettering”, opens `components/lettering/LetteringStudio.tsx`.
+- **Drawing** (`engines/lettering/bubble.ts`): the words are set in Fredoka Bold (bundled: `@fontsource/fredoka` woff, parsed by `opentype.js`). They become vector paths, puffed by the roundness and outlined. The black layer is stroked at 2 × (puff + outline), with a white layer of 2 × puff on top, so overlapping letters share one outer outline, with round joins. Openings too small to stay open are filled in (`openCounters`), so they never print as solid black dots. Lines stack outline to outline. A sample's canvas size can be kept. The SVG has no text or font, only paths. The PNG is drawn from the same paths at 300 DPI (`browser.ts`), with a transparent background or white.
+- **Copying a sample:**
+  - The sample is uploaded or picked from pictures already in Product Studio (project artwork, coloring-book pages and covers).
+  - `measureLettering` reads the size, lines, separate shapes, outline thickness (the most common black run), letter height and width, gaps, line gap and body thickness. Images over 2400 px are measured scaled down, with the DPI scaled to match.
+  - `styleFrom` solves capital height and roundness from line height and body thickness, using the font's own typical stroke (`typicalStroke`, scanline runs over the glyph outlines), then fits spacing (negative = overlap) and letter width to each line's width. It needs the sample's words for overlapping letters.
+  - Round-trip accuracy: the browser test reads back known settings within about 0.04 in and 0.25 pt.
+- **Styles** (`styles.ts`): saved on this device (localStorage `dove-product-studio:v1:lettering-styles`) and normalized. Classic bubble is built in. They are not synced online yet.
+- **Placing** (`place.ts`): always on a **copy** of the project (“… (with lettering)”): the PNG becomes an artwork asset, placed as a top or bottom band (`illustration`, area) or centred in the safe area (`background`, safe). The original project is byte-for-byte unchanged (tested).
+- **Verified:** 1,845 unit tests (13 new in tests/bubble-lettering.test.ts) and 205 browser tests (tests/browser/bubble-lettering.browser.ts is new; studio-ux now counts 13 home cards). Golden snapshots are unchanged.
 
 
 ## Devotional Spread (2026-11-25, branch `claude/devotional-spread`; merged to `main` fea7fe4 and live with Sydni's approval)

@@ -161,7 +161,7 @@ describe("Devotional Spread: Mommy & Me", () => {
     await pair.scrollIntoViewIfNeeded();
     await shot(page, "1-spread-editor", false);
     if (SHOTS) await pair.screenshot({ path: `${SHOTS}/2-spread-pair.png` });
-    await page.getByTestId("daughter-page").screenshot({ path: SHOTS ? `${SHOTS}/3-daughter-fields.png` : "/dev/null" });
+    if (SHOTS) await page.getByTestId("daughter-page").screenshot({ path: `${SHOTS}/3-daughter-fields.png` });
     if (SHOTS) await page.getByTestId("mommy-page").screenshot({ path: `${SHOTS}/4-mommy-fields.png` });
 
     // Preview and Export: facing pages, both PDFs.
