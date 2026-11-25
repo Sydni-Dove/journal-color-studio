@@ -3,7 +3,18 @@
 Read this first when picking up the work (any assistant or developer). Keep it current: update it in the same
 commit as any change to state, branches, rules or open decisions.
 
-_Last updated: 2026-11-25 — Bubble Lettering and Fit Art to Page merged to `main` and live with Sydni's approval (Nov 25).  Devotional Spread merged to `main` (fea7fe4) and live, with Sydni's approval (Nov 25). 2026-11-17 — Online saving for Cover Studio and Coloring Book on `claude/online-cover-studio` (new Supabase table + bucket created, with approval; app code not merged). Toolbar feedback on `claude/toolbar-feedback-six` (not merged). Earlier: Coloring Book on `claude/coloring-book-studio`; Phase 8 merged to `main` (89f054b) and live._
+_Last updated: 2026-11-25 — Quick book from an idea on `claude/quick-spread-book` (preview, not merged).  Bubble Lettering and Fit Art to Page merged to `main` and live with Sydni's approval (Nov 25).  Devotional Spread merged to `main` (fea7fe4) and live, with Sydni's approval (Nov 25). 2026-11-17 — Online saving for Cover Studio and Coloring Book on `claude/online-cover-studio` (new Supabase table + bucket created, with approval; app code not merged). Toolbar feedback on `claude/toolbar-feedback-six` (not merged). Earlier: Coloring Book on `claude/coloring-book-studio`; Phase 8 merged to `main` (89f054b) and live._
+
+
+## Quick book from an idea (2026-11-25, branch `claude/quick-spread-book` from main f4d47ed — preview, not merged)
+
+Sydni: “the point of this app is to be able to press a few buttons with a simple idea and it make it.” For Devotional Spread books, the Pages step now opens with **Make the whole book from your idea** (`components/coloringBook/QuickSpreadBook.tsx`):
+- **1 · Idea:** a lessons count and **Write my lessons with ChatGPT** (`lessonsPrompt`, opened and copied).
+- **2 · Paste the answer:** **Make my book** runs `parseLessons` (lenient labels, bullets, `|` or `—`, LESSON/Spread/Day/Week headings), then `spreadsFromLessons` (one spread per lesson, Girl 1), then `fillScripture`. Every daughter verse and exact quote is fetched from the public-domain text (bible-api; KJV/WEB only). A ChatGPT excerpt is kept only if `excerptFromVerse` says it's the verse's own words. A blank whose answer is missing from a kept excerpt gets the full verse. Nothing is approved automatically; the report lists replaced and not-found references.
+- **3 · Finish:** **approve all verses**, **approve all pictures**, **Copy all Art Prompts** / download .txt (`allArtPrompts`, print order), and **Upload all pictures** (`assignPictures`: named files such as “3-mommy” or “spread 3 left” go to that page, the rest fill empty pages in print order).
+- The Mommy & Me starter now begins with no pages (and `spread` set), so this panel is the first thing seen.
+- Writing the lessons inside Product Studio itself would need the live AI Edge Function changed (and Sydni's AI allowance). That was not done; it needs her approval.
+- **Verified:** 1,862 unit tests (9 new in tests/spread-import.test.ts) and 208 browser tests (the idea-to-book run in devotional-spread.browser.ts) pass.
 
 
 ## Bubble Lettering line art and Fit Art to Page (2026-11-25, branch `claude/bubble-lettering`; merged to `main` and live with Sydni's approval)

@@ -2619,3 +2619,8 @@ button.family-card:focus-visible {
 .lettering-preview--image img { display: block; max-width: 100%; max-height: 300px; object-fit: contain; }
 .fit-preview { display: grid; place-items: center; background: #ece7e3; border-radius: 8px; padding: 16px; overflow: auto; }
 .fit-preview svg { max-width: 100%; height: auto; box-shadow: 0 1px 6px rgba(0, 0, 0, 0.18); }
+.quick-book { border-left: 4px solid var(--ui-accent, #630000); }
+.quick-step { display: grid; gap: 8px; padding: 10px 0; border-top: 1px solid var(--ui-line); }
+.quick-step h3 { margin: 0; font-size: 15px; }
+.quick-step textarea { width: 100%; }
+.quick-count select { min-width: 80px; }

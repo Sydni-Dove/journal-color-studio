@@ -208,3 +208,54 @@ export function spreadArtPrompt(book: ColoringBook, b: CoverBrief, s: Scene, sid
   out.push("", END);
   return out.join("\n");
 }
+
+// ---- Every page at once ----------------------------------------------------------------------------
+
+/** Every spread's two Art Prompts, in print order, ready to paste one by one into ChatGPT. */
+export function allArtPrompts(book: ColoringBook, b: CoverBrief): string {
+  const spreads = b.scenes.filter(isSpread);
+  return spreads
+    .flatMap((s, i) => [
+      `===== Spread ${i + 1} · LEFT (daughter page): ${(s.pageTitle ?? s.title).trim()} =====\n\n${spreadArtPrompt(book, b, s, "daughter")}`,
+      `===== Spread ${i + 1} · RIGHT (Mommy page): ${(s.mommy?.title ?? "").trim() || "Mommy page"} =====\n\n${spreadArtPrompt(book, b, s, "mommy")}`,
+    ])
+    .join("\n\n\n");
+}
+
+/** The pages pictures go on, in print order: each spread's daughter page, then its Mommy page. */
+export const picturePages = (b: CoverBrief) => b.scenes.filter(isSpread).flatMap((s, i) => [{ sceneId: s.id, side: "daughter" as SpreadSide, spread: i + 1 }, { sceneId: s.id, side: "mommy" as SpreadSide, spread: i + 1 }]);
+
+/**
+ * Which page each uploaded picture goes on. A file named with its spread number and side ("3-mommy.png",
+ * "spread 3 left.png", "lesson3_daughter.png") goes there; the rest fill the remaining pages in print order, in the
+ * order the files were chosen. Pages that already have art are filled only when `replace` is on.
+ */
+export function assignPictures(names: string[], b: CoverBrief, replace = false): { file: number; sceneId: string; side: SpreadSide }[] {
+  const pages = picturePages(b);
+  const has = (p: (typeof pages)[number]) => {
+    const s = b.scenes.find((x) => x.id === p.sceneId)!;
+    return p.side === "daughter" ? !!s.illustrationId : !!s.mommy?.illustrationId;
+  };
+  const free = pages.filter((p) => replace || !has(p));
+  const taken = new Set<number>();
+  const out: { file: number; sceneId: string; side: SpreadSide }[] = [];
+  names.forEach((n, file) => {
+    const num = /(\d+)/.exec(n)?.[1];
+    const side: SpreadSide | null = /mom|mommy|mother|right/i.test(n) ? "mommy" : /daughter|girl|left|kid/i.test(n) ? "daughter" : null;
+    if (!num || !side) return;
+    const k = free.findIndex((p) => p.spread === +num && p.side === side);
+    if (k >= 0 && !taken.has(k)) {
+      taken.add(k);
+      out.push({ file, sceneId: free[k].sceneId, side });
+    }
+  });
+  let k = 0;
+  names.forEach((_, file) => {
+    if (out.some((o) => o.file === file)) return;
+    while (k < free.length && taken.has(k)) k++;
+    if (k >= free.length) return;
+    taken.add(k);
+    out.push({ file, sceneId: free[k].sceneId, side: free[k].side });
+  });
+  return out.sort((x, y) => x.file - y.file);
+}

@@ -6,9 +6,8 @@
  */
 import { BUBBLE_FONT } from "../../layouts/book/coloringLettering";
 import { MOMMY_SCRIPT_FONT } from "../../layouts/book/devotionalMommy";
-import { newSpread } from "../../engines/coloringBook/spread";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { GIRL_1, bookFromCoverBrief, bookTitle, newBook, type BookStepId, type ColoringBook } from "../../engines/coloringBook/book";
+import { DEFAULT_SPREAD, GIRL_1, bookFromCoverBrief, bookTitle, newBook, type BookStepId, type ColoringBook } from "../../engines/coloringBook/book";
 import { assembleCover, assembleInterior } from "../../engines/coloringBook/assembleBook";
 import { whatsMissing } from "../../engines/coloringBook/missing";
 import type { CoverBrief, Scene } from "../../engines/cover/brief";
@@ -162,8 +161,10 @@ function mommyAndMeStarter(): ColoringBook {
   const title = "Mommy & Me: Growing With God Together";
   return {
     ...b, name: title, faithBased: true, content: { ...b.content, title: true, scripture: "full" }, step: "pages", reached: 2,
-    brief: { ...b.brief, title, translation: "KJV", ageGroup: "Ages 4–8", pageTypography: { ...b.brief.pageTypography, letterStyle: "bubble" }, scenes: [newSpread(newId("s"), 1)] },
+    // No pages yet: the book is made from an idea in one go (Interior Pages → “Make the whole book from your idea”).
+    brief: { ...b.brief, title, translation: "KJV", ageGroup: "Ages 4–8", pageTypography: { ...b.brief.pageTypography, letterStyle: "bubble" }, scenes: [] },
     artCharacters: [GIRL_1],
+    spread: { ...DEFAULT_SPREAD },
   };
 }
 

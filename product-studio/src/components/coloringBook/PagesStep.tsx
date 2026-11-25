@@ -20,6 +20,7 @@ import { CHECKS, IllustrationCheck, LineSample, ReferenceFiles, Regenerate } fro
 import { FONT_CHOICES } from "../cover/fonts";
 import { Choice, FinishedPage, TextArea, TextInput, pageIndexOf, type StepProps } from "./shared";
 import { SpreadEditor, SpreadPair, SpreadSettingsPanel } from "./SpreadEditor";
+import { QuickSpreadBook } from "./QuickSpreadBook";
 import { isSpread, newSpread } from "../../engines/coloringBook/spread";
 
 export function PagesStep(props: StepProps & { openScene: string | null; setOpenScene: (id: string | null) => void; issues: MissingIssue[] }) {
@@ -31,6 +32,7 @@ export function PagesStep(props: StepProps & { openScene: string | null; setOpen
         <PageEditor key={scene.id} {...props} scene={scene} onClose={() => setOpenScene(null)} />
       ) : (
         <>
+          {(book.spread || book.brief.scenes.some(isSpread)) && <QuickSpreadBook {...props} />}
           <ColoringSettings {...props} />
           {book.brief.scenes.some(isSpread) && <SpreadSettingsPanel {...props} />}
           <SceneImport {...props} />

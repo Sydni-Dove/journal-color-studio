@@ -87,6 +87,10 @@ describe("Devotional Spread: Mommy & Me", () => {
     await expect(page.locator(".book-name").textContent()).resolves.toContain("Mommy & Me: Growing With God Together");
 
     // Open the spread: both pages, side by side, in print order.
+    // The starter opens on “Make the whole book from your idea”; one spread by hand here (the idea path is tested below).
+    await page.getByTestId("quick-book").waitFor();
+    await page.getByTestId("add-spread").click();
+    await page.getByRole("button", { name: "‹ All pages" }).click();
     await page.getByRole("button", { name: /Open spread 1/ }).click();
     const pair = page.locator('[data-testid^="spread-pair-"]').first();
     await pair.waitFor();
@@ -189,4 +193,56 @@ describe("Devotional Spread: Mommy & Me", () => {
     await expect.poll(() => page.locator('[data-issue="license"]').count()).toBe(0);
     await ctx.close();
   }, 120_000);
+
+  it("from one idea: the lessons prompt, paste the answer, Make my book, approve all, all Art Prompts, upload all pictures", async () => {
+    const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 }, permissions: ["clipboard-read", "clipboard-write"] });
+    await ctx.route(/fonts\.(googleapis|gstatic)\.com/, async (route) => route.fulfill({ response: await route.fetch() }).catch(() => route.abort()));
+    await ctx.route("**/rest/v1/**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+    const KJV: Record<string, string> = { "Psalm 139:14": PSALM, "1 John 4:19": "We love him, because he first loved us." };
+    await ctx.route(/bible-api\.com/, (route) => {
+      const ref = decodeURIComponent(new URL(route.request().url()).pathname.slice(1));
+      return KJV[ref] ? route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ reference: ref, text: KJV[ref] }) }) : route.fulfill({ status: 404, body: "{}" });
+    });
+    const page = await ctx.newPage();
+    await page.addInitScript(() => { window.open = () => ({} as Window); });
+    await page.goto(server.resolvedUrls!.local[0]);
+    await page.evaluate(() => localStorage.clear());
+    await page.reload();
+    await page.locator('[data-create="coloring-book"]').click();
+    await page.getByTestId("new-mommy-me").click();
+    await page.getByTestId("quick-book").waitFor();
+    // 1. The idea → the lessons prompt (copied as ChatGPT opens).
+    await page.getByTestId("quick-idea").fill("Who God says I am");
+    await page.getByTestId("quick-write").click();
+    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain("The idea: Who God says I am");
+    // 2. Paste the answer → Make my book.
+    const answer = [
+      "LESSON 1: I Am Wonderfully Made", "Theme: God made me", "Daughter scene: The girl twirls with Jesus.", "Verse: Psalm 139:14", "Verse words: I am fearfully and wonderfully made",
+      "Mommy declaration: She is wonderfully made", "Mommy art: Roses on an arch", "Read the Word:", "- Psalm 139:14 | exact | I will praise thee; for I am fearfully and wonderfully made", "Fill in the Blank:",
+      "- I am fearfully and ___ made. | wonderfully | Psalm 139:14", "Listen & Reflect: Where did you see God's work?", "Heart to Heart: What did God make special about you?", "",
+      "LESSON 2: God Loved Us First", "Daughter scene: The girl hugs Jesus.", "Verse: 1 John 4:19", "Mommy declaration: Loved first", "Read the Word:", "- 1 John 4:19 | exact | We love him",
+      "Fill in the Blank:", "- He first ___ us. | loved | 1 John 4:19", "Listen & Reflect: How were you loved today?", "Heart to Heart: Who can we love tomorrow?",
+    ].join("\n");
+    await page.getByTestId("quick-answer").fill(answer);
+    await page.getByTestId("quick-make").click();
+    await expect.poll(() => page.getByTestId("quick-report").textContent()).toContain("2 spreads made · 4 verses filled in from the KJV");
+    await expect.poll(() => page.locator('[data-testid^="spread-pair-"]').count()).toBe(2);
+    // 3. Approve all, every Art Prompt, every picture.
+    await page.getByTestId("quick-approve").click();
+    await expect.poll(() => page.getByTestId("quick-approve").textContent()).toBe("All verses approved");
+    await page.getByTestId("quick-prompts").click();
+    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain("===== Spread 2 · RIGHT (Mommy page): Loved first =====");
+    const files = await Promise.all([1, 2, 3, 4].map((k) => png(page, 2550, 3300, `pic-${k}.png`, k % 2 ? "daughter" : "mommy")));
+    await page.getByTestId("quick-upload").setInputFiles(files);
+    await expect.poll(() => page.getByRole("button", { name: /Upload all pictures/ }).textContent()).toContain("4 of 4 done");
+    await page.getByTestId("quick-approve-art").click();
+    await expect.poll(() => page.getByTestId("quick-approve-art").textContent()).toBe("All pictures approved");
+    // Nothing left to fix or approve on the pages themselves.
+    await page.locator(".steps__dot").nth(4).click();
+    await page.getByTestId("whats-missing").waitFor();
+    await expect.poll(() => page.locator('[data-issue^="art-"], [data-issue^="mommy-art-"], [data-issue^="verse-"], [data-issue^="words-"], [data-issue^="approve-"], [data-issue^="mommy-approve-"], [data-issue^="answer-"]').count()).toBe(0);
+    if (SHOTS) await page.screenshot({ path: `${SHOTS}/6-quick-book.png`, fullPage: true });
+    await ctx.close();
+  }, 120_000);
+
 });
