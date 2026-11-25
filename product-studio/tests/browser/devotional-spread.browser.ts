@@ -211,7 +211,8 @@ describe("Devotional Spread: Mommy & Me", () => {
     await page.locator('[data-create="coloring-book"]').click();
     await page.getByTestId("new-mommy-me").click();
     await page.getByTestId("quick-book").waitFor();
-    // 1. The idea → the lessons prompt (copied as ChatGPT opens).
+    // 1. The idea: Mommy & Me's is already filled in; it can be changed. → the lessons prompt (copied as ChatGPT opens).
+    await expect.poll(() => page.getByTestId("quick-idea").inputValue()).toContain("Mommy & Me: Growing With God Together. A mother and her daughter");
     await page.getByTestId("quick-idea").fill("Who God says I am");
     await page.getByTestId("quick-write").click();
     await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain("The idea: Who God says I am");

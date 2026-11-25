@@ -21,7 +21,8 @@ export function QuickSpreadBook({ book, update, say, copy }: StepProps) {
   const b = book.brief;
   const spreads = b.scenes.filter(isSpread);
   const t = translationOf(b.translation);
-  const [idea, setIdea] = useState("");
+  // The book's own idea (Mommy & Me starts with hers), ready to use or change.
+  const [idea, setIdea] = useState(b.theme ?? "");
   const [count, setCount] = useState(12);
   const [answer, setAnswer] = useState("");
   const [busy, setBusy] = useState<string | null>(null);

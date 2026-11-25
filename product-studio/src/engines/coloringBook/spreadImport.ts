@@ -16,6 +16,10 @@ import { excerptFromVerse } from "../cover/assemble";
 import { fetchPublicDomain, normalizeReference, translationOf, type FetchResult } from "./scripture";
 import { containsAnswer, newMommy, SPREAD_PAGE_TYPE } from "./spread";
 
+/** The Mommy & Me book's idea, filled in when the book is started (editable like any idea). */
+export const MOMMY_ME_IDEA =
+  "Mommy & Me: Growing With God Together. A mother and her daughter (ages 4 to 8) grow close to God side by side. Each lesson puts one truth from God's Word on two facing pages: a coloring page for the daughter and a devotional page for Mom, so they hear God's Word together, talk about it heart to heart, and do what it says that week. Lessons move from who God is and how much He loves us, to who God says I am, to hearing His voice and praying, to obeying Him with kindness, courage, joy, thankfulness and trust, to shining His light and living out what He says every day.";
+
 // ---- 1. The prompt ------------------------------------------------------------------------------
 
 /** The ChatGPT prompt that writes every lesson, in the format `parseLessons` reads. */

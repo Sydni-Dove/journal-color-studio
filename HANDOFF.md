@@ -12,7 +12,7 @@ Sydni: “the point of this app is to be able to press a few buttons with a simp
 - **1 · Idea:** a lessons count and **Write my lessons with ChatGPT** (`lessonsPrompt`, opened and copied).
 - **2 · Paste the answer:** **Make my book** runs `parseLessons` (lenient labels, bullets, `|` or `—`, LESSON/Spread/Day/Week headings), then `spreadsFromLessons` (one spread per lesson, Girl 1), then `fillScripture`. Every daughter verse and exact quote is fetched from the public-domain text (bible-api; KJV/WEB only). A ChatGPT excerpt is kept only if `excerptFromVerse` says it's the verse's own words. A blank whose answer is missing from a kept excerpt gets the full verse. Nothing is approved automatically; the report lists replaced and not-found references.
 - **3 · Finish:** **approve all verses**, **approve all pictures**, **Copy all Art Prompts** / download .txt (`allArtPrompts`, print order), and **Upload all pictures** (`assignPictures`: named files such as “3-mommy” or “spread 3 left” go to that page, the rest fill empty pages in print order).
-- The Mommy & Me starter now begins with no pages (and `spread` set), so this panel is the first thing seen.
+- The Mommy & Me starter now begins with no pages (and `spread` set), so this panel is the first thing seen. Its idea is filled in (`MOMMY_ME_IDEA` as the book's theme, editable) at Sydni's request (Nov 25, live).
 - Writing the lessons inside Product Studio itself would need the live AI Edge Function changed (and Sydni's AI allowance). That was not done; it needs her approval.
 - **Verified:** 1,862 unit tests (9 new in tests/spread-import.test.ts) and 208 browser tests (the idea-to-book run in devotional-spread.browser.ts) pass.
 
