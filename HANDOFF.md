@@ -3,10 +3,10 @@
 Read this first when picking up the work (any assistant or developer). Keep it current: update it in the same
 commit as any change to state, branches, rules or open decisions.
 
-_Last updated: 2026-11-25 — Bubble Lettering on `claude/bubble-lettering` (preview, not merged).  Devotional Spread merged to `main` (fea7fe4) and live, with Sydni's approval (Nov 25). 2026-11-17 — Online saving for Cover Studio and Coloring Book on `claude/online-cover-studio` (new Supabase table + bucket created, with approval; app code not merged). Toolbar feedback on `claude/toolbar-feedback-six` (not merged). Earlier: Coloring Book on `claude/coloring-book-studio`; Phase 8 merged to `main` (89f054b) and live._
+_Last updated: 2026-11-25 — Bubble Lettering and Fit Art to Page merged to `main` and live with Sydni's approval (Nov 25).  Devotional Spread merged to `main` (fea7fe4) and live, with Sydni's approval (Nov 25). 2026-11-17 — Online saving for Cover Studio and Coloring Book on `claude/online-cover-studio` (new Supabase table + bucket created, with approval; app code not merged). Toolbar feedback on `claude/toolbar-feedback-six` (not merged). Earlier: Coloring Book on `claude/coloring-book-studio`; Phase 8 merged to `main` (89f054b) and live._
 
 
-## Bubble Lettering line art (2026-11-25, branch `claude/bubble-lettering` from main 6ae0fd3 — preview, not merged)
+## Bubble Lettering line art and Fit Art to Page (2026-11-25, branch `claude/bubble-lettering`; merged to `main` and live with Sydni's approval)
 
 Requested by Sydni (via another chat, with her Allow). A home card, “Bubble Lettering”, opens `components/lettering/LetteringStudio.tsx`.
 - **Drawing** (`engines/lettering/bubble.ts`): the words are set in Fredoka Bold (bundled: `@fontsource/fredoka` woff, parsed by `opentype.js`). They become vector paths, puffed by the roundness and outlined. The black layer is stroked at 2 × (puff + outline), with a white layer of 2 × puff on top, so overlapping letters share one outer outline, with round joins. Openings too small to stay open are filled in (`openCounters`), so they never print as solid black dots. Lines stack outline to outline. A sample's canvas size can be kept. The SVG has no text or font, only paths. The PNG is drawn from the same paths at 300 DPI (`browser.ts`), with a transparent background or white.
