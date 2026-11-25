@@ -3,10 +3,10 @@
 Read this first when picking up the work (any assistant or developer). Keep it current: update it in the same
 commit as any change to state, branches, rules or open decisions.
 
-_Last updated: 2026-11-25 — Quick book from an idea on `claude/quick-spread-book` (preview, not merged).  Bubble Lettering and Fit Art to Page merged to `main` and live with Sydni's approval (Nov 25).  Devotional Spread merged to `main` (fea7fe4) and live, with Sydni's approval (Nov 25). 2026-11-17 — Online saving for Cover Studio and Coloring Book on `claude/online-cover-studio` (new Supabase table + bucket created, with approval; app code not merged). Toolbar feedback on `claude/toolbar-feedback-six` (not merged). Earlier: Coloring Book on `claude/coloring-book-studio`; Phase 8 merged to `main` (89f054b) and live._
+_Last updated: 2026-11-25 — Quick book from an idea merged to `main` and live with Sydni's approval (Nov 25).  Bubble Lettering and Fit Art to Page merged to `main` and live with Sydni's approval (Nov 25).  Devotional Spread merged to `main` (fea7fe4) and live, with Sydni's approval (Nov 25). 2026-11-17 — Online saving for Cover Studio and Coloring Book on `claude/online-cover-studio` (new Supabase table + bucket created, with approval; app code not merged). Toolbar feedback on `claude/toolbar-feedback-six` (not merged). Earlier: Coloring Book on `claude/coloring-book-studio`; Phase 8 merged to `main` (89f054b) and live._
 
 
-## Quick book from an idea (2026-11-25, branch `claude/quick-spread-book` from main f4d47ed — preview, not merged)
+## Quick book from an idea (2026-11-25, branch `claude/quick-spread-book`; merged to `main` and live with Sydni's approval)
 
 Sydni: “the point of this app is to be able to press a few buttons with a simple idea and it make it.” For Devotional Spread books, the Pages step now opens with **Make the whole book from your idea** (`components/coloringBook/QuickSpreadBook.tsx`):
 - **1 · Idea:** a lessons count and **Write my lessons with ChatGPT** (`lessonsPrompt`, opened and copied).
