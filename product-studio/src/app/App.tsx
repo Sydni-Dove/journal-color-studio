@@ -9,6 +9,7 @@ import { AiDocumentWizard } from "../components/wizard/AiDocumentWizard";
 import { CoverStudio } from "../components/cover/CoverStudio";
 import { ColoringBookStudio } from "../components/coloringBook/ColoringBookStudio";
 import { LetteringStudio, type StudioPicture } from "../components/lettering/LetteringStudio";
+import { ArtFitStudio } from "../components/lettering/ArtFitStudio";
 import type { ColoringBook } from "../engines/coloringBook/book";
 import { localBookStore } from "../persistence/coloringBookStore";
 import { resolveColors } from "../presets/themes/palettes";
@@ -28,6 +29,7 @@ type View =
   | { kind: "cover" }
   | { kind: "coloring"; bookId: string | null }
   | { kind: "lettering" }
+  | { kind: "fit" }
   /** `fromBook`: opened from a Coloring Book's export (its print step open; Back returns to the book). */
   | { kind: "edit"; project: ProductProject; fromBook?: string; startInExport?: boolean };
 
@@ -249,6 +251,19 @@ export function App() {
         <CoverStudio onBack={() => setView({ kind: "list" })} projects={projects} loadProject={(id) => store.load(id)} onCreateProject={open} onColoringBook={continueAsBook} />
       </>
     );
+  if (view.kind === "fit")
+    return (
+      <>
+        {banner}
+        <ArtFitStudio
+          onBack={() => setView({ kind: "list" })}
+          projects={projects}
+          loadProject={(id) => store.load(id)}
+          pictures={studioPictures(projects.map((p) => store.load(p.id)).filter((p): p is ProductProject => !!p), localBookStore.list().flatMap((b) => localBookStore.load(b.id) ?? []))}
+          onPlaced={open}
+        />
+      </>
+    );
   if (view.kind === "lettering")
     return (
       <>
@@ -311,6 +326,7 @@ export function App() {
       onGenerate={() => setView({ kind: "ai" })}
       onCovers={() => setView({ kind: "cover" })}
       onLettering={() => setView({ kind: "lettering" })}
+      onFitArt={() => setView({ kind: "fit" })}
       onColoringBook={(bookId) => setView({ kind: "coloring", bookId: bookId ?? null })}
       books={localBookStore.list()}
       key={`home-${itemsReceived}`}

@@ -8,7 +8,8 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import type { Font } from "opentype.js";
 import { DEFAULT_STYLE, describe, layoutLettering, letteringSvg, measureLettering, pngSize, PRINT_DPI, styleFrom, type LetteringStyle, type Measurement } from "../../engines/lettering/bubble";
-import { download, letteringPng, loadLetteringFont, readPixels } from "../../engines/lettering/browser";
+import { download, letteringPng, loadLetteringFont, pixelsToPng, readPixels } from "../../engines/lettering/browser";
+import { respaceLettering, type RespaceReport } from "../../engines/lettering/respace";
 import { deleteStyle, listStyles, saveStyle } from "../../engines/lettering/styles";
 import { pagesOf, placeOnCopy, type LetteringPosition } from "../../engines/lettering/place";
 import { getArtworkFile, importArtwork } from "../../engines/artwork/store";
@@ -64,6 +65,10 @@ export function LetteringStudio({ onBack, projects, loadProject, pictures, onPla
   const [pageKey, setPageKey] = useState("");
   const [position, setPosition] = useState<LetteringPosition>("top");
   const fileRef = useRef<HTMLInputElement>(null);
+  // Fixing the sample's own spacing
+  const [respaced, setRespaced] = useState<{ url: string; blob: Blob; report: RespaceReport; gapIn: number; dpi: number; widthPx: number; heightPx: number } | null>(null);
+  const [respacing, setRespacing] = useState(false);
+  const [placeWhat, setPlaceWhat] = useState<"drawn" | "respaced">("drawn");
 
   useEffect(() => {
     loadLetteringFont().then(setFont, () => setFontError("The lettering font couldn't load. Check the connection and reopen Bubble Lettering."));
@@ -83,6 +88,7 @@ export function LetteringStudio({ onBack, projects, loadProject, pictures, onPla
       if (sample) URL.revokeObjectURL(sample.url);
       setSample({ blob, name, url: URL.createObjectURL(blob), widthPx, heightPx });
       setMeasured(null);
+      setRespaced(null);
     }, () => say("That file couldn't be read as an image."));
   };
   const pick = (e: ChangeEvent<HTMLInputElement>) => {
@@ -114,6 +120,28 @@ export function LetteringStudio({ onBack, projects, loadProject, pictures, onPla
       setBusy(false);
     }
   };
+  /** Separate the sample's letters and set them `gapIn` apart (null: keep the sample's own typical gap). */
+  const respace = async (gapIn: number | null) => {
+    if (!sample) return;
+    setRespacing(true);
+    try {
+      // Full size up to 4000 px on the long side, so the outline stays crisp.
+      const { pixels, scale } = await readPixels(sample.blob, 4000);
+      const pxPerIn = dpi * scale;
+      const first = gapIn === null ? respaceLettering(pixels, 0, { text: sampleText }) : null;
+      const gap = gapIn ?? +((first!.report.originalGapPx || pxPerIn * 0.08) / pxPerIn).toFixed(3);
+      const r = respaceLettering(pixels, Math.max(0, Math.round(gap * pxPerIn)), { text: sampleText.trim() || undefined, background: white ? "white" : "none" });
+      const blob = await pixelsToPng(r.pixels);
+      setRespaced((old) => {
+        if (old) URL.revokeObjectURL(old.url);
+        return { url: URL.createObjectURL(blob), blob, report: r.report, gapIn: gap, dpi: pxPerIn, widthPx: r.pixels.width, heightPx: r.pixels.height };
+      });
+    } catch (err) {
+      say(err instanceof Error ? err.message : "The letters couldn't be separated.");
+    } finally {
+      setRespacing(false);
+    }
+  };
   const d = measured ? describe(measured, dpi * (measured.widthPx / (sample?.widthPx || measured.widthPx))) : null;
 
   const save = () => {
@@ -135,10 +163,12 @@ export function LetteringStudio({ onBack, projects, loadProject, pictures, onPla
     if (!layout || !project) return;
     const pg = pages.find((p) => `${p.item}#${p.nth}` === pageKey) ?? pages[0];
     if (!pg) return;
-    const png = await letteringPng(layout, { background: "none" });
-    const r = await importArtwork(Object.assign(png, { name: `${fileBase}.png` }));
+    const useRespaced = placeWhat === "respaced" && respaced;
+    const png = useRespaced ? respaced.blob : await letteringPng(layout, { background: "none" });
+    const r = await importArtwork(Object.assign(png, { name: useRespaced ? `${sample?.name.replace(/\.\w+$/, "") ?? "lettering"}-respaced.png` : `${fileBase}.png` }));
     if (!r.ok) return say(r.error);
-    const copy = placeOnCopy(project, r.asset, { item: pg.item, nth: pg.nth }, position, { widthIn: layout.widthIn, heightIn: layout.heightIn }, { w: pg.safeWidthIn, h: pg.safeHeightIn }, newId("lettering"));
+    const size = useRespaced ? { widthIn: respaced.widthPx / respaced.dpi, heightIn: respaced.heightPx / respaced.dpi } : { widthIn: layout.widthIn, heightIn: layout.heightIn };
+    const copy = placeOnCopy(project, r.asset, { item: pg.item, nth: pg.nth }, position, size, { w: pg.safeWidthIn, h: pg.safeHeightIn }, newId("lettering"));
     onPlaced(copy);
   };
 
@@ -206,6 +236,33 @@ export function LetteringStudio({ onBack, projects, loadProject, pictures, onPla
                   <tr><th>Roundness</th><td>{(style.puffIn * 72).toFixed(1)} pt puff past the letter shapes</td></tr>
                 </tbody>
               </table>
+            )}
+            {sample && (
+              <div className="lettering-respace" data-testid="lettering-respace">
+                <h3>Fix the spacing of this image</h3>
+                <p className="hint">Lifts each letter out exactly as drawn and sets them again with even gaps. Good for art brought back from ChatGPT.</p>
+                {!respaced ? (
+                  <button type="button" className="btn" disabled={respacing} onClick={() => void respace(null)} data-testid="lettering-respace-start">{respacing ? "Separating…" : "Separate the letters and even the gaps"}</button>
+                ) : (
+                  <>
+                    <Num label="Gap between letters" value={respaced.gapIn} min={0} max={1} step={0.01} unit="in" onChange={(g) => void respace(g)} testId="respace-gap" />
+                    <div className="lettering-preview lettering-preview--image"><img src={respaced.url} alt="The lettering with even spacing" data-testid="respaced-image" /></div>
+                    <p className="hint" data-testid="respace-report">
+                      {respaced.report.pieces.map((n, k) => `Line ${k + 1}: ${n} piece${n === 1 ? "" : "s"}`).join(" · ")}. {respaced.widthPx} × {respaced.heightPx} px.
+                    </p>
+                    {respaced.report.joined.length > 0 && (
+                      <div className="notice notice--warn" role="status" data-testid="respace-joined">
+                        <p>{respaced.report.joined.map((j) => `Line ${j.line} has ${j.letters} letters but only ${j.pieces} separate piece${j.pieces === 1 ? "" : "s"}`).join("; ")}: some letters touch, so they can't be pulled apart cleanly and move together.</p>
+                        <button type="button" className="btn btn--primary" disabled={!font || busy} onClick={() => void measure()} data-testid="respace-redraw">Redraw the words in the measured style instead</button>
+                      </div>
+                    )}
+                    <div className="row">
+                      <button type="button" className="btn btn--primary" onClick={() => download(respaced.blob, `${sample.name.replace(/\.\w+$/, "")}-respaced.png`)} data-testid="respace-download">Download respaced PNG</button>
+                      {!respaced.report.joined.length && <button type="button" className="btn" disabled={!font || busy} onClick={() => void measure()}>Redraw in the measured style instead</button>}
+                    </div>
+                  </>
+                )}
+              </div>
             )}
           </section>
 
@@ -277,6 +334,15 @@ export function LetteringStudio({ onBack, projects, loadProject, pictures, onPla
                     {pages.map((p) => <option key={`${p.item}#${p.nth}`} value={`${p.item}#${p.nth}`}>{p.label}</option>)}
                   </select>
                 </label>
+                {respaced && (
+                  <label className="field">
+                    <span>What to put on the page</span>
+                    <select value={placeWhat} aria-label="What to put on the page" onChange={(e) => setPlaceWhat(e.target.value as "drawn" | "respaced")} data-testid="lettering-place-what">
+                      <option value="drawn">The lettering drawn in step 3</option>
+                      <option value="respaced">The uploaded image, respaced</option>
+                    </select>
+                  </label>
+                )}
                 <label className="field">
                   <span>Where on the page</span>
                   <select value={position} aria-label="Where on the page" onChange={(e) => setPosition(e.target.value as LetteringPosition)}>

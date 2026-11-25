@@ -2614,3 +2614,8 @@ button.family-card:focus-visible {
 @media (max-width: 760px) {
   .lettering-grid, .lettering-sample { grid-template-columns: minmax(0, 1fr); }
 }
+.lettering-respace { display: grid; gap: 8px; border-top: 1px solid var(--ui-line); padding-top: 10px; margin-top: 8px; }
+.lettering-respace h3 { margin: 0; font-size: 15px; }
+.lettering-preview--image img { display: block; max-width: 100%; max-height: 300px; object-fit: contain; }
+.fit-preview { display: grid; place-items: center; background: #ece7e3; border-radius: 8px; padding: 16px; overflow: auto; }
+.fit-preview svg { max-width: 100%; height: auto; box-shadow: 0 1px 6px rgba(0, 0, 0, 0.18); }

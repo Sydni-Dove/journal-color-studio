@@ -21,6 +21,8 @@ type Props = {
   onCovers?: () => void;
   /** Bubble Lettering: words as coloring-page lettering. */
   onLettering?: () => void;
+  /** Fit Art to Page: any art scaled and centred inside the page margins. */
+  onFitArt?: () => void;
   /** Coloring Book: the complete coloring-book workflow (a saved book by id, or the book list). */
   onColoringBook?: (bookId?: string) => void;
   /** Saved coloring books, newest first. */
@@ -37,7 +39,7 @@ type Props = {
 const RECENT = 4;
 
 /** "What would you like to create?": finished products first. Each card opens that product's guided flow. */
-type CreateCard = { id: string; label: string; blurb: string; glyph: ProductFamilyId | "coloring" | "storybook" | "cover"; family?: ProductFamilyId; action?: "coloring" | "cover" | "lettering"; start?: WizardStart; next?: string; featured?: boolean };
+type CreateCard = { id: string; label: string; blurb: string; glyph: ProductFamilyId | "coloring" | "storybook" | "cover"; family?: ProductFamilyId; action?: "coloring" | "cover" | "lettering" | "fit"; start?: WizardStart; next?: string; featured?: boolean };
 const familyStart = (id: ProductFamilyId) => {
   const f = PRODUCT_FAMILIES.find((x) => x.id === id);
   return f?.status === "ready" ? f.start : undefined;
@@ -51,6 +53,7 @@ const CREATE: CreateCard[] = [
   { id: "planner", label: "Planner", blurb: "Monthly, weekly, daily and yearly planning pages.", glyph: "planner", family: "planner", start: familyStart("planner") },
   { id: "book-cover", label: "Book Cover", blurb: "A cover on its own: artwork instructions with the exact print size, spine and bleed.", glyph: "cover", action: "cover" },
   { id: "bubble-lettering", label: "Bubble Lettering", blurb: "Words as coloring-page lettering: black outline, white inside. Copy the look of lettering you already have, then export SVG or PNG or put it on a page.", glyph: "coloring", action: "lettering" },
+  { id: "fit-art", label: "Fit Art to Page", blurb: "Scale and centre any art (lettering, borders, frames, coloring pictures) inside your page margins, without stretching it.", glyph: "cover", action: "fit" },
   { id: "custom", label: "Other / Custom Product", blurb: "Start blank, then add the pages you need.", glyph: "custom", family: "custom", start: familyStart("custom") },
 ];
 
@@ -162,7 +165,7 @@ function describe(p: ProjectSummary, m: ProjectMeta): string {
   return `${type} · ${size}${pages}`;
 }
 
-export function ProjectList({ projects, meta, onStart, onGenerate, onCovers, onLettering, onColoringBook, books = [], onOpen, onDuplicate, onDuplicateAsVariant, onDelete, now, account }: Props) {
+export function ProjectList({ projects, meta, onStart, onGenerate, onCovers, onLettering, onFitArt, onColoringBook, books = [], onOpen, onDuplicate, onDuplicateAsVariant, onDelete, now, account }: Props) {
   const metas = useMemo(() => new Map(projects.map((p) => [p.id, meta(p.id)])), [projects, meta]);
   const recent = projects.slice(0, RECENT);
   const hasProjects = projects.length > 0;
@@ -235,7 +238,7 @@ export function ProjectList({ projects, meta, onStart, onGenerate, onCovers, onL
           <p className="hint">Choose the finished product. Each one guides you from setup to a print-ready file.</p>
           <div className="family-grid create-grid" data-testid="create-grid">
             {CREATE.map((c) => {
-              const go = c.action === "coloring" ? onColoringBook && (() => onColoringBook()) : c.action === "cover" ? onCovers : c.action === "lettering" ? onLettering : c.start ? () => onStart(c.start) : undefined;
+              const go = c.action === "coloring" ? onColoringBook && (() => onColoringBook()) : c.action === "cover" ? onCovers : c.action === "lettering" ? onLettering : c.action === "fit" ? onFitArt : c.start ? () => onStart(c.start) : undefined;
               return go ? (
                 <button key={c.id} type="button" className={`family-card${c.featured ? " family-card--featured" : ""}`} onClick={go} data-create={c.id}>
                   <Glyph id={c.glyph} />

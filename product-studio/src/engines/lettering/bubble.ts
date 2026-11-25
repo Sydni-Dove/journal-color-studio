@@ -320,7 +320,11 @@ const mode = (xs: number[]) => {
 };
 
 /** Read a bubble-lettering image: black outlines on white (or transparent). */
-export function measureLettering(px: Pixels): Measurement {
+/**
+ * The image's black ink, and everything outside the lettering (non-black pixels reachable from the image's edge).
+ * What isn't outside is a letter: its outline and the white inside it.
+ */
+export function letterMasks(px: Pixels): { ink: Uint8Array; outside: Uint8Array; box: { minX: number; minY: number; maxX: number; maxY: number } } {
   const { width: W, height: H, data } = px;
   const ink = new Uint8Array(W * H);
   let minX = W, minY = H, maxX = -1, maxY = -1;
@@ -336,7 +340,6 @@ export function measureLettering(px: Pixels): Measurement {
     }
   }
   if (maxX < 0) throw new Error("No black lettering found in this image. Use black outlines on a white or transparent background.");
-  // Outside the letters: every non-black pixel reachable from the image's edge.
   const outside = new Uint8Array(W * H);
   const stack: number[] = [];
   const seed = (i: number) => { if (!ink[i] && !outside[i]) { outside[i] = 1; stack.push(i); } };
@@ -349,24 +352,36 @@ export function measureLettering(px: Pixels): Measurement {
     if (i >= W) seed(i - W);
     if (i < W * (H - 1)) seed(i + W);
   }
-  const shape = (i: number) => !outside[i];
+  return { ink, outside, box: { minX, minY, maxX, maxY } };
+}
 
-  // Lines: bands of rows that hold lettering (small gaps inside a line are bridged).
+/** Bands of rows holding lettering (small gaps inside a line bridged): the lines, top to bottom. */
+export function lineBands(W: number, outside: Uint8Array, box: { minX: number; minY: number; maxX: number; maxY: number }): { y0: number; y1: number }[] {
   const rows: boolean[] = [];
-  for (let y = 0; y < H; y++) {
+  for (let y = 0; y <= box.maxY; y++) {
     let any = false;
-    for (let x = minX; x <= maxX && !any; x++) any = shape(y * W + x);
+    for (let x = box.minX; x <= box.maxX && !any; x++) any = !outside[y * W + x];
     rows.push(any);
   }
-  const bridge = Math.max(2, Math.round((maxY - minY) * 0.015));
+  const bridge = Math.max(2, Math.round((box.maxY - box.minY) * 0.015));
   const bands: { y0: number; y1: number }[] = [];
-  for (let y = minY; y <= maxY; y++) {
+  for (let y = box.minY; y <= box.maxY; y++) {
     if (!rows[y]) continue;
     const last = bands[bands.length - 1];
     if (last && y - last.y1 <= bridge) last.y1 = y;
     else bands.push({ y0: y, y1: y });
   }
-  const lines = bands.filter((b) => b.y1 - b.y0 >= 4).map((b) => {
+  return bands.filter((b) => b.y1 - b.y0 >= 4);
+}
+
+export function measureLettering(px: Pixels): Measurement {
+  const { width: W, height: H } = px;
+  const { ink, outside, box } = letterMasks(px);
+  const { minX, minY, maxX, maxY } = box;
+  const shape = (i: number) => !outside[i];
+
+  const bands = lineBands(W, outside, box);
+  const lines = bands.map((b) => {
     // Pieces: runs of columns holding lettering in this band (overlapping letters are one piece).
     const cols: boolean[] = [];
     for (let x = 0; x < W; x++) {

@@ -23,9 +23,9 @@ export function loadLetteringFont(): Promise<Font> {
 const MEASURE_MAX_PX = 2400;
 
 /** An image's pixels for measuring, and the scale it was read at (1 = full size). */
-export async function readPixels(blob: Blob): Promise<{ pixels: Pixels; scale: number; widthPx: number; heightPx: number }> {
+export async function readPixels(blob: Blob, maxPx = MEASURE_MAX_PX): Promise<{ pixels: Pixels; scale: number; widthPx: number; heightPx: number }> {
   const bmp = await createImageBitmap(blob);
-  const scale = Math.min(1, MEASURE_MAX_PX / Math.max(bmp.width, bmp.height));
+  const scale = Math.min(1, maxPx / Math.max(bmp.width, bmp.height));
   const w = Math.max(1, Math.round(bmp.width * scale)), h = Math.max(1, Math.round(bmp.height * scale));
   const c = document.createElement("canvas");
   c.width = w;
@@ -76,4 +76,13 @@ export function download(blob: Blob, name: string) {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
+/** Pixels → a PNG file. */
+export function pixelsToPng(p: Pixels): Promise<Blob> {
+  const c = document.createElement("canvas");
+  c.width = p.width;
+  c.height = p.height;
+  c.getContext("2d")!.putImageData(new ImageData(new Uint8ClampedArray(p.data), p.width, p.height), 0, 0);
+  return new Promise((resolve, reject) => c.toBlob((b) => (b ? resolve(b) : reject(new Error("The PNG couldn't be made."))), "image/png"));
 }
