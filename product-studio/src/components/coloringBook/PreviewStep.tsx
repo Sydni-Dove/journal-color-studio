@@ -8,12 +8,15 @@ import { assembleCover, interiorPageCount } from "../../engines/coloringBook/ass
 import { bookTitle, formatOf } from "../../engines/coloringBook/book";
 import { printReady, type MissingIssue, type Severity } from "../../engines/coloringBook/missing";
 import { PageThumb } from "../preview/PageThumb";
+import { isSpread } from "../../engines/coloringBook/spread";
 import type { StepProps } from "./shared";
 
 const HEAD: Record<Severity, string> = { blocking: "Must fix before printing", warning: "Warnings", suggestion: "Suggestions" };
 const STEP_NAME = { setup: "Book Setup", characters: "Characters", pages: "Interior Pages", cover: "Cover Design", preview: "Preview and Export" } as const;
 
-export function PreviewStep({ book, update, go, interior, issues, onExport }: StepProps & { issues: MissingIssue[]; onExport: (what: "interior" | "cover", proof: boolean) => void }) {
+export function PreviewStep({ book, update, go, interior, issues, onExport }: StepProps & { issues: MissingIssue[]; onExport: (what: "interior" | "cover" | "digital", proof: boolean) => void }) {
+  const spreads = book.brief.scenes.some(isSpread);
+  const [facing, setFacing] = useState(spreads);
   const f = formatOf(book.printFormat);
   const pages = interiorPageCount(book);
   const ready = printReady(issues);
@@ -26,7 +29,7 @@ export function PreviewStep({ book, update, go, interior, issues, onExport }: St
       <div className={`cover-panel ready-banner${ready ? " ready-banner--ok" : ""}`} data-testid="print-ready" data-ready={ready}>
         <h2 className="book-h">{ready ? "Print-ready" : "Not print-ready yet"}</h2>
         <p>
-          “{bookTitle(book) || "Untitled"}” · {book.brief.scenes.length} scene{book.brief.scenes.length === 1 ? "" : "s"} · {pages} interior pages · {f.label} · {book.sides === "single" ? "single-sided" : "double-sided"}
+          “{bookTitle(book) || "Untitled"}” · {(() => { const sp = book.brief.scenes.filter(isSpread).length, sc = book.brief.scenes.length - sp; return [sc ? `${sc} scene${sc === 1 ? "" : "s"}` : "", sp ? `${sp} Devotional Spread${sp === 1 ? "" : "s"}` : ""].filter(Boolean).join(" · ") || "0 scenes"; })()} · {pages} interior pages · {f.label} · {book.sides === "single" ? "single-sided" : "double-sided"}
         </p>
         {!ready && <p className="hint">Fix the items under “Must fix before printing”. Until then you can export a proof copy to check, but not a print-ready file.</p>}
       </div>
@@ -69,25 +72,51 @@ export function PreviewStep({ book, update, go, interior, issues, onExport }: St
         <h2 className="book-h">Export</h2>
         <div className="row">
           <button type="button" className="btn btn--primary" disabled={!ready} onClick={() => onExport("interior", false)} data-testid="export-interior">Export print-ready interior PDF</button>
+          <button type="button" className="btn btn--primary" disabled={!ready} onClick={() => onExport("digital", false)} data-testid="export-digital">Export printable digital PDF</button>
           <button type="button" className="btn" disabled={!book.cover.front} onClick={() => onExport("cover", !ready)} data-testid="export-cover">Export front cover PDF</button>
           <button type="button" className="btn btn--ghost" disabled={!book.brief.scenes.length} onClick={() => onExport("interior", true)} data-testid="export-proof">Export a proof copy (not print-ready)</button>
         </div>
-        <p className="hint">Exporting saves the finished pages as a product in your projects and opens the print step, where you save the PDF. Printers take the interior and the cover as separate files.</p>
+        <p className="hint">Both interiors are {book.brief.size.replace("×", " × ")} in. The print-ready PDF follows {f.label}'s rules; the printable digital PDF is the same pages for customers to print at home. Exporting saves the finished pages as a product in your projects and opens the print step, where you save the PDF. Printers take the interior and the cover as separate files.</p>
       </div>
 
       <div className="cover-panel" data-testid="book-preview">
         <h2 className="book-h">The complete book</h2>
-        <div className="book-spread-grid">
-          <figure className="finished-page"><PageThumb doc={cover} index={0} heightPx={240} /><figcaption className="hint">Front cover</figcaption></figure>
-          {interior.recipe.pages.slice(0, limit).map((p, i) => (
-            <figure key={p.key} className="finished-page" data-page={p.pageNumber}>
-              <PageThumb doc={interior} index={i} heightPx={240} />
-              <figcaption className="hint">Page {p.pageNumber}</figcaption>
-            </figure>
-          ))}
-        </div>
+        <label className="check"><input type="checkbox" checked={facing} onChange={(e) => setFacing(e.target.checked)} data-testid="facing-pages" /> <span>Show as facing pages (left and right, as the open book)</span></label>
+        {facing ? (
+          <div className="book-facing" data-testid="facing-view">
+            <figure className="finished-page"><PageThumb doc={cover} index={0} heightPx={240} /><figcaption className="hint">Front cover</figcaption></figure>
+            {/* Page 1 is a right-hand page on its own; then each left-hand page beside the right-hand page facing it. */}
+            {pairs(interior.recipe.pages.slice(0, limit).map((p, i) => ({ p, i }))).map((pair, k) => (
+              <div key={k} className={`spread-pair${pair.length === 1 && k === 0 ? " spread-pair--right" : ""}`} data-spread={pair.map((x) => x.p.pageNumber).join("-")}>
+                {pair.map(({ p, i }) => (
+                  <figure key={p.key} className="finished-page" data-page={p.pageNumber}>
+                    <PageThumb doc={interior} index={i} heightPx={240} />
+                    <figcaption className="hint">Page {p.pageNumber}</figcaption>
+                  </figure>
+                ))}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="book-spread-grid">
+            <figure className="finished-page"><PageThumb doc={cover} index={0} heightPx={240} /><figcaption className="hint">Front cover</figcaption></figure>
+            {interior.recipe.pages.slice(0, limit).map((p, i) => (
+              <figure key={p.key} className="finished-page" data-page={p.pageNumber}>
+                <PageThumb doc={interior} index={i} heightPx={240} />
+                <figcaption className="hint">Page {p.pageNumber}</figcaption>
+              </figure>
+            ))}
+          </div>
+        )}
         {interior.recipe.pages.length > limit && <button type="button" className="btn" onClick={() => setLimit(interior.recipe.pages.length)}>Show all {interior.recipe.pages.length} pages</button>}
       </div>
     </section>
   );
+}
+
+/** Print order as an open book: page 1 alone (a right-hand page), then pages 2–3, 4–5… side by side. */
+function pairs<T>(items: T[]): T[][] {
+  const out: T[][] = items.length ? [[items[0]]] : [];
+  for (let k = 1; k < items.length; k += 2) out.push(items.slice(k, k + 2));
+  return out;
 }

@@ -2538,6 +2538,17 @@ button.family-card:focus-visible {
 .missing-group .issue .btn { margin-top: 6px; margin-right: 6px; }
 .book-spread-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; justify-items: center; }
 .cover-preview-row { display: flex; justify-content: center; }
+/* Devotional Spreads: two facing pages touching at the binding, the left page on the left. */
+.spread-pair { display: flex; justify-content: center; gap: 2px; flex-wrap: nowrap; max-width: 100%; overflow-x: auto; }
+.spread-pair--right { justify-content: flex-end; }
+.book-facing { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 16px; justify-items: center; }
+.book-page-card--spread { grid-column: span 2; }
+.spread-editor__grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.spread-section { display: grid; gap: 8px; border: 1px solid var(--ui-line); border-radius: 8px; padding: 10px; margin: 6px 0; }
+.spread-section legend { font-weight: 600; padding: 0 4px; }
+.spread-line { display: grid; gap: 6px; padding-bottom: 8px; border-bottom: 1px dashed var(--ui-line); }
+.spread-line:last-of-type { border-bottom: 0; }
+.art-prompt { display: grid; gap: 8px; }
 .steps__status { align-self: center; }
 @media (max-width: 760px) {
   .page-editor__grid { grid-template-columns: minmax(0, 1fr); }
@@ -2545,6 +2556,9 @@ button.family-card:focus-visible {
   .page-editor__preview .page-thumb { max-width: 100%; }
   .book-pages { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
   .book-spread-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+  .spread-editor__grid { grid-template-columns: minmax(0, 1fr); }
+  .book-facing { grid-template-columns: minmax(0, 1fr); }
+  .book-page-card--spread { grid-column: auto; }
 }
 
 /* Colors: every arrangement at once, and each use's color chosen from the palette. */

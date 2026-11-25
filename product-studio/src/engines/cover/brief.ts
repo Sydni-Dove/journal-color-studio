@@ -97,6 +97,52 @@ export type Scene = {
   characters?: string;
   actions?: string;
   styleNotes?: string;
+  // Per-page lettering and Devotional Spreads (engines/coloringBook/spread.ts).
+  /** This page's own lettering (the book's "Title and verse style" when absent). */
+  letterStyle?: LetterStyle;
+  /** Hide the app's words on this page (the lettering is already drawn into the art). */
+  textOff?: boolean;
+  /** "devotional-spread": two facing pages, the daughter page on the left and the Mommy page on the right. */
+  pageType?: "devotional-spread";
+  /** The page's theme, for its Art Prompt. */
+  theme?: string;
+  /** The saved art character chosen for this page's Art Prompt (ColoringBook.artCharacters). */
+  artCharacterId?: string;
+  /** The right-hand Mommy page of a Devotional Spread. */
+  mommy?: MommyPage;
+};
+
+export type LetterStyle = "elegant" | "bubble";
+
+/** How a Read the Word line relates to the text of the Bible. Only exact quotes are Scripture wording. */
+export type ExcerptKind = "exact" | "paraphrase" | "reflection";
+export type ReadWordLine = { text: string; ref: string; kind: ExcerptKind };
+/** A Fill in the Blank statement: "___" marks the blank (or it goes at the end). The answer is never printed. */
+export type BlankLine = { text: string; answer: string; ref: string };
+
+/** The Mommy page: art on the inner side, an activity column (or a bottom band) on the outer side. */
+export type MommyPage = {
+  /** The declaration lettered on the page (elegant script by default). */
+  title?: string;
+  /** What the Mommy page's art shows (its Art Prompt). */
+  scene?: string;
+  theme?: string;
+  letterStyle?: LetterStyle;
+  textOff?: boolean;
+  artCharacterId?: string;
+  /** "column" (default): the activities down the outer side. "band": across the bottom. */
+  layout?: "column" | "band";
+  /** A reserved, labelled box for a QR code added later (never generated). */
+  qr?: boolean;
+  illustrationId?: string;
+  illustrationName?: string;
+  illustrationW?: number;
+  illustrationH?: number;
+  approvedAt?: string;
+  readWord: ReadWordLine[];
+  blanks: BlankLine[];
+  reflect: { question: string; lines: number };
+  heart: string;
 };
 
 /**
@@ -119,7 +165,7 @@ export type PageTypography = {
    * How the page's words look: "elegant" (the fonts above, default) or "bubble" (chunky outlined bubble letters
    * to color, at the bottom under the picture, with hearts and bursts — layouts/book/coloringLettering.ts).
    */
-  letterStyle?: "elegant" | "bubble";
+  letterStyle?: LetterStyle;
   /** Bubble letters: the title and verse sizes (absent = Auto: they fill about the bottom quarter of the page). */
   bubbleTitlePt?: number;
   bubbleVersePt?: number;

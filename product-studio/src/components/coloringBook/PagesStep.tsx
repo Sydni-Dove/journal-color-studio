@@ -6,7 +6,7 @@
 import { useMemo, useRef, useState, type ChangeEvent } from "react";
 import type { Complexity, LineThickness, Scene } from "../../engines/cover/brief";
 import { BACKGROUND_DENSITY, COLORING_AREAS, COMPLEXITY, ILLUSTRATION_STYLES, LINE_THICKNESS, PROPORTIONS, TEXT_PLACEMENTS, castFor, scenePrompt, verseArtBlocker } from "../../engines/cover/coloring";
-import { DIFFICULTIES, contentOf, type PageContent, type ScriptureChoice } from "../../engines/coloringBook/book";
+import { DIFFICULTIES, artCharactersOf, contentOf, type PageContent, type ScriptureChoice } from "../../engines/coloringBook/book";
 import { castNamed, parseBookOutline, scenesFromImport, type ImportedBook } from "../../engines/coloringBook/importText";
 import { fetchPublicDomain, normalizeReference, passageLink, suggestReferences, translationOf, wordingProblem } from "../../engines/coloringBook/scripture";
 import { briefFor } from "../../engines/coloringBook/assembleBook";
@@ -19,6 +19,8 @@ import { Check } from "../editor/ui";
 import { CHECKS, IllustrationCheck, LineSample, ReferenceFiles, Regenerate } from "../cover/ColoringPanels";
 import { FONT_CHOICES } from "../cover/fonts";
 import { Choice, FinishedPage, TextArea, TextInput, pageIndexOf, type StepProps } from "./shared";
+import { SpreadEditor, SpreadPair, SpreadSettingsPanel } from "./SpreadEditor";
+import { isSpread, newSpread } from "../../engines/coloringBook/spread";
 
 export function PagesStep(props: StepProps & { openScene: string | null; setOpenScene: (id: string | null) => void; issues: MissingIssue[] }) {
   const { book, openScene, setOpenScene } = props;
@@ -30,6 +32,7 @@ export function PagesStep(props: StepProps & { openScene: string | null; setOpen
       ) : (
         <>
           <ColoringSettings {...props} />
+          {book.brief.scenes.some(isSpread) && <SpreadSettingsPanel {...props} />}
           <SceneImport {...props} />
           <PageList {...props} />
         </>
@@ -257,10 +260,10 @@ function PageList({ book, setOpenScene, update, interior, issues }: StepProps & 
           const idx = pageIndexOf(interior, s.id);
           const n = issues.filter((x) => x.sceneId === s.id && x.severity === "blocking").length;
           return (
-            <li key={s.id} className="book-page-card" data-scene={i + 1}>
-              <button type="button" className="book-page-card__open" onClick={() => setOpenScene(s.id)} aria-label={`Open scene ${i + 1}: ${s.pageTitle ?? s.title}`}>
-                {idx >= 0 && <FinishedPage doc={interior} index={idx} height={180} />}
-                <strong>{i + 1}. {s.pageTitle ?? s.title}</strong>
+            <li key={s.id} className={`book-page-card${isSpread(s) ? " book-page-card--spread" : ""}`} data-scene={i + 1}>
+              <button type="button" className="book-page-card__open" onClick={() => setOpenScene(s.id)} aria-label={`Open ${isSpread(s) ? "spread" : "scene"} ${i + 1}: ${s.pageTitle ?? s.title}`}>
+                {isSpread(s) ? <SpreadPair interior={interior} scene={s} height={150} caption={false} /> : idx >= 0 && <FinishedPage doc={interior} index={idx} height={180} />}
+                <strong>{i + 1}. {isSpread(s) ? "Devotional Spread: " : ""}{s.pageTitle ?? s.title}</strong>
               </button>
               <span className={`book-chip${s.approvedAt ? " book-chip--ok" : s.illustrationId ? "" : " book-chip--todo"}`}>{st.art}</span>
               {st.verse && <span className={`book-chip${st.verse === "Verse ready" ? " book-chip--ok" : " book-chip--todo"}`}>{st.verse}</span>}
@@ -274,7 +277,11 @@ function PageList({ book, setOpenScene, update, interior, issues }: StepProps & 
           );
         })}
       </ol>
-      <button type="button" className="btn" onClick={() => { const s: Scene = { id: newId("s"), title: `Scene ${b.scenes.length + 1}`, text: "" }; update({ brief: { ...b, scenes: [...b.scenes, s] } }); setOpenScene(s.id); }}>Add a page</button>
+      <div className="row">
+        <button type="button" className="btn" onClick={() => { const s: Scene = { id: newId("s"), title: `Scene ${b.scenes.length + 1}`, text: "" }; update({ brief: { ...b, scenes: [...b.scenes, s] } }); setOpenScene(s.id); }}>Add a page</button>
+        <button type="button" className="btn" onClick={() => { const s = newSpread(newId("s"), b.scenes.length + 1); update({ brief: { ...b, scenes: [...b.scenes, s] }, ...(book.artCharacters?.length ? {} : { artCharacters: artCharactersOf(book) }) }); setOpenScene(s.id); }} data-testid="add-spread">Add a Devotional Spread</button>
+      </div>
+      <p className="hint">A Devotional Spread is two facing pages: a daughter coloring page on the left and a Mommy page on the right, with Read the Word, Fill in the Blank, Listen & Reflect and Heart to Heart.</p>
     </div>
   );
 }
@@ -283,7 +290,7 @@ function PageList({ book, setOpenScene, update, interior, issues }: StepProps & 
 const previewHeight = () => (typeof window === "undefined" ? 560 : Math.max(240, Math.min(560, Math.floor((window.innerWidth - 40) * 1.28))));
 
 /** One page: its finished preview beside everything that goes on it. */
-function PageEditor({ book, scene, setScene, say, copy, interior, issues, onClose, setOpenScene }: StepProps & { scene: Scene; onClose: () => void; setOpenScene: (id: string | null) => void; issues: MissingIssue[] }) {
+function PageEditor({ book, scene, setScene, say, copy, interior, issues, onClose, setOpenScene, update, setBrief, go }: StepProps & { scene: Scene; onClose: () => void; setOpenScene: (id: string | null) => void; issues: MissingIssue[] }) {
   const b = book.brief;
   const i = b.scenes.indexOf(scene);
   const brief = useMemo(() => briefFor(book), [book]);
@@ -296,6 +303,17 @@ function PageEditor({ book, scene, setScene, say, copy, interior, issues, onClos
   const cast = castFor(brief, scene.castIds);
   const prompt = verseArtBlocker(brief, scene) ? null : scenePrompt(brief, scene, i);
   const [showPrompt, setShowPrompt] = useState(false);
+  const nav = (
+    <div className="page-editor__nav row">
+      <button type="button" className="btn" onClick={onClose}>‹ All pages</button>
+      <button type="button" className="btn btn--ghost" disabled={i === 0} onClick={() => setOpenScene(b.scenes[i - 1].id)}>‹ Previous</button>
+      <strong>{isSpread(scene) ? "Spread" : "Scene"} {i + 1} of {b.scenes.length}</strong>
+      <button type="button" className="btn btn--ghost" disabled={i === b.scenes.length - 1} onClick={() => setOpenScene(b.scenes[i + 1].id)}>Next ›</button>
+    </div>
+  );
+  if (isSpread(scene)) {
+    return <SpreadEditor book={book} scene={scene} setScene={setScene} say={say} copy={copy} interior={interior} issues={issues} update={update} setBrief={setBrief} go={go} nav={nav} previewHeight={Math.min(440, previewHeight())} scriptureEditor={c.scripture !== "none" ? <ScriptureEditor key={scene.id} book={book} scene={scene} set={set} say={say} /> : null} />;
+  }
   const generate = () => {
     if (!prompt) return;
     const message = `Please create this coloring-page illustration. I will attach the reference pictures of the characters with this message if I have them.\n\n${prompt}`;
@@ -349,6 +367,15 @@ function PageEditor({ book, scene, setScene, say, copy, interior, issues, onClos
               </div>
               {own && <button type="button" className="btn btn--ghost" onClick={() => set({ content: undefined })}>Use the book's settings on this page</button>}
             </div>
+            <label className="field">
+              <span>Lettering on this page</span>
+              <select value={scene.letterStyle ?? ""} aria-label="Lettering on this page" onChange={(e) => set({ letterStyle: (e.target.value || undefined) as Scene["letterStyle"] })} data-testid="page-lettering">
+                <option value="">The book's choice ({b.pageTypography.letterStyle === "bubble" ? "bubble letters" : "elegant"})</option>
+                <option value="bubble">Bubble letters (to color)</option>
+                <option value="elegant">Elegant lettering</option>
+              </select>
+            </label>
+            <Check label="Text off (the lettering is already drawn into the art)" checked={!!scene.textOff} onChange={(textOff) => set({ textOff: textOff || undefined })} />
             {book.faithBased && c.scripture !== "none" && <ScriptureEditor key={scene.id} book={book} scene={scene} set={set} say={say} />}
             {c.lesson && <TextArea label="Lesson or reflection" value={scene.lessonText ?? ""} onChange={(v) => set({ lessonText: v || undefined })} testId="lesson-text" />}
             {c.customText && <TextArea label="Custom text" rows={2} value={scene.customText ?? ""} onChange={(v) => set({ customText: v || undefined })} testId="custom-text" />}

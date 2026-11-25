@@ -11,7 +11,7 @@
 import { newId } from "../presets/products/projectFactory";
 import { COVER_PALETTES } from "../presets/themes/palettes";
 import { jcsPaletteId } from "../design-library/palettes";
-import { COVER_SCHEMA_VERSION, newBrief, type CoverBrief, type CoverCollection, type CoverItem } from "../engines/cover/brief";
+import { COVER_SCHEMA_VERSION, newBrief, type CoverBrief, type CoverCollection, type CoverItem, type MommyPage } from "../engines/cover/brief";
 import { summarizePalette } from "../engines/cover/prompt";
 import { announceItemsChanged, markItemDeleted } from "./itemBases";
 
@@ -196,6 +196,25 @@ function normalizeContent(c: Record<string, unknown>): Partial<import("../engine
   };
 }
 
+/** A Devotional Spread's Mommy page: every field checked, nothing invented. */
+function normalizeMommy(m: Record<string, unknown>): MommyPage {
+  const str = (v: unknown) => (typeof v === "string" ? v : "");
+  const list = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is Record<string, unknown> => !!x && typeof x === "object") : []);
+  const reflect = (m.reflect ?? {}) as Record<string, unknown>;
+  return {
+    ...Object.fromEntries((["title", "scene", "theme", "artCharacterId", "illustrationId", "illustrationName", "approvedAt"] as const).flatMap((k) => (optText(m[k]) ? [[k, m[k]]] : []))),
+    ...(m.letterStyle === "bubble" || m.letterStyle === "elegant" ? { letterStyle: m.letterStyle as "bubble" | "elegant" } : {}),
+    ...(m.textOff === true ? { textOff: true } : {}),
+    ...(m.layout === "band" ? { layout: "band" as const } : {}),
+    ...(m.qr === true ? { qr: true } : {}),
+    ...(Number(m.illustrationW) > 0 && Number(m.illustrationH) > 0 ? { illustrationW: Number(m.illustrationW), illustrationH: Number(m.illustrationH) } : {}),
+    readWord: list(m.readWord).map((r) => ({ text: str(r.text), ref: str(r.ref), kind: r.kind === "paraphrase" || r.kind === "reflection" ? r.kind : ("exact" as const) })),
+    blanks: list(m.blanks).map((x) => ({ text: str(x.text), answer: str(x.answer), ref: str(x.ref) })),
+    reflect: { question: str(reflect.question), lines: Math.max(0, Math.min(8, Math.round(Number(reflect.lines ?? 4)) || 0)) },
+    heart: str(m.heart),
+  };
+}
+
 /** The cast, scenes, coloring defaults and coloring-cover choices (absent in collections saved before them). */
 function normalizeColoring(r: Record<string, unknown>, d: CoverBrief): Partial<CoverBrief> {
   const cast = (Array.isArray(r.cast) ? r.cast : []).flatMap((x) => {
@@ -224,6 +243,13 @@ function normalizeColoring(r: Record<string, unknown>, d: CoverBrief): Partial<C
       ...(c.verseSource === "customer" || c.verseSource === "public-domain" ? { verseSource: c.verseSource as "customer" | "public-domain" } : {}),
       ...(c.content && typeof c.content === "object" ? { content: normalizeContent(c.content as Record<string, unknown>) } : {}),
       ...(Number(c.attempts) > 0 ? { attempts: Math.round(Number(c.attempts)) } : {}),
+      // Per-page lettering, text off, and Devotional Spreads.
+      ...(c.letterStyle === "bubble" || c.letterStyle === "elegant" ? { letterStyle: c.letterStyle as "bubble" | "elegant" } : {}),
+      ...(c.textOff === true ? { textOff: true } : {}),
+      ...(c.pageType === "devotional-spread" ? { pageType: "devotional-spread" as const } : {}),
+      ...(optText(c.theme) ? { theme: optText(c.theme) } : {}),
+      ...(optText(c.artCharacterId) ? { artCharacterId: optText(c.artCharacterId) } : {}),
+      ...(c.mommy && typeof c.mommy === "object" ? { mommy: normalizeMommy(c.mommy as Record<string, unknown>) } : {}),
       ...(c.checks && typeof c.checks === "object" ? { checks: Object.fromEntries(Object.entries(c.checks as Record<string, unknown>).filter(([, v]) => typeof v === "boolean")) as Record<string, boolean> } : {}),
     }];
   });

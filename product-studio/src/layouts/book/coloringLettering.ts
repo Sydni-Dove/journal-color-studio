@@ -37,7 +37,7 @@ const LINE_HEIGHT = 1.08;
 /** Outline weight the strokes share with the letters (points). */
 const STROKE_PT = 1.6;
 
-type Words = { title: string; verse: string; ref: string; titlePt?: number; versePt?: number; raiseIn: number };
+type Words = { title: string; verse: string; ref: string; titlePt?: number; versePt?: number; raiseIn: number; top: boolean };
 
 function wordsOf(ctx: LayoutContext): Words {
   const blocks = ctx.module?.promptSet?.blocks ?? [];
@@ -51,6 +51,8 @@ function wordsOf(ctx: LayoutContext): Words {
     versePt: get("verse")?.headingSizePt,
     // "Move the words up" travels on a block of its own (its weight, in inches).
     raiseIn: Math.max(0, Math.min(MAX_RAISE_IN, get("raise")?.weight ?? 0)),
+    // A Devotional Spread's daughter page: the words across the top, the picture under them.
+    top: !!get("place-top"),
   };
 }
 
@@ -108,14 +110,16 @@ export function solveColoringLettering(ctx: LayoutContext): SolvedPage {
   const gap = 0.08;
   const cx = body.x + body.w / 2;
   // "Move the words up": the lettering sits that much higher, closer to the picture.
-  let bottom = body.y + body.h - w.raiseIn;
+  let bottom = body.y + body.h - (w.top ? 0 : w.raiseIn);
 
   // Verse size: the maker's, or Auto — the largest (up to AUTO_VERSE_MAX_PT) on at most four lines within ~15% of the page.
   const burstRoom = 0.55;
   const verseW = body.w - 2 * burstRoom;
   let versePt = w.versePt ?? AUTO_VERSE_MAX_PT;
   let verseLines = w.verse ? wrap(ctx, w.verse, verseW, versePt) : [];
-  const verseFits = (pt: number, lines: string[]) => lines.length <= MAX_VERSE_LINES && (w.versePt !== undefined || lineH(pt, lines.length) <= body.h * AUTO_VERSE_SHARE);
+  // Words across the top (a Devotional Spread's daughter page): Auto keeps the whole lettering to about the top quarter.
+  const share = w.top ? 0.62 : 1;
+  const verseFits = (pt: number, lines: string[]) => lines.length <= MAX_VERSE_LINES && (w.versePt !== undefined || lineH(pt, lines.length) <= body.h * AUTO_VERSE_SHARE * share);
   while (w.verse && !verseFits(versePt, verseLines) && versePt > MIN_VERSE_PT) {
     versePt = Math.max(MIN_VERSE_PT, versePt - 2);
     verseLines = wrap(ctx, w.verse, verseW, versePt);
@@ -155,7 +159,7 @@ export function solveColoringLettering(ctx: LayoutContext): SolvedPage {
   let titleTop = bottom;
   if (w.title) {
     // The maker's size, or Auto: the largest (up to AUTO_TITLE_MAX_PT) within ~11% of the page; never wider than the page.
-    let pt = w.titlePt ?? Math.min(AUTO_TITLE_MAX_PT, Math.floor((body.h * AUTO_TITLE_SHARE * 72) / LINE_HEIGHT));
+    let pt = w.titlePt ?? Math.min(AUTO_TITLE_MAX_PT, Math.floor((body.h * AUTO_TITLE_SHARE * share * 72) / LINE_HEIGHT));
     const heartAt = (p: number) => Math.min(36, Math.round(p * 0.4));
     const roomAt = (p: number) => body.w - 2 * ((heartAt(p) * 0.9) / 72 + 0.25);
     while (pt > 24 && m(w.title, style(ctx, pt)) > roomAt(pt)) pt -= 2;
@@ -166,7 +170,7 @@ export function solveColoringLettering(ctx: LayoutContext): SolvedPage {
       const splits = words.slice(1).map((_, k) => [words.slice(0, k + 1).join(" "), words.slice(k + 1).join(" ")]);
       const widest = (ls: string[], p: number) => Math.max(...ls.map((l) => m(l, style(ctx, p))));
       const best = splits.sort((x, y) => widest(x, 40) - widest(y, 40))[0];
-      let p2 = Math.min(AUTO_TITLE_MAX_PT, Math.floor((body.h * AUTO_TITLE_SHARE * 1.6 * 72) / (LINE_HEIGHT * 2)));
+      let p2 = Math.min(AUTO_TITLE_MAX_PT, Math.floor((body.h * AUTO_TITLE_SHARE * share * 1.6 * 72) / (LINE_HEIGHT * 2)));
       while (p2 > 24 && widest(best, p2) > roomAt(p2)) p2 -= 2;
       if (p2 > pt) {
         pt = p2;
@@ -183,9 +187,23 @@ export function solveColoringLettering(ctx: LayoutContext): SolvedPage {
     titleTop = y;
   }
 
-  // The picture: from the top of the page down to just above the lettering, tucking slightly behind the title.
-  const artBottom = w.title || w.verse || w.ref ? Math.min(body.y + body.h, titleTop + ART_TUCK_IN) : body.y + body.h;
-  const art = { x: body.x, y: body.y, w: body.w, h: Math.max(0, artBottom - body.y) };
+  const anyWords = !!(w.title || w.verse || w.ref);
+  let art: Rect;
+  if (w.top && anyWords) {
+    // Words at the top: the same lettering, moved up so the title starts at the top of the page; the picture fills the rest.
+    const stackBottom = body.y + body.h;
+    const dy = body.y - titleTop;
+    for (const n of nodes.slice(frame.nodes.length)) {
+      n.rect = { ...n.rect, y: n.rect.y + dy };
+      if (n.type === "rule") Object.assign(n, { y1: n.y1 + dy, y2: n.y2 + dy });
+    }
+    const top = stackBottom + dy + gap;
+    art = { x: body.x, y: top, w: body.w, h: Math.max(0, body.y + body.h - top) };
+  } else {
+    // The picture: from the top of the page down to just above the lettering, tucking slightly behind the title.
+    const artBottom = anyWords ? Math.min(body.y + body.h, titleTop + ART_TUCK_IN) : body.y + body.h;
+    art = { x: body.x, y: body.y, w: body.w, h: Math.max(0, artBottom - body.y) };
+  }
   nodes.unshift(group("cl-art", "Section", art));
   if (art.h < body.h * 0.45) diagnostics.push({ severity: "warning", rule: "min-writing-area", componentId: "cl-art", message: "The lettering leaves less than half the page for the picture. Use a shorter excerpt or smaller lettering." });
 

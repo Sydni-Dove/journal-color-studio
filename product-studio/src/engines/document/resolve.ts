@@ -499,8 +499,10 @@ const artCache = new WeakMap<ResolvedDocument, Map<number, PageArt[]>>();
 export function pictureAreaOf(doc: ResolvedDocument, index: number, g = fullGeometryFor(doc, doc.recipe.pages[index], index)): Rect | null {
   const page = doc.recipe.pages[index];
   if (!page || page.filler) return null;
-  const art = solvePage(doc, index).nodes.find((n) => n.type === "group" && /-art$/.test(n.id)) as { rect: Rect } | undefined;
+  const art = solvePage(doc, index).nodes.find((n) => n.type === "group" && /-art$/.test(n.id)) as { id: string; rect: Rect } | undefined;
   if (!art) return null;
+  // A picture area narrower than the page (a Devotional Spread's Mommy page: the art on the inner side) is used as laid out.
+  if (art.id === "dm-art") return { ...art.rect };
   const side = Math.max(g.safe.left, g.safe.right);
   return { x: side, y: art.rect.y, w: g.trimWidthIn - 2 * side, h: art.rect.h };
 }

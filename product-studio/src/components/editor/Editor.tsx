@@ -1,6 +1,7 @@
 import { ScripturePermissions } from "./ScripturePermissions";
 import { LUXE_TITLE_FONT } from "../../presets/coverLuxe";
 import { BUBBLE_FONT } from "../../layouts/book/coloringLettering";
+import { MOMMY_SCRIPT_FONT } from "../../layouts/book/devotionalMommy";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { PanelResizer, usePanelWidth } from "./PanelResizer";
 import { compositionFor, contentGeometryFor, geometryFor, resolveDocument, solvePage, type ResolvedDocument } from "../../engines/document/resolve";
@@ -94,6 +95,8 @@ export function Editor({ project, onChange, onBack, saveStatus, cloudLabel, star
         if (n.kind === "group") return walk(n.children);
         // A coloring page in bubble letters draws its words in the bubble font.
         if (n.layoutId === "coloring-lettering") out.add(BUBBLE_FONT);
+        // A Devotional Spread's Mommy page: its declaration in script (or bubble letters).
+        if (n.layoutId === "devotional-mommy") out.add(MOMMY_SCRIPT_FONT).add(BUBBLE_FONT);
         n.promptSet?.blocks.forEach((b) => b.headingFont && out.add(b.headingFont));
       });
     walk(project.recipe.structure ?? []);

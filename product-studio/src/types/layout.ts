@@ -83,7 +83,8 @@ export type TextNode = NodeBase & {
   /** Drawn as black outlines with white inside (bubble lettering to color). */
   outline?: boolean;
   /** Drawn as a shape instead of its text: an outlined heart filling its box. */
-  glyph?: "heart";
+  /** Drawn as a shape instead of its text: an outlined heart, or a delicate botanical sprig (a separator). */
+  glyph?: "heart" | "sprig";
   /** Semantic element this text is (user-positionable page titles, headings, footer). */
   semantic?: SemanticTextKey;
   /** Where a semantic element was placed, and the layout's default for it. */

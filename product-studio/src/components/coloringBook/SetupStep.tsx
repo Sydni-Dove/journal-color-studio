@@ -2,6 +2,7 @@
 import { AGE_RANGES, CONTENT_PRESETS, PRINT_FORMATS, bookTitle, formatOf, type PageContent, type ScriptureChoice } from "../../engines/coloringBook/book";
 import { TRANSLATIONS, translationOf } from "../../engines/coloringBook/scripture";
 import { bookLicense, interiorPageCount } from "../../engines/coloringBook/assembleBook";
+import { isSpread } from "../../engines/coloringBook/spread";
 import { Check } from "../editor/ui";
 import { Choice, TextInput, type StepProps } from "./shared";
 
@@ -15,6 +16,8 @@ export function SetupStep({ book, update, setBrief }: StepProps) {
   const t = translationOf(b.translation);
   const lic = bookLicense(book);
   const f = formatOf(book.printFormat);
+  // Devotional Spreads quote the NIV word for word: export waits for the publisher's permission to be recorded.
+  const nivSpreads = t.id === "NIV" && b.scenes.some(isSpread);
   return (
     <section className="cover-step book-step" aria-label="Book setup">
       <div className="cover-two">
@@ -65,6 +68,12 @@ export function SetupStep({ book, update, setBrief }: StepProps) {
                     : `${t.id} is copyrighted. Product Studio never types verse wording itself: paste it from your Bible or the publisher's site and approve it. Free use is limited to ${t.maxVerses ?? "a set number of"} verses${t.maxShare ? `, under ${Math.round(t.maxShare * 100)}% of the book's words` : ""}, with the publisher's notice on the copyright page (added for you).`}
                 </span>
               </label>
+            )}
+            {nivSpreads && !(lic && (lic.overShare || lic.overVerses)) && (
+              <div className="notice notice--warn" role="status" data-testid="niv-permission">
+                <p>This book's Devotional Spreads quote the NIV word for word. Export stays blocked until you record Biblica's written permission ({t.permissions}). Or switch to the KJV or WEB, or mark lines as paraphrases or reflections.</p>
+                <Check label={`I have the publisher's written permission to quote ${t.id} in this book`} checked={book.scripturePermission} onChange={(scripturePermission) => update({ scripturePermission })} />
+              </div>
             )}
             {lic && (lic.overShare || lic.overVerses) && (
               <div className="notice notice--warn" role="status" data-testid="license-warning">
@@ -131,7 +140,14 @@ export function SetupStep({ book, update, setBrief }: StepProps) {
           onChange={(sides) => update({ sides })}
           testId="sides"
         />
-        <p className="hint">Single-sided keeps markers from bleeding into the next picture. Blank backs count as printed pages.</p>
+        <p className="hint">Single-sided keeps markers from bleeding into the next picture. Blank backs count as printed pages.{b.scenes.some(isSpread) ? " Devotional Spreads always print as facing pages (the daughter page on the left, the Mommy page on the right), with no blank page between them." : ""}</p>
+        <label className="field">
+          <span>Binding margin (inner gutter)</span>
+          <select value={String(b.gutter)} aria-label="Binding margin" onChange={(e) => setBrief({ gutter: Number(e.target.value) })} data-testid="gutter">
+            {[...new Set([b.gutter, 0.375, 0.5, 0.625, 0.75, 0.875, 1])].sort((x, y) => x - y).map((g) => <option key={g} value={g}>{g} in</option>)}
+          </select>
+          <span className="hint">Kept clear on the bound edge of every page: on the left of right-hand pages and on the right of left-hand pages, so it mirrors across each spread.</span>
+        </label>
         <div className="content-switches">
           <Check label="Title page" checked={book.frontMatter.titlePage} onChange={(titlePage) => update({ frontMatter: { ...book.frontMatter, titlePage } })} />
           <Check label="Copyright page" checked={book.frontMatter.copyrightPage} onChange={(copyrightPage) => update({ frontMatter: { ...book.frontMatter, copyrightPage } })} />

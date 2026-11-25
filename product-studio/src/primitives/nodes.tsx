@@ -103,6 +103,24 @@ export function TextBlock({ node, typography }: { node: TextNode; typography: Ty
       ? { color: "#ffffff", WebkitTextStroke: `${Math.max(1, (node.fit?.sizePt ?? role.sizePt) * 0.05) * 2}pt #000000`, paintOrder: "stroke fill" }
       : {}),
   };
+  if (node.glyph === "sprig") {
+    // A delicate botanical separator: a fine vine with small open leaves either side of a little flower.
+    const { x, y, w, h } = node.rect;
+    const leaves = [16, 30, 44].flatMap((lx, k) => [
+      `M${lx} 8 q4 ${k % 2 ? 6 : -6} 9 ${k % 2 ? 5 : -5} q-4 ${k % 2 ? -1 : 1} -9 ${k % 2 ? -5 : 5}z`,
+      `M${120 - lx} 8 q-4 ${k % 2 ? 6 : -6} -9 ${k % 2 ? 5 : -5} q4 ${k % 2 ? -1 : 1} 9 ${k % 2 ? -5 : 5}z`,
+    ]);
+    return (
+      <svg className="ps-text" data-node={node.id} data-glyph="sprig" style={{ position: "absolute", left: `${x}in`, top: `${y}in`, width: `${w}in`, height: `${h}in`, overflow: "visible" }} viewBox="0 0 120 16" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+        <g fill="#ffffff" stroke="#8A8A8A" strokeWidth={0.7} strokeLinejoin="round" strokeLinecap="round">
+          <path d="M8 8 C30 6 42 10 54 8 M66 8 C78 6 90 10 112 8" fill="none" />
+          {leaves.map((d, i) => <path key={i} d={d} />)}
+          {[0, 72, 144, 216, 288].map((a) => <ellipse key={a} cx={60} cy={4.6} rx={1.7} ry={3.2} transform={`rotate(${a} 60 8)`} />)}
+          <circle cx={60} cy={8} r={1.3} />
+        </g>
+      </svg>
+    );
+  }
   if (node.glyph === "heart") {
     // An outlined heart, white inside, to color.
     const { x, y, w, h } = node.rect;

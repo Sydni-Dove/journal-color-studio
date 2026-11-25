@@ -5,7 +5,7 @@
  */
 import { itemsChanged, normalizeBrief } from "./coverStore";
 import { markItemDeleted } from "./itemBases";
-import { newBook, PRINT_FORMATS, type BookStepId, type ColoringBook, type PageContent } from "../engines/coloringBook/book";
+import { DEFAULT_SPREAD, newBook, PRINT_FORMATS, type BookStepId, type ColoringBook, type PageContent, type SpreadSettings } from "../engines/coloringBook/book";
 
 const PREFIX = "dove-product-studio:v1";
 const INDEX_KEY = `${PREFIX}:coloring-book-index`;
@@ -42,6 +42,17 @@ function content(raw: unknown, d: PageContent): PageContent {
   };
 }
 
+/** The Mommy page settings, each kept within the range its control offers. */
+function normalizeSpread(s: Record<string, unknown>): SpreadSettings {
+  const num = (v: unknown, d: number, lo: number, hi: number) => (Number.isFinite(Number(v)) && v !== null && v !== "" ? Math.max(lo, Math.min(hi, Number(v))) : d);
+  return {
+    split: num(s.split, DEFAULT_SPREAD.split, 0.5, 0.8),
+    headingPt: num(s.headingPt, DEFAULT_SPREAD.headingPt, 7, 18),
+    bodyPt: num(s.bodyPt, DEFAULT_SPREAD.bodyPt, 7, 16),
+    lineSpacingIn: num(s.lineSpacingIn, DEFAULT_SPREAD.lineSpacingIn, 0.2, 0.5),
+  };
+}
+
 export function normalizeBook(raw: unknown): ColoringBook | null {
   const r = (raw ?? {}) as Record<string, unknown>;
   if (typeof r.id !== "string") return null;
@@ -70,6 +81,11 @@ export function normalizeBook(raw: unknown): ColoringBook | null {
       ...(front && typeof front.id === "string" ? { front: { id: front.id, name: String(front.name ?? "cover"), w: Number(front.w) || 0, h: Number(front.h) || 0 } } : {}),
       ...(typeof cv.approved === "string" ? { approved: cv.approved } : {}),
     },
+    ...(r.spread && typeof r.spread === "object" ? { spread: normalizeSpread(r.spread as Record<string, unknown>) } : {}),
+    ...(Array.isArray(r.artCharacters)
+      ? { artCharacters: r.artCharacters.flatMap((x) => { const c = (x ?? {}) as Record<string, unknown>; return typeof c.id === "string" ? [{ id: c.id, name: typeof c.name === "string" ? c.name : "", description: typeof c.description === "string" ? c.description : "" }] : []; }) }
+      : {}),
+    ...(typeof r.digitalProjectId === "string" ? { digitalProjectId: r.digitalProjectId } : {}),
     ...(typeof r.interiorProjectId === "string" ? { interiorProjectId: r.interiorProjectId } : {}),
     ...(typeof r.coverProjectId === "string" ? { coverProjectId: r.coverProjectId } : {}),
     step: STEPS.includes(r.step as BookStepId) ? (r.step as BookStepId) : "setup",

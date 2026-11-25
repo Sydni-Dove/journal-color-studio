@@ -89,12 +89,40 @@ export type ColoringBook = {
   cover: { front?: CoverArt; mode: "with-title" | "as-is"; approved?: string; backText: string };
   /** The customer has the translation publisher's written permission (for quotations beyond the free-use limits). */
   scripturePermission: boolean;
+  /** Devotional Spreads: the Mommy page's split, sizes and writing-line spacing (DEFAULT_SPREAD when absent). */
+  spread?: SpreadSettings;
+  /** Saved characters for Art Prompts: each description is pasted word for word into the prompt. */
+  artCharacters?: ArtCharacter[];
   /** The products the finished interior and cover were saved as (re-exporting updates the same ones). */
   interiorProjectId?: string;
   coverProjectId?: string;
+  /** The printable digital PDF's product (re-exporting updates the same one). */
+  digitalProjectId?: string;
   step: BookStepId;
   reached: number;
 };
+
+/**
+ * The Mommy page of a Devotional Spread:
+ *   split          the art's share of the page width (column) or height (band), 0.5–0.8
+ *   headingPt      the section labels (Read the Word…)
+ *   bodyPt         the excerpts, statements and questions
+ *   lineSpacingIn  the writing lines' spacing
+ */
+export type SpreadSettings = { split: number; headingPt: number; bodyPt: number; lineSpacingIn: number };
+export const DEFAULT_SPREAD: SpreadSettings = { split: 0.65, headingPt: 10.5, bodyPt: 9.5, lineSpacingIn: 0.3 };
+export const spreadOf = (book: Pick<ColoringBook, "spread">): SpreadSettings => ({ ...DEFAULT_SPREAD, ...(book.spread ?? {}) });
+
+/** A saved Art Prompt character: the description goes into prompts exactly as written. */
+export type ArtCharacter = { id: string; name: string; description: string };
+export const GIRL_1: ArtCharacter = {
+  id: "girl-1",
+  name: "Girl 1",
+  description:
+    "A joyful Black girl about 6 years old with long braids gathered into a high ponytail tied with a large bow. Round face, large gentle eyes and a small open smile. Knee-length dress with puffed short sleeves, a round collar, a sash tied in a bow at the waist and a full twirl skirt. Ankle socks and Mary Jane shoes.",
+};
+/** The book's saved Art Prompt characters (Girl 1 until the maker saves their own). */
+export const artCharactersOf = (book: Pick<ColoringBook, "artCharacters">): ArtCharacter[] => (book.artCharacters?.length ? book.artCharacters : [GIRL_1]);
 
 /** The content a scene's finished page uses: the scene's own choice where it made one, the book's otherwise. */
 export function contentOf(book: ColoringBook, s: Scene): PageContent {

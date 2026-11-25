@@ -5,8 +5,10 @@
  * renderer from one assembled book, so the page previews, the book preview and the print file are the same pages.
  */
 import { BUBBLE_FONT } from "../../layouts/book/coloringLettering";
+import { MOMMY_SCRIPT_FONT } from "../../layouts/book/devotionalMommy";
+import { newSpread } from "../../engines/coloringBook/spread";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { bookFromCoverBrief, bookTitle, newBook, type BookStepId, type ColoringBook } from "../../engines/coloringBook/book";
+import { GIRL_1, bookFromCoverBrief, bookTitle, newBook, type BookStepId, type ColoringBook } from "../../engines/coloringBook/book";
 import { assembleCover, assembleInterior } from "../../engines/coloringBook/assembleBook";
 import { whatsMissing } from "../../engines/coloringBook/missing";
 import type { CoverBrief, Scene } from "../../engines/cover/brief";
@@ -107,15 +109,16 @@ function BookFlow({ initial, store, onBack, onExport, onLibrary }: { initial: Co
   };
 
   const interior = useMemo(() => resolveDocument(assembleInterior(book)), [book]);
-  const fontsReady = useFontLoader(interior.typography.fonts, [book.brief.pageTypography.titleFont, book.brief.pageTypography.scriptureFont, BUBBLE_FONT]);
+  const fontsReady = useFontLoader(interior.typography.fonts, [book.brief.pageTypography.titleFont, book.brief.pageTypography.scriptureFont, BUBBLE_FONT, MOMMY_SCRIPT_FONT]);
   const issues = useMemo(() => whatsMissing(book, (fontsReady && createCanvasMeasurer()) || heuristicMeasurer), [book, fontsReady]);
   const props = { book, update, setBrief, setScene, say, copy, go, interior };
   const blocking = issues.filter((i) => i.severity === "blocking").length;
 
-  const exportBook = (what: "interior" | "cover", proof: boolean) => {
-    const p = what === "interior" ? assembleInterior(book, book.interiorProjectId) : assembleCover(book, book.coverProjectId);
-    const named = { ...p, name: `${p.name}${proof ? " (proof)" : ""}` };
-    const next = { ...book, ...(what === "interior" ? { interiorProjectId: p.id } : { coverProjectId: p.id }) };
+  const exportBook = (what: "interior" | "cover" | "digital", proof: boolean) => {
+    // The printable digital PDF: the same 8.5 × 11 in pages, set up for printing at home (no printer's binding rules).
+    const p = what === "interior" ? assembleInterior(book, book.interiorProjectId) : what === "digital" ? assembleInterior({ ...book, printFormat: "digital" }, book.digitalProjectId) : assembleCover(book, book.coverProjectId);
+    const named = { ...p, name: `${p.name}${what === "digital" ? " (printable digital PDF)" : ""}${proof ? " (proof)" : ""}` };
+    const next = { ...book, ...(what === "interior" ? { interiorProjectId: p.id } : what === "digital" ? { digitalProjectId: p.id } : { coverProjectId: p.id }) };
     // Saved now, and the copy saved on leaving is this one (the book closes as the print step opens).
     latest.current = next;
     save(next);
@@ -151,6 +154,17 @@ function BookFlow({ initial, store, onBack, onExport, onLibrary }: { initial: Co
       </div>
     </div>
   );
+}
+
+/** A new Devotional Spread book: Mommy & Me, KJV, one empty spread to fill in (Girl 1 saved for Art Prompts). */
+function mommyAndMeStarter(): ColoringBook {
+  const b = newBook(newId("book"));
+  const title = "Mommy & Me: Growing With God Together";
+  return {
+    ...b, name: title, faithBased: true, content: { ...b.content, title: true, scripture: "full" }, step: "pages", reached: 2,
+    brief: { ...b.brief, title, translation: "KJV", ageGroup: "Ages 4–8", pageTypography: { ...b.brief.pageTypography, letterStyle: "bubble" }, scenes: [newSpread(newId("s"), 1)] },
+    artCharacters: [GIRL_1],
+  };
 }
 
 /** The coloring books on this device: open one, start a new one, or bring one in from Cover Studio. */
@@ -195,6 +209,7 @@ function BookLibrary({ store, coverStore, onOpen, onBack, onAdvanced }: { store:
           <p className="lede">Create a complete coloring book: set it up, add your characters and scenes, generate each picture, design the cover, preview the whole book and export print-ready files.</p>
           <div className="card-actions">
             <button type="button" className="btn btn--primary btn--big" onClick={() => start(newBook(newId("book")))} data-testid="new-coloring-book">Start a new coloring book</button>
+            <button type="button" className="btn btn--big" onClick={() => start(mommyAndMeStarter())} data-testid="new-mommy-me">Start “Mommy & Me: Growing With God Together” (Devotional Spreads)</button>
           </div>
         </section>
         {list.length > 0 && (

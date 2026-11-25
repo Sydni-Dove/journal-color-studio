@@ -20,7 +20,8 @@ import type { ProductProject } from "../../types/project";
 import type { PromptBlock } from "../../types/prompts";
 import type { BookStep } from "../../types/recipe";
 import type { ArtworkAsset, ArtworkPlacement } from "../../types/artwork";
-import { bookTitle, contentOf, formatOf, type ColoringBook } from "./book";
+import { bookTitle, contentOf, formatOf, spreadOf, type ColoringBook } from "./book";
+import { daughterPage, isSpread, isWholePage, mommyOf, mommyPage, mommyScripture } from "./spread";
 import { licenseCheck, translationOf, verseCount, wordCount } from "./scripture";
 
 /** The brief the pages are assembled and prompted from: the book's content choices, sides and print format applied. */
@@ -45,7 +46,9 @@ export function printedReferences(book: ColoringBook): string[] {
   const b = briefFor(book);
   return b.scenes.flatMap((s) => {
     const c = pageContentOf(b, s)!;
-    return c.scripture !== "none" && s.scriptureRef?.trim() ? [s.scriptureRef.trim()] : [];
+    // A Devotional Spread's Mommy page quotes Scripture too (its exact quotes; paraphrases and reflections aren't quotations).
+    const mommy = isSpread(s) ? mommyScripture(s).refs : [];
+    return [...(c.scripture !== "none" && s.scriptureRef?.trim() ? [s.scriptureRef.trim()] : []), ...mommy];
   });
 }
 
@@ -64,6 +67,11 @@ export function bookWords(book: ColoringBook): { total: number; scripture: numbe
     if (c.scripture !== "none" && s.scriptureRef) total += wordCount(s.scriptureRef);
     if (c.lesson) total += wordCount(s.lessonText ?? "");
     if (c.customText) total += wordCount(s.customText ?? "");
+    if (isSpread(s)) {
+      const m = mommyScripture(s);
+      total += m.allWords;
+      scripture += m.words;
+    }
   }
   return { total, scripture };
 }
@@ -116,7 +124,16 @@ export function bookStructure(book: ColoringBook): BookStep[] {
     if (single) out.push(blank("front-belongs-back", "Back of “This book belongs to” (blank)"));
   }
   b.scenes.forEach((s, i) => {
-    out.push(page(`scene-${s.id}`, `Scene ${i + 1}: ${s.pageTitle ?? s.title}`, pageBlocks(b, s), sceneLayoutId(b)));
+    if (isSpread(s)) {
+      // A Devotional Spread: the daughter page on a left-hand (even) page, the Mommy page facing it. A blank page
+      // first when the spread would otherwise start on a right-hand page. No blank backs inside a spread.
+      if ((out.length + 1) % 2 === 1) out.push(page(`pad-${s.id}`, `Blank page before spread ${i + 1}`, [{ id: "empty", label: "", space: "fill", responseStyle: "blank" }]));
+      const d = daughterPage(b, s), m = mommyPage(b, s);
+      out.push(page(`scene-${s.id}`, `Spread ${i + 1} (left): ${s.pageTitle ?? s.title}`, d.blocks, d.layoutId));
+      out.push(page(`mommy-${s.id}`, `Spread ${i + 1} (right): Mommy page`, m.blocks, m.layoutId));
+      return;
+    }
+    out.push(page(`scene-${s.id}`, `Scene ${i + 1}: ${s.pageTitle ?? s.title}`, pageBlocks(b, s), sceneLayoutId(b, s)));
     if (single) out.push(blank(`back-${s.id}`, `Back of scene ${i + 1} (blank)`));
   });
   for (let i = 0; i < book.drawingPages; i++) {
@@ -128,7 +145,7 @@ export function bookStructure(book: ColoringBook): BookStep[] {
 
 /** The scene a step id belongs to (a scene page or its blank back), or null for front matter and drawing pages. */
 export function sceneOfStep(book: ColoringBook, stepId: string): Scene | null {
-  const id = /^(?:scene|back)-(.+)$/.exec(stepId)?.[1];
+  const id = /^(?:scene|back|mommy|pad)-(.+)$/.exec(stepId)?.[1];
   return id ? book.brief.scenes.find((s) => s.id === id) ?? null : null;
 }
 
@@ -140,7 +157,40 @@ function sizeOf(b: CoverBrief) {
 
 /** The scenes' uploaded illustrations as artwork assets (the files themselves are in the artwork store). */
 export function sceneAssets(b: CoverBrief): ArtworkAsset[] {
-  return b.scenes.flatMap((s) => (s.illustrationId ? [{ id: s.illustrationId, name: s.illustrationName ?? "illustration", mime: "image/png" as const, widthPx: s.illustrationW ?? 1, heightPx: s.illustrationH ?? 1, hasAlpha: false, bytes: 0, addedAt: "" }] : []));
+  const asset = (id: string, name: string | undefined, w?: number, h?: number): ArtworkAsset => ({ id, name: name ?? "illustration", mime: "image/png" as const, widthPx: w ?? 1, heightPx: h ?? 1, hasAlpha: false, bytes: 0, addedAt: "" });
+  const out = b.scenes.flatMap((s) => {
+    const m = isSpread(s) ? mommyOf(s) : null;
+    return [
+      ...(s.illustrationId ? [asset(s.illustrationId, s.illustrationName, s.illustrationW, s.illustrationH)] : []),
+      ...(m?.illustrationId ? [asset(m.illustrationId, m.illustrationName, m.illustrationW, m.illustrationH)] : []),
+    ];
+  });
+  // One asset per picture, even when two pages use the same one.
+  return out.filter((a, i) => out.findIndex((x) => x.id === a.id) === i);
+}
+
+/** Where a Devotional Spread's pictures go: a whole-page picture fills the page; any other is fitted to its art area. */
+function spreadPlacements(b: CoverBrief, s: Scene, split: number): ArtworkPlacement[] {
+  const out: ArtworkPlacement[] = [];
+  const pg = pageCanvas(b);
+  const full = { x: b.safe, y: b.safe, w: pg.trimW - 2 * b.safe, h: pg.trimH - 2 * b.safe };
+  if (s.illustrationId) {
+    const whole = isWholePage(s.illustrationW, s.illustrationH);
+    // Words across the top: a fitted picture sits at the top of its area, right under them.
+    out.push({
+      id: `art-${s.id}`, use: "background", assetId: s.illustrationId, targets: [{ item: `scene-${s.id}` }], fit: "fit", crop: { x: 0.5, y: s.textOff ? 0.5 : 0, zoom: 1 }, opacity: 1,
+      ...(whole ? { extent: "bleed" as const } : { extent: "region" as const, region: full }),
+    });
+  }
+  const m = mommyOf(s);
+  if (m.illustrationId) {
+    const whole = isWholePage(m.illustrationW, m.illustrationH);
+    out.push({
+      id: `art-mommy-${s.id}`, use: "background", assetId: m.illustrationId, targets: [{ item: `mommy-${s.id}` }], fit: "fit", crop: { x: 0.5, y: 0.5, zoom: 1 }, opacity: 1,
+      ...(whole ? { extent: "bleed" as const } : { extent: "region" as const, region: { ...full, x: b.gutter, w: (pg.trimW - b.gutter - b.safe) * split } }),
+    });
+  }
+  return out;
 }
 
 /** The finished interior: every page of the book, its illustrations placed. `id` keeps the same product when rebuilt. */
@@ -156,9 +206,10 @@ export function assembleInterior(book: ColoringBook, id?: string): ProductProjec
     recipe: { items: [], ordering: "sequential", structure: bookStructure(book) },
   } as never) as ProductProject;
   const assets = sceneAssets(b);
-  const placements: ArtworkPlacement[] = b.scenes.flatMap((s) => (s.illustrationId ? [illustrationPlacement(b, s)] : []));
+  const placements: ArtworkPlacement[] = b.scenes.flatMap((s) => (isSpread(s) ? spreadPlacements(b, s, spreadOf(book).split) : s.illustrationId ? [illustrationPlacement(b, s)] : []));
   // Fonts and sizes as the product's own typography, so Style → Typography in the editor changes every page.
-  const typed = { ...project, typography: bookTypography(b) };
+  // A Devotional Spread's Mommy pages: the book's split, sizes and line spacing.
+  const typed = { ...project, typography: bookTypography(b), ...(b.scenes.some(isSpread) ? { layoutOptions: { ...project.layoutOptions, devotionalSpread: spreadOf(book) } } : {}) };
   const out = placements.length ? { ...typed, artwork: { assets, placements } } : typed;
   return id ? { ...out, id } : out;
 }

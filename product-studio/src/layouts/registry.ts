@@ -16,6 +16,7 @@ import { weeklySpread } from "./planner/weeklySpread";
 import { blankPage } from "./shared/blankPage";
 import type { LayoutDefinition } from "./shared/types";
 import { coloringLettering } from "./book/coloringLettering";
+import { devotionalMommy } from "./book/devotionalMommy";
 import { STATIONERY_LAYOUTS } from "./stationery/stationeryLayout";
 
 /**
@@ -23,7 +24,7 @@ import { STATIONERY_LAYOUTS } from "./stationery/stationeryLayout";
  * the shared notes page (used as spread filler). The full template library
  * is Phase 6 — added only after these validate.
  */
-export const LAYOUTS: LayoutDefinition[] = [coverPage, dividerPage, todoNotepad, groceryNotepad, linedJournal, notesPage, blankPage, monthlyCalendar, weeklySpread, weeklyDeskPad, guidedPage, weeklyPlanMwgSpread, dailyPlanner, luxuryDailyExecution, dailyPlannerSheet, weeklyPlanSpread, meetingWithGodSpread, backCoverPage, ...STATIONERY_LAYOUTS, cardSheet, checklistNotepad, ...YEARLY_LAYOUTS, coloringLettering];
+export const LAYOUTS: LayoutDefinition[] = [coverPage, dividerPage, todoNotepad, groceryNotepad, linedJournal, notesPage, blankPage, monthlyCalendar, weeklySpread, weeklyDeskPad, guidedPage, weeklyPlanMwgSpread, dailyPlanner, luxuryDailyExecution, dailyPlannerSheet, weeklyPlanSpread, meetingWithGodSpread, backCoverPage, ...STATIONERY_LAYOUTS, cardSheet, checklistNotepad, ...YEARLY_LAYOUTS, coloringLettering, devotionalMommy];
 
 export const FILLER_LAYOUT_ID = notesPage.id;
 /** Filler layout when the planner's filler kind is "blank". */

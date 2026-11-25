@@ -93,8 +93,17 @@ export function excerptFromVerse(excerpt: string, verse: string): boolean {
   return words(excerpt).length > 0;
 }
 
-/** The layout a scene's page uses. */
-export const sceneLayoutId = (b: CoverBrief) => (b.pageTypography.letterStyle === "bubble" && b.pageContent ? "coloring-lettering" : "guided-page");
+/**
+ * The brief as one page sees it: the page's own lettering (bubble or elegant) over the book's "Title and verse
+ * style". Saved pages without a choice of their own use the book's, as before.
+ */
+export function sceneBrief(b: CoverBrief, s?: Scene): CoverBrief {
+  if (!s?.letterStyle || (b.pageTypography.letterStyle ?? "elegant") === s.letterStyle) return b;
+  return { ...b, pageTypography: { ...b.pageTypography, letterStyle: s.letterStyle === "bubble" ? "bubble" : undefined } };
+}
+
+/** The layout a scene's page uses (its own lettering, else the book's). */
+export const sceneLayoutId = (b: CoverBrief, s?: Scene) => (sceneBrief(b, s).pageTypography.letterStyle === "bubble" && b.pageContent ? "coloring-lettering" : "guided-page");
 
 export function verseLine(b: CoverBrief, s: Scene): string {
   const content = pageContentOf(b, s);
@@ -110,7 +119,10 @@ export function verseLine(b: CoverBrief, s: Scene): string {
 }
 
 /** The page's sections, in order: title and verse where the text placement puts them, the illustration area between. */
-export function pageBlocks(b: CoverBrief, s: Scene, withText = true): PromptBlock[] {
+export function pageBlocks(book: CoverBrief, s: Scene, withText = true): PromptBlock[] {
+  // The page's own lettering; "Text off": the words are already drawn into the art, so the page shows the picture alone.
+  const b = sceneBrief(book, s);
+  if (s.textOff && b.pageContent) withText = false;
   const t = b.pageTypography;
   const output = outputOf(b, s);
   const content = pageContentOf(b, s);
@@ -193,7 +205,7 @@ export function assembleColoringBook(b: CoverBrief, scenes: Scene[] = b.scenes, 
   const preset = SIZE_PRESETS.find((z) => z.unit === "in" && Math.min(z.short, z.long) === Math.min(page.trimW, page.trimH) && Math.max(z.short, z.long) === Math.max(page.trimW, page.trimH));
   const structure: BookStep[] = scenes.flatMap((s, i): BookStep[] => [
     {
-      kind: "step", id: `scene-${s.id}`, module: "custom", layoutId: sceneLayoutId(b), cadence: { type: "copies", count: 1 },
+      kind: "step", id: `scene-${s.id}`, module: "custom", layoutId: sceneLayoutId(b, s), cadence: { type: "copies", count: 1 },
       title: `Scene ${i + 1}: ${s.title}`, promptSet: { blocks: pageBlocks(b, s) },
     },
     // Each picture on its own sheet: the back stays blank (a one-page preview of a scene has no back).
@@ -237,7 +249,7 @@ export function illustrationPlacement(b: CoverBrief, s: Scene): ArtworkPlacement
   const exact = isPageCanvas(b, s.illustrationW, s.illustrationH);
   return {
     // Bubble letters: a fitted picture sits at the bottom of its area, right against the words (no gap between them).
-    id: `art-${s.id}`, use: "background", assetId: s.illustrationId!, targets: [{ item: `scene-${s.id}` }], fit: "fit", crop: { x: 0.5, y: b.pageTypography.letterStyle === "bubble" ? 1 : 0.5, zoom: 1 }, opacity: 1,
+    id: `art-${s.id}`, use: "background", assetId: s.illustrationId!, targets: [{ item: `scene-${s.id}` }], fit: "fit", crop: { x: 0.5, y: sceneBrief(b, s).pageTypography.letterStyle === "bubble" ? 1 : 0.5, zoom: 1 }, opacity: 1,
     extent: exact ? "bleed" : "region", ...(exact ? {} : { region: artRegion(b, s).rect }),
   };
 }
