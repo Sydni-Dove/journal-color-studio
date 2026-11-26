@@ -143,9 +143,11 @@ export type LayoutOptions = {
   topBorder?: boolean;
   /**
    * Shade the margin beside each section that has a margin note: a pale band (the palette's
-   * decorHighlight) the height of the section, with the note inside it. Absent = no shading.
+   * decorHighlight) the height of the section, with the note inside it. "strip" = one continuous band
+   * down the margin, from the first section to the last and out to the page's outer edge (through any bleed), with
+   * each note level with its section. Absent = no shading.
    */
-  marginNoteShade?: boolean;
+  marginNoteShade?: boolean | "strip";
   /** Daily layout: ordered section keys. */
   dailySections: WordingKey[];
   /**
