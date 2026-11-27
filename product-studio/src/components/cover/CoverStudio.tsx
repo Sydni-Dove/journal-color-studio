@@ -15,6 +15,7 @@ import {
 } from "../../engines/cover/guides";
 import { AGE_GROUPS, ART_PLACEMENTS, ART_USES, CATEGORIES, CLEAR_AREAS, INTERIOR_KINDS, TYPOGRAPHY_CHOICES, categoryBlocker, categoryCreateBlocker, categoryPrompt, categoryTitle } from "../../engines/cover/categories";
 import { StepFooter, StepHeader, type StepDef } from "../editor/Steps";
+import { isPrompt, promptTitle, rememberPrompt } from "../../engines/prompts/library";
 import { createBlocker, handoffPrompt, paletteColors, promptBlocker, promptFor, summarizePalette } from "../../engines/cover/prompt";
 import { CHATGPT_HOME, launchChatGpt } from "../../engines/cover/launch";
 import { fmt, resolveCoverSpec, specLine } from "../../engines/cover/spec";
@@ -105,7 +106,7 @@ export function CoverStudio({ onBack, projects, loadProject, store = localCoverS
   const colors = paletteColors(brief);
 
   const copy = (text: string) =>
-    navigator.clipboard.writeText(text).then(() => say(TIPS.copied)).catch(() => say(TIPS.noCopy));
+    (isPrompt(text) && rememberPrompt(text, promptTitle(text), `Cover Studio · ${brief.title || brief.collection || "Untitled"}`), navigator.clipboard.writeText(text)).then(() => say(TIPS.copied)).catch(() => say(TIPS.noCopy));
   const needTitle = (): boolean => {
     if (!blocked) return false;
     say(blocked);

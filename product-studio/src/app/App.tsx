@@ -10,6 +10,8 @@ import { CoverStudio } from "../components/cover/CoverStudio";
 import { ColoringBookStudio } from "../components/coloringBook/ColoringBookStudio";
 import { LetteringStudio, type StudioPicture } from "../components/lettering/LetteringStudio";
 import { ArtFitStudio } from "../components/lettering/ArtFitStudio";
+import { MyPrompts } from "../components/prompts/MyPrompts";
+import { loadDraft, localCoverStore } from "../persistence/coverStore";
 import type { ColoringBook } from "../engines/coloringBook/book";
 import { localBookStore } from "../persistence/coloringBookStore";
 import { resolveColors } from "../presets/themes/palettes";
@@ -30,6 +32,7 @@ type View =
   | { kind: "coloring"; bookId: string | null }
   | { kind: "lettering" }
   | { kind: "fit" }
+  | { kind: "prompts" }
   /** `fromBook`: opened from a Coloring Book's export (its print step open; Back returns to the book). */
   | { kind: "edit"; project: ProductProject; fromBook?: string; startInExport?: boolean };
 
@@ -251,6 +254,21 @@ export function App() {
         <CoverStudio onBack={() => setView({ kind: "list" })} projects={projects} loadProject={(id) => store.load(id)} onCreateProject={open} onColoringBook={continueAsBook} />
       </>
     );
+  if (view.kind === "prompts")
+    return (
+      <>
+        {banner}
+        <MyPrompts
+          onBack={() => setView({ kind: "list" })}
+          books={localBookStore.list().flatMap((b) => localBookStore.load(b.id) ?? [])}
+          collections={[
+            ...localCoverStore.list().flatMap((c) => localCoverStore.load(c.id) ?? []),
+            // The Cover Studio draft in progress (when it isn't a saved collection already).
+            ...((d) => (d && !d.collectionId ? [{ schemaVersion: 1, id: "cover-draft", name: "Cover Studio draft", createdAt: d.updatedAt ?? "", updatedAt: d.updatedAt ?? "", brief: d.brief, items: d.items, direction: d.direction }] : []))(loadDraft()),
+          ]}
+        />
+      </>
+    );
   if (view.kind === "fit")
     return (
       <>
@@ -327,6 +345,7 @@ export function App() {
       onCovers={() => setView({ kind: "cover" })}
       onLettering={() => setView({ kind: "lettering" })}
       onFitArt={() => setView({ kind: "fit" })}
+      onPrompts={() => setView({ kind: "prompts" })}
       onColoringBook={(bookId) => setView({ kind: "coloring", bookId: bookId ?? null })}
       books={localBookStore.list()}
       key={`home-${itemsReceived}`}

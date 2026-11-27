@@ -2624,3 +2624,10 @@ button.family-card:focus-visible {
 .quick-step h3 { margin: 0; font-size: 15px; }
 .quick-step textarea { width: 100%; }
 .quick-count select { min-width: 80px; }
+.my-prompts .segmented { margin: 12px 0; }
+.prompt-group { border: 1px solid var(--ui-line); border-radius: 8px; padding: 8px 12px; margin: 8px 0; background: #fff; }
+.prompt-group > summary { cursor: pointer; padding: 4px 0; }
+.prompt-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+.prompt-item { display: grid; gap: 6px; border-top: 1px solid var(--ui-line); padding-top: 6px; }
+.prompt-item summary { cursor: pointer; }
+.prompt-item > .btn, .prompt-item > .row { justify-self: start; }

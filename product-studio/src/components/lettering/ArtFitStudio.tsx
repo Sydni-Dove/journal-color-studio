@@ -7,6 +7,7 @@
  */
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { borderPrompt, contentBox, cutEdges, detectFrame, fitArt, frameSvg, pageBoxes, redrawFrame, type Box, type Edge, type Frame, type Margins, type PageSpec } from "../../engines/artfit/fit";
+import { rememberPrompt } from "../../engines/prompts/library";
 import { download, readPixels } from "../../engines/lettering/browser";
 import { pagesOf, placeOnCopy } from "../../engines/lettering/place";
 import { getArtworkFile, importArtwork } from "../../engines/artwork/store";
@@ -163,7 +164,7 @@ export function ArtFitStudio({ onBack, projects, loadProject, pictures, onPlaced
                     <summary>Redraw a border inside the margins (Art Prompt for ChatGPT)</summary>
                     <p className="hint">This border isn't made of plain lines, so it can't be rebuilt from the part that's left. Paste this into ChatGPT with the image, then bring the new border back here.</p>
                     <pre className="cover-prompt" data-testid="fit-border-prompt">{borderPrompt(page, margins)}</pre>
-                    <button type="button" className="btn" onClick={() => void navigator.clipboard.writeText(borderPrompt(page, margins)).then(() => say("Copied."), () => say("Copy isn't available in this browser."))}>Copy the Art Prompt</button>
+                    <button type="button" className="btn" onClick={() => { rememberPrompt(borderPrompt(page, margins), "Redraw a border inside the margins", "Fit Art to Page"); void navigator.clipboard.writeText(borderPrompt(page, margins)).then(() => say("Copied."), () => say("Copy isn't available in this browser.")); }}>Copy the Art Prompt</button>
                   </details>
                 )}
               </div>

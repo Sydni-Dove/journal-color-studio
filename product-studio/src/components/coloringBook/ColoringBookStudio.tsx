@@ -7,6 +7,7 @@
 import { BUBBLE_FONT } from "../../layouts/book/coloringLettering";
 import { MOMMY_SCRIPT_FONT } from "../../layouts/book/devotionalMommy";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { isPrompt, promptTitle, rememberPrompt } from "../../engines/prompts/library";
 import { MOMMY_ME_IDEA } from "../../engines/coloringBook/spreadImport";
 import { DEFAULT_SPREAD, GIRL_1, bookFromCoverBrief, bookTitle, newBook, type BookStepId, type ColoringBook } from "../../engines/coloringBook/book";
 import { assembleCover, assembleInterior } from "../../engines/coloringBook/assembleBook";
@@ -101,7 +102,7 @@ function BookFlow({ initial, store, onBack, onExport, onLibrary }: { initial: Co
     window.clearTimeout(msgTimer.current);
     msgTimer.current = window.setTimeout(() => setMessage(null), 5000);
   };
-  const copy = (t: string) => navigator.clipboard.writeText(t).then(() => say("Copied to clipboard")).catch(() => say("Copy isn't available in this browser"));
+  const copy = (t: string) => (isPrompt(t) && rememberPrompt(t, promptTitle(t), `Coloring book · ${bookTitle(latest.current ?? book) || "Untitled"}`), navigator.clipboard.writeText(t)).then(() => say("Copied to clipboard")).catch(() => say("Copy isn't available in this browser"));
   const go = (s: BookStepId, sceneId?: string) => {
     setBookState((b) => ({ ...b, step: s, reached: Math.max(b.reached, ORDER.indexOf(s)) }));
     setOpenScene(sceneId ?? null);

@@ -3,7 +3,15 @@
 Read this first when picking up the work (any assistant or developer). Keep it current: update it in the same
 commit as any change to state, branches, rules or open decisions.
 
-_Last updated: 2026-11-25 — Quick book from an idea merged to `main` and live with Sydni's approval (Nov 25).  Bubble Lettering and Fit Art to Page merged to `main` and live with Sydni's approval (Nov 25).  Devotional Spread merged to `main` (fea7fe4) and live, with Sydni's approval (Nov 25). 2026-11-17 — Online saving for Cover Studio and Coloring Book on `claude/online-cover-studio` (new Supabase table + bucket created, with approval; app code not merged). Toolbar feedback on `claude/toolbar-feedback-six` (not merged). Earlier: Coloring Book on `claude/coloring-book-studio`; Phase 8 merged to `main` (89f054b) and live._
+_Last updated: 2026-11-27 — My Prompts on `claude/my-prompts` (preview, not merged). 2026-11-25 — Quick book from an idea merged to `main` and live with Sydni's approval (Nov 25).  Bubble Lettering and Fit Art to Page merged to `main` and live with Sydni's approval (Nov 25).  Devotional Spread merged to `main` (fea7fe4) and live, with Sydni's approval (Nov 25). 2026-11-17 — Online saving for Cover Studio and Coloring Book on `claude/online-cover-studio` (new Supabase table + bucket created, with approval; app code not merged). Toolbar feedback on `claude/toolbar-feedback-six` (not merged). Earlier: Coloring Book on `claude/coloring-book-studio`; Phase 8 merged to `main` (89f054b) and live._
+
+
+## My Prompts (2026-11-27, branch `claude/my-prompts` from main 132fbd3 — preview, not merged)
+
+The “My Prompts” button on the home page (top bar) opens `components/prompts/MyPrompts.tsx`, backed by `engines/prompts/library.ts`:
+- **From your books:** every prompt is rebuilt from every saved coloring book and Cover Studio collection, plus the unsaved Cover Studio draft. That covers the lessons prompt, cover artwork, character design sheet, every scene's artwork instructions, both Art Prompts of every Devotional Spread, and Cover Studio design prompts. You can download all (.txt), one book's prompts (.txt), or copy them.
+- **Used before:** every prompt sent to ChatGPT (`launchChatGpt` records it) or copied (the Coloring Book and Cover Studio `copy`, prompts of 150+ characters; the Fit Art border prompt) is kept word for word, newest first. They are kept on this device in localStorage (`dove-product-studio:v1:prompt-history`, last 500, duplicates moved to the top), not synced online. The list starts from this release; earlier uses are covered by “From your books”.
+- **Verified:** 1,870 unit tests (8 new in tests/my-prompts.test.ts) and 209 browser tests (tests/browser/my-prompts.browser.ts) pass.
 
 
 ## Quick book from an idea (2026-11-25, branch `claude/quick-spread-book`; merged to `main` and live with Sydni's approval)

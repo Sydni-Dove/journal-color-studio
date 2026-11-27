@@ -8,6 +8,8 @@
  * The parameter is ChatGPT's, not an API: it can change. So the studio always keeps the copy-and-paste way next to it, copies the
  * prompt as a backup when it launches, and says what to do when the box comes up empty.
  */
+import { promptTitle, rememberPrompt } from "../prompts/library";
+
 export const CHATGPT_HOME = "https://chatgpt.com/";
 
 /** The longest address the launch uses. Longer prompts are not put in an address (browsers, proxies and ChatGPT cut long ones). */
@@ -27,6 +29,8 @@ export type LaunchResult = "launched" | "too-long" | "blocked";
  * "blocked": the browser refused the new tab.
  */
 export function launchChatGpt(message: string, open: (url: string, target: string) => Window | null): LaunchResult {
+  // Every prompt sent to ChatGPT is kept in My Prompts, as it was sent.
+  rememberPrompt(message, promptTitle(message), "Sent to ChatGPT");
   const direct = fitsInAddress(message);
   const w = open(direct ? chatgptPromptUrl(message) : CHATGPT_HOME, "_blank");
   if (!w) return "blocked";

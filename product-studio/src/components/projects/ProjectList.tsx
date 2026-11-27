@@ -23,6 +23,8 @@ type Props = {
   onLettering?: () => void;
   /** Fit Art to Page: any art scaled and centred inside the page margins. */
   onFitArt?: () => void;
+  /** My Prompts: every ChatGPT prompt made, to copy or download again. */
+  onPrompts?: () => void;
   /** Coloring Book: the complete coloring-book workflow (a saved book by id, or the book list). */
   onColoringBook?: (bookId?: string) => void;
   /** Saved coloring books, newest first. */
@@ -165,7 +167,7 @@ function describe(p: ProjectSummary, m: ProjectMeta): string {
   return `${type} · ${size}${pages}`;
 }
 
-export function ProjectList({ projects, meta, onStart, onGenerate, onCovers, onLettering, onFitArt, onColoringBook, books = [], onOpen, onDuplicate, onDuplicateAsVariant, onDelete, now, account }: Props) {
+export function ProjectList({ projects, meta, onStart, onGenerate, onCovers, onLettering, onFitArt, onPrompts, onColoringBook, books = [], onOpen, onDuplicate, onDuplicateAsVariant, onDelete, now, account }: Props) {
   const metas = useMemo(() => new Map(projects.map((p) => [p.id, meta(p.id)])), [projects, meta]);
   const recent = projects.slice(0, RECENT);
   const hasProjects = projects.length > 0;
@@ -181,6 +183,7 @@ export function ProjectList({ projects, meta, onStart, onGenerate, onCovers, onL
         <button className="btn btn--primary" onClick={() => onStart()}>New product</button>
         {onGenerate && <button className="btn" onClick={onGenerate}>Generate with AI</button>}
         {onCovers && <button className="btn" onClick={onCovers}>Cover Studio</button>}
+        {onPrompts && <button className="btn" onClick={onPrompts} data-testid="open-my-prompts">My Prompts</button>}
       </header>
       <div className="page-shell home">
         <section className="home-hero">
